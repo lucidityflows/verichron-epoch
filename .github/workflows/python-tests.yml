@@ -17,6 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://verichron_ci:verichron_ci@localhost:5432/verichron_ci
+      # Separate name on purpose: the postgres test backend TRUNCATEs tables,
+      # so it only ever reads this, never DATABASE_URL (libs/testing/testing/pg_real.py).
+      TEST_DATABASE_URL: postgresql://verichron_ci:verichron_ci@localhost:5432/verichron_ci
     services:
       postgres:
         image: postgres:16
@@ -70,5 +73,6 @@ jobs:
         # testpaths / norecursedirs already scoped correctly in root
         # pyproject.toml ([tool.pytest.ini_options]): packages, scripts,
         # apps; iLEAPP/node_modules/.venv/dist/.git/infra excluded. The
-        # transaction-boundary tests currently use PgDouble; PostgreSQL
-        # integration coverage will be added alongside the evidence schema.
+        # transaction-boundary suites (test_db_writer.py,
+        # test_extractor_ingest_atomicity.py) run every test twice: once on
+        # PgDouble, once on the postgres service above via TEST_DATABASE_URL.
