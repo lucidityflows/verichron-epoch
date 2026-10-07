@@ -13,7 +13,7 @@ import {
 } from "@verichron/contracts";
 
 import { parseFlags, type Config } from "./utils/cli.js";
-import { pathExists, writeMarker } from "./utils/fs.js";
+import { pathExists, writeFileAtomic, writeMarker } from "./utils/fs.js";
 import { hashTree } from "./utils/manifest.js";
 import { discoverMvtBin } from "./utils/resolver.js";
 import { repairDecrypted } from "./utils/repair.js";
@@ -319,32 +319,38 @@ async function readRepairFailures(p: string): Promise<string[]> {
  * Runs every time rather than skipping when a manifest exists: an existing
  * manifest says nothing about whether the tree changed since. The stat cache
  * keeps an unchanged tree cheap; --verify re-reads every byte.
+ *
+ * Publish order is what keeps the sidecar trustworthy across crashes: the
+ * manifest goes to a content-addressed path first (never overwritten in
+ * place), then the sidecar is atomically replaced to point at it. At every
+ * instant the sidecar on disk names a root whose manifest exists and matches.
  */
 async function hashBackup(cfg: Config, name: string, src: string): Promise<void> {
   const paths = deriveEvidencePath(cfg.workspace, name);
   const result = await hashTree(src, { cachePath: paths.fingerprints, verify: cfg.verify });
 
-  await fsp.mkdir(path.dirname(paths.manifest), { recursive: true });
-  await fsp.writeFile(paths.manifest, result.manifest);
+  const manifestPath = paths.manifestFor(result.contentRoot);
+  await writeFileAtomic(manifestPath, result.manifest);
 
   const sidecar = EvidenceSidecar.parse({
     schema_version: 1,
     evidence_name: name,
     algorithm: "sha256",
     content_root: result.contentRoot,
-    manifest_path: path.relative(cfg.workspace, paths.manifest).split(path.sep).join("/"),
+    manifest_path: path.relative(cfg.workspace, manifestPath).split(path.sep).join("/"),
     file_count: result.fileCount,
     total_bytes: result.totalBytes,
     source_path: path.resolve(src),
     hashed_at: new Date().toISOString(),
     tool: { name: "mvt-runner", version: TOOL_VERSION },
   });
-  await fsp.mkdir(path.dirname(paths.sidecar), { recursive: true });
-  await fsp.writeFile(paths.sidecar, JSON.stringify(sidecar, null, 2) + "\n");
+  await writeFileAtomic(paths.sidecar, JSON.stringify(sidecar, null, 2) + "\n");
 
+  // Must start with "done": apps/epoch's mvtLogParser only completes a stage
+  // on a "[stage] done..." (or skip) line.
   console.log(
-    `  [hash]    ${result.fileCount} files (${result.hashed} hashed, ${result.reused} cached)` +
-      ` root ${result.contentRoot} -> ${paths.sidecar}`
+    `  [hash]    done -> ${paths.sidecar}` +
+      ` (${result.fileCount} files, ${result.hashed} hashed, ${result.reused} cached, root ${result.contentRoot})`
   );
 }
 
