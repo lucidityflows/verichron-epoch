@@ -7,17 +7,13 @@ import { spawn } from "node:child_process";
 import {
   discoverBackups,
   BACKUP_SEARCH_MAX_DEPTH,
-  CHECK_MARKER,
-  DECRYPT_MARKER,
   deriveEvidencePath,
   EvidenceSidecar,
-  readDerivativeMarker,
-  renderDerivativeMarker,
   type Backup,
 } from "@verichron/contracts";
 
 import { parseFlags, type Config } from "./utils/cli.js";
-import { pathExists, writeFileAtomic, writeMarker } from "./utils/fs.js";
+import { pathExists, writeMarker } from "./utils/fs.js";
 import { hashTree } from "./utils/manifest.js";
 import { discoverMvtBin } from "./utils/resolver.js";
 import { repairDecrypted } from "./utils/repair.js";
@@ -128,9 +124,8 @@ async function run(cfg: Config): Promise<void> {
     const src = backup.path;
     console.log(`=== ${name} ===`);
 
-    let contentRoot: string;
     try {
-      contentRoot = await hashBackup(cfg, name, src);
+      await hashBackup(cfg, name, src);
     } catch (err) {
       console.error(`  [hash] error: ${err instanceof Error ? err.message : err}`);
       failedBackups.add(name);
@@ -138,31 +133,11 @@ async function run(cfg: Config): Promise<void> {
     }
 
     const decDir = path.join(cfg.workspace, "decrypted", name);
-    const decMarker = path.join(decDir, DECRYPT_MARKER);
-    const resDir = path.join(cfg.workspace, "results", name);
+    const decMarker = path.join(decDir, ".mvt_decrypted_ok");
     let decryptRan = false;
-    // The decrypt is reusable only if it was made from the backup as it is
-    // now: its marker records the content_root it came from (EPOCH-404).
-    const previousDecrypt = readDerivativeMarker(decDir, DECRYPT_MARKER);
-    const decryptIsCurrent = previousDecrypt?.content_root === contentRoot;
-    if (!cfg.forceDecrypt && decryptIsCurrent) {
+    if (!cfg.forceDecrypt && (await pathExists(decMarker))) {
       console.log("  [decrypt] already done, skipping");
     } else {
-      if (!decryptIsCurrent && (await pathExists(decDir))) {
-        // A decrypt (and the results built on it) from a different version
-        // of this backup, or with no provenance: remove both so no stale
-        // file can survive into the new decrypt.
-        console.log("  [decrypt] the backup changed since its last decrypt; clearing the stale decrypt and results");
-        await fsp.rm(decDir, { recursive: true, force: true });
-        await fsp.rm(resDir, { recursive: true, force: true });
-      }
-      // Withdraw every marker that vouches for this decrypt BEFORE touching
-      // it. A decrypt that dies part-way (e.g. --force-decrypt over an
-      // existing copy) must not leave a valid marker in front of half-written
-      // files; only a decrypt that completes recreates them below.
-      await fsp.rm(decMarker, { force: true });
-      await fsp.rm(path.join(decDir, ".mvt_repaired_ok"), { force: true });
-      await fsp.rm(path.join(resDir, CHECK_MARKER), { force: true });
       // Bounded retry loop: a wrong password re-prompts up to
       // MAX_PASSWORD_ATTEMPTS times before this backup is given up on and
       // recorded as failed. Any non-password decrypt failure breaks out
@@ -224,33 +199,7 @@ async function run(cfg: Config): Promise<void> {
 
       if (!decrypted) continue; // move to the next backup; this one is recorded in failedBackups
 
-      // The marker attributes this decrypt to `contentRoot`, hashed before
-      // decrypt-backup read the source. Confirm the source still hashes to it
-      // (cheap: unchanged files hit the stat cache); if the backup changed
-      // in between, the decrypt may be of a different version, so it gets no
-      // marker and registration will refuse it.
-      let recheck: Awaited<ReturnType<typeof hashTree>>;
-      try {
-        recheck = await hashTree(src, { cachePath: deriveEvidencePath(cfg.workspace, name).fingerprints });
-      } catch (err) {
-        // e.g. the source drive disconnected after decrypt-backup finished.
-        // The decrypt can't be attributed to a root, so it gets no marker;
-        // this backup is failed and the rest still run, as with the first hash.
-        console.error(
-          `  [decrypt] error: could not re-check the backup after decrypting: ${err instanceof Error ? err.message : err}`
-        );
-        failedBackups.add(name);
-        continue;
-      }
-      if (recheck.contentRoot !== contentRoot) {
-        console.error(
-          "  [decrypt] error: the backup changed while it was being decrypted; re-run to re-hash and re-decrypt it"
-        );
-        failedBackups.add(name);
-        continue;
-      }
-
-      await writeFileAtomic(decMarker, renderDerivativeMarker(contentRoot));
+      await writeMarker(decMarker);
       decryptRan = true;
       console.log("  [decrypt] done");
     }
@@ -287,16 +236,13 @@ async function run(cfg: Config): Promise<void> {
       }
     }
 
-    const resMarker = path.join(resDir, CHECK_MARKER);
-    const forceCheck =
-      cfg.force || decryptRan || readDerivativeMarker(resDir, CHECK_MARKER)?.content_root !== contentRoot;
-    if (!forceCheck) {
+    const resDir = path.join(cfg.workspace, "results", name);
+    const resMarker = path.join(resDir, ".mvt_check_ok");
+    const forceCheck = cfg.force || decryptRan;
+    if (!forceCheck && (await pathExists(resMarker))) {
       console.log("  [check]   already done, skipping");
     } else {
       const logPath = path.join(cfg.workspace, "logs", `${name}.log`);
-      // Same rule as the decrypt: no marker vouches for results while
-      // check-backup is rewriting them.
-      await fsp.rm(resMarker, { force: true });
       try {
         await checkBackup(cfg, decDir, resDir, logPath);
       } catch (err) {
@@ -304,7 +250,7 @@ async function run(cfg: Config): Promise<void> {
         failedBackups.add(name);
         continue;
       }
-      await writeFileAtomic(resMarker, renderDerivativeMarker(contentRoot));
+      await writeMarker(resMarker);
       console.log("  [check]   done ->", resDir);
     }
     console.log();
@@ -315,7 +261,7 @@ async function run(cfg: Config): Promise<void> {
     backups.map(async (backup) => ({
       label: backup.label,
       success: !failedBackups.has(backup.label),
-      decrypted: await pathExists(path.join(cfg.workspace, "decrypted", backup.label, DECRYPT_MARKER)),
+      decrypted: await pathExists(path.join(cfg.workspace, "decrypted", backup.label, ".mvt_decrypted_ok")),
     }))
   );
   await fsp.writeFile(
@@ -373,40 +319,33 @@ async function readRepairFailures(p: string): Promise<string[]> {
  * Runs every time rather than skipping when a manifest exists: an existing
  * manifest says nothing about whether the tree changed since. The stat cache
  * keeps an unchanged tree cheap; --verify re-reads every byte.
- *
- * Publish order is what keeps the sidecar trustworthy across crashes: the
- * manifest goes to a content-addressed path first (never overwritten in
- * place), then the sidecar is atomically replaced to point at it. At every
- * instant the sidecar on disk names a root whose manifest exists and matches.
  */
-async function hashBackup(cfg: Config, name: string, src: string): Promise<string> {
+async function hashBackup(cfg: Config, name: string, src: string): Promise<void> {
   const paths = deriveEvidencePath(cfg.workspace, name);
   const result = await hashTree(src, { cachePath: paths.fingerprints, verify: cfg.verify });
 
-  const manifestPath = paths.manifestFor(result.contentRoot);
-  await writeFileAtomic(manifestPath, result.manifest);
+  await fsp.mkdir(path.dirname(paths.manifest), { recursive: true });
+  await fsp.writeFile(paths.manifest, result.manifest);
 
   const sidecar = EvidenceSidecar.parse({
     schema_version: 1,
     evidence_name: name,
     algorithm: "sha256",
     content_root: result.contentRoot,
-    manifest_path: path.relative(cfg.workspace, manifestPath).split(path.sep).join("/"),
+    manifest_path: path.relative(cfg.workspace, paths.manifest).split(path.sep).join("/"),
     file_count: result.fileCount,
     total_bytes: result.totalBytes,
     source_path: path.resolve(src),
     hashed_at: new Date().toISOString(),
     tool: { name: "mvt-runner", version: TOOL_VERSION },
   });
-  await writeFileAtomic(paths.sidecar, JSON.stringify(sidecar, null, 2) + "\n");
+  await fsp.mkdir(path.dirname(paths.sidecar), { recursive: true });
+  await fsp.writeFile(paths.sidecar, JSON.stringify(sidecar, null, 2) + "\n");
 
-  // Must start with "done": apps/epoch's mvtLogParser only completes a stage
-  // on a "[stage] done..." (or skip) line.
   console.log(
-    `  [hash]    done -> ${paths.sidecar}` +
-      ` (${result.fileCount} files, ${result.hashed} hashed, ${result.reused} cached, root ${result.contentRoot})`
+    `  [hash]    ${result.fileCount} files (${result.hashed} hashed, ${result.reused} cached)` +
+      ` root ${result.contentRoot} -> ${paths.sidecar}`
   );
-  return result.contentRoot;
 }
 
 /**

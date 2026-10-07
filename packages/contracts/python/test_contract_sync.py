@@ -251,3 +251,35 @@ def test_load_schema_returns_an_independent_copy():
     first = load_schema()
     first["properties"]["source_type"]["enum"].append("mutated")
     assert "mutated" not in load_schema()["properties"]["source_type"]["enum"]
+
+# --------------------------------------------------------------------------
+# Evidence sidecar (EPOCH-401). The Zod half of this check, plus Zod/JSON
+# Schema field parity, lives in apps/mvt-runner/src/utils/manifest.test.ts.
+# --------------------------------------------------------------------------
+
+SIDECAR_SCHEMA = CONTRACTS_DIR / "evidence-sidecar.schema.json"
+SIDECAR_EXAMPLE = CONTRACTS_DIR / "evidence-sidecar.example.json"
+
+
+def test_evidence_sidecar_example_validates_against_the_json_schema():
+    jsonschema = pytest.importorskip("jsonschema")
+    jsonschema.validate(json.loads(SIDECAR_EXAMPLE.read_text()), json.loads(SIDECAR_SCHEMA.read_text()))
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"smuggled": True},
+        {"content_root": "not-a-sha256"},
+        {"algorithm": "md5"},
+        {"file_count": -1},
+    ],
+    ids=["extra-field", "bad-root", "wrong-algorithm", "negative-count"],
+)
+def test_evidence_sidecar_schema_rejects_invalid_sidecars(mutation):
+    jsonschema = pytest.importorskip("jsonschema")
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            {**json.loads(SIDECAR_EXAMPLE.read_text()), **mutation},
+            json.loads(SIDECAR_SCHEMA.read_text()),
+        )

@@ -19,14 +19,6 @@ export type { Backup } from "./ts/discoverBackups.js";
 export { deriveResultsPath } from './ts/deriveResultsPath.js';
 export { deriveEvidencePath } from './ts/deriveEvidencePath.js';
 export { EvidenceSidecar } from './ts/evidenceSidecar.js';
-export { contractVersion, CONTRACT_SCHEMAS } from './ts/contractVersion.js';
-export {
-  DECRYPT_MARKER,
-  CHECK_MARKER,
-  DerivativeMarker,
-  readDerivativeMarker,
-  renderDerivativeMarker,
-} from './ts/derivativeMarker.js';
 export { SourceType, isSourceType } from './ts/sourceType'
 export type { SourceType as SourceTypeValue } from './ts/sourceType'
 export { loadRootEnv, resolveDatabaseUrl } from './ts/env.js';
