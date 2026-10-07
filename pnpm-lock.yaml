@@ -167,8 +167,8 @@ importers:
         specifier: ^4.7.0
         version: 4.7.0(vite@5.4.21(@types/node@24.13.3)(lightningcss@1.32.0)(terser@5.51.2))
       electron:
-        specifier: 44.7.0
-        version: 44.7.0
+        specifier: 44.0.0
+        version: 44.0.0
       eslint:
         specifier: ^10.9.1
         version: 10.9.1(jiti@2.7.0)
@@ -258,10 +258,6 @@ importers:
         version: 6.0.3
 
   packages/etl-db-reader:
-    dependencies:
-      '@verichron/contracts':
-        specifier: workspace:*
-        version: link:../contracts
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -275,9 +271,6 @@ importers:
       pg:
         specifier: 'catalog:'
         version: 8.23.0
-      tsx:
-        specifier: 'catalog:'
-        version: 4.23.12
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -300,9 +293,6 @@ importers:
       pg:
         specifier: 'catalog:'
         version: 8.23.0
-      tsx:
-        specifier: 'catalog:'
-        version: 4.23.12
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -505,7 +495,7 @@ packages:
     engines: {node: '>=22.12.0'}
 
   '@electron/node-gyp@https://codeload.github.com/electron/node-gyp/tar.gz/06b29aafb7708acef8b3669835c8a7857ebc92d2':
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/electron/node-gyp/tar.gz/06b29aafb7708acef8b3669835c8a7857ebc92d2}
+    resolution: {gitHosted: true, integrity: sha512-MXgzlTDEEndJB3TBbvd5uFQO/8gaINo1Hfen8vef5rq/VHVPeB63uuv/uO5+8GFsAJ/rauu6XB79S6K4+aXc+w==, tarball: https://codeload.github.com/electron/node-gyp/tar.gz/06b29aafb7708acef8b3669835c8a7857ebc92d2}
     version: 10.2.0-electron.1
     engines: {node: '>=12.13.0'}
     hasBin: true
@@ -2341,8 +2331,8 @@ packages:
     resolution: {integrity: sha512-j9ETcBGJaXxAY/b6UBpR7LZfjdU4BAO+yvr4ifqHEdyuc3UNCy91PDGkWKY5UQ4coHNYfnwFggrqD6QPeFGAlg==}
     engines: {node: '>=8.0.0'}
 
-  electron@44.7.0:
-    resolution: {integrity: sha512-aUq9/zLAAFYc+a9gy6cd0C3Y/N/RmovLCD8TV8LhIzNhuND6HEgsu96jJz9cbAxvckSPv+Trf2PKEjktoZgFkw==}
+  electron@44.0.0:
+    resolution: {integrity: sha512-FkTqPrFPZYljdPI5b7KORGsJTd6FgUQDefl5MrU3Xz9R87pAj9JLreIjDqcRN8hJIkFHIou0o8kKzvcpT9qiRQ==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -6384,7 +6374,7 @@ snapshots:
       - supports-color
     optional: true
 
-  electron@44.7.0:
+  electron@44.0.0:
     dependencies:
       '@electron-internal/extract-zip': 1.0.5
       '@electron/get': 5.1.0
