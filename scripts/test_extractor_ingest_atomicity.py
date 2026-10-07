@@ -32,13 +32,7 @@ import pytest
 
 import crash.main as crash_main
 import mvt_iocs.main as mvt_main
-from testing.pg_double import sqlite_supports_upsert_returning
 from testing.pg_real import BACKENDS, open_db
-
-pytestmark = pytest.mark.skipif(
-    not sqlite_supports_upsert_returning(),
-    reason="test double needs SQLite >= 3.35 for UPSERT ... RETURNING",
-)
 
 RUN_ID = "aaaaaaaa-0000-0000-0000-000000000000"
 RETRY_RUN_ID = "bbbbbbbb-0000-0000-0000-000000000000"
