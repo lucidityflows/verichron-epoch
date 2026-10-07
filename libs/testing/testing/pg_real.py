@@ -43,9 +43,8 @@ from typing import Any
 
 import psycopg2
 import psycopg2.extras
-import pytest
 
-from .pg_double import PgDouble
+from .pg_double import PgDouble, sqlite_supports_upsert_returning
 
 TEST_DATABASE_URL_ENV = "TEST_DATABASE_URL"
 
@@ -61,14 +60,20 @@ class PgReal:
         self._conn = psycopg2.connect(dsn)
         self.commits = 0
         self.rollbacks = 0
-        with self._conn.cursor() as cur:
-            cur.execute(f"TRUNCATE {', '.join(_TABLES)} RESTART IDENTITY CASCADE")
-            for run_id in run_ids:
-                cur.execute(
-                    "INSERT INTO pipeline_runs (run_id, backup_source) VALUES (%s, %s)",
-                    (run_id, "pytest"),
-                )
-        self._conn.commit()
+        try:
+            with self._conn.cursor() as cur:
+                cur.execute(f"TRUNCATE {', '.join(_TABLES)} RESTART IDENTITY CASCADE")
+                for run_id in run_ids:
+                    cur.execute(
+                        "INSERT INTO pipeline_runs (run_id, backup_source) VALUES (%s, %s)",
+                        (run_id, "pytest"),
+                    )
+            self._conn.commit()
+        except BaseException:
+            # open_db's try/finally only starts once this returns, so a failed
+            # setup must release the connection (and its locks) itself.
+            self._conn.close()
+            raise
 
     @property
     def encoding(self) -> str:
@@ -123,9 +128,15 @@ def open_db(backend: str, run_ids: Iterable[str]) -> Iterator[PgDouble | PgReal]
 
     The postgres backend skips locally when TEST_DATABASE_URL is unset, but
     fails in CI: a real-Postgres leg that silently skips is the same as not
-    having one.
+    having one. The SQLite version gate applies to the pgdouble leg only;
+    Postgres does not depend on it.
     """
+    # Imported here so `from testing import PgDouble` works without pytest.
+    import pytest
+
     if backend == "pgdouble":
+        if not sqlite_supports_upsert_returning():
+            pytest.skip("test double needs SQLite >= 3.35 for UPSERT ... RETURNING")
         conn: PgDouble | PgReal = PgDouble()
     else:
         dsn = os.environ.get(TEST_DATABASE_URL_ENV)

@@ -26,16 +26,10 @@ import pytest
 
 from db_writer import compute_file_hash, incomplete_ingests, ingest, write_records
 from normalized_record import NormalizedRecord, SourceType
-from testing.pg_double import sqlite_supports_upsert_returning
 from testing.pg_real import BACKENDS, open_db
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MIGRATION = REPO_ROOT / "packages" / "etl-db-writer" / "migrations" / "0002_ingest_completion.sql"
-
-pytestmark = pytest.mark.skipif(
-    not sqlite_supports_upsert_returning(),
-    reason="test double needs SQLite >= 3.35 for UPSERT ... RETURNING",
-)
 
 RUN_ID = "11111111-1111-1111-1111-111111111111"
 
