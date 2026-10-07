@@ -13,8 +13,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx --test '*.test.ts'"
+    "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "pg": "catalog:"
@@ -24,7 +23,6 @@
     "@types/pg": "catalog:",
     "pg": "catalog:",
     "typescript": "catalog:",
-    "dotenv": "catalog:",
-    "tsx": "catalog:"
+    "dotenv": "catalog:"
   }
 }
