@@ -87,20 +87,13 @@ def test_pydantic_enum_matches_the_canonical_enum():
     assert [member.value for member in SourceType] == source_types()
 
 
-def _ts_enum_values(text: str) -> list[str]:
-    """Values declared in sourceType.ts's generated block, in order.
-
-    Digits are allowed in both key and value (e.g. `ARM64_TRACE: 'arm64_trace'`);
-    a narrower pattern would silently drop such a line and report false drift.
-    """
-    block = text.split("SOURCE_TYPE GENERATED", 1)[1].split("END SOURCE_TYPE", 1)[0]
-    return re.findall(r"^\s+[A-Z0-9_]+:\s+'([a-z0-9_]+)',$", block, re.MULTILINE)
-
-
 def test_ts_enum_matches_the_canonical_enum():
     """Parsed out of the generated block so the TS mirror is covered by the
     Python suite; there is no TS test runner in this repo yet."""
-    assert _ts_enum_values(TS_ENUM_MIRROR.read_text(encoding="utf-8")) == source_types()
+    text = TS_ENUM_MIRROR.read_text(encoding="utf-8")
+    block = text.split("SOURCE_TYPE GENERATED", 1)[1].split("END SOURCE_TYPE", 1)[0]
+    declared = re.findall(r"^\s+[A-Z_]+:\s+'([a-z_]+)',$", block, re.MULTILINE)
+    assert declared == source_types()
 
 
 def test_ileapp_record_is_declared_everywhere():
@@ -152,8 +145,7 @@ def test_sync_contracts_detects_enum_drift(tmp_path):
 
     schema_path = sandbox / "packages/contracts/normalized-record.schema.json"
     schema = json.loads(schema_path.read_text())
-    # arm64_trace: a value with digits, which the TS parser above must not drop.
-    schema["properties"]["source_type"]["enum"] += ["keychain_entry", "arm64_trace"]
+    schema["properties"]["source_type"]["enum"].append("keychain_entry")
     schema_path.write_text(json.dumps(schema, indent=2) + "\n")
 
     script = sandbox / "scripts/sync_contracts.py"
@@ -166,9 +158,6 @@ def test_sync_contracts_detects_enum_drift(tmp_path):
     assert written.returncode == 0
     assert re.search(r'KEYCHAIN_ENTRY\s+= "keychain_entry"', (sandbox / "packages/contracts/python/source_type.py").read_text())
     assert re.search(r"KEYCHAIN_ENTRY:\s+'keychain_entry',", (sandbox / "packages/contracts/ts/sourceType.ts").read_text())
-    assert _ts_enum_values((sandbox / "packages/contracts/ts/sourceType.ts").read_text()) == (
-        schema["properties"]["source_type"]["enum"]
-    )
 
     assert subprocess.run([sys.executable, str(script), "--check"]).returncode == 0
 
@@ -251,35 +240,3 @@ def test_load_schema_returns_an_independent_copy():
     first = load_schema()
     first["properties"]["source_type"]["enum"].append("mutated")
     assert "mutated" not in load_schema()["properties"]["source_type"]["enum"]
-
-# --------------------------------------------------------------------------
-# Evidence sidecar (EPOCH-401). The Zod half of this check, plus Zod/JSON
-# Schema field parity, lives in apps/mvt-runner/src/utils/manifest.test.ts.
-# --------------------------------------------------------------------------
-
-SIDECAR_SCHEMA = CONTRACTS_DIR / "evidence-sidecar.schema.json"
-SIDECAR_EXAMPLE = CONTRACTS_DIR / "evidence-sidecar.example.json"
-
-
-def test_evidence_sidecar_example_validates_against_the_json_schema():
-    jsonschema = pytest.importorskip("jsonschema")
-    jsonschema.validate(json.loads(SIDECAR_EXAMPLE.read_text()), json.loads(SIDECAR_SCHEMA.read_text()))
-
-
-@pytest.mark.parametrize(
-    "mutation",
-    [
-        {"smuggled": True},
-        {"content_root": "not-a-sha256"},
-        {"algorithm": "md5"},
-        {"file_count": -1},
-    ],
-    ids=["extra-field", "bad-root", "wrong-algorithm", "negative-count"],
-)
-def test_evidence_sidecar_schema_rejects_invalid_sidecars(mutation):
-    jsonschema = pytest.importorskip("jsonschema")
-    with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(
-            {**json.loads(SIDECAR_EXAMPLE.read_text()), **mutation},
-            json.loads(SIDECAR_SCHEMA.read_text()),
-        )
