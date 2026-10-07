@@ -1,23 +1,11 @@
 import { parseArgs } from "node:util";
 import * as path from "node:path";
 import * as os from "node:os";
-import { fileURLToPath } from "node:url";
-
-// src/utils/ and dist/utils/ are both four levels below the repository root.
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-
-/**
- * mvt-ios from its own pinned environment, tools/mvt (EPOCH-458). It is never
- * looked up anywhere else, so every machine runs the same mvt version.
- */
-export const DEFAULT_MVT_BIN = path.join(REPO_ROOT, "tools", "mvt", ".venv", "bin", "mvt-ios");
 
 export interface Config {
   source: string;
   workspace: string;
   mvtBin: string;
-  /** mvt-ios's data and config home (its IOC folder lives here); see mvtEnv(). */
-  mvtHome: string;
   sqliteBin: string;
   force: boolean;
   forceDecrypt: boolean;
@@ -39,8 +27,7 @@ export function parseFlags(): Config {
     options: {
       source: { type: "string", default: "" },
       workspace: { type: "string", default: path.join(home, "mvt-workspace") },
-      "mvt-bin": { type: "string", default: DEFAULT_MVT_BIN },
-      "mvt-home": { type: "string", default: defaultMvtHome() },
+      "mvt-bin": { type: "string", default: path.join(home, "mvt", ".venv", "bin", "mvt-ios") },
       "sqlite-bin": { type: "string", default: "sqlite3" },
       force: { type: "boolean", default: false },
       "force-decrypt": { type: "boolean", default: false },
@@ -76,7 +63,6 @@ export function parseFlags(): Config {
     source: values.source as string,
     workspace: values.workspace as string,
     mvtBin: values["mvt-bin"] as string,
-    mvtHome: path.resolve(values["mvt-home"] as string),
     sqliteBin: values["sqlite-bin"] as string,
     force: values.force as boolean,
     forceDecrypt: values["force-decrypt"] as boolean,
@@ -88,27 +74,13 @@ export function parseFlags(): Config {
   };
 }
 
-/**
- * VERICHRON_MVT_HOME, else <XDG_DATA_HOME or ~/.local/share>/verichron/mvt.
- * Owned by mvt-runner: mvt-ios's MVT_DATA_FOLDER and MVT_CONFIG_FOLDER point
- * inside it, so the IOC set it records is the one mvt-ios loads.
- */
-function defaultMvtHome(): string {
-  if (process.env.VERICHRON_MVT_HOME) return process.env.VERICHRON_MVT_HOME;
-  const dataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share");
-  return path.join(dataHome, "verichron", "mvt");
-}
-
 function printUsage() {
   console.error(`Usage: mvt-runner --source <dir> [options]
 
 Options:
   --source <dir>          directory containing backup subdirectories (required)
   --workspace <dir>        workspace directory for evidence/decrypted/results (default: ./mvt-workspace)
-  --mvt-bin <path>         path to mvt-ios binary (default: <repo-root>/tools/mvt/.venv/bin/mvt-ios,
-                           the pinned environment "mise run setup" creates)
-  --mvt-home <dir>         mvt-ios data/config home; IOCs are kept and hashed here only
-                           (default: $VERICHRON_MVT_HOME or ~/.local/share/verichron/mvt)
+  --mvt-bin <path>         path to mvt-ios binary (default: <repo-root>/.venv/bin/mvt-ios or your active mvt venv)
   --sqlite-bin <path>      path to sqlite3 binary used for repairing malformed DBs (default: "sqlite3" on PATH)
   --force                  re-run check-backup even if already done (does NOT touch decrypt/repair state)
   --force-decrypt          re-run decrypt-backup, repair, and check-backup even if already done
