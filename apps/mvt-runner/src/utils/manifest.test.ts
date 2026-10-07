@@ -14,7 +14,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { after, before, describe, it } from "node:test";
 
-import { EvidenceSidecar } from "@verichron/contracts";
+import { deriveEvidencePath, EvidenceSidecar } from "@verichron/contracts";
 
 import { writeFileAtomic } from "./fs.js";
 import {
@@ -155,6 +155,15 @@ describe("verifyManifest", () => {
     });
   });
 
+  it("a second on-disk spelling of a listed name fails verification", async () => {
+    if (process.platform === "darwin") return; // APFS can't hold both names
+    const root = await freshTree("verify-twin");
+    const { manifest } = await hashTree(root);
+    // Identical bytes under the NFD spelling: same canonical path, same hash.
+    await fsp.writeFile(path.join(root, "cafe\u0301.txt"), GOLDEN_FILES["caf\u00e9.txt"]);
+    await assert.rejects(verifyManifest(root, manifest), /normalize to the same canonical path/);
+  });
+
   it("rejects a malformed manifest instead of skipping lines", async () => {
     await assert.rejects(verifyManifest(tmp, "not a manifest line\n"), /malformed manifest line/);
   });
@@ -244,6 +253,20 @@ describe("stat-fingerprint cache", () => {
     assert.equal(second.contentRoot, first.contentRoot);
   });
 
+  it("a file dated before 1970 stays cached (negative mtime)", async () => {
+    const root = await freshTree("pre-epoch");
+    const old = new Date("1960-01-01T00:00:00Z");
+    await fsp.utimes(path.join(root, "a.txt"), old, old);
+    const cachePath = path.join(tmp, "pre-epoch.fingerprints.json");
+
+    await hashTree(root, { cachePath });
+    const cache = JSON.parse(await fsp.readFile(cachePath, "utf8"));
+    assert.match(cache.entries["a.txt"].mtimeNs, /^-\d+$/, "fixture really has a negative mtime");
+
+    const second = await hashTree(root, { cachePath });
+    assert.deepEqual([second.hashed, second.reused], [0, 7]);
+  });
+
   it("a corrupt cache file costs a re-hash, never a failure", async () => {
     const root = await freshTree("corrupt-cache");
     const cachePath = path.join(tmp, "corrupt.fingerprints.json");
@@ -274,6 +297,19 @@ describe("writeFileAtomic", () => {
     await assert.rejects(writeFileAtomic(blocked, "partial\n"));
     assert.equal(await fsp.readFile(existing, "utf8"), "valid\n");
     assert.deepEqual((await fsp.readdir(dir)).sort(), ["blocked", "sidecar.json"]);
+  });
+});
+
+describe("evidence paths", () => {
+  it("a 255-byte label (the filename limit) still gets writable evidence files", async () => {
+    const label = "L".repeat(255);
+    const paths = deriveEvidencePath(path.join(tmp, "ws"), label);
+    const root = "0".repeat(64);
+    for (const file of [paths.sidecar, paths.fingerprints, paths.manifestFor(root)]) {
+      assert.equal(path.relative(paths.dir, file).includes(label), false, "label is not part of any file name");
+      await writeFileAtomic(file, "x\n");
+    }
+    assert.deepEqual((await fsp.readdir(paths.dir)).sort(), ["fingerprints.json", "manifests", "sidecar.json"]);
   });
 });
 

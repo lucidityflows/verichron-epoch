@@ -106,7 +106,8 @@ function isFingerprint(value: unknown): value is Fingerprint {
   return (
     typeof v.sha256 === "string" && SHA256_RE.test(v.sha256) &&
     typeof v.size === "string" && DIGITS_RE.test(v.size) &&
-    typeof v.mtimeNs === "string" && DIGITS_RE.test(v.mtimeNs) &&
+    // mtime can be negative: files dated before 1970 are valid evidence.
+    typeof v.mtimeNs === "string" && /^-?\d+$/.test(v.mtimeNs) &&
     typeof v.ino === "string" && DIGITS_RE.test(v.ino)
   );
 }
@@ -233,6 +234,11 @@ export async function verifyManifest(root: string, manifest: string): Promise<Ve
 
   for await (const absolute of walkFiles(root)) {
     const rel = canonicalPath(path.relative(root, absolute));
+    if (seen.has(rel)) {
+      // Same rule as renderManifest: a second on-disk spelling of a listed
+      // name must not hide behind the first and pass verification.
+      throw new Error(`two files normalize to the same canonical path: ${rel}`);
+    }
     seen.add(rel);
     const want = expected.get(rel);
     if (want === undefined) {

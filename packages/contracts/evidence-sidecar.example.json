@@ -3,7 +3,7 @@
   "evidence_name": "00008030-001A2B3C4D5E6F70",
   "algorithm": "sha256",
   "content_root": "2e6be9112ddc57ae61fea2201190ed45b18c70dced9b3de1b50cb953dff2e32a",
-  "manifest_path": "hashes/00008030-001A2B3C4D5E6F70.2e6be9112ddc57ae61fea2201190ed45b18c70dced9b3de1b50cb953dff2e32a.sha256",
+  "manifest_path": "evidence/00008030-001A2B3C4D5E6F70/manifests/2e6be9112ddc57ae61fea2201190ed45b18c70dced9b3de1b50cb953dff2e32a.sha256",
   "file_count": 7,
   "total_bytes": 288,
   "source_path": "/evidence/backups/00008030-001A2B3C4D5E6F70",
