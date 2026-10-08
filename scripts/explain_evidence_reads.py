@@ -87,11 +87,11 @@ def _seed(cur) -> None:
             """
             INSERT INTO forensic_records (ingest_id, evidence_id, source_type, event_time, process_name, fields)
             SELECT i.ingest_id, i.evidence_id,
-                   CASE WHEN n % 2000 = 0 THEN 'mvt_ioc_detection'
-                        WHEN n % 2000 = 1000 THEN 'timestamp_anomaly'
+                   CASE WHEN n %% 2000 = 0 THEN 'mvt_ioc_detection'
+                        WHEN n %% 2000 = 1000 THEN 'timestamp_anomaly'
                         ELSE 'crash_report' END,
                    timestamptz '2024-01-01' + (n * interval '10 seconds'),
-                   'proc_' || (n % 50),
+                   'proc_' || (n %% 50),
                    '{}'::jsonb
             FROM ingested_files i
             CROSS JOIN LATERAL generate_series(1, %s) r
