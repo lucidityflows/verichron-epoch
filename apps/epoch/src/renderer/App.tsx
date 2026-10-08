@@ -11,6 +11,9 @@ import { TooltipProvider } from './components/ui/Tooltip';
 import { useEpochStore } from './store/useEpochStore';
 import { runsApi } from './api/runs';
 
+function runPhase(run: PipelineRunRow): 'in_progress' | 'finished' {
+  return run.finished_at ? 'finished' : 'in_progress';
+}
 
 const IOC_SOURCE_TYPES = ['mvt_ioc_detection', 'timestamp_anomaly'] as const;
 
@@ -101,12 +104,6 @@ export const App: React.FC = () => {
   }, [setDbStatus, setRuns, setSelectedRun]);
 
   const loadRecords = async (run: PipelineRunRow) => {
-    if (!run.evidence_id) {
-      // Nothing to read; RecordsView says the evidence isn't registered.
-      setRecords([], 0);
-      setRecordsLoaded(true);
-      return;
-    }
     try {
       // First page only, with the true total (R25). RecordsView says when it
       // is showing less than everything; the paged, server-filtered grid is
@@ -140,7 +137,7 @@ export const App: React.FC = () => {
         <Sidebar active={section} onSelect={handleSectionSelect} dbStatus={dbStatus} />
 
         <div className="flex-1 flex flex-col min-w-0">
-          {selectedRun && <EvidenceTag run={selectedRun} />}
+          {selectedRun && <EvidenceTag run={selectedRun} phase={runPhase(selectedRun)} />}
 
           <div className="flex-1 overflow-auto p-8">
             {section === 'workspace' && (
@@ -171,7 +168,6 @@ export const App: React.FC = () => {
                 records={visibleRecords}
                 loadedCount={records.length}
                 totalCount={recordsTotal}
-                evidenceRegistered={!!selectedRun?.evidence_id}
                 availableSourceTypes={availableSourceTypes}
                 sourceTypeFilter={sourceTypeFilter}
                 onFilterChange={setSourceTypeFilter}

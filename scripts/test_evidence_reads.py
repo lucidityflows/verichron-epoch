@@ -36,10 +36,8 @@ OTHER_DERIVATIVE = "bbbb0000-0000-0000-0000-0000000000db"
 SEEDED = {EVIDENCE: DERIVATIVE, OTHER_EVIDENCE: OTHER_DERIVATIVE}
 
 
-def ctx(run_id: str = RUN_A, evidence_id: str = EVIDENCE, version: int = 1) -> IngestContext:
-    return IngestContext(
-        evidence_id=evidence_id, derivative_id=SEEDED[evidence_id], run_id=run_id, parser_version=version
-    )
+def ctx(run_id: str = RUN_A, evidence_id: str = EVIDENCE) -> IngestContext:
+    return IngestContext(evidence_id=evidence_id, derivative_id=SEEDED[evidence_id], run_id=run_id)
 
 
 @pytest.fixture(params=BACKENDS)
@@ -68,8 +66,8 @@ def current(db, evidence_id: str = EVIDENCE, view: str = "current_forensic_recor
 
 
 def write(db, path: Path, version: int, names: list[str], evidence_id: str = EVIDENCE) -> None:
-    shape = {"source_type": "crash_report", "payload_kind": "full"}
-    with ingest(db, ctx(evidence_id=evidence_id, version=version), path, **shape) as unit:
+    shape = {"source_type": "crash_report", "parser_version": version, "payload_kind": "full"}
+    with ingest(db, ctx(evidence_id=evidence_id), path, **shape) as unit:
         unit.write([record(n) for n in names])
 
 
@@ -196,118 +194,6 @@ def test_the_report_shows_the_same_facts_under_either_run(db, tmp_path):
     assert section_a == section_b
     for n in range(3):
         assert f"INCIDENT-{n}" in section_a
-
-
-def test_the_report_takes_its_evidence_from_the_run_when_not_given(db, tmp_path):
-    """The orchestrator doesn't pass --evidence-id until EPOCH-404; a run
-    with registered evidence must still get its facts."""
-    if not isinstance(db, PgReal):
-        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
-    from reporting.generate_report import generate_report
-
-    backup = tmp_path / "backup"
-    backup.mkdir()
-    (backup / "crash.ips").write_text(_valid_ips("INCIDENT-FROM-RUN"))
-    assert crash_main.run(db, ctx(RUN_A), str(backup)).failed == 0
-    with db.cursor() as cur:
-        cur.execute(
-            "UPDATE pipeline_runs SET evidence_id = %s, derivative_id = %s WHERE run_id = %s",
-            (EVIDENCE, DERIVATIVE, RUN_A),
-        )
-    db.commit()
-
-    out = tmp_path / "report.md"
-    generate_report(db._conn, RUN_A, None, str(out), None)
-    report = out.read_text()
-    assert f"`{EVIDENCE}`" in report
-    assert "INCIDENT-FROM-RUN" in _crash_section(report)
-
-
-def test_the_report_says_what_produced_each_derivative_the_run_read(db, tmp_path):
-    """EPOCH-406: "produced by mvt-ios X.Y, IOC set abc123, N files repaired"."""
-    if not isinstance(db, PgReal):
-        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
-    import json
-
-    from reporting.generate_report import generate_report
-
-    results = "aaaa0000-0000-0000-0000-0000000000eb"
-    repair = {
-        "status": "ran",
-        "tool": {"name": "sqlite3", "version": "3.45.1"},
-        "scanned": 12,
-        "repaired": 2,
-        "failed_files": ["HomeDomain/Library/SMS/sms.db"],
-        "preserved_originals": ["a.db.corrupt-1", "HomeDomain/Library/SMS/sms.db.corrupt-1"],
-    }
-    mvt = json.dumps({"name": "mvt-ios", "version": "2.6.1"})
-    with db.cursor() as cur:
-        cur.execute(
-            "UPDATE evidence_derivatives SET tool = %s, params = %s WHERE derivative_id = %s",
-            (mvt, json.dumps({"repair": repair}), DERIVATIVE),
-        )
-        cur.execute(
-            "INSERT INTO evidence_derivatives "
-            "(derivative_id, evidence_id, parent_derivative_id, kind, path, tool, params, provenance_key) "
-            "VALUES (%s, %s, %s, 'mvt_results', '/pytest/results', %s, %s, repeat('1', 64))",
-            (results, EVIDENCE, DERIVATIVE, mvt, json.dumps({"ioc_set_hash": "abc123" + "0" * 58, "ioc_file_count": 14})),
-        )
-        cur.execute(
-            "UPDATE pipeline_runs SET evidence_id = %s, derivative_id = %s WHERE run_id = %s",
-            (EVIDENCE, DERIVATIVE, RUN_A),
-        )
-        cur.execute(
-            "INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id) "
-            "VALUES (%s, 'mvt_iocs', 'succeeded', %s)",
-            (RUN_A, results),
-        )
-    db.commit()
-
-    # A detection filed by an earlier results set (an older IOC set): its
-    # alerts.json was ingested then, and that ingest still stands.
-    older = "aaaa0000-0000-0000-0000-0000000000ea"
-    with db.cursor() as cur:
-        cur.execute(
-            "INSERT INTO evidence_derivatives "
-            "(derivative_id, evidence_id, parent_derivative_id, kind, path, tool, params, provenance_key) "
-            "VALUES (%s, %s, %s, 'mvt_results', '/pytest/results-old', %s, %s, repeat('2', 64))",
-            (older, EVIDENCE, DERIVATIVE, mvt, json.dumps({"ioc_set_hash": "0ff0" + "0" * 60, "ioc_file_count": 9})),
-        )
-    db.commit()
-    alerts = tmp_path / "alerts.json"
-    alerts.write_text("[]")
-    old_pass = IngestContext(evidence_id=EVIDENCE, derivative_id=older, run_id=RUN_B, parser_version=1)
-    with ingest(db, old_pass, alerts, source_type="mvt_ioc_detection", payload_kind="full") as unit:
-        unit.write([NormalizedRecord(source_type=SourceType.MVT_IOC_DETECTION, fields={})])
-
-    out = tmp_path / "report.md"
-    generate_report(db._conn, RUN_A, None, str(out), None)
-    report = out.read_text()
-    section = report.split("## Provenance", 1)[1].split("---", 1)[0]
-    inputs, sources = section.split("### Where the facts in this report come from", 1)
-    assert "produced by mvt-ios 2.6.1; repair by sqlite3 3.45.1: 12 database(s) checked, 2 repaired" in inputs
-    assert "1 could not be fully recovered, 2 original(s) preserved" in inputs
-    assert "not fully recovered: `HomeDomain/Library/SMS/sms.db`" in inputs
-    assert "**mvt results** (`/pytest/results`): produced by mvt-ios 2.6.1, IOC set `abc123000000` (14 file(s))" in inputs
-    assert "/pytest/results-old" not in inputs, "this run did not read the older results set"
-    assert (
-        "**mvt results** (`/pytest/results-old`): produced by mvt-ios 2.6.1, IOC set `0ff000000000` (9 file(s))"
-        " — 1 record(s); **from an earlier pass, not an input of this run**"
-    ) in sources
-
-
-def test_a_run_without_evidence_gets_a_report_that_says_so(db, tmp_path):
-    """No evidence read must not look like nothing found."""
-    if not isinstance(db, PgReal):
-        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
-    from reporting.generate_report import generate_report
-
-    out = tmp_path / "report.md"
-    generate_report(db._conn, RUN_B, None, str(out), None)
-    report = out.read_text()
-    assert "## No evidence registered" in report
-    assert "not the same as finding nothing" in report
-    assert "## Crash Reports" not in report
 
 
 # ==========================================================================

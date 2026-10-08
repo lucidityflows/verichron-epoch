@@ -43,9 +43,7 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
     setPivots([]);
     setPivotsLoaded(false);
     setPivotsError(null);
-    // No registered evidence means nothing to read -- shown as such below,
-    // never as "no matches".
-    if (!selectedRun?.evidence_id) return;
+    if (!selectedRun) return;
     runsApi
       .getCorrelationPivots(selectedRun.run_id)
       .then((rows) => {
@@ -93,10 +91,6 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
       <h2 className="font-display text-display text-accent mb-6">Indicator Matches</h2>
       {!selectedRun ? (
         <p className="text-muted-foreground text-data">Select an investigation first.</p>
-      ) : !selectedRun.evidence_id ? (
-        <p className="text-muted-foreground text-data">
-          This investigation's evidence isn't registered yet, so its facts haven't been read. This is not the same as finding nothing.
-        </p>
       ) : pivotsError ? (
         <p className="text-muted-foreground text-data">Could not load indicator matches: {pivotsError}</p>
       ) : !pivotsLoaded ? (

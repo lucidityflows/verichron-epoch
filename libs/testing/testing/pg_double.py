@@ -50,7 +50,7 @@ def sqlite_supports_upsert_returning() -> bool:
     return sqlite3.sqlite_version_info >= MIN_SQLITE_VERSION
 
 
-# The subset of the migrations (0001 to 0003) that the writers touch,
+# The subset of the migrations (0001 to 0004) that the writers and readers touch,
 # translated to SQLite types. The evidence tables are left out: their foreign
 # keys are certified on the real-Postgres test leg (R33), not here. Kept minimal on purpose: adding unused
 # columns here would imply coverage that does not exist.
@@ -95,6 +95,28 @@ CREATE TABLE forensic_records (
     fields          TEXT NOT NULL DEFAULT '{}',
     -- Same composite key as 0003: a record's evidence must be its unit's.
     FOREIGN KEY (ingest_id, evidence_id) REFERENCES ingested_files(ingest_id, evidence_id)
+);
+
+-- 0004's read views, same selection rules in SQLite's dialect.
+CREATE VIEW forensic_records_history AS
+SELECT f.id, f.ingest_id, f.evidence_id, i.derivative_id, i.file_hash, i.parser_version,
+       f.incident_id, f.source_type, f.event_time, f.bug_type, f.process_name,
+       f.pid, f.bundle_id, f.fields
+FROM forensic_records f
+JOIN ingested_files i ON i.ingest_id = f.ingest_id
+WHERE i.ingest_complete = 1;
+
+CREATE VIEW current_forensic_records AS
+SELECT h.*
+FROM forensic_records_history h
+JOIN ingested_files i ON i.ingest_id = h.ingest_id
+WHERE NOT EXISTS (
+    SELECT 1 FROM ingested_files newer
+    WHERE newer.evidence_id = i.evidence_id
+      AND newer.file_hash = i.file_hash
+      AND newer.source_type = i.source_type
+      AND newer.parser_version > i.parser_version
+      AND newer.ingest_complete = 1
 );
 """
 

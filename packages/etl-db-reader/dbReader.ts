@@ -44,7 +44,6 @@
  * apps/reporting/generate_report.py can't disagree about them (R27).
  */
 
-import { deriveResultsPath } from '@verichron/contracts';
 import type { Client, Pool, PoolClient } from 'pg';
 
 type Db = Client | PoolClient | Pool;
@@ -59,9 +58,6 @@ export interface PipelineRunRow {
   derivative_id: string | null;
   contract_version: string;
   tool_versions: Record<string, string>;
-  /** From the run_completeness view: the ONE completeness predicate (R23,
-   * EPOCH-404). Read this; never re-derive it from stage rows. */
-  state: 'running' | 'incomplete' | 'complete';
 }
 
 export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
@@ -105,11 +101,10 @@ const RECORD_COLUMNS = `id, ingest_id, evidence_id, derivative_id, file_hash, pa
  */
 export async function getPipelineRuns(client: Db, limit = 100): Promise<PipelineRunRow[]> {
   const result = await client.query<PipelineRunRow>(
-    `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id,
-            r.contract_version, r.tool_versions, c.state
-       FROM pipeline_runs r
-       JOIN run_completeness c USING (run_id)
-      ORDER BY r.started_at DESC
+    `SELECT run_id, backup_source, started_at, finished_at, evidence_id, derivative_id,
+            contract_version, tool_versions
+       FROM pipeline_runs
+      ORDER BY started_at DESC
       LIMIT $1`,
     [limit]
   );
@@ -127,76 +122,6 @@ export async function getRunEvidence(client: Db, runId: string): Promise<string 
     [runId]
   );
   return result.rows[0]?.evidence_id ?? null;
-}
-
-/**
- * Where the mvt results a run's stages read are now: the current path of that
- * `mvt_results` derivative, or null if they read none (e.g. check-backup
- * failed, so no results were registered). A results derivative is specific to
- * one results set (IOC set and mvt version), so this is the most precise
- * location of a run's outputs; registration updates it when its workspace
- * moves.
- */
-async function runResultsDerivativePath(client: Db, runId: string): Promise<string | null> {
-  const result = await client.query<{ path: string }>(
-    `SELECT DISTINCT d.path
-       FROM pipeline_stage_status s
-       JOIN evidence_derivatives d ON d.derivative_id = s.derivative_id
-      WHERE s.run_id = $1 AND d.kind = 'mvt_results'`,
-    [runId]
-  );
-  if (result.rows.length > 1) {
-    throw new Error(`run ${runId} read more than one mvt results derivative`);
-  }
-  return result.rows[0]?.path ?? null;
-}
-
-/**
- * Where the decrypted backup a run processed is now: the current path of the
- * run's decrypted derivative, or null if the run has no registered evidence
- * (it predates EPOCH-404) or doesn't exist. Registration updates a
- * derivative's path when its workspace moves, so this follows a moved
- * workspace; the run's `backup_source` keeps the path it started from.
- *
- * The orchestrator derives a run's results path, where it writes the report,
- * from this path (`deriveResultsPath`), whether or not mvt results were
- * registered; prefer the run's results derivative and fall back to this. A decrypt
- * can be shared by several results sets in different workspaces, and its one
- * path is wherever it was last registered.
- */
-async function runDecryptedPath(client: Db, runId: string): Promise<string | null> {
-  const result = await client.query<{ path: string }>(
-    `SELECT d.path
-       FROM pipeline_runs r
-       JOIN evidence_derivatives d ON d.derivative_id = r.derivative_id
-      WHERE r.run_id = $1 AND d.kind = 'decrypted'`,
-    [runId]
-  );
-  return result.rows[0]?.path ?? null;
-}
-
-/**
- * Where a run's results are now: the directory the orchestrator pointed every
- * stage at as `--results-path`, and where the reporting stage wrote the run's
- * report. Null if the run has no registered evidence or no derivable results
- * location.
- *
- * - The `mvt_results` derivative the run read comes first. It is specific to
- *   the run's results set (IOC set and mvt version).
- * - Otherwise (check-backup failed, so no results were registered) the path is
- *   derived from the run's decrypt with `deriveResultsPath`, as the
- *   orchestrator derived it. A decrypt can be shared by results sets in several
- *   workspaces and points wherever it was last registered, so it is only the
- *   fallback.
- *
- * Both come from the database, where registration keeps a derivative's path
- * current when its workspace moves; the run's `backup_source` goes stale.
- */
-export async function getRunResultsLocation(client: Db, runId: string): Promise<string | null> {
-  const results = await runResultsDerivativePath(client, runId);
-  if (results) return results;
-  const decrypted = await runDecryptedPath(client, runId);
-  return decrypted ? (deriveResultsPath(decrypted) ?? null) : null;
 }
 
 /**
@@ -358,6 +283,12 @@ export async function getForensicRecords(
     filters.push(`(process_name ILIKE $${params.length} OR bundle_id ILIKE $${params.length})`);
   }
 
+  const totalResult = await client.query<{ total: string }>(
+    `SELECT COUNT(*) AS total FROM ${source} WHERE ${filters.join(' AND ')}`,
+    params
+  );
+  const total = Number(totalResult.rows[0].total);
+
   // Keyset: rows strictly after the cursor in (col IS NULL, col, id) order.
   // NULLs sort last whatever the direction, so the null region is always the
   // tail and is walked by id alone.
@@ -380,41 +311,24 @@ export async function getForensicRecords(
   }
   pageParams.push(limit + 1);
   const dir = direction.toUpperCase();
-  // ONE statement for the count and the page. Postgres takes one snapshot per
-  // statement, so `total` and `rows` always describe the same state of the
-  // views; as two queries, an ingest completing between them could give a
-  // page with more rows than `total`, or a stale total (R25). The client may
-  // be a Pool, so a transaction across two queries isn't an option.
-  //
-  // The LEFT JOIN keeps the count when the page is empty. sort_value is the
-  // sort column as Postgres prints it: the cursor is built from it, not from
-  // the mapped row, because node-postgres turns timestamptz into a JS Date,
-  // which drops microseconds and would skip or repeat rows across pages.
-  const result = await client.query<
-    { [K in keyof ForensicRecordRow]: ForensicRecordRow[K] | null } & { total: string; sort_value: string | null }
-  >(
-    `SELECT counted.total, page.*
-       FROM (SELECT COUNT(*) AS total FROM ${source} WHERE ${filters.join(' AND ')}) counted
-       LEFT JOIN LATERAL (
-         SELECT ${RECORD_COLUMNS}, (${column})::text AS sort_value
-           FROM ${source}
-          WHERE ${pageFilters.join(' AND ')}
-          ORDER BY (${column} IS NULL), ${column} ${dir}, id ${dir}
-          LIMIT $${pageParams.length}
-       ) page ON TRUE
-      ORDER BY (page.${column} IS NULL), page.${column} ${dir}, page.id ${dir}`,
+  // sort_value is the sort column as Postgres prints it. The cursor is built
+  // from it rather than from the mapped row, because node-postgres turns
+  // timestamptz into a JS Date, which drops microseconds: two rows in the
+  // same millisecond would then be skipped or repeated across pages.
+  const result = await client.query<ForensicRecordRow & { sort_value: string | null }>(
+    `SELECT ${RECORD_COLUMNS}, (${column})::text AS sort_value
+       FROM ${source}
+      WHERE ${pageFilters.join(' AND ')}
+      ORDER BY (${column} IS NULL), ${column} ${dir}, id ${dir}
+      LIMIT $${pageParams.length}`,
     pageParams
   );
 
-  const total = Number(result.rows[0].total);
-  const fetched = result.rows.filter((row) => row.id !== null);
-  const pageRows = fetched.slice(0, limit);
-  const last = pageRows.at(-1);
+  const page = result.rows.slice(0, limit);
+  const last = page.at(-1);
   const nextCursor =
-    fetched.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
-  const rows = pageRows.map(
-    ({ total: _total, sort_value: _cursorOnly, ...row }) => row as ForensicRecordRow
-  );
+    result.rows.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
+  const rows = page.map(({ sort_value: _cursorOnly, ...row }) => row);
   return { rows, total, nextCursor };
 }
 

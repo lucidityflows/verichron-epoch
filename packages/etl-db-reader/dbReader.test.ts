@@ -20,12 +20,10 @@ import { after, before, describe, it } from 'node:test';
 import pg from 'pg';
 
 import {
-  MAX_RECORDS_PAGE as MAX_PAGE,
   getCorrelatedContext,
   getCorrelationPivots,
   getForensicRecords,
   getRunEvidence,
-  getRunResultsLocation,
   type ForensicRecordQuery,
   type ForensicRecordRow,
   type RecordSortKey,
@@ -38,12 +36,6 @@ const MIGRATIONS = path.resolve(__dirname, '../etl-db-writer/migrations');
 const EVIDENCE = '11111111-1111-1111-1111-111111111111';
 const OTHER = '22222222-2222-2222-2222-222222222222';
 const RUN = '33333333-3333-3333-3333-333333333333';
-const FAILED_CHECK_RUN = '44444444-4444-4444-4444-444444444444';
-const DECRYPT = '55555555-5555-5555-5555-555555555555';
-const UNREGISTERED_RUN = '77777777-7777-7777-7777-777777777777';
-const SHARED_DECRYPT = '88888888-8888-8888-8888-888888888888';
-const RESULTS_A = '99999999-0000-0000-0000-00000000000a';
-const RUN_A = '99999999-0000-0000-0000-0000000000aa';
 
 /** 23 records for EVIDENCE: more than several pages at limit 4. Includes NULL
  * times and names, exact ties (decided by id), and two times that differ only
@@ -95,9 +87,8 @@ before(async () => {
       [evidence, root]
     );
     await db.query(
-      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
-       VALUES ($1, $1, 'decrypted', '/test', '{"name": "test", "version": "0"}',
-               '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('0', 64))`,
+      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path)
+       VALUES ($1, $1, 'decrypted', '/test')`,
       [evidence]
     );
   }
@@ -235,49 +226,6 @@ describe('getForensicRecords', live, () => {
     assert.ok(!names.includes('other_evidence'));
   });
 
-  it('total and rows come from one snapshot even when an ingest completes mid-read', async () => {
-    // A client that lets one more ingest complete right after the reader's
-    // first statement. With count and page as two statements, that ingest
-    // would land between them and the page would disagree with its total.
-    let statements = 0;
-    let completed = false;
-    const racing = {
-      query: async (...args: Parameters<pg.Client['query']>) => {
-        const result = await (db.query as (...a: unknown[]) => Promise<unknown>)(...args);
-        statements += 1;
-        if (!completed) {
-          completed = true;
-          const unit = await insertUnit(EVIDENCE, 'a'.repeat(64), 1, true);
-          await insertRecord(unit, EVIDENCE, 'crash_report', '2024-04-01 00:00:00+00', 'raced_in', null);
-        }
-        return result;
-      },
-    };
-
-    const page = await getForensicRecords(racing as never, EVIDENCE, { limit: MAX_PAGE });
-    assert.equal(statements, 1, 'count and page are one statement');
-    assert.equal(page.total, page.rows.length, 'the total describes exactly the rows returned');
-    assert.equal(page.nextCursor, null);
-
-    const after = await getForensicRecords(db, EVIDENCE, { limit: MAX_PAGE });
-    assert.equal(after.total, page.total + 1, 'the raced ingest is visible to the next read');
-    await db.query(`DELETE FROM forensic_records WHERE process_name = 'raced_in'`);
-    await db.query(`DELETE FROM ingested_files WHERE file_hash = repeat('a', 64)`);
-  });
-
-  it('an empty page still reports the true total', async () => {
-    const page = await getForensicRecords(db, EVIDENCE, { text: 'no-such-process' });
-    assert.deepEqual([page.rows, page.total, page.nextCursor], [[], 0, null]);
-    const beyond = await walk({ sort: 'event_time' }, 1000);
-    const last = beyond.at(-1)!;
-    const tail = await getForensicRecords(db, EVIDENCE, {
-      limit: 1,
-      cursor: Buffer.from(JSON.stringify({ v: null, id: String(Number(last.id) + 10_000) })).toString('base64url'),
-    });
-    assert.equal(tail.rows.length, 0);
-    assert.equal(tail.total, ROWS.length + 1, 'past the last row, the total is still reported');
-  });
-
   it('rejects parameters outside the allowlist', async () => {
     const bad: unknown[] = [
       { orderBy: 'id; DROP TABLE forensic_records' },
@@ -308,81 +256,5 @@ describe('evidence-scoped helpers', live, () => {
     const context = await getCorrelatedContext(db, EVIDENCE, new Date(timed.event_time!).toISOString(), timed.id);
     assert.ok(context.length > 0);
     assert.ok(context.every((c) => c.id !== timed.id && c.process_name !== 'other_evidence'));
-  });
-});
-
-describe('getRunResultsLocation', live, () => {
-  before(async () => {
-    // A run whose check-backup failed: no mvt results were registered and no
-    // stage read any, but the run has its decrypt.
-    await db.query(
-      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
-       VALUES ($1, $2, 'decrypted', '/old/ws/decrypted/a', '{"name": "mvt-ios", "version": "0"}',
-               '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('2', 64))`,
-      [DECRYPT, EVIDENCE]
-    );
-    await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-       VALUES ($1, '/old/ws/decrypted/a', 'test', '{}', $2, $3)`,
-      [FAILED_CHECK_RUN, EVIDENCE, DECRYPT]
-    );
-    await db.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id)
-       VALUES ($1, 'crash', 'succeeded', $2), ($1, 'reporting', 'succeeded', $2)`,
-      [FAILED_CHECK_RUN, DECRYPT]
-    );
-
-    // Run A in workspace A read results made with IOC set A. The same backup,
-    // decrypted identically, was then registered from workspace B with another
-    // IOC set: the shared decrypt now points at B, run A's results still at A.
-    await db.query(
-      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
-       VALUES ($1, $2, 'decrypted', '/ws-b/decrypted/a', '{"name": "mvt-ios", "version": "0"}',
-               '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('3', 64))`,
-      [SHARED_DECRYPT, EVIDENCE]
-    );
-    await db.query(
-      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, parent_derivative_id, tool, params, provenance_key)
-       VALUES ($1, $2, 'mvt_results', '/ws-a/results/a', $3, '{"name": "mvt-ios", "version": "0"}', '{}', repeat('4', 64))`,
-      [RESULTS_A, EVIDENCE, SHARED_DECRYPT]
-    );
-    await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-       VALUES ($1, '/ws-a/decrypted/a', 'test', '{}', $2, $3)`,
-      [RUN_A, EVIDENCE, SHARED_DECRYPT]
-    );
-    await db.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id)
-       VALUES ($1, 'crash', 'succeeded', $2), ($1, 'mvt_iocs', 'succeeded', $3), ($1, 'reporting', 'succeeded', $2)`,
-      [RUN_A, SHARED_DECRYPT, RESULTS_A]
-    );
-
-    // A run from before evidence registration (EPOCH-404).
-    await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions)
-       VALUES ($1, '/legacy/decrypted/a', 'test', '{}')`,
-      [UNREGISTERED_RUN]
-    );
-  });
-
-  it("uses the mvt results the run read, not the shared decrypt's latest workspace", async () => {
-    assert.equal(await getRunResultsLocation(db, RUN_A), '/ws-a/results/a');
-  });
-
-  it('derives the location from the decrypt when check-backup failed and no results were registered', async () => {
-    assert.equal(await getRunResultsLocation(db, FAILED_CHECK_RUN), '/old/ws/results/a');
-  });
-
-  it('follows a moved workspace, not the run backup_source', async () => {
-    // What registration does when the same decrypt is found at a new location.
-    await db.query(`UPDATE evidence_derivatives SET path = '/new/ws/decrypted/a' WHERE derivative_id = $1`, [DECRYPT]);
-    assert.equal(await getRunResultsLocation(db, FAILED_CHECK_RUN), '/new/ws/results/a');
-    await db.query(`UPDATE evidence_derivatives SET path = '/moved/results/a' WHERE derivative_id = $1`, [RESULTS_A]);
-    assert.equal(await getRunResultsLocation(db, RUN_A), '/moved/results/a');
-  });
-
-  it('is null for a run without registered evidence, and for an unknown run', async () => {
-    assert.equal(await getRunResultsLocation(db, UNREGISTERED_RUN), null);
-    assert.equal(await getRunResultsLocation(db, '66666666-6666-6666-6666-666666666666'), null);
   });
 });

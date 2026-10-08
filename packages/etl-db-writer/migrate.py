@@ -73,6 +73,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _relation("devices"),
         f"SELECT ({_relation('idx_forensic_fields_gin')}) AND ({_column('forensic_records', 'ingest_id')})",
     ),
+    "0004_evidence_read_views.sql": (
+        _relation("forensic_records_history"),
+        _relation("idx_forensic_evidence_source_time"),
+    ),
 }
 
 

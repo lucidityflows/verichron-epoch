@@ -17,6 +17,24 @@ on:
 jobs:
   mvt-runner:
     runs-on: ubuntu-latest
+    env:
+      # The etl-db-reader tests create and drop their own throwaway database
+      # on this server (EPOCH-403), so this role must be allowed CREATE DATABASE.
+      TEST_DATABASE_URL: postgresql://verichron_ci:verichron_ci@localhost:5432/verichron_ci
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: verichron_ci
+          POSTGRES_USER: verichron_ci
+          POSTGRES_PASSWORD: verichron_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U verichron_ci -d verichron_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -32,7 +50,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter "@verichron/mvt-runner..." --filter "@verichron/etl-db-writer..."
+        run: pnpm install --frozen-lockfile --filter "@verichron/mvt-runner..." --filter "@verichron/etl-db-writer..." --filter "@verichron/etl-db-reader..."
 
       # mvt-runner resolves @verichron/contracts through its built dist/.
       - name: Build contracts
@@ -49,3 +67,9 @@ jobs:
 
       - name: Test etl-db-writer
         run: pnpm --filter @verichron/etl-db-writer test
+
+      - name: Typecheck etl-db-reader
+        run: pnpm --filter @verichron/etl-db-reader typecheck
+
+      - name: Test etl-db-reader (real Postgres)
+        run: pnpm --filter @verichron/etl-db-reader test

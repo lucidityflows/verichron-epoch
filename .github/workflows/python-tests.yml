@@ -70,6 +70,12 @@ jobs:
 
       - name: Run pytest
         run: uv run pytest -q
+
+      # EPOCH-403: EXPLAIN output for the evidence-scoped correlation reads on
+      # a ~260k-record fixture, kept in the log for review. The pytest above
+      # already fails the build if either read stops using an index.
+      - name: Explain evidence reads
+        run: uv run python scripts/explain_evidence_reads.py
         # testpaths / norecursedirs already scoped correctly in root
         # pyproject.toml ([tool.pytest.ini_options]): packages, scripts,
         # apps; iLEAPP/node_modules/.venv/dist/.git/infra excluded. The

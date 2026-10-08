@@ -10,8 +10,6 @@ interface RecordsViewProps {
   loadedCount: number;
   /** Every record for the run's evidence, from the reader (R25). */
   totalCount: number;
-  /** False when the run has no registered evidence, so nothing was read. */
-  evidenceRegistered: boolean;
   availableSourceTypes: string[];
   sourceTypeFilter: string | null;
   onFilterChange: (sourceType: string | null) => void;
@@ -78,7 +76,6 @@ export function RecordsView({
   records,
   loadedCount,
   totalCount,
-  evidenceRegistered,
   availableSourceTypes,
   sourceTypeFilter,
   onFilterChange,
@@ -93,20 +90,16 @@ export function RecordsView({
       {selectedRun && loadedCount < totalCount && (
         // A capped list must say so (R25). Filters below apply only to the
         // loaded rows until the server-side grid lands (EPOCH-411).
-        <p className="text-data text-muted-foreground mb-4">
+        <p className="text-label text-muted-foreground mb-4">
           Showing the first {loadedCount.toLocaleString()} of {totalCount.toLocaleString()} records for this
           evidence. Filters apply to the loaded records only.
         </p>
       )}
 
       {!selectedRun ? (
-        <p className="text-muted-foreground text-data">Select an investigation first.</p>
-      ) : !evidenceRegistered ? (
-        <p className="text-muted-foreground text-data">
-          This investigation's evidence isn't registered yet, so its facts haven't been read. This is not the same as finding nothing.
-        </p>
+        <p className="text-muted-foreground text-sm">Select an investigation first.</p>
       ) : records.length === 0 && !sourceTypeFilter ? (
-        <p className="text-muted-foreground text-data">No records for this run.</p>
+        <p className="text-muted-foreground text-sm">No records for this run.</p>
       ) : (
         <>
           <div className="flex gap-2 mb-5">
@@ -143,7 +136,7 @@ export function RecordsView({
             onRowClick={(row) => setExpandedId(expandedId === String(row.id) ? null : String(row.id))}
             estimateRowHeight={44}
             className="h-[calc(100vh-20rem)] rounded-lg shadow-elevation-1"
-            emptyState={<p className="text-muted-foreground text-data">No records match this filter.</p>}
+            emptyState={<p className="text-muted-foreground text-sm">No records match this filter.</p>}
             renderExpanded={(row) => (
               <pre className="text-data font-mono text-muted-foreground whitespace-pre-wrap break-all">
                 {JSON.stringify(row.fields, null, 2)}
