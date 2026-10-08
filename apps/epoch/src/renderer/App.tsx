@@ -11,9 +11,6 @@ import { TooltipProvider } from './components/ui/Tooltip';
 import { useEpochStore } from './store/useEpochStore';
 import { runsApi } from './api/runs';
 
-function runPhase(run: PipelineRunRow): 'in_progress' | 'finished' {
-  return run.finished_at ? 'finished' : 'in_progress';
-}
 
 const IOC_SOURCE_TYPES = ['mvt_ioc_detection', 'timestamp_anomaly'] as const;
 
@@ -143,7 +140,7 @@ export const App: React.FC = () => {
         <Sidebar active={section} onSelect={handleSectionSelect} dbStatus={dbStatus} />
 
         <div className="flex-1 flex flex-col min-w-0">
-          {selectedRun && <EvidenceTag run={selectedRun} phase={runPhase(selectedRun)} />}
+          {selectedRun && <EvidenceTag run={selectedRun} />}
 
           <div className="flex-1 overflow-auto p-8">
             {section === 'workspace' && (
