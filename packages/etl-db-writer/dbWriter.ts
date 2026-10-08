@@ -74,6 +74,8 @@ export interface IngestContext {
   evidenceId: string;
   derivativeId: string;
   runId: string;
+  /** The stage's parserVersion from its stage.json, via the orchestrator (EPOCH-404). */
+  parserVersion: number;
 }
 
 export const PAYLOAD_KINDS = ['full', 'summary', 'none'] as const;
@@ -82,8 +84,6 @@ export type PayloadKind = (typeof PAYLOAD_KINDS)[number];
 export interface IngestParams {
   filePath: string;
   sourceType: string;
-  /** The extractor's integer PARSER_VERSION; a bump makes a new unit (R8). */
-  parserVersion: number;
   /** What `rawPayload` holds (R12). */
   payloadKind: PayloadKind;
   /** Attach now if known; otherwise call `unit.setRawPayload()` after parsing. */
@@ -108,7 +108,15 @@ function fixContext(ctx: IngestContext): Readonly<IngestContext> {
       );
     }
   }
-  return Object.freeze({ evidenceId: ctx.evidenceId, derivativeId: ctx.derivativeId, runId: ctx.runId });
+  if (!Number.isInteger(ctx.parserVersion) || ctx.parserVersion < 1) {
+    throw new Error(`IngestContext.parserVersion must be an integer >= 1, got ${ctx.parserVersion}`);
+  }
+  return Object.freeze({
+    evidenceId: ctx.evidenceId,
+    derivativeId: ctx.derivativeId,
+    runId: ctx.runId,
+    parserVersion: ctx.parserVersion,
+  });
 }
 
 /**
@@ -188,7 +196,7 @@ async function labelRun(client: Db, ctx: Readonly<IngestContext>, ingestId: stri
  * Atomic ingest of one file: ledger row + records + completion flag, or nothing.
  *
  * ```ts
- * await ingest(client, ctx, { filePath, sourceType, parserVersion, payloadKind }, async (unit) => {
+ * await ingest(client, ctx, { filePath, sourceType, payloadKind }, async (unit) => {
  *   if (unit.alreadyIngested) return;
  *   await unit.write(records);
  * });
@@ -215,10 +223,8 @@ export async function ingest<T>(
 ): Promise<IngestOutcome<T>> {
   // Every use of identity below reads this frozen copy, never callerCtx.
   const ctx = fixContext(callerCtx);
-  const { filePath, sourceType, parserVersion, payloadKind, rawPayload } = params;
-  if (!Number.isInteger(parserVersion) || parserVersion < 1) {
-    throw new Error(`parserVersion must be an integer >= 1, got ${parserVersion}`);
-  }
+  const { filePath, sourceType, payloadKind, rawPayload } = params;
+  const { parserVersion } = ctx;
   if (!PAYLOAD_KINDS.includes(payloadKind)) {
     throw new Error(`payloadKind must be one of ${PAYLOAD_KINDS.join(', ')}, got ${payloadKind}`);
   }

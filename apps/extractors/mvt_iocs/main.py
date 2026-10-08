@@ -59,9 +59,6 @@ from normalized_record import NormalizedRecord, SourceType
 
 import psycopg2
 
-#: Bump when parsing or normalization changes what this extractor writes. A
-#: bump re-ingests every file as a new unit beside the old rows (R8).
-PARSER_VERSION = 1
 
 
 # Modules that legitimately contain forward-looking, scheduled data rather
@@ -174,7 +171,6 @@ def process_alerts(conn, ctx: IngestContext, results_dir: Path) -> ETLRunResult:
             ctx,
             path,
             source_type=SourceType.MVT_IOC_DETECTION.value,
-            parser_version=PARSER_VERSION,
             # The whole parsed alerts.json is kept (R12).
             payload_kind="full",
         ) as unit:
@@ -273,7 +269,6 @@ def process_timeline(conn, ctx: IngestContext, results_dir: Path) -> ETLRunResul
             ctx,
             path,
             source_type=SourceType.TIMESTAMP_ANOMALY.value,
-            parser_version=PARSER_VERSION,
             # Row and plugin counts only, not the timeline itself (R12; see
             # the comment below).
             payload_kind="summary",

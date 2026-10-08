@@ -47,7 +47,9 @@ SEEDED_EVIDENCE = {EVIDENCE_ID: DERIVATIVE_ID, OTHER_EVIDENCE_ID: OTHER_DERIVATI
 
 
 def ctx(run_id: str, evidence_id: str = EVIDENCE_ID) -> IngestContext:
-    return IngestContext(evidence_id=evidence_id, derivative_id=SEEDED_EVIDENCE[evidence_id], run_id=run_id)
+    return IngestContext(
+        evidence_id=evidence_id, derivative_id=SEEDED_EVIDENCE[evidence_id], run_id=run_id, parser_version=1
+    )
 
 
 @pytest.fixture(params=BACKENDS)
@@ -128,7 +130,7 @@ def test_a_successful_ips_file_is_deduped_not_duplicated(db, tmp_path):
     assert db.ledger()[0]["produced_by_runs"] == [RUN_ID, RETRY_RUN_ID], (
         "one unit for one evidence item, labeled with both runs that saw it (R7)"
     )
-    assert db.ledger()[0]["parser_version"] == crash_main.PARSER_VERSION
+    assert db.ledger()[0]["parser_version"] == 1, "stamped from the context, not the extractor"
 
 
 def _valid_ips() -> str:
@@ -250,5 +252,5 @@ def test_llm_findings_ingest_through_the_evidence_scoped_door(db, tmp_path):
     ledger = db.ledger()
     assert len(ledger) == 1
     assert ledger[0]["payload_kind"] == "none"
-    assert ledger[0]["parser_version"] == analysis_main.PARSER_VERSION
+    assert ledger[0]["parser_version"] == 1
     assert db.record_count() == 1

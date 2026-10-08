@@ -99,17 +99,20 @@ PAYLOAD_KINDS = ("full", "summary", "none")
 @dataclass(frozen=True)
 class IngestContext:
     """Who an ingest is stamped with: the evidence, the derivative being read,
-    and the run doing the reading.
+    the run doing the reading, and the parser version doing the parsing.
 
     Built once per extractor process from the orchestrator's CLI arguments
     (`add_context_args` / `context_from_args`) and handed to every `ingest()`
-    call. Extractor code never constructs these IDs itself, so it cannot
-    misattribute what it cannot label (R16).
+    call. Extractor code never constructs these values itself, so it cannot
+    misattribute what it cannot label (R16). The parser version comes from
+    the stage's stage.json, through the orchestrator (EPOCH-404), so there is
+    one source for it rather than a constant in each extractor (R2).
     """
 
     evidence_id: str
     derivative_id: str
     run_id: str
+    parser_version: int
 
     def __post_init__(self) -> None:
         for name in ("evidence_id", "derivative_id", "run_id"):
@@ -118,6 +121,9 @@ class IngestContext:
                     f"IngestContext.{name} is required: an ingest cannot happen before "
                     "evidence is registered (EPOCH-404's pre-flight step)"
                 )
+        version = self.parser_version
+        if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+            raise ValueError(f"IngestContext.parser_version must be an integer >= 1, got {version!r}")
 
 
 def add_context_args(parser) -> None:
@@ -127,10 +133,18 @@ def add_context_args(parser) -> None:
     parser.add_argument(
         "--derivative-id", required=True, help="evidence_derivatives.derivative_id this stage reads"
     )
+    parser.add_argument(
+        "--parser-version", required=True, type=int, help="this stage's parserVersion from its stage.json"
+    )
 
 
 def context_from_args(args) -> IngestContext:
-    return IngestContext(evidence_id=args.evidence_id, derivative_id=args.derivative_id, run_id=args.run_id)
+    return IngestContext(
+        evidence_id=args.evidence_id,
+        derivative_id=args.derivative_id,
+        run_id=args.run_id,
+        parser_version=args.parser_version,
+    )
 
 
 class IngestUnit:
@@ -222,7 +236,6 @@ def ingest(
     file_path: str | Path,
     *,
     source_type: str,
-    parser_version: int,
     payload_kind: str,
     raw_payload: dict[str, Any] | None = None,
 ) -> Iterator[IngestUnit]:
@@ -231,8 +244,7 @@ def ingest(
 
     Usage::
 
-        with ingest(conn, ctx, path, source_type=..., parser_version=PARSER_VERSION,
-                    payload_kind="full") as unit:
+        with ingest(conn, ctx, path, source_type=..., payload_kind="full") as unit:
             if unit.already_ingested:
                 pass            # dedup — this evidence's file is already complete
             else:
@@ -261,9 +273,8 @@ def ingest(
     both deciding to write.
     """
     if not isinstance(ctx, IngestContext):
-        raise TypeError("ingest() needs an IngestContext (evidence_id, derivative_id, run_id)")
-    if not isinstance(parser_version, int) or isinstance(parser_version, bool) or parser_version < 1:
-        raise ValueError(f"parser_version must be an integer >= 1, got {parser_version!r}")
+        raise TypeError("ingest() needs an IngestContext (evidence_id, derivative_id, run_id, parser_version)")
+    parser_version = ctx.parser_version
     if payload_kind not in PAYLOAD_KINDS:
         raise ValueError(f"payload_kind must be one of {PAYLOAD_KINDS}, got {payload_kind!r}")
 

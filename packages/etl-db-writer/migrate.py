@@ -77,6 +77,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _relation("forensic_records_history"),
         _relation("idx_forensic_evidence_source_time"),
     ),
+    "0005_run_registration.sql": (
+        _relation("run_completeness"),
+        _relation("evidence_derivatives_identity"),
+    ),
 }
 
 

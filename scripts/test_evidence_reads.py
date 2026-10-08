@@ -36,8 +36,10 @@ OTHER_DERIVATIVE = "bbbb0000-0000-0000-0000-0000000000db"
 SEEDED = {EVIDENCE: DERIVATIVE, OTHER_EVIDENCE: OTHER_DERIVATIVE}
 
 
-def ctx(run_id: str = RUN_A, evidence_id: str = EVIDENCE) -> IngestContext:
-    return IngestContext(evidence_id=evidence_id, derivative_id=SEEDED[evidence_id], run_id=run_id)
+def ctx(run_id: str = RUN_A, evidence_id: str = EVIDENCE, version: int = 1) -> IngestContext:
+    return IngestContext(
+        evidence_id=evidence_id, derivative_id=SEEDED[evidence_id], run_id=run_id, parser_version=version
+    )
 
 
 @pytest.fixture(params=BACKENDS)
@@ -66,8 +68,8 @@ def current(db, evidence_id: str = EVIDENCE, view: str = "current_forensic_recor
 
 
 def write(db, path: Path, version: int, names: list[str], evidence_id: str = EVIDENCE) -> None:
-    shape = {"source_type": "crash_report", "parser_version": version, "payload_kind": "full"}
-    with ingest(db, ctx(evidence_id=evidence_id), path, **shape) as unit:
+    shape = {"source_type": "crash_report", "payload_kind": "full"}
+    with ingest(db, ctx(evidence_id=evidence_id, version=version), path, **shape) as unit:
         unit.write([record(n) for n in names])
 
 

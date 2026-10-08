@@ -4,6 +4,6 @@
   "runtime": "python",
   "order": 20,
   "requiresResultsPath": false,
-  "parserVersion": 2,
+  "parserVersion": 1,
   "enabled": true
 }

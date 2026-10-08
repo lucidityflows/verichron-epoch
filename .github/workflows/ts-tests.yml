@@ -50,7 +50,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter "@verichron/mvt-runner..." --filter "@verichron/etl-db-writer..." --filter "@verichron/etl-db-reader..."
+        run: pnpm install --frozen-lockfile --filter "@verichron/mvt-runner..." --filter "@verichron/etl-db-writer..." --filter "@verichron/etl-db-reader..." --filter "@verichron/orchestrator..."
 
       # mvt-runner resolves @verichron/contracts through its built dist/.
       - name: Build contracts
@@ -73,3 +73,11 @@ jobs:
 
       - name: Test etl-db-reader (real Postgres)
         run: pnpm --filter @verichron/etl-db-reader test
+
+      - name: Typecheck orchestrator
+        run: pnpm --filter @verichron/orchestrator typecheck
+
+      # EPOCH-404: pre-flight registration, evidence-keyed resume and the
+      # completeness predicate, against a throwaway database on this server.
+      - name: Test orchestrator (real Postgres)
+        run: pnpm --filter @verichron/orchestrator test

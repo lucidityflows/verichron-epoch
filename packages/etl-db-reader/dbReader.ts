@@ -58,6 +58,9 @@ export interface PipelineRunRow {
   derivative_id: string | null;
   contract_version: string;
   tool_versions: Record<string, string>;
+  /** From the run_completeness view: the ONE completeness predicate (R23,
+   * EPOCH-404). Read this; never re-derive it from stage rows. */
+  state: 'running' | 'incomplete' | 'complete';
 }
 
 export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
@@ -101,10 +104,11 @@ const RECORD_COLUMNS = `id, ingest_id, evidence_id, derivative_id, file_hash, pa
  */
 export async function getPipelineRuns(client: Db, limit = 100): Promise<PipelineRunRow[]> {
   const result = await client.query<PipelineRunRow>(
-    `SELECT run_id, backup_source, started_at, finished_at, evidence_id, derivative_id,
-            contract_version, tool_versions
-       FROM pipeline_runs
-      ORDER BY started_at DESC
+    `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id,
+            r.contract_version, r.tool_versions, c.state
+       FROM pipeline_runs r
+       JOIN run_completeness c USING (run_id)
+      ORDER BY r.started_at DESC
       LIMIT $1`,
     [limit]
   );

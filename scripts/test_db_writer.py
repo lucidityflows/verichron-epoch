@@ -56,11 +56,16 @@ DERIVATIVE_B = "bbbb0000-0000-0000-0000-0000000000db"
 SEEDED_EVIDENCE = {EVIDENCE_A: DERIVATIVE_A, EVIDENCE_B: DERIVATIVE_B}
 
 #: The unit-shape arguments every crash-report ingest below shares.
-UNIT = {"source_type": "crash_report", "parser_version": 1, "payload_kind": "full"}
+UNIT = {"source_type": "crash_report", "payload_kind": "full"}
 
 
-def ctx(run_id: str = RUN_ID, evidence_id: str = EVIDENCE_A) -> IngestContext:
-    return IngestContext(evidence_id=evidence_id, derivative_id=SEEDED_EVIDENCE[evidence_id], run_id=run_id)
+def ctx(run_id: str = RUN_ID, evidence_id: str = EVIDENCE_A, version: int = 1) -> IngestContext:
+    return IngestContext(
+        evidence_id=evidence_id,
+        derivative_id=SEEDED_EVIDENCE[evidence_id],
+        run_id=run_id,
+        parser_version=version,
+    )
 
 
 @pytest.fixture(params=BACKENDS)
@@ -381,7 +386,7 @@ def test_same_content_under_two_evidence_items_is_two_units(db, tmp_path):
     evidence item silently got nothing. Identity is per evidence (R6)."""
     empty = tmp_path / "alerts.json"
     empty.write_text("[]")
-    unit_shape = {"source_type": "mvt_ioc_detection", "parser_version": 1, "payload_kind": "full"}
+    unit_shape = {"source_type": "mvt_ioc_detection", "payload_kind": "full"}
 
     with ingest(db, ctx(RUN_ID, EVIDENCE_A), empty, **unit_shape) as unit:
         unit.write([])
@@ -434,11 +439,11 @@ def test_a_failed_attempt_leaves_no_run_label(db, artifact):
 def test_parser_version_bump_appends_a_unit_and_keeps_the_old_one(db, artifact):
     """R8: a new parser_version is a new unit beside the old one. Nothing is
     superseded or deleted; the old rows stay queryable as history."""
-    with ingest(db, ctx(RUN_ID), artifact, **{**UNIT, "parser_version": 1}) as unit:
+    with ingest(db, ctx(RUN_ID, version=1), artifact, **UNIT) as unit:
         unit.write([record(0)])
     v1_before = db.ledger()[0]
 
-    with ingest(db, ctx(RUN_ID), artifact, **{**UNIT, "parser_version": 2}) as unit:
+    with ingest(db, ctx(RUN_ID, version=2), artifact, **UNIT) as unit:
         assert not unit.already_ingested, "a version bump must re-ingest, not dedup"
         unit.write([record(0), record(1)])
 
@@ -453,7 +458,7 @@ def test_latest_version_read_returns_only_the_newest_unit(db, artifact):
     real schema and its index."""
     postgres_only(db)
     for version in (1, 2):
-        with ingest(db, ctx(RUN_ID), artifact, **{**UNIT, "parser_version": version}) as unit:
+        with ingest(db, ctx(RUN_ID, version=version), artifact, **UNIT) as unit:
             unit.write([record(version)])
 
     with db.cursor() as cur:
@@ -475,9 +480,9 @@ def test_latest_version_read_returns_only_the_newest_unit(db, artifact):
 def test_ingest_requires_a_complete_context():
     """No evidence, no ingest: a call before registration cannot happen."""
     with pytest.raises(ValueError, match="evidence_id"):
-        IngestContext(evidence_id="", derivative_id=DERIVATIVE_A, run_id=RUN_ID)
+        IngestContext(evidence_id="", derivative_id=DERIVATIVE_A, run_id=RUN_ID, parser_version=1)
     with pytest.raises(ValueError, match="derivative_id"):
-        IngestContext(evidence_id=EVIDENCE_A, derivative_id="", run_id=RUN_ID)
+        IngestContext(evidence_id=EVIDENCE_A, derivative_id="", run_id=RUN_ID, parser_version=1)
 
 
 def test_ingest_rejects_a_bare_run_id_where_the_context_belongs(db, artifact):
@@ -487,17 +492,15 @@ def test_ingest_rejects_a_bare_run_id_where_the_context_belongs(db, artifact):
     assert db.ledger() == []
 
 
-@pytest.mark.parametrize(
-    "override, message",
-    [
-        ({"parser_version": 0}, "parser_version"),
-        ({"parser_version": "1"}, "parser_version"),
-        ({"payload_kind": "everything"}, "payload_kind"),
-    ],
-)
-def test_ingest_rejects_an_invalid_unit_shape(db, artifact, override, message):
-    with pytest.raises(ValueError, match=message):
-        with ingest(db, ctx(), artifact, **{**UNIT, **override}):
+@pytest.mark.parametrize("version", [0, -1, "1", True])
+def test_the_context_rejects_an_invalid_parser_version(version):
+    with pytest.raises(ValueError, match="parser_version"):
+        IngestContext(evidence_id=EVIDENCE_A, derivative_id=DERIVATIVE_A, run_id=RUN_ID, parser_version=version)
+
+
+def test_ingest_rejects_an_invalid_payload_kind(db, artifact):
+    with pytest.raises(ValueError, match="payload_kind"):
+        with ingest(db, ctx(), artifact, **{**UNIT, "payload_kind": "everything"}):
             pass
     assert db.ledger() == []
 
@@ -526,7 +529,7 @@ def test_a_unit_cannot_read_a_derivative_of_other_evidence(db, artifact):
     """The composite key on ingested_files: evidence A's unit can't claim
     evidence B's decrypted pass as its source."""
     postgres_only(db)
-    mixed = IngestContext(evidence_id=EVIDENCE_A, derivative_id=DERIVATIVE_B, run_id=RUN_ID)
+    mixed = IngestContext(evidence_id=EVIDENCE_A, derivative_id=DERIVATIVE_B, run_id=RUN_ID, parser_version=1)
     with pytest.raises(psycopg2.IntegrityError, match="ingested_files_derivative_same_evidence"):
         with ingest(db, mixed, artifact, **UNIT) as unit:
             unit.write([record(0)])

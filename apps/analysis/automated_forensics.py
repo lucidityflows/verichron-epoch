@@ -47,12 +47,6 @@ from db_writer import IngestContext, add_context_args, context_from_args, ingest
 from normalized_record import NormalizedRecord, SourceType
 import psycopg2
 
-#: Bump when the flagged-row mapping changes what this stage writes; a bump
-#: re-ingests every file as a new unit beside the old rows (R8). Model and
-#: prompt are NOT part of this yet: findings from a different --model dedup
-#: against the earlier ones. Versioning interpretations by producer (R8's
-#: second half) is not ticketed.
-PARSER_VERSION = 1
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, UTC
@@ -336,12 +330,14 @@ def ingest_file_findings(
     result = ETLRunResult()
     record_count = 0
     try:
+        # Known gap (R8, not ticketed): the unit key is (evidence, file,
+        # source type, parser version) -- the model and prompt aren't in it,
+        # so findings from a different --model dedup against earlier ones.
         with ingest(
             pg_conn,
             ctx,
             file_path,
             source_type=SourceType.LLM_FLAGGED_ANOMALY.value,
-            parser_version=PARSER_VERSION,
             # Only derived findings are written; the analyzed file is not kept (R12).
             payload_kind="none",
         ) as unit:
