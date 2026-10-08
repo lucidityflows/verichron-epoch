@@ -20,6 +20,7 @@ import { after, before, describe, it } from 'node:test';
 import pg from 'pg';
 
 import {
+  MAX_RECORDS_PAGE as MAX_PAGE,
   getCorrelatedContext,
   getCorrelationPivots,
   getForensicRecords,
@@ -224,6 +225,49 @@ describe('getForensicRecords', live, () => {
     const names = everything.map((r) => r.process_name);
     assert.ok(!names.includes('stranded'));
     assert.ok(!names.includes('other_evidence'));
+  });
+
+  it('total and rows come from one snapshot even when an ingest completes mid-read', async () => {
+    // A client that lets one more ingest complete right after the reader's
+    // first statement. With count and page as two statements, that ingest
+    // would land between them and the page would disagree with its total.
+    let statements = 0;
+    let completed = false;
+    const racing = {
+      query: async (...args: Parameters<pg.Client['query']>) => {
+        const result = await (db.query as (...a: unknown[]) => Promise<unknown>)(...args);
+        statements += 1;
+        if (!completed) {
+          completed = true;
+          const unit = await insertUnit(EVIDENCE, 'a'.repeat(64), 1, true);
+          await insertRecord(unit, EVIDENCE, 'crash_report', '2024-04-01 00:00:00+00', 'raced_in', null);
+        }
+        return result;
+      },
+    };
+
+    const page = await getForensicRecords(racing as never, EVIDENCE, { limit: MAX_PAGE });
+    assert.equal(statements, 1, 'count and page are one statement');
+    assert.equal(page.total, page.rows.length, 'the total describes exactly the rows returned');
+    assert.equal(page.nextCursor, null);
+
+    const after = await getForensicRecords(db, EVIDENCE, { limit: MAX_PAGE });
+    assert.equal(after.total, page.total + 1, 'the raced ingest is visible to the next read');
+    await db.query(`DELETE FROM forensic_records WHERE process_name = 'raced_in'`);
+    await db.query(`DELETE FROM ingested_files WHERE file_hash = repeat('a', 64)`);
+  });
+
+  it('an empty page still reports the true total', async () => {
+    const page = await getForensicRecords(db, EVIDENCE, { text: 'no-such-process' });
+    assert.deepEqual([page.rows, page.total, page.nextCursor], [[], 0, null]);
+    const beyond = await walk({ sort: 'event_time' }, 1000);
+    const last = beyond.at(-1)!;
+    const tail = await getForensicRecords(db, EVIDENCE, {
+      limit: 1,
+      cursor: Buffer.from(JSON.stringify({ v: null, id: String(Number(last.id) + 10_000) })).toString('base64url'),
+    });
+    assert.equal(tail.rows.length, 0);
+    assert.equal(tail.total, ROWS.length + 1, 'past the last row, the total is still reported');
   });
 
   it('rejects parameters outside the allowlist', async () => {

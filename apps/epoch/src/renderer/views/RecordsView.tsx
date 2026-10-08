@@ -10,6 +10,8 @@ interface RecordsViewProps {
   loadedCount: number;
   /** Every record for the run's evidence, from the reader (R25). */
   totalCount: number;
+  /** False when the run has no registered evidence, so nothing was read. */
+  evidenceRegistered: boolean;
   availableSourceTypes: string[];
   sourceTypeFilter: string | null;
   onFilterChange: (sourceType: string | null) => void;
@@ -76,6 +78,7 @@ export function RecordsView({
   records,
   loadedCount,
   totalCount,
+  evidenceRegistered,
   availableSourceTypes,
   sourceTypeFilter,
   onFilterChange,
@@ -98,6 +101,10 @@ export function RecordsView({
 
       {!selectedRun ? (
         <p className="text-muted-foreground text-sm">Select an investigation first.</p>
+      ) : !evidenceRegistered ? (
+        <p className="text-muted-foreground text-sm">
+          This investigation's evidence isn't registered yet, so its facts haven't been read. This is not the same as finding nothing.
+        </p>
       ) : records.length === 0 && !sourceTypeFilter ? (
         <p className="text-muted-foreground text-sm">No records for this run.</p>
       ) : (

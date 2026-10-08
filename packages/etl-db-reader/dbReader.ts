@@ -283,12 +283,6 @@ export async function getForensicRecords(
     filters.push(`(process_name ILIKE $${params.length} OR bundle_id ILIKE $${params.length})`);
   }
 
-  const totalResult = await client.query<{ total: string }>(
-    `SELECT COUNT(*) AS total FROM ${source} WHERE ${filters.join(' AND ')}`,
-    params
-  );
-  const total = Number(totalResult.rows[0].total);
-
   // Keyset: rows strictly after the cursor in (col IS NULL, col, id) order.
   // NULLs sort last whatever the direction, so the null region is always the
   // tail and is walked by id alone.
@@ -311,24 +305,41 @@ export async function getForensicRecords(
   }
   pageParams.push(limit + 1);
   const dir = direction.toUpperCase();
-  // sort_value is the sort column as Postgres prints it. The cursor is built
-  // from it rather than from the mapped row, because node-postgres turns
-  // timestamptz into a JS Date, which drops microseconds: two rows in the
-  // same millisecond would then be skipped or repeated across pages.
-  const result = await client.query<ForensicRecordRow & { sort_value: string | null }>(
-    `SELECT ${RECORD_COLUMNS}, (${column})::text AS sort_value
-       FROM ${source}
-      WHERE ${pageFilters.join(' AND ')}
-      ORDER BY (${column} IS NULL), ${column} ${dir}, id ${dir}
-      LIMIT $${pageParams.length}`,
+  // ONE statement for the count and the page. Postgres takes one snapshot per
+  // statement, so `total` and `rows` always describe the same state of the
+  // views; as two queries, an ingest completing between them could give a
+  // page with more rows than `total`, or a stale total (R25). The client may
+  // be a Pool, so a transaction across two queries isn't an option.
+  //
+  // The LEFT JOIN keeps the count when the page is empty. sort_value is the
+  // sort column as Postgres prints it: the cursor is built from it, not from
+  // the mapped row, because node-postgres turns timestamptz into a JS Date,
+  // which drops microseconds and would skip or repeat rows across pages.
+  const result = await client.query<
+    { [K in keyof ForensicRecordRow]: ForensicRecordRow[K] | null } & { total: string; sort_value: string | null }
+  >(
+    `SELECT counted.total, page.*
+       FROM (SELECT COUNT(*) AS total FROM ${source} WHERE ${filters.join(' AND ')}) counted
+       LEFT JOIN LATERAL (
+         SELECT ${RECORD_COLUMNS}, (${column})::text AS sort_value
+           FROM ${source}
+          WHERE ${pageFilters.join(' AND ')}
+          ORDER BY (${column} IS NULL), ${column} ${dir}, id ${dir}
+          LIMIT $${pageParams.length}
+       ) page ON TRUE
+      ORDER BY (page.${column} IS NULL), page.${column} ${dir}, page.id ${dir}`,
     pageParams
   );
 
-  const page = result.rows.slice(0, limit);
-  const last = page.at(-1);
+  const total = Number(result.rows[0].total);
+  const fetched = result.rows.filter((row) => row.id !== null);
+  const pageRows = fetched.slice(0, limit);
+  const last = pageRows.at(-1);
   const nextCursor =
-    result.rows.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
-  const rows = page.map(({ sort_value: _cursorOnly, ...row }) => row);
+    fetched.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
+  const rows = pageRows.map(
+    ({ total: _total, sort_value: _cursorOnly, ...row }) => row as ForensicRecordRow
+  );
   return { rows, total, nextCursor };
 }
 

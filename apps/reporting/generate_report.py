@@ -320,15 +320,32 @@ RENDERERS = {
 }
 
 
-def generate_report(conn, run_id: str, evidence_id: str, output_path: str, results_path: str | None) -> None:
+def fetch_run_evidence(conn, run_id: str) -> str | None:
+    """The evidence a run processed, or None before EPOCH-404 registers it."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT evidence_id FROM pipeline_runs WHERE run_id = %s", (run_id,))
+        row = cur.fetchone()
+    return str(row[0]) if row and row[0] is not None else None
+
+
+def generate_report(
+    conn, run_id: str, evidence_id: str | None, output_path: str, results_path: str | None
+) -> None:
     """Stage status is this run's own (a run's outcome is about the run);
-    every fact is the evidence's, whichever run produced it (R7)."""
+    every fact is the evidence's, whichever run produced it (R7).
+
+    With no evidence_id given, the run's registered evidence is used. A run
+    with none still gets a report, one that says no facts were read, rather
+    than an empty report that reads like "nothing was found".
+    """
+    if evidence_id is None:
+        evidence_id = fetch_run_evidence(conn, run_id)
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     stages = fetch_stage_status(conn, run_id)
 
     lines = [
         "# Forensic Investigation Report",
-        f"**Evidence ID:** `{evidence_id}`  ",
+        f"**Evidence ID:** `{evidence_id or 'not registered'}`  ",
         f"**Run ID:** `{run_id}`  ",
         f"**Generated:** {timestamp}  ",
         "",
@@ -338,6 +355,20 @@ def generate_report(conn, run_id: str, evidence_id: str, output_path: str, resul
     lines += render_stage_preface(stages)
     lines.append("---")
     lines.append("")
+
+    if evidence_id is None:
+        lines += [
+            "## No evidence registered",
+            "",
+            "This run has no registered evidence, so no facts were read and this report "
+            "contains no findings. That is not the same as finding nothing: register the "
+            "backup (EPOCH-404's pre-flight step) and re-run to read its facts.",
+            "",
+        ]
+        with open(output_path, "w") as f:
+            f.write("\n".join(lines))
+        print(f"[reporting] wrote {output_path} (no evidence registered for run {run_id})")
+        return
 
     lines += render_correlation_section(conn, evidence_id, Path(results_path) if results_path else None)
 
@@ -389,7 +420,11 @@ def main():
     fatal_if_missing_venv()
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-id", required=True)
-    parser.add_argument("--evidence-id", required=True, help="the evidence this report covers; every fact is read by evidence (R7)")
+    parser.add_argument(
+        "--evidence-id",
+        default=None,
+        help="the evidence this report covers (R7); defaults to the run's pipeline_runs.evidence_id",
+    )
     # Passed to every stage by the orchestrator; the report reads the
     # evidence's current facts, not one derivative's.
     parser.add_argument("--derivative-id", required=False)

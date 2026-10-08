@@ -196,6 +196,45 @@ def test_the_report_shows_the_same_facts_under_either_run(db, tmp_path):
         assert f"INCIDENT-{n}" in section_a
 
 
+def test_the_report_takes_its_evidence_from_the_run_when_not_given(db, tmp_path):
+    """The orchestrator doesn't pass --evidence-id until EPOCH-404; a run
+    with registered evidence must still get its facts."""
+    if not isinstance(db, PgReal):
+        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
+    from reporting.generate_report import generate_report
+
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / "crash.ips").write_text(_valid_ips("INCIDENT-FROM-RUN"))
+    assert crash_main.run(db, ctx(RUN_A), str(backup)).failed == 0
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE pipeline_runs SET evidence_id = %s, derivative_id = %s WHERE run_id = %s",
+            (EVIDENCE, DERIVATIVE, RUN_A),
+        )
+    db.commit()
+
+    out = tmp_path / "report.md"
+    generate_report(db._conn, RUN_A, None, str(out), None)
+    report = out.read_text()
+    assert f"`{EVIDENCE}`" in report
+    assert "INCIDENT-FROM-RUN" in _crash_section(report)
+
+
+def test_a_run_without_evidence_gets_a_report_that_says_so(db, tmp_path):
+    """No evidence read must not look like nothing found."""
+    if not isinstance(db, PgReal):
+        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
+    from reporting.generate_report import generate_report
+
+    out = tmp_path / "report.md"
+    generate_report(db._conn, RUN_B, None, str(out), None)
+    report = out.read_text()
+    assert "## No evidence registered" in report
+    assert "not the same as finding nothing" in report
+    assert "## Crash Reports" not in report
+
+
 # ==========================================================================
 # No reader filters facts by run (EPOCH-403 DoD)
 # ==========================================================================

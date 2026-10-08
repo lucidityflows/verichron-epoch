@@ -104,6 +104,12 @@ export const App: React.FC = () => {
   }, [setDbStatus, setRuns, setSelectedRun]);
 
   const loadRecords = async (run: PipelineRunRow) => {
+    if (!run.evidence_id) {
+      // Nothing to read; RecordsView says the evidence isn't registered.
+      setRecords([], 0);
+      setRecordsLoaded(true);
+      return;
+    }
     try {
       // First page only, with the true total (R25). RecordsView says when it
       // is showing less than everything; the paged, server-filtered grid is
@@ -168,6 +174,7 @@ export const App: React.FC = () => {
                 records={visibleRecords}
                 loadedCount={records.length}
                 totalCount={recordsTotal}
+                evidenceRegistered={!!selectedRun?.evidence_id}
                 availableSourceTypes={availableSourceTypes}
                 sourceTypeFilter={sourceTypeFilter}
                 onFilterChange={setSourceTypeFilter}
