@@ -220,3 +220,35 @@ def test_missing_alerts_json_is_not_a_failure(db, tmp_path):
 
     assert (result.succeeded, result.failed) == (0, 0)
     assert db.ledger() == []
+
+
+# ==========================================================================
+# analysis (LLM findings)
+# ==========================================================================
+
+
+def test_llm_findings_ingest_through_the_evidence_scoped_door(db, tmp_path):
+    """The analysis stage is the fourth writer. It was missed in the first
+    EPOCH-402 pass and kept calling ingest() with a bare run_id, so every
+    file's findings failed with a TypeError. Driven end to end here so it
+    can't silently fall behind the writer's signature again."""
+    import analysis.automated_forensics as analysis_main
+
+    analyzed = tmp_path / "datausage.json"
+    analyzed.write_text("{}")
+    checkpoint = analysis_main.init_checkpoint_db(str(tmp_path / "checkpoint.db"))
+    checkpoint.execute(
+        "INSERT INTO chunk_status (file_name, chunk_index, total_chunks, status, result_rows, updated_at) "
+        "VALUES (?, 0, 1, 'flagged', ?, '2026-10-07T00:00:00Z')",
+        (analyzed.name, json.dumps(["| 101 | suspicious_proc | High | odd network use |"])),
+    )
+    checkpoint.commit()
+
+    result = analysis_main.ingest_file_findings(db, ctx(RUN_ID), str(analyzed), checkpoint, analyzed.name)
+
+    assert result.failed == 0, result.failures
+    ledger = db.ledger()
+    assert len(ledger) == 1
+    assert ledger[0]["payload_kind"] == "none"
+    assert ledger[0]["parser_version"] == analysis_main.PARSER_VERSION
+    assert db.record_count() == 1

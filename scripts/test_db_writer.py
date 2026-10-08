@@ -20,6 +20,7 @@ when its author intended, and was still wrong.
 from __future__ import annotations
 
 import re
+import sqlite3
 from pathlib import Path
 
 import psycopg2
@@ -506,6 +507,41 @@ def test_payload_kind_is_recorded_on_the_ledger(db, artifact):
     with ingest(db, ctx(), artifact, **{**UNIT, "payload_kind": "summary"}) as unit:
         unit.write([record(0)])
     assert db.ledger()[0]["payload_kind"] == "summary"
+
+
+def test_a_record_cannot_be_filed_under_another_evidences_unit(db, artifact):
+    """The composite key on forensic_records: the record's evidence must be its
+    unit's evidence. Two separate single-column keys would accept this."""
+    with ingest(db, ctx(RUN_ID, EVIDENCE_A), artifact, **UNIT) as unit:
+        unit.write([record(0)])
+        unit_of_a = unit.ingest_id
+
+    with pytest.raises((psycopg2.IntegrityError, sqlite3.IntegrityError)):
+        write_records(db, unit_of_a, EVIDENCE_B, [record(1)])
+    db.rollback()
+    assert db.record_count() == 1
+
+
+def test_a_unit_cannot_read_a_derivative_of_other_evidence(db, artifact):
+    """The composite key on ingested_files: evidence A's unit can't claim
+    evidence B's decrypted pass as its source."""
+    postgres_only(db)
+    mixed = IngestContext(evidence_id=EVIDENCE_A, derivative_id=DERIVATIVE_B, run_id=RUN_ID)
+    with pytest.raises(psycopg2.IntegrityError, match="ingested_files_derivative_same_evidence"):
+        with ingest(db, mixed, artifact, **UNIT) as unit:
+            unit.write([record(0)])
+    assert db.ledger() == []
+
+
+def test_a_run_cannot_pair_evidence_with_another_evidences_derivative(db):
+    postgres_only(db)
+    with pytest.raises(psycopg2.IntegrityError, match="pipeline_runs_derivative_same_evidence"):
+        with db.cursor() as cur:
+            cur.execute(
+                "UPDATE pipeline_runs SET evidence_id = %s, derivative_id = %s WHERE run_id = %s",
+                (EVIDENCE_A, DERIVATIVE_B, RUN_ID),
+            )
+    db.rollback()
 
 
 def test_deleting_a_run_deletes_no_evidence_or_facts(db, artifact):

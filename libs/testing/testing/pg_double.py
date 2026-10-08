@@ -73,6 +73,7 @@ CREATE TABLE ingested_files (
     record_count     INTEGER,
     completed_at     TEXT,
     UNIQUE (evidence_id, file_hash, source_type, parser_version),
+    UNIQUE (ingest_id, evidence_id),
     CHECK (
         (ingest_complete = 1 AND record_count IS NOT NULL AND completed_at IS NOT NULL)
         OR
@@ -82,7 +83,7 @@ CREATE TABLE ingested_files (
 
 CREATE TABLE forensic_records (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    ingest_id       INTEGER NOT NULL REFERENCES ingested_files(ingest_id),
+    ingest_id       INTEGER NOT NULL,
     evidence_id     TEXT NOT NULL,
     incident_id     TEXT,
     source_type     TEXT NOT NULL,
@@ -91,7 +92,9 @@ CREATE TABLE forensic_records (
     process_name    TEXT,
     pid             INTEGER,
     bundle_id       TEXT,
-    fields          TEXT NOT NULL DEFAULT '{}'
+    fields          TEXT NOT NULL DEFAULT '{}',
+    -- Same composite key as 0003: a record's evidence must be its unit's.
+    FOREIGN KEY (ingest_id, evidence_id) REFERENCES ingested_files(ingest_id, evidence_id)
 );
 """
 

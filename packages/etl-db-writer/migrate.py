@@ -45,16 +45,39 @@ def ensure_migrations_table(conn) -> None:
     conn.commit()
 
 
-#: For each migration, a query that is true once its schema exists. Used only
-#: by bootstrap_if_needed(); add an entry with every new migration.
-APPLIED_MARKERS: dict[str, str] = {
-    "0001_init.sql": "SELECT to_regclass('pipeline_runs') IS NOT NULL",
-    "0002_ingest_completion.sql": (
+def _relation(name: str) -> str:
+    return f"SELECT to_regclass('{name}') IS NOT NULL"
+
+
+def _column(table: str, column: str) -> str:
+    return (
         "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
-        "WHERE table_name = 'ingested_files' AND column_name = 'ingest_complete')"
+        f"WHERE table_name = '{table}' AND column_name = '{column}')"
+    )
+
+
+#: For each migration, two checks: `started` is true once its FIRST object
+#: exists, `finished` once its LAST statement has run. Used only by
+#: bootstrap_if_needed(); add an entry with every new migration, and keep
+#: `finished` pointed at whatever that file creates last.
+APPLIED_MARKERS: dict[str, tuple[str, str]] = {
+    "0001_init.sql": (
+        _relation("pipeline_runs"),
+        _relation("idx_forensic_fields_gin"),
     ),
-    "0003_evidence_schema.sql": "SELECT to_regclass('evidence_items') IS NOT NULL",
+    "0002_ingest_completion.sql": (
+        _column("ingested_files", "ingest_complete"),
+        _relation("idx_ingested_files_incomplete"),
+    ),
+    "0003_evidence_schema.sql": (
+        _relation("devices"),
+        f"SELECT ({_relation('idx_forensic_fields_gin')}) AND ({_column('forensic_records', 'ingest_id')})",
+    ),
 }
+
+
+class PartialMigrationError(RuntimeError):
+    """A migration applied outside this script stopped part-way."""
 
 
 def bootstrap_if_needed(conn) -> None:
@@ -66,34 +89,60 @@ def bootstrap_if_needed(conn) -> None:
     so a brand-new dev volume runs EVERY .sql file at first boot, while
     schema_migrations stays empty because that hook doesn't know this script
     exists. Without this, the first `migrate.py` run would re-apply those files
-    and fail on "relation already exists" -- not because anything is wrong,
-    just because two mechanisms applied the same files.
+    and fail on "relation already exists".
 
-    Each migration declares a marker (APPLIED_MARKERS); a migration whose
-    marker already holds but which the ledger doesn't list is recorded instead
-    of re-run. A missing marker entry fails loudly, so a new migration can't
-    silently skip this check.
+    initdb runs each file with psql outside a transaction, so a first boot that
+    stops mid-file leaves a migration half-applied. Each migration therefore
+    has two markers (APPLIED_MARKERS): it is recorded only when its LAST
+    statement's effect is present, and a migration that started but did not
+    finish raises PartialMigrationError instead of being reported as up to
+    date. A missing marker entry fails loudly, so a new migration can't skip
+    this check.
     """
     with conn.cursor() as cur:
         cur.execute("SELECT filename FROM schema_migrations")
         applied = {row[0] for row in cur.fetchall()}
 
-    for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+    paths = sorted(MIGRATIONS_DIR.glob("*.sql"))
+    missing = [path.name for path in paths if path.name not in APPLIED_MARKERS]
+    if missing:
+        raise RuntimeError(
+            f"{', '.join(missing)} has no entry in APPLIED_MARKERS; add one so a database "
+            "initialized by docker-entrypoint-initdb.d can be reconciled"
+        )
+
+    def holds(sql: str) -> bool:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return bool(cur.fetchone()[0])
+
+    # Migrations apply in order, so the newest one that STARTED is the one
+    # that matters: if it finished, every earlier one did too, even when a
+    # later migration has since dropped an earlier one's marker objects (0003
+    # rebuilds the tables 0001 and 0002 created). Judging each file on its own
+    # markers would blame the wrong file after an interrupted 0003.
+    newest_started = None
+    for index, path in enumerate(paths):
+        if holds(APPLIED_MARKERS[path.name][0]):
+            newest_started = index
+    if newest_started is None:
+        conn.commit()
+        return
+
+    newest = paths[newest_started]
+    if not holds(APPLIED_MARKERS[newest.name][1]):
+        conn.rollback()
+        raise PartialMigrationError(
+            f"{newest.name} was only partly applied outside this script (probably an "
+            "interrupted docker-entrypoint-initdb.d first boot). Its first objects exist "
+            "but its last statement never ran, so the schema is inconsistent. Recreate the "
+            "database volume and start again; a first boot that stopped part-way holds no "
+            "evidence."
+        )
+
+    for path in paths[: newest_started + 1]:
         if path.name in applied:
             continue
-        marker = APPLIED_MARKERS.get(path.name)
-        if marker is None:
-            raise RuntimeError(
-                f"{path.name} has no entry in APPLIED_MARKERS; add one so a database "
-                "initialized by docker-entrypoint-initdb.d can be reconciled"
-            )
-        with conn.cursor() as cur:
-            cur.execute(marker)
-            already_there = bool(cur.fetchone()[0])
-        if not already_there:
-            # Everything from here on is genuinely pending; leave it to the
-            # normal apply loop.
-            break
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO schema_migrations (filename) VALUES (%s) ON CONFLICT DO NOTHING",
@@ -138,7 +187,11 @@ def main() -> None:
 
     try:
         ensure_migrations_table(conn)
-        bootstrap_if_needed(conn)
+        try:
+            bootstrap_if_needed(conn)
+        except PartialMigrationError as e:
+            print(f"[migrate] {e}", file=sys.stderr)
+            sys.exit(1)
 
         pending = pending_migrations(conn)
         if not pending:

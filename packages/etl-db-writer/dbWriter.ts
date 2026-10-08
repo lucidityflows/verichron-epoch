@@ -90,7 +90,16 @@ export interface IngestParams {
   rawPayload?: Record<string, unknown>;
 }
 
-function assertContext(ctx: IngestContext): void {
+/**
+ * Validate the caller's context and return a frozen copy of its three IDs.
+ *
+ * ingest() reads identity across several awaits and again inside
+ * `unit.write()`. Holding the caller's object would let a caller that reuses
+ * it for the next evidence item, mid-ingest, split one unit across two
+ * evidence items: the ledger row under one, its records or run label under
+ * the other. Python gets this from a frozen dataclass; here it's a copy.
+ */
+function fixContext(ctx: IngestContext): Readonly<IngestContext> {
   for (const key of ['evidenceId', 'derivativeId', 'runId'] as const) {
     if (!ctx?.[key]) {
       throw new Error(
@@ -99,6 +108,7 @@ function assertContext(ctx: IngestContext): void {
       );
     }
   }
+  return Object.freeze({ evidenceId: ctx.evidenceId, derivativeId: ctx.derivativeId, runId: ctx.runId });
 }
 
 /**
@@ -109,7 +119,7 @@ export class IngestUnit {
 
   constructor(
     private readonly client: Db,
-    private readonly ctx: IngestContext,
+    private readonly ctx: Readonly<IngestContext>,
     public readonly filePath: string,
     public readonly fileHash: string,
     public readonly ingestId: string,
@@ -165,7 +175,7 @@ export interface IngestOutcome<T> {
 }
 
 /** Record this run on the unit's produced_by_runs (R7), once. Audit only. */
-async function labelRun(client: Db, ctx: IngestContext, ingestId: string): Promise<void> {
+async function labelRun(client: Db, ctx: Readonly<IngestContext>, ingestId: string): Promise<void> {
   await client.query(
     `UPDATE ingested_files
         SET produced_by_runs = array_append(produced_by_runs, $1::uuid)
@@ -199,11 +209,12 @@ async function labelRun(client: Db, ctx: IngestContext, ingestId: string): Promi
  */
 export async function ingest<T>(
   client: Db,
-  ctx: IngestContext,
+  callerCtx: IngestContext,
   params: IngestParams,
   body: (unit: IngestUnit) => Promise<T>
 ): Promise<IngestOutcome<T>> {
-  assertContext(ctx);
+  // Every use of identity below reads this frozen copy, never callerCtx.
+  const ctx = fixContext(callerCtx);
   const { filePath, sourceType, parserVersion, payloadKind, rawPayload } = params;
   if (!Number.isInteger(parserVersion) || parserVersion < 1) {
     throw new Error(`parserVersion must be an integer >= 1, got ${parserVersion}`);

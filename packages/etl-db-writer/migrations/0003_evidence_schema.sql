@@ -65,12 +65,19 @@ CREATE TABLE evidence_locations (
 CREATE TABLE evidence_derivatives (
     derivative_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     evidence_id           UUID NOT NULL REFERENCES evidence_items (evidence_id),
-    parent_derivative_id  UUID REFERENCES evidence_derivatives (derivative_id),
+    parent_derivative_id  UUID,
     kind                  TEXT NOT NULL CHECK (kind IN ('decrypted', 'mvt_results')),
     path                  TEXT NOT NULL,
     tool                  JSONB NOT NULL DEFAULT '{}'::jsonb,
     params                JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Target for the composite foreign keys below: a reference to a
+    -- derivative also names its evidence, and the pair must match.
+    CONSTRAINT evidence_derivatives_id_evidence UNIQUE (derivative_id, evidence_id),
+    -- A pass derived from another pass belongs to the same evidence.
+    CONSTRAINT evidence_derivatives_parent_same_evidence
+        FOREIGN KEY (parent_derivative_id, evidence_id)
+        REFERENCES evidence_derivatives (derivative_id, evidence_id)
 );
 
 CREATE INDEX idx_evidence_derivatives_evidence ON evidence_derivatives (evidence_id);
@@ -108,9 +115,14 @@ CREATE TRIGGER evidence_events_immutable
 -- registration sets them on every new run.
 ALTER TABLE pipeline_runs
     ADD COLUMN evidence_id      UUID REFERENCES evidence_items (evidence_id),
-    ADD COLUMN derivative_id    UUID REFERENCES evidence_derivatives (derivative_id),
+    ADD COLUMN derivative_id    UUID,
     ADD COLUMN contract_version TEXT,
-    ADD COLUMN tool_versions    JSONB;
+    ADD COLUMN tool_versions    JSONB,
+    -- The run's derivative must be a pass over the run's evidence. Unchecked
+    -- while either is still NULL (MATCH SIMPLE), i.e. until EPOCH-404.
+    ADD CONSTRAINT pipeline_runs_derivative_same_evidence
+        FOREIGN KEY (derivative_id, evidence_id)
+        REFERENCES evidence_derivatives (derivative_id, evidence_id);
 
 -- Existing rows predate R35 and have no provenance to record; every run
 -- created from here on must carry it.
@@ -131,7 +143,7 @@ DROP TABLE ingested_files;
 CREATE TABLE ingested_files (
     ingest_id         BIGSERIAL PRIMARY KEY,
     evidence_id       UUID NOT NULL REFERENCES evidence_items (evidence_id),
-    derivative_id     UUID NOT NULL REFERENCES evidence_derivatives (derivative_id),
+    derivative_id     UUID NOT NULL,
     file_hash         TEXT NOT NULL,
     source_type       TEXT NOT NULL,
     parser_version    INTEGER NOT NULL CHECK (parser_version >= 1),
@@ -149,6 +161,13 @@ CREATE TABLE ingested_files (
     completed_at      TIMESTAMPTZ,
     CONSTRAINT ingested_files_unit_unique
         UNIQUE (evidence_id, file_hash, source_type, parser_version),
+    -- The derivative a unit was read from must be a pass over that unit's
+    -- evidence; separate single-column keys would accept A's unit with B's pass.
+    CONSTRAINT ingested_files_derivative_same_evidence
+        FOREIGN KEY (derivative_id, evidence_id)
+        REFERENCES evidence_derivatives (derivative_id, evidence_id),
+    -- Target for forensic_records' composite key.
+    CONSTRAINT ingested_files_id_evidence UNIQUE (ingest_id, evidence_id),
     CONSTRAINT ingested_files_completion_consistent CHECK (
         (ingest_complete AND record_count IS NOT NULL AND completed_at IS NOT NULL)
         OR
@@ -169,8 +188,10 @@ CREATE INDEX idx_ingested_files_latest
 
 CREATE TABLE forensic_records (
     id            BIGSERIAL PRIMARY KEY,
-    ingest_id     BIGINT NOT NULL REFERENCES ingested_files (ingest_id),
-    -- Denormalized from ingested_files for the evidence-scoped read path.
+    ingest_id     BIGINT NOT NULL,
+    -- Denormalized from ingested_files for the evidence-scoped read path. The
+    -- composite key below guarantees it is the unit's own evidence, so a
+    -- record can never be filed under the wrong evidence.
     evidence_id   UUID NOT NULL REFERENCES evidence_items (evidence_id),
     incident_id   TEXT,
     source_type   TEXT NOT NULL,
@@ -179,7 +200,10 @@ CREATE TABLE forensic_records (
     process_name  TEXT,
     pid           INTEGER,
     bundle_id     TEXT,
-    fields        JSONB NOT NULL DEFAULT '{}'::jsonb
+    fields        JSONB NOT NULL DEFAULT '{}'::jsonb,
+    CONSTRAINT forensic_records_unit_same_evidence
+        FOREIGN KEY (ingest_id, evidence_id)
+        REFERENCES ingested_files (ingest_id, evidence_id)
 );
 
 CREATE INDEX idx_forensic_ingest ON forensic_records (ingest_id);
