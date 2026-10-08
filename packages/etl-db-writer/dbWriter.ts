@@ -74,8 +74,6 @@ export interface IngestContext {
   evidenceId: string;
   derivativeId: string;
   runId: string;
-  /** The stage's parserVersion from its stage.json, via the orchestrator (EPOCH-404). */
-  parserVersion: number;
 }
 
 export const PAYLOAD_KINDS = ['full', 'summary', 'none'] as const;
@@ -84,22 +82,15 @@ export type PayloadKind = (typeof PAYLOAD_KINDS)[number];
 export interface IngestParams {
   filePath: string;
   sourceType: string;
+  /** The extractor's integer PARSER_VERSION; a bump makes a new unit (R8). */
+  parserVersion: number;
   /** What `rawPayload` holds (R12). */
   payloadKind: PayloadKind;
   /** Attach now if known; otherwise call `unit.setRawPayload()` after parsing. */
   rawPayload?: Record<string, unknown>;
 }
 
-/**
- * Validate the caller's context and return a frozen copy of its three IDs.
- *
- * ingest() reads identity across several awaits and again inside
- * `unit.write()`. Holding the caller's object would let a caller that reuses
- * it for the next evidence item, mid-ingest, split one unit across two
- * evidence items: the ledger row under one, its records or run label under
- * the other. Python gets this from a frozen dataclass; here it's a copy.
- */
-function fixContext(ctx: IngestContext): Readonly<IngestContext> {
+function assertContext(ctx: IngestContext): void {
   for (const key of ['evidenceId', 'derivativeId', 'runId'] as const) {
     if (!ctx?.[key]) {
       throw new Error(
@@ -108,15 +99,6 @@ function fixContext(ctx: IngestContext): Readonly<IngestContext> {
       );
     }
   }
-  if (!Number.isInteger(ctx.parserVersion) || ctx.parserVersion < 1) {
-    throw new Error(`IngestContext.parserVersion must be an integer >= 1, got ${ctx.parserVersion}`);
-  }
-  return Object.freeze({
-    evidenceId: ctx.evidenceId,
-    derivativeId: ctx.derivativeId,
-    runId: ctx.runId,
-    parserVersion: ctx.parserVersion,
-  });
 }
 
 /**
@@ -127,7 +109,7 @@ export class IngestUnit {
 
   constructor(
     private readonly client: Db,
-    private readonly ctx: Readonly<IngestContext>,
+    private readonly ctx: IngestContext,
     public readonly filePath: string,
     public readonly fileHash: string,
     public readonly ingestId: string,
@@ -183,7 +165,7 @@ export interface IngestOutcome<T> {
 }
 
 /** Record this run on the unit's produced_by_runs (R7), once. Audit only. */
-async function labelRun(client: Db, ctx: Readonly<IngestContext>, ingestId: string): Promise<void> {
+async function labelRun(client: Db, ctx: IngestContext, ingestId: string): Promise<void> {
   await client.query(
     `UPDATE ingested_files
         SET produced_by_runs = array_append(produced_by_runs, $1::uuid)
@@ -196,7 +178,7 @@ async function labelRun(client: Db, ctx: Readonly<IngestContext>, ingestId: stri
  * Atomic ingest of one file: ledger row + records + completion flag, or nothing.
  *
  * ```ts
- * await ingest(client, ctx, { filePath, sourceType, payloadKind }, async (unit) => {
+ * await ingest(client, ctx, { filePath, sourceType, parserVersion, payloadKind }, async (unit) => {
  *   if (unit.alreadyIngested) return;
  *   await unit.write(records);
  * });
@@ -217,14 +199,15 @@ async function labelRun(client: Db, ctx: Readonly<IngestContext>, ingestId: stri
  */
 export async function ingest<T>(
   client: Db,
-  callerCtx: IngestContext,
+  ctx: IngestContext,
   params: IngestParams,
   body: (unit: IngestUnit) => Promise<T>
 ): Promise<IngestOutcome<T>> {
-  // Every use of identity below reads this frozen copy, never callerCtx.
-  const ctx = fixContext(callerCtx);
-  const { filePath, sourceType, payloadKind, rawPayload } = params;
-  const { parserVersion } = ctx;
+  assertContext(ctx);
+  const { filePath, sourceType, parserVersion, payloadKind, rawPayload } = params;
+  if (!Number.isInteger(parserVersion) || parserVersion < 1) {
+    throw new Error(`parserVersion must be an integer >= 1, got ${parserVersion}`);
+  }
   if (!PAYLOAD_KINDS.includes(payloadKind)) {
     throw new Error(`payloadKind must be one of ${PAYLOAD_KINDS.join(', ')}, got ${payloadKind}`);
   }

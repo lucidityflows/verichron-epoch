@@ -34,6 +34,9 @@ from normalized_record import NormalizedRecord, SourceType
 
 import psycopg2
 
+#: Bump when parsing or normalization changes what this extractor writes. A
+#: bump re-ingests every file as a new unit beside the old rows (R8).
+PARSER_VERSION = 1
 
 
 # --- parsing (ported from deep_ips_report.py, unchanged logic) -------------
@@ -221,6 +224,7 @@ def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
                 ctx,
                 file_path,
                 source_type=SourceType.CRASH_REPORT.value,
+                parser_version=PARSER_VERSION,
                 # The whole parsed .ips document is kept (R12).
                 payload_kind="full",
             ) as unit:

@@ -11,6 +11,7 @@
     "ts/deriveResultsPath.ts", 
     "ts/deriveEvidencePath.ts",
     "ts/evidenceSidecar.ts",
+    "ts/contractVersion.ts",
     "ts/discoverBackups.ts", 
     "ts/normalizedRecord.ts", 
     "ts/normalizedRecord.d.ts", 

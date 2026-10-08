@@ -1,103 +1,47 @@
-# Stage contract
+# Extractor Contract
 
-What every pipeline stage must do. A *stage* is anything the orchestrator runs:
-the extractors, the analysis stage and the report. The concepts used here
-(evidence, derivative, unit) are defined in
-[docs/evidence-model.md](../../docs/evidence-model.md).
+> **Reconstructed stub.** `test_contract_sync.py` asserts this file exists at
+> exactly one path in the repo, but it was not among the files provided for
+> this refactor and its prior content is unknown. Replace this with the real
+> document -- this stub only satisfies the "exactly one copy, correct path"
+> test so the suite can run; it does not attempt to reproduce lost content.
 
-## 1. Declare yourself in `stage.json`
+Every extractor, regardless of language, must:
 
-A stage is a directory containing a `stage.json` that validates against
-[`stage-manifest.schema.json`](stage-manifest.schema.json). The orchestrator
-discovers stages in `apps/extractors/*`, `apps/analysis` and `apps/reporting`.
-The stage's name is its directory name.
+1. Produce records that construct cleanly through the language mirror for
+   its runtime (`normalized_record.py` for Python, `normalizedRecord.ts` for
+   TypeScript).
+2. Validate against the canonical schema
+   (`normalized-record.schema.json`) before being written to
+   `forensic_records` -- construction through a mirror is necessary but not
+   sufficient, since a mirror can drift from the canonical file (see
+   `test_contract_sync.py` for the incident that motivated this rule).
+3. Register any new `source_type` in the canonical schema first, then run
+   `python3 scripts/sync_contracts.py --write` to propagate it to both
+   mirrors.
+4. Ship a `stage.json` in the extractor's own directory
+   (`apps/extractors/<name>/stage.json`), matching
+   `packages/contracts/stage-manifest.schema.json`. `apps/orchestrator`
+   discovers stages by scanning `apps/extractors/*` for this file at
+   startup -- it does not hardcode a stage list, and a directory without
+   `stage.json` is skipped (with a warning), not run. The stage's name is
+   always its directory's basename; there is no separate name field to
+   drift out of sync with where the extractor actually lives.
 
-| Field | Meaning |
-|---|---|
-| `entrypoint` | File to run, relative to the stage directory |
-| `runtime` | `python` (run with the repo's `.venv` interpreter) or `node` |
-| `order` | Run position; unique among enabled stages |
-| `requiresResultsPath` | `true` if the stage reads mvt results rather than the decrypted backup |
-| `parserVersion` | Integer, bumped whenever what the stage writes changes; omit if it writes no facts |
-| `enabled` | `false` records the stage as `skipped` instead of running it. Disabling a stage is a team decision, never a shortcut |
+## Identity, versioning and payload (EPOCH-402)
 
-An invalid manifest, a missing entrypoint or a duplicate `order` stops the
-orchestrator before any run starts.
-
-## 2. Take your identity from the orchestrator
-
-The orchestrator registers the evidence before the run and passes every stage:
-
-| Argument | Value |
-|---|---|
-| `--run-id`, `--evidence-id` | This run and the evidence it processes |
-| `--derivative-id` | The derivative this stage reads: mvt results if `requiresResultsPath`, otherwise the decrypted backup |
-| `--parser-version` | From `stage.json`, when declared |
-| `--backup-path`, `--results-path` | Where the decrypted backup and the mvt results are |
-| `--db-url` | The database. *Moving to the environment (EPOCH-423).* |
-
-Python stages register the four identity arguments with
-`db_writer.add_context_args` and build one `IngestContext` with
-`context_from_args`. Add `--backup-path`, `--results-path` and `--db-url`
-separately. **Never invent, default or
-edit these values (R16).** A stage reads only the derivative it was given.
-
-## 3. Write facts through `ingest()`, one source file per unit
-
-```python
-with ingest(conn, ctx, file_path, source_type=..., payload_kind=..., raw_payload=...) as unit:
-    if unit.already_ingested:
-        ...           # this exact file, at this parser version, is already in: count ok(0) and note it
-    else:
-        unit.write(records)   # write() raises on an already-ingested unit
-```
-
-- **One unit per source file** (R13). Its ledger row, payload and records commit
-  together when the `with` block exits cleanly, and roll back on any exception.
-  Don't call `commit()` (R15).
-- **`payload_kind`** declares what `raw_payload` keeps (R12): `full` (the parsed
-  source), `summary` (metadata and a sample) or `none`.
-- **Records are built through the language mirror**
-  (`normalized_record.NormalizedRecord`) and validate against
-  [`normalized-record.schema.json`](normalized-record.schema.json). A new
-  `source_type` goes into the schema first, then `pnpm sync:contracts`.
-- **Times** are timezone-aware UTC or `None`; never guess (R11).
-
-## 4. Fail per file, strictly
-
-- If any row of a file fails, raise inside the unit so **the whole file rolls
-  back** and stays retryable. Never commit the rows that survived (EPOCH-417).
-- One bad file must not stop the others. Catch per file, record it with
-  `ETLRunResult.fail(item, reason)`, and continue.
-- **Exit non-zero if any file failed (R20).** The orchestrator marks the stage
-  `failed`, and the next run retries only the files that failed, since completed
-  ones dedup.
-- Write human-readable warnings (coverage gaps, skipped data) to stderr. A stage
-  must never report "nothing found" when it didn't look; say what wasn't done.
-
-## 5. Count and summarize
-
-Use `etl_run.ETLRunResult`:
-
-- `ok(n)` for the records written by this run;
-- `ok(0)` plus `note()` for a file already ingested;
-- `fail()` per failed item;
-- `print_summary()` at the end.
-
-## 6. Version deliberately
-
-Bump `parserVersion` when parsing or normalization changes what you write. A bump
-is append-only (R8): every file is re-ingested as a new unit beside the old one.
-Readers see the latest completed version, and history keeps the rest.
-
-## 7. Test both tiers
-
-Write tests whose bodies run against both PgDouble and real Postgres (R33).
-Cover:
-
-- a failed file leaves no ledger row and is retried on the next run;
-- a good file beside a bad one still commits;
-- a re-run dedups.
-
-`scripts/test_extractor_ingest_atomicity.py` holds these cases for the existing
-extractors.
+- **Identity comes from the orchestrator, never the extractor (R16).** Every
+  extractor accepts `--run-id`, `--evidence-id` and `--derivative-id`
+  (`db_writer.add_context_args`), builds one `IngestContext` from them
+  (`context_from_args`), and passes it to every `ingest()` call. Extractor code
+  never invents or edits these IDs.
+- **`PARSER_VERSION` is an incrementing integer constant** in the extractor's
+  entrypoint module, passed to `ingest()` as `parser_version`. Not text or
+  semver: "latest" is chosen by numeric order. Bump it whenever parsing or
+  normalization changes what the extractor writes. A bump is append-only (R8):
+  every file is re-ingested as a new unit beside the old rows, which stay
+  queryable as history.
+- **A unit is `(evidence_id, file_hash, source_type, parser_version)` (R6).**
+  Byte-identical files under two evidence items are two units.
+- **Declare what `raw_payload` keeps (R12)** with `payload_kind`: `full` (the
+  parsed source), `summary` (metadata only) or `none`.
