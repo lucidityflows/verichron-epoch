@@ -26,11 +26,16 @@ before(() => {
   mkdirSync(path.join(source, 'BK1'), { recursive: true });
   writeFileSync(path.join(source, 'BK1', 'Manifest.db'), 'db');
   writeFileSync(path.join(source, 'BK1', 'version.txt'), 'v1');
+  // A second backup, to show one backup's failure doesn't stop the others.
+  mkdirSync(path.join(source, 'BK2'), { recursive: true });
+  writeFileSync(path.join(source, 'BK2', 'Manifest.db'), 'db2');
+  writeFileSync(path.join(source, 'BK2', 'version.txt'), 'w1');
 
   // decrypt-backup -p PW -d DEST SRC  -> DEST/from-<version>.txt
   // check-backup --output OUT DIR     -> OUT/
   // STUB_DECRYPT=fail: write part of the decrypt, then fail (not a password error).
   // STUB_DECRYPT=mutate: decrypt, then change the source, as if it changed mid-decrypt.
+  // STUB_DECRYPT=unplug: decrypt BK1, then remove its source, as if the drive disconnected.
   stub = path.join(tmp, 'mvt-stub');
   writeFileSync(
     stub,
@@ -39,7 +44,8 @@ case "$1" in
   decrypt-backup)
     mkdir -p "$5" && touch "$5/from-$(cat "$6/version.txt").txt" "$5/Manifest.db"
     if [ "$STUB_DECRYPT" = fail ]; then echo "disk error mid-decrypt" >&2; exit 2; fi
-    if [ "$STUB_DECRYPT" = mutate ]; then echo "mutated" > "$6/version.txt"; fi ;;
+    if [ "$STUB_DECRYPT" = mutate ]; then echo "mutated" > "$6/version.txt"; fi
+    if [ "$STUB_DECRYPT" = unplug ] && [ "$(basename "$6")" = BK1 ]; then rm -rf "$6"; fi ;;
   check-backup) mkdir -p "$3" ;;
 esac
 exit 0
@@ -115,5 +121,14 @@ describe('decrypt provenance', () => {
     const out = await runCli(['--force-decrypt'], 'mutate');
     assert.match(out, /backup changed while it was being decrypted/);
     assert.equal(readDerivativeMarker(decrypted(), DECRYPT_MARKER), null);
+  });
+
+  it('a source that disappears after decrypting fails that backup, and the rest still run', async () => {
+    // BK1's last decrypt was refused (previous test), so this run re-decrypts it.
+    const out = await runCli([], 'unplug');
+    assert.match(out, /\[decrypt\] error: could not re-check the backup after decrypting/);
+    assert.equal(readDerivativeMarker(decrypted(), DECRYPT_MARKER), null, 'an unattributable decrypt gets no marker');
+    assert.match(out, /=== BK2 ===/);
+    assert.match(out, /summary written to/, 'the run finished instead of crashing on the first failure');
   });
 });

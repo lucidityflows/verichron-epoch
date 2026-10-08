@@ -229,7 +229,19 @@ async function run(cfg: Config): Promise<void> {
       // (cheap: unchanged files hit the stat cache); if the backup changed
       // in between, the decrypt may be of a different version, so it gets no
       // marker and registration will refuse it.
-      const recheck = await hashTree(src, { cachePath: deriveEvidencePath(cfg.workspace, name).fingerprints });
+      let recheck: Awaited<ReturnType<typeof hashTree>>;
+      try {
+        recheck = await hashTree(src, { cachePath: deriveEvidencePath(cfg.workspace, name).fingerprints });
+      } catch (err) {
+        // e.g. the source drive disconnected after decrypt-backup finished.
+        // The decrypt can't be attributed to a root, so it gets no marker;
+        // this backup is failed and the rest still run, as with the first hash.
+        console.error(
+          `  [decrypt] error: could not re-check the backup after decrypting: ${err instanceof Error ? err.message : err}`
+        );
+        failedBackups.add(name);
+        continue;
+      }
       if (recheck.contentRoot !== contentRoot) {
         console.error(
           "  [decrypt] error: the backup changed while it was being decrypted; re-run to re-hash and re-decrypt it"
