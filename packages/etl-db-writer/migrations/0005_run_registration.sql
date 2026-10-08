@@ -36,8 +36,13 @@ FROM pipeline_runs r;
 COMMENT ON VIEW run_completeness IS
     'The single run-completeness predicate (R23, EPOCH-404): running | incomplete | complete. Callers must not re-derive it.';
 
--- A derivative is identified, for registration, by the evidence it came from,
--- its kind, and where it lives: registering the same decrypt again finds the
--- existing row instead of minting a new one each run.
+-- A derivative is identified by the evidence it came from, its kind and the
+-- derivative it was made from -- NOT by where it lives. `path` is its
+-- last-known location, updated on registration, so a workspace moved to
+-- another mount resumes instead of minting a new derivative and re-running
+-- every stage. (One decrypt per evidence, and one results set per decrypt;
+-- EPOCH-406 extends this when the IOC set distinguishes result sets.)
+-- NULLS NOT DISTINCT: a decrypt has no parent, and two NULL parents must
+-- still collide.
 CREATE UNIQUE INDEX evidence_derivatives_identity
-    ON evidence_derivatives (evidence_id, kind, path);
+    ON evidence_derivatives (evidence_id, kind, parent_derivative_id) NULLS NOT DISTINCT;

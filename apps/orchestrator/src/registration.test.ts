@@ -10,12 +10,16 @@
 
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { promisify } from 'node:util';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 import pg from 'pg';
+
+import { CHECK_MARKER, DECRYPT_MARKER, renderDerivativeMarker } from '@verichron/contracts';
 
 import { getRunState, hasSucceededRun } from './db.js';
 import { runPipelineForBackup } from './pipeline.js';
@@ -95,7 +99,12 @@ function infoPlist(udid: string, name: string): string {
  * EPOCH-401 evidence files (content-addressed manifest + sidecar). */
 function makeWorkspace(
   name: string,
-  { manifest = 'a'.repeat(64) + '  Manifest.db\n', sourcePath = `/media/source/${name}`, label = 'BK1', results = true } = {}
+  {
+    manifest = 'a'.repeat(64) + '  Manifest.db\n',
+    sourcePath = `/media/source/${name}`,
+    label = 'BK1',
+    results = true,
+  }: { manifest?: string; sourcePath?: string; label?: string; results?: boolean } = {}
 ): Workspace {
   const workspace = path.join(tmp, name);
   const backupPath = path.join(workspace, 'decrypted', label);
@@ -103,9 +112,14 @@ function makeWorkspace(
   mkdirSync(backupPath, { recursive: true });
   writeFileSync(path.join(backupPath, 'Manifest.db'), '');
   writeFileSync(path.join(backupPath, 'Info.plist'), infoPlist(UDID, 'Alice &amp; Bob&apos;s iPhone'));
-  if (results) mkdirSync(resultsPath, { recursive: true });
-
   const contentRoot = createHash('sha256').update(manifest).digest('hex');
+  // Provenance markers, as mvt-runner writes them once each derivative is done.
+  writeFileSync(path.join(backupPath, DECRYPT_MARKER), renderDerivativeMarker(contentRoot));
+  if (results) {
+    mkdirSync(resultsPath, { recursive: true });
+    writeFileSync(path.join(resultsPath, CHECK_MARKER), renderDerivativeMarker(contentRoot));
+  }
+
   const evidenceDir = path.join(workspace, 'evidence', label);
   mkdirSync(path.join(evidenceDir, 'manifests'), { recursive: true });
   writeFileSync(path.join(evidenceDir, 'manifests', `${contentRoot}.sha256`), manifest);
@@ -174,6 +188,22 @@ describe('device identity', () => {
     assert.equal(deviceKey(` ${UDID.toLowerCase()} `, secret), key, 'UDID case and spacing do not split a device');
   });
 
+  it('concurrent first use publishes one complete secret that every process reads', async () => {
+    const shared = path.join(tmp, 'race', 'device-key.secret');
+    const script = `import { loadDeviceSecret } from ${JSON.stringify(path.resolve(import.meta.dirname, 'registration.ts'))};
+      process.stdout.write(loadDeviceSecret(${JSON.stringify(shared)}).toString('hex'));`;
+    const run = promisify(execFile);
+    const outputs = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        run(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { cwd: import.meta.dirname })
+      )
+    );
+    const secrets = new Set(outputs.map((o) => o.stdout));
+    assert.equal(secrets.size, 1, 'every racing process read the same secret');
+    assert.match([...secrets][0], /^[0-9a-f]{64}$/);
+    assert.deepEqual(readdirSync(path.dirname(shared)), ['device-key.secret'], 'no staging files left behind');
+  });
+
   it('refuses a secret other users can read', { skip: process.platform === 'win32' }, () => {
     const loose = path.join(tmp, 'loose', 'device-key.secret');
     loadDeviceSecret(loose);
@@ -218,6 +248,23 @@ describe('pre-flight registration', live, () => {
     ]);
   });
 
+  it('a workspace moved to another path keeps its derivatives and resumes', async () => {
+    const ws = makeWorkspace('moving');
+    const first = await run(ws.backupPath);
+    assert.ok(first.runId);
+
+    const moved = path.join(tmp, 'moved-elsewhere');
+    cpSync(ws.workspace, moved, { recursive: true });
+    const second = await run(path.join(moved, 'decrypted', 'BK1'));
+
+    assert.equal(second.skipped, true, 'the completed run is found, not redone');
+    const { rows } = await db.query<{ kind: string; path: string }>(
+      `SELECT kind, path FROM evidence_derivatives ORDER BY kind`
+    );
+    assert.equal(rows.length, 2, 'one decrypt and one results derivative, not new ones');
+    assert.ok(rows.every((r) => r.path.startsWith(moved)), 'each derivative records its new location');
+  });
+
   it('every run row carries its evidence and derivative', async () => {
     const ws = makeWorkspace('stamped');
     const result = await run(ws.backupPath);
@@ -248,6 +295,41 @@ describe('pre-flight registration', live, () => {
       assert.equal(await count('evidence_items'), 0);
     });
   }
+
+  for (const [label, corrupt] of [
+    ['a decrypt made from an earlier version of the backup', (ws: Workspace) =>
+      writeFileSync(path.join(ws.backupPath, DECRYPT_MARKER), renderDerivativeMarker('f'.repeat(64)))],
+    ['a decrypt with no provenance marker', (ws: Workspace) => rmSync(path.join(ws.backupPath, DECRYPT_MARKER))],
+    ['mvt results made from an earlier version of the backup', (ws: Workspace) =>
+      writeFileSync(path.join(ws.resultsPath, CHECK_MARKER), renderDerivativeMarker('f'.repeat(64)))],
+    ['a results path that is a file, not a directory', (ws: Workspace) => {
+      rmSync(ws.resultsPath, { recursive: true });
+      writeFileSync(ws.resultsPath, 'not a directory');
+    }],
+  ] as const) {
+    it(`${label} is refused before any run`, async () => {
+      const ws = makeWorkspace(`stale-${label.replace(/\W+/g, '-')}`);
+      corrupt(ws);
+      const result = await run(ws.backupPath);
+      assert.equal(result.success, false);
+      assert.ok(result.error);
+      assert.equal(await count('pipeline_runs'), 0);
+      assert.equal(await count('evidence_items'), 0);
+    });
+  }
+
+  it('results whose check never finished are not registered, and results stages stop before starting', async () => {
+    const ws = makeWorkspace('unchecked');
+    rmSync(path.join(ws.resultsPath, CHECK_MARKER));
+    const reader = recordingStage('needs-results', 10, { requiresResultsPath: true, parserVersion: 1 });
+    const result = await run(ws.backupPath, { enabled: [reader], disabled: [] });
+    assert.equal(result.success, false);
+    const kinds = await db.query<{ kind: string }>(`SELECT kind FROM evidence_derivatives`);
+    assert.deepEqual(kinds.rows.map((r) => r.kind), ['decrypted']);
+    const stage = await db.query(`SELECT status, error_message FROM pipeline_stage_status WHERE run_id = $1`, [result.runId]);
+    assert.equal(stage.rows[0].status, 'failed');
+    assert.match(stage.rows[0].error_message, /no results directory was registered/);
+  });
 
   it('stores no raw UDID anywhere', async () => {
     const ws = makeWorkspace('no-udid');

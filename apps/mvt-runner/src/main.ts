@@ -7,8 +7,12 @@ import { spawn } from "node:child_process";
 import {
   discoverBackups,
   BACKUP_SEARCH_MAX_DEPTH,
+  CHECK_MARKER,
+  DECRYPT_MARKER,
   deriveEvidencePath,
   EvidenceSidecar,
+  readDerivativeMarker,
+  renderDerivativeMarker,
   type Backup,
 } from "@verichron/contracts";
 
@@ -124,8 +128,9 @@ async function run(cfg: Config): Promise<void> {
     const src = backup.path;
     console.log(`=== ${name} ===`);
 
+    let contentRoot: string;
     try {
-      await hashBackup(cfg, name, src);
+      contentRoot = await hashBackup(cfg, name, src);
     } catch (err) {
       console.error(`  [hash] error: ${err instanceof Error ? err.message : err}`);
       failedBackups.add(name);
@@ -133,11 +138,24 @@ async function run(cfg: Config): Promise<void> {
     }
 
     const decDir = path.join(cfg.workspace, "decrypted", name);
-    const decMarker = path.join(decDir, ".mvt_decrypted_ok");
+    const decMarker = path.join(decDir, DECRYPT_MARKER);
+    const resDir = path.join(cfg.workspace, "results", name);
     let decryptRan = false;
-    if (!cfg.forceDecrypt && (await pathExists(decMarker))) {
+    // The decrypt is reusable only if it was made from the backup as it is
+    // now: its marker records the content_root it came from (EPOCH-404).
+    const previousDecrypt = readDerivativeMarker(decDir, DECRYPT_MARKER);
+    const decryptIsCurrent = previousDecrypt?.content_root === contentRoot;
+    if (!cfg.forceDecrypt && decryptIsCurrent) {
       console.log("  [decrypt] already done, skipping");
     } else {
+      if (!decryptIsCurrent && (await pathExists(decDir))) {
+        // A decrypt (and the results built on it) from a different version
+        // of this backup, or with no provenance: remove both so no stale
+        // file can survive into the new decrypt.
+        console.log("  [decrypt] the backup changed since its last decrypt; clearing the stale decrypt and results");
+        await fsp.rm(decDir, { recursive: true, force: true });
+        await fsp.rm(resDir, { recursive: true, force: true });
+      }
       // Bounded retry loop: a wrong password re-prompts up to
       // MAX_PASSWORD_ATTEMPTS times before this backup is given up on and
       // recorded as failed. Any non-password decrypt failure breaks out
@@ -199,7 +217,7 @@ async function run(cfg: Config): Promise<void> {
 
       if (!decrypted) continue; // move to the next backup; this one is recorded in failedBackups
 
-      await writeMarker(decMarker);
+      await writeFileAtomic(decMarker, renderDerivativeMarker(contentRoot));
       decryptRan = true;
       console.log("  [decrypt] done");
     }
@@ -236,10 +254,10 @@ async function run(cfg: Config): Promise<void> {
       }
     }
 
-    const resDir = path.join(cfg.workspace, "results", name);
-    const resMarker = path.join(resDir, ".mvt_check_ok");
-    const forceCheck = cfg.force || decryptRan;
-    if (!forceCheck && (await pathExists(resMarker))) {
+    const resMarker = path.join(resDir, CHECK_MARKER);
+    const forceCheck =
+      cfg.force || decryptRan || readDerivativeMarker(resDir, CHECK_MARKER)?.content_root !== contentRoot;
+    if (!forceCheck) {
       console.log("  [check]   already done, skipping");
     } else {
       const logPath = path.join(cfg.workspace, "logs", `${name}.log`);
@@ -250,7 +268,7 @@ async function run(cfg: Config): Promise<void> {
         failedBackups.add(name);
         continue;
       }
-      await writeMarker(resMarker);
+      await writeFileAtomic(resMarker, renderDerivativeMarker(contentRoot));
       console.log("  [check]   done ->", resDir);
     }
     console.log();
@@ -261,7 +279,7 @@ async function run(cfg: Config): Promise<void> {
     backups.map(async (backup) => ({
       label: backup.label,
       success: !failedBackups.has(backup.label),
-      decrypted: await pathExists(path.join(cfg.workspace, "decrypted", backup.label, ".mvt_decrypted_ok")),
+      decrypted: await pathExists(path.join(cfg.workspace, "decrypted", backup.label, DECRYPT_MARKER)),
     }))
   );
   await fsp.writeFile(
@@ -325,7 +343,7 @@ async function readRepairFailures(p: string): Promise<string[]> {
  * place), then the sidecar is atomically replaced to point at it. At every
  * instant the sidecar on disk names a root whose manifest exists and matches.
  */
-async function hashBackup(cfg: Config, name: string, src: string): Promise<void> {
+async function hashBackup(cfg: Config, name: string, src: string): Promise<string> {
   const paths = deriveEvidencePath(cfg.workspace, name);
   const result = await hashTree(src, { cachePath: paths.fingerprints, verify: cfg.verify });
 
@@ -352,6 +370,7 @@ async function hashBackup(cfg: Config, name: string, src: string): Promise<void>
     `  [hash]    done -> ${paths.sidecar}` +
       ` (${result.fileCount} files, ${result.hashed} hashed, ${result.reused} cached, root ${result.contentRoot})`
   );
+  return result.contentRoot;
 }
 
 /**

@@ -19,12 +19,18 @@
  */
 
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Client } from 'pg';
 
-import { deriveEvidencePath, EvidenceSidecar } from '@verichron/contracts';
+import {
+  CHECK_MARKER,
+  DECRYPT_MARKER,
+  deriveEvidencePath,
+  EvidenceSidecar,
+  readDerivativeMarker,
+} from '@verichron/contracts';
 
 /** Registration refused: the run must not start. The message says why. */
 export class RegistrationError extends Error {
@@ -69,15 +75,24 @@ export function defaultSecretPath(): string {
 /**
  * Read the secret, creating it (32 random bytes, hex, mode 0600) on first use.
  * A secret readable by group or others is refused rather than used.
+ *
+ * Creation is atomic and never clobbers: the secret is fully written to a
+ * private temp file, then hard-linked into place. link() fails if the name
+ * exists, so when two processes race on first use, exactly one secret wins
+ * and nobody can observe it half-written.
  */
 export function loadDeviceSecret(secretPath: string = defaultSecretPath()): Buffer {
   if (!existsSync(secretPath)) {
     mkdirSync(path.dirname(secretPath), { recursive: true, mode: 0o700 });
+    const staging = `${secretPath}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
+    writeFileSync(staging, randomBytes(32).toString('hex') + '\n', { flag: 'wx', mode: 0o600 });
     try {
-      // 'wx' fails if another process created it first; then we just read it.
-      writeFileSync(secretPath, randomBytes(32).toString('hex') + '\n', { flag: 'wx', mode: 0o600 });
+      linkSync(staging, secretPath);
     } catch (err) {
+      // Another process published its secret first; use that one.
       if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    } finally {
+      unlinkSync(staging);
     }
   }
   if (process.platform !== 'win32' && (statSync(secretPath).mode & 0o077) !== 0) {
@@ -210,6 +225,42 @@ function verifySidecar(workspace: string, label: string): VerifiedSidecar {
   };
 }
 
+/**
+ * Each derivative must have been made from THIS evidence: its completion
+ * marker records the content_root it came from. A decrypt or results set
+ * left over from an earlier version of the backup under the same label is
+ * refused, so its facts can't be filed under the new evidence.
+ *
+ * Returns the results directory to register, or null when there are none
+ * yet (results-reading stages then fail clearly before they start).
+ */
+function verifyDerivatives(decryptedPath: string, resultsPath: string | undefined, contentRoot: string): string | null {
+  const decrypt = readDerivativeMarker(decryptedPath, DECRYPT_MARKER);
+  if (decrypt?.content_root !== contentRoot) {
+    throw new RegistrationError(
+      decrypt
+        ? `the decrypted copy at ${decryptedPath} was made from content root ${decrypt.content_root.slice(0, 12)}…, ` +
+            `but the evidence sidecar names ${contentRoot.slice(0, 12)}…; re-run mvt-runner to re-decrypt`
+        : `${decryptedPath} has no valid ${DECRYPT_MARKER} recording which evidence it was decrypted from; ` +
+            're-run mvt-runner'
+    );
+  }
+
+  if (!resultsPath || !existsSync(resultsPath)) return null;
+  if (!statSync(resultsPath).isDirectory()) {
+    throw new RegistrationError(`the results path ${resultsPath} exists but is not a directory`);
+  }
+  const check = readDerivativeMarker(resultsPath, CHECK_MARKER);
+  if (!check) return null; // check-backup hasn't completed: no results to register
+  if (check.content_root !== contentRoot) {
+    throw new RegistrationError(
+      `the mvt results at ${resultsPath} were made from content root ${check.content_root.slice(0, 12)}…, ` +
+        `but the evidence sidecar names ${contentRoot.slice(0, 12)}…; re-run mvt-runner`
+    );
+  }
+  return path.resolve(resultsPath);
+}
+
 // ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
@@ -227,6 +278,11 @@ async function appendEvent(
   );
 }
 
+/**
+ * A derivative's identity is (evidence, kind, parent), not its path: the
+ * path is its last-known location and is updated here, so a moved workspace
+ * keeps its derivative (and its completed runs) instead of starting over.
+ */
 async function upsertDerivative(
   client: Client,
   evidenceId: string,
@@ -238,7 +294,7 @@ async function upsertDerivative(
   const { rows } = await client.query<{ derivative_id: string; inserted: boolean }>(
     `INSERT INTO evidence_derivatives (evidence_id, kind, path, parent_derivative_id)
      VALUES ($1, $2, $3, $4)
-     ON CONFLICT (evidence_id, kind, path) DO UPDATE SET path = EXCLUDED.path
+     ON CONFLICT (evidence_id, kind, parent_derivative_id) DO UPDATE SET path = EXCLUDED.path
      RETURNING derivative_id, (xmax = 0) AS inserted`,
     [evidenceId, kind, derivativePath, parentId]
   );
@@ -264,7 +320,7 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
   const device = readDevice([path.resolve(input.backupPath), sidecar.sourcePath]);
   const key = deviceKey(device.udid, loadDeviceSecret(input.secretPath));
   const decryptedPath = path.resolve(input.backupPath);
-  const resultsPath = input.resultsPath && existsSync(input.resultsPath) ? path.resolve(input.resultsPath) : null;
+  const resultsPath = verifyDerivatives(decryptedPath, input.resultsPath, sidecar.contentRoot);
 
   await client.query('BEGIN');
   try {
