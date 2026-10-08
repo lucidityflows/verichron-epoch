@@ -29,12 +29,17 @@ before(() => {
 
   // decrypt-backup -p PW -d DEST SRC  -> DEST/from-<version>.txt
   // check-backup --output OUT DIR     -> OUT/
+  // STUB_DECRYPT=fail: write part of the decrypt, then fail (not a password error).
+  // STUB_DECRYPT=mutate: decrypt, then change the source, as if it changed mid-decrypt.
   stub = path.join(tmp, 'mvt-stub');
   writeFileSync(
     stub,
     `#!/bin/sh
 case "$1" in
-  decrypt-backup) mkdir -p "$5" && touch "$5/from-$(cat "$6/version.txt").txt" "$5/Manifest.db" ;;
+  decrypt-backup)
+    mkdir -p "$5" && touch "$5/from-$(cat "$6/version.txt").txt" "$5/Manifest.db"
+    if [ "$STUB_DECRYPT" = fail ]; then echo "disk error mid-decrypt" >&2; exit 2; fi
+    if [ "$STUB_DECRYPT" = mutate ]; then echo "mutated" > "$6/version.txt"; fi ;;
   check-backup) mkdir -p "$3" ;;
 esac
 exit 0
@@ -45,13 +50,14 @@ exit 0
 
 after(() => rmSync(tmp, { recursive: true, force: true }));
 
-function runCli(): Promise<string> {
+function runCli(extraArgs: string[] = [], stubMode = ''): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
       ['--import', 'tsx', path.resolve(import.meta.dirname, 'main.ts'),
-        '--source', source, '--workspace', workspace, '--mvt-bin', stub, '--sqlite-bin', '/nonexistent/sqlite3'],
-      { stdio: ['pipe', 'pipe', 'pipe'] }
+        '--source', source, '--workspace', workspace, '--mvt-bin', stub, '--sqlite-bin', '/nonexistent/sqlite3',
+        ...extraArgs],
+      { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, STUB_DECRYPT: stubMode } }
     );
     let out = '';
     child.stdout.on('data', (c) => (out += c));
@@ -92,5 +98,22 @@ describe('decrypt provenance', () => {
     assert.ok(readdirSync(decrypted()).includes('from-v2.txt'));
     assert.ok(!readdirSync(decrypted()).includes('from-v1.txt'), 'the stale decrypt was removed, not merged into');
     assert.equal(readDerivativeMarker(results(), CHECK_MARKER)?.content_root, after.content_root, 'results redone too');
+  });
+
+  it('a forced re-decrypt that fails part-way leaves no marker vouching for the copy', async () => {
+    assert.ok(readDerivativeMarker(decrypted(), DECRYPT_MARKER), 'precondition: a valid decrypt exists');
+    const out = await runCli(['--force-decrypt'], 'fail');
+    assert.match(out, /\[decrypt\] error/);
+    assert.equal(readDerivativeMarker(decrypted(), DECRYPT_MARKER), null, 'registration will refuse this copy');
+    assert.equal(readDerivativeMarker(results(), CHECK_MARKER), null, 'results built on it are withdrawn too');
+
+    await runCli();
+    assert.ok(readDerivativeMarker(decrypted(), DECRYPT_MARKER), 'a clean re-run restores it');
+  });
+
+  it('a backup that changes while being decrypted gets no marker', async () => {
+    const out = await runCli(['--force-decrypt'], 'mutate');
+    assert.match(out, /backup changed while it was being decrypted/);
+    assert.equal(readDerivativeMarker(decrypted(), DECRYPT_MARKER), null);
   });
 });

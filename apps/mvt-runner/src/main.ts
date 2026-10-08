@@ -156,6 +156,13 @@ async function run(cfg: Config): Promise<void> {
         await fsp.rm(decDir, { recursive: true, force: true });
         await fsp.rm(resDir, { recursive: true, force: true });
       }
+      // Withdraw every marker that vouches for this decrypt BEFORE touching
+      // it. A decrypt that dies part-way (e.g. --force-decrypt over an
+      // existing copy) must not leave a valid marker in front of half-written
+      // files; only a decrypt that completes recreates them below.
+      await fsp.rm(decMarker, { force: true });
+      await fsp.rm(path.join(decDir, ".mvt_repaired_ok"), { force: true });
+      await fsp.rm(path.join(resDir, CHECK_MARKER), { force: true });
       // Bounded retry loop: a wrong password re-prompts up to
       // MAX_PASSWORD_ATTEMPTS times before this backup is given up on and
       // recorded as failed. Any non-password decrypt failure breaks out
@@ -217,6 +224,20 @@ async function run(cfg: Config): Promise<void> {
 
       if (!decrypted) continue; // move to the next backup; this one is recorded in failedBackups
 
+      // The marker attributes this decrypt to `contentRoot`, hashed before
+      // decrypt-backup read the source. Confirm the source still hashes to it
+      // (cheap: unchanged files hit the stat cache); if the backup changed
+      // in between, the decrypt may be of a different version, so it gets no
+      // marker and registration will refuse it.
+      const recheck = await hashTree(src, { cachePath: deriveEvidencePath(cfg.workspace, name).fingerprints });
+      if (recheck.contentRoot !== contentRoot) {
+        console.error(
+          "  [decrypt] error: the backup changed while it was being decrypted; re-run to re-hash and re-decrypt it"
+        );
+        failedBackups.add(name);
+        continue;
+      }
+
       await writeFileAtomic(decMarker, renderDerivativeMarker(contentRoot));
       decryptRan = true;
       console.log("  [decrypt] done");
@@ -261,6 +282,9 @@ async function run(cfg: Config): Promise<void> {
       console.log("  [check]   already done, skipping");
     } else {
       const logPath = path.join(cfg.workspace, "logs", `${name}.log`);
+      // Same rule as the decrypt: no marker vouches for results while
+      // check-backup is rewriting them.
+      await fsp.rm(resMarker, { force: true });
       try {
         await checkBackup(cfg, decDir, resDir, logPath);
       } catch (err) {
