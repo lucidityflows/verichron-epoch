@@ -45,7 +45,8 @@ export type ToolAvailabilityStatus =
   | { available: true; path: string }
   | { available: false; reason: string };
 
-export type BackupProgressPhase = 'preparing' | 'transferring' | 'verifying' | 'done' | 'error';
+/** `device-action`: the pull is waiting for the user to do something on the device. */
+export type BackupProgressPhase = 'preparing' | 'device-action' | 'transferring' | 'verifying' | 'done' | 'error';
 
 export interface BackupProgress {
   phase: BackupProgressPhase;
@@ -55,16 +56,25 @@ export interface BackupProgress {
   message: string;
 }
 
+export interface PullOptions {
+  /** The backup password: the device's existing one, or the new one when encryption is turned on. */
+  password: string;
+  /** The user agreed to turn on the device's encrypted backups if they're off (EPOCH-466). */
+  enableEncryption: boolean;
+}
+
 export interface DeviceBackupSource {
   readonly id: string;
   readonly label: string;
   checkToolAvailable(): Promise<ToolAvailabilityStatus>;
   listConnectedDevices(): Promise<DeviceInfo[]>;
+  /** Whether the device makes encrypted backups; throws when it can't be read. */
+  backupEncryptionEnabled(device: DeviceInfo): Promise<boolean>;
   pullBackup(
     device: DeviceInfo,
     destDir: string,
     onProgress: (progress: BackupProgress) => void,
-    password?: string
+    options: PullOptions
   ): Promise<string>;
 }
 

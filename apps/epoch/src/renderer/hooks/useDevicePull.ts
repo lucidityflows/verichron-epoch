@@ -11,6 +11,12 @@ import type {
 } from '../../shared/types/tools';
 import { devicesApi } from '../api/devices';
 
+/** An IPC error's own message, without Electron's "Error invoking remote method" prefix. */
+function ipcErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return 'Unknown error';
+  return err.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+}
+
 export type Phase = 'checking' | 'unavailable' | 'available' | 'acquiring' | 'pulling' | 'pulled';
  
 export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
@@ -36,6 +42,10 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   const [destDir, setDestDir] = useState<string | null>(null);
   const [pullProgress, setPullProgress] = useState<BackupProgress[]>([]);
   const [pullError, setPullError] = useState<string | null>(null);
+  // EPOCH-466: encrypted backups are off and the user is being asked to turn them on.
+  const [encryptionConsent, setEncryptionConsent] = useState(false);
+  // Something the user must do on the device now, e.g. enter its passcode.
+  const [deviceAction, setDeviceAction] = useState<string | null>(null);
 
   // Maintain refs to prevent effect re-registrations on transient prop/state changes
   const onBackupPulledRef = useRef(onBackupPulled);
@@ -135,7 +145,9 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       }
     });
     const unsubProgress = devicesApi.onDeviceBackupProgress((progress) => {
-      setPullProgress((prev) => [...prev, progress]);
+      setDeviceAction(progress.phase === 'device-action' ? progress.message : null);
+      // An error is shown once, as the pull error, not also in the log.
+      if (progress.phase !== 'error') setPullProgress((prev) => [...prev, progress]);
       if (progress.phase === 'done') {
         setPhase('pulled');
         if (destDirRef.current && onBackupPulledRef.current) {
@@ -226,22 +238,46 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     if (dir) setDestDir(dir);
   };
  
-  const handlePull = async (password: string) => {
-    if (!sourceId || !selectedDevice || !destDir) return;
+  /**
+   * Pulls a backup. When the device's encrypted backups are off, it first
+   * asks the user (EPOCH-466) and returns 'consent-needed'; the pull is then
+   * retried with `enableEncryption` once they agree.
+   */
+  const handlePull = async (password: string, enableEncryption = false): Promise<'consent-needed' | 'finished'> => {
+    if (!sourceId || !selectedDevice || !destDir) return 'finished';
     if (!password || password.trim() === '') {
-      setPullError('A secure decryption password is required to create an encrypted backup.');
-      return;
+      setPullError('A backup password is required.');
+      return 'finished';
     }
-    setPhase('pulling');
     setPullProgress([]);
     setPullError(null);
-    try {
-      await devicesApi.pullDeviceBackup(sourceId, selectedDevice, destDir, password);
-    } catch (err) {
-      setPullError(err instanceof Error ? err.message : 'Unknown error');
-      setPhase('available');
+    setDeviceAction(null);
+    if (!enableEncryption) {
+      try {
+        if (!(await devicesApi.getBackupEncryption(sourceId, selectedDevice))) {
+          setEncryptionConsent(true);
+          return 'consent-needed';
+        }
+      } catch (err) {
+        setPullError(ipcErrorMessage(err));
+        return 'finished';
+      }
     }
+    setEncryptionConsent(false);
+    setPhase('pulling');
+    try {
+      await devicesApi.pullDeviceBackup(sourceId, selectedDevice, destDir, { password, enableEncryption });
+    } catch (err) {
+      // The pull usually reported its error as progress already.
+      setPullError((prev) => prev ?? ipcErrorMessage(err));
+      setPhase('available');
+    } finally {
+      setDeviceAction(null);
+    }
+    return 'finished';
   };
+
+  const cancelEncryptionConsent = () => setEncryptionConsent(false);
  
   return {
     sources,
@@ -266,6 +302,9 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     destDir,
     pullProgress,
     pullError,
+    encryptionConsent,
+    cancelEncryptionConsent,
+    deviceAction,
     runCompileFromSource,
     handleSelectDestination,
     handlePull,

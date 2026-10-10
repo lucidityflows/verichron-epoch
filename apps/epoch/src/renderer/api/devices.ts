@@ -1,5 +1,6 @@
 import type {
   DeviceInfo,
+  PullOptions,
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
   ToolAcquisitionResult,
@@ -18,8 +19,9 @@ export const devicesApi = {
   getToolAcquisitionActions: (sourceId: string): Promise<ToolAcquisitionAction[]> =>
     window.epoch.getToolAcquisitionActions(sourceId),
   selectDeviceBackupDestination: () => window.epoch.selectDeviceBackupDestination(),
-  pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, password?: string) =>
-    window.epoch.pullDeviceBackup(sourceId, device, destDir, password),
+  getBackupEncryption: (sourceId: string, device: DeviceInfo) => window.epoch.getBackupEncryption(sourceId, device),
+  pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) =>
+    window.epoch.pullDeviceBackup(sourceId, device, destDir, options),
   runToolAcquisitionSteps: (steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> =>
     window.epoch.runToolAcquisitionSteps(steps, installPrefix),
   getToolSetupStatus: (sourceId: string): Promise<ToolSetupStatus | null> => window.epoch.getToolSetupStatus(sourceId),
