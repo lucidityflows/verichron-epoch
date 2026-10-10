@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Terminal,
   Lock,
+  ShieldCheck,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -42,6 +43,9 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
     destDir,
     pullProgress,
     pullError,
+    encryptionConsent,
+    cancelEncryptionConsent,
+    deviceAction,
     runCompileFromSource,
     setupStatus,
     setupRun,
@@ -89,18 +93,27 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
     }
   };
 
-  const onPullClick = async () => {
+  const onPullClick = async (enableEncryption = false) => {
     if (!password || password.trim() === '') {
-      setPasswordError('A secure decryption password is required to create an encrypted backup.');
+      setPasswordError('A backup password is required.');
       return;
     }
     setPasswordError(null);
+    let result: 'consent-needed' | 'finished' = 'finished';
     try {
-      await handlePull(password);
+      result = await handlePull(password, enableEncryption);
     } finally {
-      setPassword('');
+      // Kept while the user decides whether to turn on encrypted backups.
+      if (result !== 'consent-needed') setPassword('');
     }
   };
+
+  const onCancelConsent = () => {
+    cancelEncryptionConsent();
+    setPassword('');
+  };
+
+  const pullLocked = phase === 'pulling' || encryptionConsent;
 
   if (!sourceId) return null;
  
@@ -330,7 +343,7 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
                   variant="outline"
                   size="sm"
                   onClick={handleSelectDestination}
-                  disabled={phase === 'pulling'}
+                  disabled={pullLocked}
                 >
                   <FolderOpen size="0.875rem" />
                   {destDir ? 'Change Destination' : 'Choose Destination'}
@@ -347,16 +360,18 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
               {/* Secure Backup Password Input */}
               <div className="mt-2 pt-3 shadow-elevation-1">
                 <label className="text-label text-foreground mb-1 flex items-center gap-2">
-                  <Lock size="0.875rem" className="text-accent" /> Backup encryption password (required)
+                  <Lock size="0.875rem" className="text-accent" /> Backup password (required)
                 </label>
                 <p className="text-data text-muted-foreground mb-2">
-                  Unencrypted backups omit sensitive artifacts like Keychain and Health data. Epoch will enforce encryption during creation using this password.
+                  Epoch makes encrypted backups only, because unencrypted ones leave out Keychain and Health data. If
+                  this iPhone already makes encrypted backups, enter its backup password. Otherwise, this becomes its
+                  backup password.
                 </p>
                 <PasswordField
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); if (passwordError) setPasswordError(null); }}
-                  disabled={phase === 'pulling'}
-                  placeholder="Enter temporary backup password"
+                  disabled={pullLocked}
+                  placeholder="Backup password"
                   invalid={!!passwordError}
                 />
                 <FieldError>{passwordError}</FieldError>
@@ -364,9 +379,34 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
             </div>
           )}
  
-          {selectedDevice && destDir && phase !== 'pulled' && (
+          {selectedDevice && encryptionConsent && (
+            <section className="rounded-lg bg-accent/10 border border-accent/30 shadow-elevation-1 p-5 flex flex-col gap-3">
+              <h3 className="flex items-center gap-2 font-display text-heading text-foreground">
+                <ShieldCheck size="1.125rem" className="text-accent" /> Turn On Encrypted Backups?
+              </h3>
+              <p className="text-data text-foreground">
+                Encrypted backups are off on {selectedDevice.name}. To continue, Epoch will turn them on with the
+                password you entered.
+              </p>
+              <ul className="text-data text-muted-foreground list-disc pl-5 flex flex-col gap-1">
+                <li>You'll unlock {selectedDevice.name} and enter its passcode on it to approve the change.</li>
+                <li>The setting stays on after the backup, and later backups of this iPhone use this password.</li>
+                <li>Epoch records the change with this pull.</li>
+              </ul>
+              <div className="flex items-center gap-3 mt-1">
+                <Button onClick={() => onPullClick(true)}>
+                  <ShieldCheck size="1rem" /> Turn On and Continue
+                </Button>
+                <Button variant="outline" onClick={onCancelConsent}>
+                  Cancel
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {selectedDevice && destDir && phase !== 'pulled' && !encryptionConsent && (
             <Button
-              onClick={onPullClick}
+              onClick={() => onPullClick()}
               disabled={!passwordProvided}
               loading={phase === 'pulling'}
               loadingText="Pulling encrypted backup…"
@@ -376,6 +416,14 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
             </Button>
           )}
  
+          {deviceAction && phase === 'pulling' && (
+            <div className="flex items-center gap-3 text-data text-foreground bg-accent/10 border border-accent/30 shadow-elevation-1 rounded-lg p-4 mt-5">
+              <Smartphone size="1.125rem" className="text-accent shrink-0" />
+              <span className="flex-1">{deviceAction}</span>
+              <Loader className="text-accent" />
+            </div>
+          )}
+
           {pullProgress.length > 0 && (
             <pre className="bg-background/90 shadow-elevation-1 rounded-xl p-4 text-data font-mono whitespace-pre-wrap overflow-auto max-h-48 text-foreground/80 mt-5 leading-relaxed">
               {pullProgress.map((p) => p.message).join('\n')}

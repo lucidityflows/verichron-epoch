@@ -11,6 +11,7 @@ import type { Backup } from '@verichron/contracts';
 import type {
   BackupProgress,
   DeviceInfo,
+  PullOptions,
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
   ToolAcquisitionResult,
@@ -113,7 +114,9 @@ declare global {
       checkDeviceBackupToolAvailable: (sourceId: string) => Promise<ToolAvailabilityStatus>;
       listConnectedDevices: (sourceId: string) => Promise<DeviceInfo[]>;
       getToolAcquisitionActions: (sourceId: string) => Promise<ToolAcquisitionAction[]>;
-      ßßpullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, password?: string) => Promise<string>;      runToolAcquisitionSteps: (
+      getBackupEncryption: (sourceId: string, device: DeviceInfo) => Promise<boolean>;
+      pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) => Promise<string>;
+      runToolAcquisitionSteps: (
         steps: ToolAcquisitionCommand[],
         installPrefix: string
       ) => Promise<ToolAcquisitionResult>;

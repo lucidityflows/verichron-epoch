@@ -5,6 +5,7 @@ import type { AnalysisRunStatus, ReportResult } from '../shared/types/window';
 import type {
   BackupProgress,
   DeviceInfo,
+  PullOptions,
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
   ToolAcquisitionResult,
@@ -114,8 +115,10 @@ const dbApi = {
     ipcRenderer.invoke('epoch:listConnectedDevices', sourceId),
   getToolAcquisitionActions: (sourceId: string): Promise<ToolAcquisitionAction[]> =>
     ipcRenderer.invoke('epoch:getToolAcquisitionActions', sourceId),
-  pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, password?: string): Promise<string> =>
-    ipcRenderer.invoke('epoch:pullDeviceBackup', sourceId, device, destDir, password),
+  getBackupEncryption: (sourceId: string, device: DeviceInfo): Promise<boolean> =>
+    ipcRenderer.invoke('epoch:getBackupEncryption', sourceId, device),
+  pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions): Promise<string> =>
+    ipcRenderer.invoke('epoch:pullDeviceBackup', sourceId, device, destDir, options),
   runToolAcquisitionSteps: (
     steps: ToolAcquisitionCommand[],
     installPrefix: string

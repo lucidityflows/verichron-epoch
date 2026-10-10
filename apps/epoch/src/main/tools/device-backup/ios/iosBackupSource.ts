@@ -1,5 +1,5 @@
 import { spawn, execFileSync } from 'child_process';
-import type { BackupProgress, DeviceBackupSource, DeviceInfo, ToolAvailabilityStatus } from '../../../../shared/types/tools';
+import type { BackupProgress, DeviceBackupSource, DeviceInfo, PullOptions, ToolAvailabilityStatus } from '../../../../shared/types/tools';
 import { bundledToolPath, detectBinary } from '../detection';
 import { idevicebackup2InstallPrefix } from './iosAcquisitionStrategy';
 
@@ -7,6 +7,8 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { manifestMatchesPins, readManifest } from './toolchain';
+import { enableBackupEncryption } from './encryption';
+import { appendPullRecord, type PullRecord } from './pullRecord';
 
 export interface DecryptionOptions {
   backupPath: string;
@@ -148,120 +150,153 @@ export class IosBackupSource implements DeviceBackupSource {
   }
 
   /**
-   * Pulls a full backup from the device and hands it to idevicebackup2 as an
-   * ENCRYPTED backup only. There is deliberately no code path here that
-   * produces an unencrypted backup and no code path that programmatically
-   * flips the device's backup-encryption toggle.
+   * Whether the device makes encrypted backups ("Encrypt Local Backup").
+   * Throws when the device can't be read, rather than reporting it as off.
+   */
+  async backupEncryptionEnabled(device: DeviceInfo): Promise<boolean> {
+    const tools = toolBinaryPath();
+    if (!tools.ideviceinfo) throw new Error('ideviceinfo is not available -- call checkToolAvailable() first.');
+    const value = readLockdownValue(tools.ideviceinfo, device.id, 'WillEncrypt', 'com.apple.mobile.backup');
+    if (value === undefined) {
+      throw new Error(`Couldn't read the backup settings of ${device.name}. Unlock it, make sure it trusts this computer, then try again.`);
+    }
+    return value === 'true';
+  }
+
+  /**
+   * Pulls a full, encrypted backup. Epoch never makes an unencrypted one.
    *
-   * Why the toggle is gone (EPOCH-101)
-   * -----------------------------------
-   * The previous implementation shelled out to
-   * `idevicebackup2 -u <udid> encryption on <password>` via `execFileSync`
-   * with `stdio: 'ignore'` when the device wasn't already set to encrypt
-   * backups, then reversed it with `encryption off` after the pull.
-   * `encryption on` triggers an on-device trust/pairing confirmation that
-   * `idevicebackup2` expects to negotiate interactively over the same
-   * connection -- `execFileSync` can neither see nor answer that prompt, so
-   * the handshake stalled and surfaced as `error code -1` / exit 255. That
-   * failure was not a bug in the retry logic; it was structural: a
-   * non-interactive spawn can never satisfy an interactive device prompt.
+   * When the device's encrypted backups are off, the pull stops unless the
+   * user has agreed to turn them on (`options.enableEncryption`). Turning
+   * them on needs the device's passcode, entered on the device
+   * (enableBackupEncryption). The setting stays on afterwards: turning it
+   * off would need the passcode again. Each pull, and whether Epoch changed
+   * the setting, is recorded next to the backup (appendPullRecord).
    *
-   * Rather than build a second, interactive spawn path just to flip a
-   * device setting, this now refuses to proceed when encryption isn't
-   * already enabled (see the `isEncrypted` check below) and tells the
-   * person exactly what to do instead. `BACKUP_PASSWORD` is the only
-   * channel the password travels through, and it goes straight to the
-   * `backup` invocation itself -- idevicebackup2 reads it from the
-   * environment to unlock/encrypt non-interactively, and it never appears
-   * as a CLI argument (which would otherwise be visible in the process
-   * table via `ps`).
+   * The password reaches idevicebackup2 only through BACKUP_PASSWORD, never
+   * as an argument.
    */
   async pullBackup(
     device: DeviceInfo,
     destDir: string,
     onProgress: (progress: BackupProgress) => void,
-    password?: string
+    options: PullOptions
   ): Promise<string> {
-    if (!password || password.trim() === '') {
-      throw new Error('A backup decryption password is required to perform a secure extraction.');
-    }
+    const { password, enableEncryption } = options;
+    if (password.trim() === '') throw new Error('A backup password is required.');
 
     const tools = toolBinaryPath();
     if (!tools.available || !tools.idevicebackup2 || !tools.ideviceinfo) {
       throw new Error('idevicebackup2 and ideviceinfo are not available -- call checkToolAvailable() first.');
     }
+    const idevicebackup2 = tools.idevicebackup2;
 
-    onProgress({ phase: 'preparing', message: `Checking encryption status for ${device.name}...` });
+    const record: PullRecord = {
+      udid: device.id,
+      device_name: device.name,
+      model: device.model ?? null,
+      ios_version: device.osVersion ?? null,
+      tool: 'idevicebackup2',
+      tool_version: toolVersion(idevicebackup2),
+      started_at: new Date().toISOString(),
+      finished_at: null,
+      backup_encryption: 'unknown',
+      outcome: 'failed',
+    };
 
-    const isEncrypted =
-      readLockdownValue(tools.ideviceinfo, device.id, 'WillEncrypt', 'com.apple.mobile.backup') === 'true';
-
-    if (!isEncrypted) {
-      const message =
-        `${device.name} does not have encrypted backups enabled, and Epoch will not enable it on your behalf. ` +
-        `A previous version tried to flip this setting automatically via "idevicebackup2 encryption on", but ` +
-        `that command requires answering an on-device trust prompt interactively -- attempting it headlessly ` +
-        `caused a handshake failure (error code -1, exit 255), not a real backup. ` +
-        `Turn on "Encrypt Local Backup" for this device yourself (in Finder on macOS: select the device > ` +
-        `General > Encrypt local backup; in iTunes on Windows: the Backups section), set a backup password ` +
-        `there, then retry this pull using that same password.`;
+    const fail = (message: string): never => {
       onProgress({ phase: 'error', message });
       throw new Error(message);
+    };
+
+    try {
+      onProgress({ phase: 'preparing', message: `Checking the backup settings of ${device.name}…` });
+      if (await this.backupEncryptionEnabled(device)) {
+        record.backup_encryption = 'already-on';
+      } else {
+        record.backup_encryption = 'off-unchanged';
+        if (!enableEncryption) {
+          fail(`Encrypted backups are off on ${device.name}. Turn them on to continue.`);
+        }
+        record.backup_encryption = 'turn-on-failed';
+        onProgress({ phase: 'preparing', message: `Turning on encrypted backups for ${device.name}…` });
+        const result = await enableBackupEncryption({
+          idevicebackup2,
+          udid: device.id,
+          password,
+          onPasscodeRequested: () =>
+            onProgress({ phase: 'device-action', message: `Unlock ${device.name} and enter its passcode to allow encrypted backups.` }),
+        });
+        if (result.timedOut) {
+          fail(`The passcode wasn't entered on ${device.name} in time, so encrypted backups are still off. Try again.`);
+        }
+        if (result.code !== 0 || !(await this.backupEncryptionEnabled(device))) {
+          const detail = result.tail.length > 0 ? ` idevicebackup2: ${result.tail[result.tail.length - 1]}` : '';
+          fail(`Encrypted backups couldn't be turned on for ${device.name}.${detail}`);
+        }
+        record.backup_encryption = 'turned-on-by-epoch';
+        onProgress({ phase: 'preparing', message: `Encrypted backups are on for ${device.name}.` });
+      }
+
+      onProgress({ phase: 'preparing', message: `Starting the encrypted backup of ${device.name}…` });
+      await runBackup(idevicebackup2, device.id, destDir, password, onProgress);
+      record.outcome = 'completed';
+      onProgress({ phase: 'done', message: 'Backup complete.' });
+      return destDir;
+    } finally {
+      record.finished_at = new Date().toISOString();
+      try {
+        await appendPullRecord(destDir, record);
+      } catch (err) {
+        // A completed pull without its record fails; a failed pull keeps its own error.
+        if (record.outcome === 'completed') throw err;
+        console.error('Failed to record the device pull', err);
+      }
     }
-
-    onProgress({ phase: 'preparing', message: `Starting secure backup of ${device.name}...` });
-
-    return new Promise((resolve, reject) => {
-      // The one and only place `password` is used: as an environment
-      // variable for idevicebackup2's own process, never as a CLI arg and
-      // never used to toggle device state.
-      const env: NodeJS.ProcessEnv = {
-        ...process.env,
-        BACKUP_PASSWORD: password,
-      };
-
-      const proc = spawn(tools.idevicebackup2!, ['backup', '--full', destDir, '-u', device.id], { env });
-
-      proc.stdout.on('data', (chunk: Buffer) => {
-        const lines = chunk
-          .toString('utf-8')
-          .split('\n')
-          .map((l) => l.trim())
-          .filter((l) => l.length > 0);
-        for (const line of lines) {
-          onProgress({ phase: 'transferring', message: line });
-        }
-      });
-
-      let stderrOutput = '';
-      proc.stderr.on('data', (chunk: Buffer) => {
-        stderrOutput += chunk.toString('utf-8');
-      });
-
-      proc.once('error', (err: Error) => {
-        onProgress({ phase: 'error', message: err.message });
-        reject(err);
-      });
-
-      proc.once('close', async (code: number | null) => {
-        if (encryptionToggledByUs) {
-          onProgress({ phase: 'preparing', message: 'Restoring original device encryption state...' });
-          try {
-            execFileSync(tools.idevicebackup2!, ['-u', device.id, 'encryption', 'off', password], { encoding: 'utf-8', stdio: 'ignore' });
-          } catch (err) {
-            console.error('Failed to disable device encryption post-backup', err);
-          }
-        }
-
-        if (code === 0) {
-          onProgress({ phase: 'done', message: 'Backup complete.' });
-          resolve(destDir);
-        } else {
-          const message = stderrOutput.trim() || `idevicebackup2 exited with code ${code}`;
-          onProgress({ phase: 'error', message });
-          reject(new Error(message));
-        }
-      });
-    });
   }
+}
+
+function toolVersion(binary: string): string | null {
+  try {
+    return execFileSync(binary, ['--version'], { encoding: 'utf-8' }).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Runs `idevicebackup2 backup --full`; rejects with its error output when it fails. */
+function runBackup(
+  idevicebackup2: string,
+  udid: string,
+  destDir: string,
+  password: string,
+  onProgress: (progress: BackupProgress) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(idevicebackup2, ['backup', '--full', destDir, '-u', udid], {
+      env: { ...process.env, BACKUP_PASSWORD: password },
+    });
+
+    proc.stdout.on('data', (chunk: Buffer) => {
+      for (const line of chunk.toString('utf-8').split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed.length > 0) onProgress({ phase: 'transferring', message: trimmed });
+      }
+    });
+
+    let stderrOutput = '';
+    proc.stderr.on('data', (chunk: Buffer) => {
+      stderrOutput += chunk.toString('utf-8');
+    });
+
+    const fail = (message: string) => {
+      onProgress({ phase: 'error', message });
+      reject(new Error(message));
+    };
+    proc.once('error', (err: Error) => fail(err.message));
+    proc.once('close', (code: number | null) => {
+      if (code === 0) resolve();
+      else fail(stderrOutput.trim() || `idevicebackup2 exited with code ${code}`);
+    });
+  });
 }

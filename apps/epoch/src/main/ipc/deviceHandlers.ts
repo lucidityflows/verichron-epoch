@@ -7,6 +7,7 @@ import type {
   DeviceInfo,
   ToolAcquisitionCommand,
   BackupProgress,
+  PullOptions,
   ToolAcquisitionResult,
   ToolSetupEvent,
   ToolSetupResult,
@@ -54,13 +55,19 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     return strategy.availableActions();
   });
 
+  ipcMain.handle('epoch:getBackupEncryption', async (_event, sourceId: string, device: DeviceInfo) => {
+    const source = getDeviceBackupSource(sourceId);
+    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    return source.backupEncryptionEnabled(device);
+  });
+
   let deviceBackupInFlight = false;
 
   ipcMain.handle(
     'epoch:pullDeviceBackup',
-    async (_event, sourceId: string, device: DeviceInfo, destDir: string, password?: string) => {
-      if (!password || password.trim() === '') {
-        throw new Error('A secure password is required to encrypt the backup session.');
+    async (_event, sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) => {
+      if (!options?.password || options.password.trim() === '') {
+        throw new Error('A backup password is required.');
       }
 
       if (deviceBackupInFlight) {
@@ -77,7 +84,7 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
           (progress: BackupProgress) => {
             sendToRenderer('epoch:deviceBackupProgress', progress);
           },
-          password
+          options
         );
       } finally {
         deviceBackupInFlight = false;
