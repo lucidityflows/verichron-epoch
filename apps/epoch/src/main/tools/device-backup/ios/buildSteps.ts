@@ -1,4 +1,3 @@
-import { execFileSync } from 'child_process';
 import path from 'path';
 import type { ToolAcquisitionCommand } from '../../../../shared/types/tools';
 
@@ -38,23 +37,14 @@ const REPOS_IN_DEPENDENCY_ORDER: SourceRepo[] = [
   { name: 'libimobiledevice', gitUrl: 'https://github.com/libimobiledevice/libimobiledevice.git' },
 ];
 
-/** The one step needing real root/administrator privileges -- shown to the
- * user as a single line to run themselves, not spawned by the app. Covers
- * the *build tools* (compiler, autotools, pkg-config, OpenSSL headers);
- * deliberately does NOT include libplist-dev/libusbmuxd-dev/
- * libimobiledevice-glue-dev/libtatsu-dev, since those are exactly what
- * gets built from source below instead of taken from the distro. */
+/** Windows: the build tools WSL needs, shown to the user as one line to
+ * run themselves. Linux and macOS use the guided setup's own requirement
+ * checks and install instead (toolchain/requirements.ts, EPOCH-465). */
 export function systemPackageInstallCommand(platform: NodeJS.Platform): string {
-  if (platform === 'darwin') {
-    return 'brew install autoconf automake libtool pkg-config openssl';
+  if (platform !== 'win32') {
+    throw new Error('systemPackageInstallCommand is for the Windows (WSL) path; Linux and macOS use guided setup');
   }
-  if (platform === 'win32') {
-    return 'wsl -- bash -lc "sudo apt-get install -y build-essential pkg-config checkinstall git autoconf automake libtool-bin libssl-dev usbmuxd"';
-  }
-  // Debian/Ubuntu is the only Linux distro this targets today -- matches
-  // the userMemories' own Ubuntu/Debian environment. Other distros' package
-  // names differ (dnf/pacman equivalents) and aren't covered by this pass.
-  return 'sudo apt-get install -y build-essential pkg-config checkinstall git autoconf automake libtool-bin libssl-dev usbmuxd';
+  return 'wsl -- bash -lc "sudo apt-get install -y build-essential pkg-config checkinstall git autoconf automake libtool-bin libssl-dev usbmuxd"';
 }
 
 /** Full automated build sequence -- clone, autogen, make, make install
@@ -119,47 +109,3 @@ export function compileFromSourceStepsViaWsl(buildDir: string, installPrefix: st
     args: ['--', 'bash', '-lc', `cd '${step.cwd}' && ${step.command} ${step.args.join(' ')}`],
   }));
 }
-
-/**
- * Checks for a `brew` executable on PATH. Homebrew's own libimobiledevice
- * formula resolves libplist/libimobiledevice-glue/libusbmuxd/libtatsu as
- * dependencies automatically, so this is offered as the preferred macOS
- * path over compileFromSourceSteps above -- but only when it's actually
- * present, so the UI never points a user at a command that will just fail
- * again immediately.
- *
- * Uses the shell builtin `command -v` (same technique as
- * detection.ts's detectBinary POSIX branch) since `brew` itself isn't
- * guaranteed to be resolvable via a plain execFileSync('brew', ...) call
- * on every shell setup (e.g. Apple Silicon's /opt/homebrew/bin not yet on
- * a non-interactive PATH).
- */
-export function isHomebrewAvailable(): boolean {
-  try {
-    const env = {
-      ...process.env,
-      PATH: ['/opt/homebrew/bin', '/usr/local/bin', process.env.PATH].filter(Boolean).join(':'),
-    };
-    execFileSync('/bin/sh', ['-c', 'command -v brew'], { env, stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * `brew install <formulas>` as a single ToolAcquisitionCommand. Unlike
- * compileFromSourceSteps, there's no dependency-order list to maintain
- * here -- Homebrew resolves the same chain (libplist, libimobiledevice-glue,
- * libusbmuxd, libtatsu) as dependencies of the libimobiledevice formula.
- */
-export function homebrewInstallCommand(
-  formulas: string[] = ['libplist', 'libimobiledevice']
-): ToolAcquisitionCommand {
-  return {
-    label: `Install via Homebrew (${formulas.join(', ')})`,
-    command: 'brew',
-    args: ['install', ...formulas],
-  };
-}
-

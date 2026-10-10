@@ -96,6 +96,7 @@ never silently deleted.
 | **Node 24 LTS** and **Electron 44**, pinned to the latest patch; Node moves only together with Electron | Electron 44 bundles Node 24, so tooling and app runtime match; Electron patches carry Chromium security fixes | EPOCH-458 |
 | mvt and iLEAPP each run from their own pinned uv environment (`tools/mvt`, `tools/ileapp`), not from the workspace venv | Their exact dependency pins conflict (`packaging` 26.x against 24.1); sharing one venv had silently held mvt at an outdated release | EPOCH-458 |
 | Setup checks every prerequisite before installing and installs only from lockfiles; Dependabot proposes dependency updates | Failures name the missing prerequisite instead of surfacing deep inside an install; exact pins stay current only if updates are proposed | EPOCH-458 |
+| iPhone import tools (Linux, macOS): the app shows every requirement with its status, installs missing system packages through the OS's administrator prompt (pkexec; Homebrew on macOS needs none), and builds libplist 2.8.0, libimobiledevice-glue 1.3.3, libusbmuxd 2.1.1, libtatsu 1.0.5 and libimobiledevice 1.4.0 from release tarballs pinned by SHA-256 into its own tools folder. A manifest written after `idevicebackup2` is verified marks them installed | The tool acquires evidence, so every machine must build the same verified code and record it. Release tarballs need no autotools. Users see what's needed and what they have before anything runs. Windows keeps its WSL path for now | EPOCH-465 |
 
 ## Testing and CI
 

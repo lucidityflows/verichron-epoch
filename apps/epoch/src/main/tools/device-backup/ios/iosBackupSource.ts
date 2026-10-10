@@ -6,6 +6,7 @@ import { idevicebackup2InstallPrefix } from './iosAcquisitionStrategy';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { manifestMatchesPins, readManifest } from './toolchain';
 
 export interface DecryptionOptions {
   backupPath: string;
@@ -75,12 +76,21 @@ async function verifyBackupCredentials(manifestPath: string, passwordBuffer: Buf
   }
 }
 
-function toolBinaryPath(): { available: boolean; idevicebackup2?: string; idevice_id?: string; ideviceinfo?: string } {
+/**
+ * The tools-folder copy of a binary, when it may be used. On Linux and macOS
+ * that requires the guided setup's manifest: a folder without it holds an
+ * unverified or half-finished build (EPOCH-465). Otherwise only PATH counts.
+ */
+function trustedToolPath(name: string): string | undefined {
   const installPrefix = idevicebackup2InstallPrefix();
+  if (process.platform !== 'win32' && !manifestMatchesPins(readManifest(installPrefix))) return undefined;
+  return bundledToolPath(installPrefix, name);
+}
 
-  const backup2 = detectBinary('idevicebackup2', bundledToolPath(installPrefix, 'idevicebackup2'));
-  const idTool = detectBinary('idevice_id', bundledToolPath(installPrefix, 'idevice_id'));
-  const infoTool = detectBinary('ideviceinfo', bundledToolPath(installPrefix, 'ideviceinfo'));
+function toolBinaryPath(): { available: boolean; idevicebackup2?: string; idevice_id?: string; ideviceinfo?: string } {
+  const backup2 = detectBinary('idevicebackup2', trustedToolPath('idevicebackup2'));
+  const idTool = detectBinary('idevice_id', trustedToolPath('idevice_id'));
+  const infoTool = detectBinary('ideviceinfo', trustedToolPath('ideviceinfo'));
 
   return {
     available: backup2.available,
@@ -110,8 +120,7 @@ export class IosBackupSource implements DeviceBackupSource {
   readonly label = 'iOS Device';
 
   async checkToolAvailable(): Promise<ToolAvailabilityStatus> {
-    const installPrefix = idevicebackup2InstallPrefix();
-    return detectBinary('idevicebackup2', bundledToolPath(installPrefix, 'idevicebackup2'));
+    return detectBinary('idevicebackup2', trustedToolPath('idevicebackup2'));
   }
 
   async listConnectedDevices(): Promise<DeviceInfo[]> {

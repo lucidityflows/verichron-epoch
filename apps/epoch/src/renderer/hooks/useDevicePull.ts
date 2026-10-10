@@ -5,6 +5,9 @@ import type {
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
   ToolAvailabilityStatus,
+  ToolSetupFailure,
+  ToolSetupStatus,
+  ToolSetupStep,
 } from '../../shared/types/tools';
 import { devicesApi } from '../api/devices';
 
@@ -19,7 +22,14 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   const [acquisitionOutput, setAcquisitionOutput] = useState<string[]>([]);
   const [acquisitionStep, setAcquisitionStep] = useState<string | null>(null);
   const [acquisitionError, setAcquisitionError] = useState<string | null>(null);
-  const [homebrewFallbackAvailable, setHomebrewFallbackAvailable] = useState(false);
+
+  // Guided setup (EPOCH-465), Linux and macOS.
+  const [setupStatus, setSetupStatus] = useState<ToolSetupStatus | null>(null);
+  const [setupRun, setSetupRun] = useState<'install' | 'build' | null>(null);
+  const [setupSteps, setSetupSteps] = useState<ToolSetupStep[]>([]);
+  const [setupOutput, setSetupOutput] = useState<string[]>([]);
+  const [setupFailure, setSetupFailure] = useState<ToolSetupFailure | null>(null);
+  const [setupNote, setSetupNote] = useState<string | null>(null);
  
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<DeviceInfo | null>(null);
@@ -49,11 +59,10 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     setPhase('checking');
     setAcquisitionStep(null);
     setAcquisitionError(null);
-    setHomebrewFallbackAvailable(false);
     setDevices([]);
     setSelectedDevice(null);
     setActions([]);
- 
+
     try {
       const status = await window.epoch.checkDeviceBackupToolAvailable(id);
       setToolStatus(status);
@@ -62,9 +71,10 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
         const found = await window.epoch.listConnectedDevices(id);
         setDevices(found);
       } else {
+        const guided = await devicesApi.getToolSetupStatus(id);
+        setSetupStatus(guided);
+        if (!guided) setActions(await window.epoch.getToolAcquisitionActions(id));
         setPhase('unavailable');
-        const acts = await window.epoch.getToolAcquisitionActions(id);
-        setActions(acts);
       }
     } catch (error: unknown) {
       setPhase('unavailable');
@@ -117,13 +127,11 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       }
       if (result.success) {
         setAcquisitionStep(null);
-        setHomebrewFallbackAvailable(false);
         if (sourceId) checkTool(sourceId);
       } else {
         setPhase('unavailable');
         setAcquisitionStep(null);
         setAcquisitionError(`Failed at: ${result.failedStep}`);
-        setHomebrewFallbackAvailable(!!result.homebrewFallbackAvailable);
       }
     });
     const unsubProgress = devicesApi.onDeviceBackupProgress((progress) => {
@@ -139,6 +147,21 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       }
     });
  
+    const unsubSetup = devicesApi.onToolSetupEvent((event) => {
+      if (event.type === 'plan') {
+        setSetupSteps(event.steps);
+      } else if (event.type === 'step') {
+        setSetupSteps((prev) =>
+          prev.map((step) => (step.id === event.id ? { ...step, status: event.status, detail: event.detail } : step))
+        );
+      } else {
+        setSetupOutput((prev) => {
+          const next = [...prev, event.line];
+          return next.length > 2500 ? next.slice(next.length - 2500) : next;
+        });
+      }
+    });
+
     return () => {
       if (outputRafId !== null) {
         cancelAnimationFrame(outputRafId);
@@ -147,6 +170,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       unsubOutput();
       unsubFinished();
       unsubProgress();
+      unsubSetup();
     };
   }, [sourceId, checkTool]);
  
@@ -167,22 +191,36 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     }
   };
  
-  const runHomebrewInstall = async (formulas: string[]) => {
-    setPhase('acquiring');
-    setAcquisitionOutput([]);
-    setAcquisitionError(null);
-    setAcquisitionStep(`Install via Homebrew (${formulas.join(', ')})`);
-    setHomebrewFallbackAvailable(false);
- 
+  /** Runs a guided setup step (install system tools, or build the
+   * libraries), then re-checks everything so the checklist reflects the
+   * machine as it is now. */
+  const runSetup = async (kind: 'install' | 'build') => {
+    if (!sourceId) return;
+    setSetupRun(kind);
+    setSetupSteps([]);
+    setSetupOutput([]);
+    setSetupFailure(null);
+    setSetupNote(null);
     try {
-      await devicesApi.runHomebrewInstall(formulas);
+      const result =
+        kind === 'install'
+          ? await devicesApi.installToolSetupRequirements(sourceId)
+          : await devicesApi.buildToolSetup(sourceId);
+      if (!result.success && result.failure) setSetupFailure(result.failure);
+      if (result.note) setSetupNote(result.note);
     } catch (error: unknown) {
-      setPhase('unavailable');
-      setAcquisitionStep(null);
-      setAcquisitionError(error instanceof Error ? error.message : 'Failed to run Homebrew installation.');
+      setSetupFailure({
+        stepId: kind,
+        label: kind === 'install' ? 'Install system tools' : 'Install iPhone libraries',
+        hint: error instanceof Error ? error.message : undefined,
+        tail: [],
+      });
+    } finally {
+      setSetupRun(null);
+      await checkTool(sourceId);
     }
   };
- 
+
   const handleSelectDestination = async () => {
     const dir = await devicesApi.selectDeviceBackupDestination();
     if (dir) setDestDir(dir);
@@ -215,7 +253,13 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     acquisitionOutput,
     acquisitionStep,
     acquisitionError,
-    homebrewFallbackAvailable,
+    setupStatus,
+    setupRun,
+    setupSteps,
+    setupOutput,
+    setupFailure,
+    setupNote,
+    runSetup,
     devices,
     selectedDevice,
     setSelectedDevice,
@@ -223,7 +267,6 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     pullProgress,
     pullError,
     runCompileFromSource,
-    runHomebrewInstall,
     handleSelectDestination,
     handlePull,
     checkAvailability,

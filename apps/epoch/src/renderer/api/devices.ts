@@ -4,6 +4,9 @@ import type {
   ToolAcquisitionCommand,
   ToolAcquisitionResult,
   ToolAvailabilityStatus,
+  ToolSetupEvent,
+  ToolSetupResult,
+  ToolSetupStatus,
   BackupProgress,
 } from '../../shared/types/tools';
 
@@ -19,7 +22,11 @@ export const devicesApi = {
     window.epoch.pullDeviceBackup(sourceId, device, destDir, password),
   runToolAcquisitionSteps: (steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> =>
     window.epoch.runToolAcquisitionSteps(steps, installPrefix),
-  runHomebrewInstall: (formulas: string[]) => window.epoch.runHomebrewInstall(formulas),
+  getToolSetupStatus: (sourceId: string): Promise<ToolSetupStatus | null> => window.epoch.getToolSetupStatus(sourceId),
+  installToolSetupRequirements: (sourceId: string): Promise<ToolSetupResult> =>
+    window.epoch.installToolSetupRequirements(sourceId),
+  buildToolSetup: (sourceId: string): Promise<ToolSetupResult> => window.epoch.buildToolSetup(sourceId),
+  onToolSetupEvent: (callback: (event: ToolSetupEvent) => void) => window.epoch.onToolSetupEvent(callback),
 
   onDeviceBackupProgress: (callback: (progress: BackupProgress) => void) =>
     window.epoch.onDeviceBackupProgress(callback),

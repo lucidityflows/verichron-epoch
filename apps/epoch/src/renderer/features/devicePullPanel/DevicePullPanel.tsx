@@ -19,6 +19,7 @@ import { Loader } from '../../components/ui/Loader';
 import { useDevicePull } from '../../hooks/useDevicePull';
 import { PasswordField } from '../../components/ui/PasswordField';
 import { FieldError } from '../../components/ui/FieldError';
+import { ToolSetup } from './ToolSetup';
  
 interface DevicePullPanelProps {
   onBackupPulled: (destDir: string) => void;
@@ -42,8 +43,13 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
     pullProgress,
     pullError,
     runCompileFromSource,
-    runHomebrewInstall,
-    homebrewFallbackAvailable,
+    setupStatus,
+    setupRun,
+    setupSteps,
+    setupOutput,
+    setupFailure,
+    setupNote,
+    runSetup,
     handleSelectDestination,
     handlePull,
     checkAvailability,
@@ -120,13 +126,30 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
         )}
       </div>
  
-      {phase === 'checking' && (
+      {phase === 'checking' && !setupStatus && (
         <p className="text-data text-muted-foreground flex items-center gap-2 py-2">
           <Loader className="text-accent" /> Checking for the required tool…
         </p>
       )}
- 
-      {phase === 'unavailable' && toolStatus && !toolStatus.available && (
+
+      {/* Guided setup (Linux, macOS). Stays on screen through the re-check
+          that follows each run, so progress and failures don't flash away. */}
+      {(phase === 'unavailable' || phase === 'checking') && setupStatus && (
+        <ToolSetup
+          status={setupStatus}
+          running={setupRun}
+          steps={setupSteps}
+          output={setupOutput}
+          failure={setupFailure}
+          note={setupNote}
+          onInstallSystem={() => runSetup('install')}
+          onBuild={() => runSetup('build')}
+          onCheckAgain={checkAvailability}
+        />
+      )}
+
+      {/* Windows: the acquisition actions (WSL build). */}
+      {phase === 'unavailable' && !setupStatus && toolStatus && !toolStatus.available && (
         <div>
           {/* Flag banner, standard 1 of 2 in this file -- see the Setup
            * Error card below. Both now share the same treatment
@@ -148,21 +171,6 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
                 <div className="flex-1">
                   <p className="text-flag">Setup failed</p>
                   <p className="text-foreground/90 mt-1 font-mono">{acquisitionError}</p>
-                  {homebrewFallbackAvailable && (
-                    <div className="mt-4 pt-4 shadow-elevation-1">
-                      <p className="text-foreground/80 mb-3">
-                        Homebrew is available on this Mac and can install the required libraries directly instead.
-                      </p>
-                      <Button
-                        variant="outline"
-                        tone="danger"
-                        size="sm"
-                        onClick={() => runHomebrewInstall(['libplist', 'libimobiledevice'])}
-                      >
-                        <Wrench size="0.875rem" /> Try Homebrew Instead
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -177,8 +185,6 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
                       ? 'Install the Required System Tools'
                       : action.kind === 'compile-from-source'
                       ? 'Set Up iPhone Import Automatically'
-                      : action.kind === 'homebrew-install'
-                      ? 'Install via Homebrew'
                       : 'Use a Verified Tool Package'}
                   </h3>
                   <p className="text-data text-muted-foreground mt-1">
@@ -186,14 +192,9 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
                       ? 'Complete this one-time setup in your terminal, then return here to import a backup directly from your iPhone.'
                       : action.kind === 'compile-from-source'
                       ? 'Epoch can build and configure the required components locally on this computer.'
-                      : action.kind === 'homebrew-install'
-                      ? 'Uses your existing Homebrew installation to install libplist and libimobiledevice — usually faster and more reliable than compiling from source.'
                       : 'A verified package can provide the components needed for direct iPhone import.'}
                   </p>
                 </div>
-                {action.kind === 'homebrew-install' && (
-                  <Badge variant="accent" className="shrink-0">Recommended</Badge>
-                )}
               </div>
               
               {action.kind === 'install-instructions' && (
@@ -235,14 +236,6 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
- 
-              {action.kind === 'homebrew-install' && (
-                <div className="mt-4">
-                  <Button onClick={() => runHomebrewInstall(action.formulas)}>
-                    <Wrench size="1rem" /> Install with Homebrew
-                  </Button>
                 </div>
               )}
  

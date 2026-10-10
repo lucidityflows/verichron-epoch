@@ -71,17 +71,12 @@ export interface DeviceBackupSource {
 export type ToolAcquisitionAction =
   | { kind: 'install-instructions'; title: string; commands: string[] }
   | { kind: 'compile-from-source'; title: string; steps: ToolAcquisitionCommand[] }
-  | { kind: 'download-verified-release'; title: string; manifestUrl: string }
-  | { kind: 'homebrew-install'; title: string; formulas: string[] };
+  | { kind: 'download-verified-release'; title: string; manifestUrl: string };
 
-/** Result of running an acquisition action. `homebrewFallbackAvailable` is
- * set only when a compile-from-source step failed on macOS AND `brew` is
- * present on the host -- it tells the UI it can offer the Homebrew path
- * instead of leaving the user stuck on manual terminal instructions. */
+/** Result of running a (Windows) acquisition action. */
 export interface ToolAcquisitionResult {
   success: boolean;
   failedStep?: string;
-  homebrewFallbackAvailable?: boolean;
 }
 
 export interface ToolAcquisitionCommand {
@@ -97,9 +92,97 @@ export interface ToolAcquisitionCommand {
 }
 
 export interface ToolAcquisitionStrategy {
+  /** Guided setup, where this platform supports it (EPOCH-465). */
+  guided?: GuidedToolSetup;
   /** What can this platform actually do to get the tool installed? Returns
    * every viable action so the UI can offer a choice (e.g. Linux: compile
    * from source, only option; Windows: bundled binary check, or a verified
    * download) rather than this layer picking one on the caller's behalf. */
   availableActions(): ToolAcquisitionAction[];
+}
+
+/* ---------------------------------------------------------------------------
+ * Guided tool setup (EPOCH-465): what a source needs on this machine, whether
+ * each requirement is met, and a step-by-step install with structured
+ * progress. Linux and macOS; Windows keeps ToolAcquisitionAction.
+ * ------------------------------------------------------------------------- */
+
+export type ToolSetupGroup = 'system' | 'service' | 'libraries';
+
+export interface ToolSetupRequirement {
+  id: string;
+  group: ToolSetupGroup;
+  /** A name, e.g. "pkg-config" or "libplist 2.8.0". */
+  label: string;
+  ok: boolean;
+  /** The installed version when known. */
+  version?: string;
+  /** One sentence: what it's for, or why it isn't met. */
+  detail?: string;
+}
+
+export interface ToolSetupInstallPlan {
+  /** The packages that would be installed. */
+  packages: string[];
+  /** The exact command, for the user to read or copy. */
+  command: string;
+  /** True when the app can run it itself (through the OS's admin prompt where needed). */
+  automatic: boolean;
+  /** Anything the user should know first, e.g. "Epoch will ask for your administrator password." */
+  note?: string;
+}
+
+export interface ToolSetupStatus {
+  /** Guided setup is available on this platform. */
+  supported: boolean;
+  requirements: ToolSetupRequirement[];
+  /** Every system and service requirement is met, so the libraries can be built. */
+  systemReady: boolean;
+  /** The libraries are installed at the pinned versions and verified. */
+  installed: boolean;
+  /** How to install what's missing from the system, or null when nothing is. */
+  install: ToolSetupInstallPlan | null;
+  /** A previous build stopped part-way and can resume. */
+  canResume: boolean;
+  /** Why guided setup isn't available, when `supported` is false. */
+  unsupportedReason?: string;
+}
+
+export type ToolSetupStepStatus = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+
+export interface ToolSetupStep {
+  id: string;
+  label: string;
+  status: ToolSetupStepStatus;
+  /** The current phase of a running step, e.g. "Configuring", or why it was skipped. */
+  detail?: string;
+}
+
+export type ToolSetupEvent =
+  | { type: 'plan'; steps: ToolSetupStep[] }
+  | { type: 'step'; id: string; status: ToolSetupStepStatus; detail?: string }
+  | { type: 'output'; id: string; line: string };
+
+export interface ToolSetupFailure {
+  stepId: string;
+  /** What failed, as a name: "Configure libplist 2.8.0". */
+  label: string;
+  /** A plain-language cause when the output shows one. */
+  hint?: string;
+  /** The last lines of the failed command's output. */
+  tail: string[];
+}
+
+export interface ToolSetupResult {
+  success: boolean;
+  failure?: ToolSetupFailure;
+  /** Something to do next, e.g. finishing Apple's installer. */
+  note?: string;
+}
+
+/** Implemented by an acquisition strategy that offers guided setup. */
+export interface GuidedToolSetup {
+  status(): Promise<ToolSetupStatus>;
+  installRequirements(emit: (event: ToolSetupEvent) => void): Promise<ToolSetupResult>;
+  build(emit: (event: ToolSetupEvent) => void): Promise<ToolSetupResult>;
 }

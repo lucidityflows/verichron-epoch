@@ -21,7 +21,8 @@
     "package": "electron-forge package",
     "premake": "pnpm run build:contracts && pnpm run build:db-reader",
     "make": "electron-forge make",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "tsx --test 'src/main/**/*.test.ts'"
   },
   "keywords": [],
   "author": {

@@ -3,8 +3,15 @@ import path from 'path';
 import fs from 'fs/promises';
 import { spawn } from 'child_process';
 import { listDeviceBackupSources, getDeviceBackupSource, getAcquisitionStrategy } from '../tools/device-backup/registry';
-import { isHomebrewAvailable } from '../tools/device-backup/ios/buildSteps';
-import type { DeviceInfo, ToolAcquisitionCommand, BackupProgress, ToolAcquisitionResult } from '../../shared/types/tools';
+import type {
+  DeviceInfo,
+  ToolAcquisitionCommand,
+  BackupProgress,
+  ToolAcquisitionResult,
+  ToolSetupEvent,
+  ToolSetupResult,
+  ToolSetupStatus,
+} from '../../shared/types/tools';
 
 export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null) {
   function sendToRenderer(channel: string, ...args: unknown[]) {
@@ -102,17 +109,6 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
           PKG_CONFIG_PATH: [pkgConfigPath, process.env.PKG_CONFIG_PATH].filter(Boolean).join(path.delimiter),
         };
 
-        if (process.platform === 'darwin') {
-          const macPaths = [
-            '/opt/homebrew/bin',
-            '/usr/local/bin',
-            '/opt/homebrew/opt/libtool/bin',
-            '/usr/local/opt/libtool/bin'
-          ].join(':');
-          
-          env.PATH = env.PATH ? `${macPaths}:${env.PATH}` : macPaths;
-        }
-
         const exitCode = await new Promise<number>((resolve, reject) => {
           const child = spawn(step.command, step.args, { cwd: step.cwd, env });
           child.stdout?.on('data', (chunk: Buffer) => {
@@ -126,8 +122,7 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
         });
 
         if (exitCode !== 0) {
-          const homebrewFallbackAvailable = process.platform === 'darwin' && isHomebrewAvailable();
-          const result: ToolAcquisitionResult = { success: false, failedStep: step.label, homebrewFallbackAvailable };
+          const result: ToolAcquisitionResult = { success: false, failedStep: step.label };
           sendToRenderer('epoch:toolAcquisitionFinished', result);
           return result;
         }
@@ -141,52 +136,34 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     }
   });
 
-  ipcMain.handle('epoch:runHomebrewInstall', async (_event, formulas: string[]): Promise<{ success: boolean }> => {
-    if (acquisitionInFlight) {
-      throw new Error('A tool acquisition run is already in progress.');
-    }
-    if (process.platform !== 'darwin') {
-      throw new Error('Homebrew installation is only supported on macOS.');
-    }
-    if (!isHomebrewAvailable()) {
-      throw new Error('brew was not found on PATH.');
-    }
+  // Guided setup (EPOCH-465): Linux and macOS. One run at a time, shared with
+  // the Windows acquisition steps above.
+  function guidedFor(sourceId: string) {
+    const guided = getAcquisitionStrategy(sourceId)?.guided;
+    if (!guided) throw new Error(`Guided setup isn't available for ${sourceId} on this platform`);
+    return guided;
+  }
 
+  async function runGuided(work: (emit: (event: ToolSetupEvent) => void) => Promise<ToolSetupResult>) {
+    if (acquisitionInFlight) throw new Error('A setup run is already in progress.');
     acquisitionInFlight = true;
-    const label = `Install via Homebrew (${formulas.join(', ')})`;
-
     try {
-      sendToRenderer('epoch:toolAcquisitionStepStarted', label);
-
-      const env: NodeJS.ProcessEnv = {
-        ...process.env,
-      };
-      const macPaths = [
-        '/opt/homebrew/bin',
-        '/usr/local/bin',
-        '/opt/homebrew/opt/libtool/bin',
-        '/usr/local/opt/libtool/bin',
-      ].join(':');
-      env.PATH = env.PATH ? `${macPaths}:${env.PATH}` : macPaths;
-
-      const exitCode = await new Promise<number>((resolve, reject) => {
-        const child = spawn('brew', ['install', ...formulas], { env });
-        child.stdout?.on('data', (chunk: Buffer) => {
-          sendToRenderer('epoch:toolAcquisitionOutput', { step: label, line: chunk.toString('utf-8') });
-        });
-        child.stderr?.on('data', (chunk: Buffer) => {
-          sendToRenderer('epoch:toolAcquisitionOutput', { step: label, line: chunk.toString('utf-8') });
-        });
-        child.once('error', reject);
-        child.once('close', (code) => resolve(code ?? 1));
-      });
-
-      const success = exitCode === 0;
-      const result: ToolAcquisitionResult = success ? { success: true } : { success: false, failedStep: label };
-      sendToRenderer('epoch:toolAcquisitionFinished', result);
-      return { success };
+      return await work((event) => sendToRenderer('epoch:toolSetupEvent', event));
     } finally {
       acquisitionInFlight = false;
     }
+  }
+
+  ipcMain.handle('epoch:getToolSetupStatus', async (_event, sourceId: string): Promise<ToolSetupStatus | null> => {
+    const guided = getAcquisitionStrategy(sourceId)?.guided;
+    return guided ? guided.status() : null;
   });
+
+  ipcMain.handle('epoch:installToolSetupRequirements', async (_event, sourceId: string): Promise<ToolSetupResult> =>
+    runGuided((emit) => guidedFor(sourceId).installRequirements(emit))
+  );
+
+  ipcMain.handle('epoch:buildToolSetup', async (_event, sourceId: string): Promise<ToolSetupResult> =>
+    runGuided((emit) => guidedFor(sourceId).build(emit))
+  );
 }

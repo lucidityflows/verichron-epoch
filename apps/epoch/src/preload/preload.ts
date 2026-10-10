@@ -8,6 +8,9 @@ import type {
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
   ToolAcquisitionResult,
+  ToolSetupEvent,
+  ToolSetupResult,
+  ToolSetupStatus,
   ToolAvailabilityStatus,
 } from '../shared/types/tools';
  
@@ -118,8 +121,17 @@ const dbApi = {
     installPrefix: string
   ): Promise<ToolAcquisitionResult> =>
     ipcRenderer.invoke('epoch:runToolAcquisitionSteps', steps, installPrefix),
-  runHomebrewInstall: (formulas: string[]): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke('epoch:runHomebrewInstall', formulas),
+  getToolSetupStatus: (sourceId: string): Promise<ToolSetupStatus | null> =>
+    ipcRenderer.invoke('epoch:getToolSetupStatus', sourceId),
+  installToolSetupRequirements: (sourceId: string): Promise<ToolSetupResult> =>
+    ipcRenderer.invoke('epoch:installToolSetupRequirements', sourceId),
+  buildToolSetup: (sourceId: string): Promise<ToolSetupResult> =>
+    ipcRenderer.invoke('epoch:buildToolSetup', sourceId),
+  onToolSetupEvent: (callback: (event: ToolSetupEvent) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, event: ToolSetupEvent) => callback(event);
+    ipcRenderer.on('epoch:toolSetupEvent', listener);
+    return () => ipcRenderer.removeListener('epoch:toolSetupEvent', listener);
+  },
   onDeviceBackupProgress: (callback: (progress: BackupProgress) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: BackupProgress) => callback(progress);
     ipcRenderer.on('epoch:deviceBackupProgress', listener);

@@ -14,6 +14,9 @@ import type {
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
   ToolAcquisitionResult,
+  ToolSetupEvent,
+  ToolSetupResult,
+  ToolSetupStatus,
   ToolAvailabilityStatus,
 } from './tools';
  
@@ -114,7 +117,10 @@ declare global {
         steps: ToolAcquisitionCommand[],
         installPrefix: string
       ) => Promise<ToolAcquisitionResult>;
-      runHomebrewInstall: (formulas: string[]) => Promise<{ success: boolean }>;
+      getToolSetupStatus: (sourceId: string) => Promise<ToolSetupStatus | null>;
+      installToolSetupRequirements: (sourceId: string) => Promise<ToolSetupResult>;
+      buildToolSetup: (sourceId: string) => Promise<ToolSetupResult>;
+      onToolSetupEvent: (callback: (event: ToolSetupEvent) => void) => () => void;
       onDeviceBackupProgress: (callback: (progress: BackupProgress) => void) => () => void;
       onToolAcquisitionStepStarted: (callback: (label: string) => void) => () => void;
       onToolAcquisitionOutput: (callback: (entry: { step: string; line: string }) => void) => () => void;
