@@ -7,6 +7,7 @@ import type {
   DeviceInfo,
   ToolAcquisitionCommand,
   BackupProgress,
+  BackupStats,
   PullOptions,
   ToolAcquisitionResult,
   ToolSetupEvent,
@@ -61,6 +62,25 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     return source.backupEncryptionEnabled(device);
   });
 
+  ipcMain.handle('epoch:cancelDeviceBackup', async (_event, sourceId: string) => {
+    const source = getDeviceBackupSource(sourceId);
+    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    return source.cancelPull();
+  });
+
+  ipcMain.handle('epoch:getIncompleteBackup', async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
+    const source = getDeviceBackupSource(sourceId);
+    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    return source.incompleteBackup(destDir, device);
+  });
+
+  ipcMain.handle('epoch:deleteIncompleteBackup', async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
+    if (deviceBackupInFlight) throw new Error('A device backup is running; cancel it before deleting.');
+    const source = getDeviceBackupSource(sourceId);
+    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    return source.deleteIncompleteBackup(destDir, device);
+  });
+
   let deviceBackupInFlight = false;
 
   ipcMain.handle(
@@ -83,6 +103,9 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
           destDir,
           (progress: BackupProgress) => {
             sendToRenderer('epoch:deviceBackupProgress', progress);
+          },
+          (stats: BackupStats) => {
+            sendToRenderer('epoch:deviceBackupStats', stats);
           },
           options
         );

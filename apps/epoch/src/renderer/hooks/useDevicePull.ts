@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type {
   BackupProgress,
+  BackupStats,
+  IncompleteBackup,
   DeviceInfo,
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
@@ -46,6 +48,11 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   const [encryptionConsent, setEncryptionConsent] = useState(false);
   // Something the user must do on the device now, e.g. enter its passcode.
   const [deviceAction, setDeviceAction] = useState<string | null>(null);
+  const [pullStats, setPullStats] = useState<BackupStats | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  // A backup folder left by a pull that didn't finish, offered for deletion.
+  const [incomplete, setIncomplete] = useState<IncompleteBackup | null>(null);
+  const [deletingIncomplete, setDeletingIncomplete] = useState(false);
 
   // Maintain refs to prevent effect re-registrations on transient prop/state changes
   const onBackupPulledRef = useRef(onBackupPulled);
@@ -162,6 +169,8 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       }
     });
  
+    const unsubStats = devicesApi.onDeviceBackupStats(setPullStats);
+
     const unsubSetup = devicesApi.onToolSetupEvent((event) => {
       if (event.type === 'plan') {
         setSetupSteps(event.steps);
@@ -186,6 +195,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       unsubFinished();
       unsubProgress();
       unsubSetup();
+      unsubStats();
     };
   }, [sourceId, checkTool]);
  
@@ -241,6 +251,48 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     if (dir) setDestDir(dir);
   };
  
+  const refreshIncomplete = useCallback(async () => {
+    if (!sourceId || !selectedDevice || !destDir) {
+      setIncomplete(null);
+      return;
+    }
+    try {
+      setIncomplete(await devicesApi.getIncompleteBackup(sourceId, destDir, selectedDevice));
+    } catch (err) {
+      setIncomplete(null);
+      setPullError(ipcErrorMessage(err));
+    }
+  }, [sourceId, selectedDevice, destDir]);
+
+  // An earlier pull may have left an incomplete backup in the chosen folder.
+  useEffect(() => {
+    if (phase === 'available') void refreshIncomplete();
+  }, [phase, refreshIncomplete]);
+
+  const cancelPull = async () => {
+    if (!sourceId) return;
+    setCancelling(true);
+    try {
+      await devicesApi.cancelDeviceBackup(sourceId);
+    } catch (err) {
+      setCancelling(false);
+      setPullError(ipcErrorMessage(err));
+    }
+  };
+
+  const deleteIncomplete = async () => {
+    if (!sourceId || !selectedDevice || !destDir) return;
+    setDeletingIncomplete(true);
+    try {
+      await devicesApi.deleteIncompleteBackup(sourceId, destDir, selectedDevice);
+    } catch (err) {
+      setPullError(ipcErrorMessage(err));
+    } finally {
+      setDeletingIncomplete(false);
+      await refreshIncomplete();
+    }
+  };
+
   /**
    * Pulls a backup. When the device's encrypted backups are off, it first
    * asks the user (EPOCH-466) and returns 'consent-needed'; the pull is then
@@ -255,6 +307,8 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     setPullProgress([]);
     setPullError(null);
     setDeviceAction(null);
+    setPullStats(null);
+    setIncomplete(null);
     if (!enableEncryption) {
       try {
         if (!(await devicesApi.getBackupEncryption(sourceId, selectedDevice))) {
@@ -276,6 +330,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       setPhase('available');
     } finally {
       setDeviceAction(null);
+      setCancelling(false);
     }
     return 'finished';
   };
@@ -308,6 +363,12 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     encryptionConsent,
     cancelEncryptionConsent,
     deviceAction,
+    pullStats,
+    cancelPull,
+    cancelling,
+    incomplete,
+    deleteIncomplete,
+    deletingIncomplete,
     runCompileFromSource,
     handleSelectDestination,
     handlePull,

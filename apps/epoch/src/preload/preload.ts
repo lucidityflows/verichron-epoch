@@ -6,6 +6,8 @@ import type {
   BackupProgress,
   DeviceInfo,
   PullOptions,
+  BackupStats,
+  IncompleteBackup,
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
   ToolAcquisitionResult,
@@ -119,6 +121,16 @@ const dbApi = {
     ipcRenderer.invoke('epoch:getBackupEncryption', sourceId, device),
   pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions): Promise<string> =>
     ipcRenderer.invoke('epoch:pullDeviceBackup', sourceId, device, destDir, options),
+  cancelDeviceBackup: (sourceId: string): Promise<boolean> => ipcRenderer.invoke('epoch:cancelDeviceBackup', sourceId),
+  getIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo): Promise<IncompleteBackup | null> =>
+    ipcRenderer.invoke('epoch:getIncompleteBackup', sourceId, destDir, device),
+  deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo): Promise<void> =>
+    ipcRenderer.invoke('epoch:deleteIncompleteBackup', sourceId, destDir, device),
+  onDeviceBackupStats: (callback: (stats: BackupStats) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, stats: BackupStats) => callback(stats);
+    ipcRenderer.on('epoch:deviceBackupStats', listener);
+    return () => ipcRenderer.removeListener('epoch:deviceBackupStats', listener);
+  },
   runToolAcquisitionSteps: (
     steps: ToolAcquisitionCommand[],
     installPrefix: string

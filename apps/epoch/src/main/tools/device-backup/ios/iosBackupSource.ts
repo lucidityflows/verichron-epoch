@@ -1,5 +1,13 @@
-import { spawn, execFileSync } from 'child_process';
-import type { BackupProgress, DeviceBackupSource, DeviceInfo, PullOptions, ToolAvailabilityStatus } from '../../../../shared/types/tools';
+import { spawn, execFileSync, type ChildProcess } from 'child_process';
+import type {
+  BackupProgress,
+  BackupStats,
+  DeviceBackupSource,
+  DeviceInfo,
+  IncompleteBackup,
+  PullOptions,
+  ToolAvailabilityStatus,
+} from '../../../../shared/types/tools';
 import { bundledToolPath, detectBinary } from '../detection';
 import { idevicebackup2InstallPrefix } from './iosAcquisitionStrategy';
 
@@ -10,6 +18,7 @@ import { manifestMatchesPins, readManifest } from './toolchain';
 import { enableBackupEncryption, PASSCODE_TIMEOUT_MS } from './encryption';
 import { failureMessage } from './deviceErrors';
 import { lastLines } from './toolchain/process';
+import { folderSize, OutputParser, snapshotState, type OutputEvent } from './backupRun';
 import { appendPullRecord, type PullRecord } from './pullRecord';
 
 export interface DecryptionOptions {
@@ -122,6 +131,59 @@ function readLockdownValue(ideviceinfoPath: string, udid: string, key: string, d
 export class IosBackupSource implements DeviceBackupSource {
   readonly id = 'ios';
   readonly label = 'iOS Device';
+  /** The running backup process, while a backup runs. */
+  private running: ChildProcess | null = null;
+  /** Null when no pull is running; true once the user asked to cancel it. */
+  private cancelRequested: boolean | null = null;
+
+  /**
+   * Stops the running backup cleanly: SIGINT, as Ctrl+C would, so
+   * idevicebackup2 tells the device it is aborting. Killed if it hasn't
+   * stopped within CANCEL_GRACE_MS. False when no backup is running.
+   */
+  cancelPull(): boolean {
+    const proc = this.running;
+    if (!proc || this.cancelRequested === null) return false;
+    this.cancelRequested = true;
+    proc.kill('SIGINT');
+    setTimeout(() => {
+      if (proc.exitCode === null && proc.signalCode === null) proc.kill('SIGKILL');
+    }, CANCEL_GRACE_MS).unref();
+    return true;
+  }
+
+  /**
+   * The device's backup folder in `destDir` when it holds a backup that
+   * didn't finish (Status.plist's SnapshotState isn't "finished"). Such a
+   * folder can't be used; the next pull starts over in it.
+   */
+  async incompleteBackup(destDir: string, device: DeviceInfo): Promise<IncompleteBackup | null> {
+    const backupDir = backupFolder(destDir, device);
+    const plistutil = trustedToolPath('plistutil');
+    if (!plistutil) throw new Error('plistutil is not available -- complete the iPhone tool setup first.');
+    try {
+      await fs.access(backupDir);
+    } catch {
+      return null;
+    }
+    if ((await snapshotState(plistutil, backupDir)) === 'finished') return null;
+    return { path: backupDir, bytes: await folderSize(backupDir) };
+  }
+
+  /** Deletes an incomplete backup folder, after checking again that it is incomplete. */
+  async deleteIncompleteBackup(destDir: string, device: DeviceInfo): Promise<void> {
+    if (this.running) throw new Error("A backup is running; cancel it before deleting.");
+    const incomplete = await this.incompleteBackup(destDir, device);
+    if (!incomplete) throw new Error('There is no incomplete backup to delete.');
+    await fs.rm(incomplete.path, { recursive: true });
+    await appendPullRecord(destDir, {
+      event: 'incomplete-backup-deleted',
+      udid: device.id,
+      path: incomplete.path,
+      bytes: incomplete.bytes,
+      deleted_at: new Date().toISOString(),
+    });
+  }
 
   async checkToolAvailable(): Promise<ToolAvailabilityStatus> {
     return detectBinary('idevicebackup2', trustedToolPath('idevicebackup2'));
@@ -182,6 +244,7 @@ export class IosBackupSource implements DeviceBackupSource {
     device: DeviceInfo,
     destDir: string,
     onProgress: (progress: BackupProgress) => void,
+    onStats: (stats: BackupStats) => void,
     options: PullOptions
   ): Promise<string> {
     const { password, enableEncryption } = options;
@@ -203,6 +266,7 @@ export class IosBackupSource implements DeviceBackupSource {
       started_at: new Date().toISOString(),
       finished_at: null,
       backup_encryption: 'unknown',
+      received_bytes: null,
       outcome: 'failed',
     };
 
@@ -211,6 +275,8 @@ export class IosBackupSource implements DeviceBackupSource {
       throw new Error(message);
     };
 
+    if (this.cancelRequested !== null) throw new Error('A backup is already running.');
+    this.cancelRequested = false;
     try {
       onProgress({ phase: 'preparing', message: `Checking the backup settings of ${device.name}…` });
       if (await this.backupEncryptionEnabled(device)) {
@@ -242,11 +308,28 @@ export class IosBackupSource implements DeviceBackupSource {
         phase: 'device-action',
         message: `Unlock ${device.name} and keep it unlocked until the backup finishes. It will ask for its passcode to start.`,
       });
-      await runBackup(idevicebackup2, device, destDir, password, onProgress);
+      const estimatedBytes = usedStorage(tools.ideviceinfo, device.id);
+      if (estimatedBytes !== null) {
+        onProgress({
+          phase: 'preparing',
+          message: `${device.name} has about ${formatGB(estimatedBytes)} of data to copy. A large backup can take an hour or more.`,
+        });
+      }
+      record.received_bytes = await runBackup(idevicebackup2, device, destDir, password, onProgress, onStats, estimatedBytes, {
+        setProcess: (proc) => {
+          this.running = proc;
+        },
+        cancelled: () => this.cancelRequested === true,
+      });
       record.outcome = 'completed';
       onProgress({ phase: 'done', message: 'Backup complete.' });
       return destDir;
+    } catch (err) {
+      if (this.cancelRequested) record.outcome = 'cancelled';
+      throw err;
     } finally {
+      this.running = null;
+      this.cancelRequested = null;
       record.finished_at = new Date().toISOString();
       try {
         await appendPullRecord(destDir, record);
@@ -259,6 +342,23 @@ export class IosBackupSource implements DeviceBackupSource {
   }
 }
 
+/** The device's folder in `destDir`; refuses an identifier that isn't a plain name. */
+function backupFolder(destDir: string, device: DeviceInfo): string {
+  if (!/^[A-Za-z0-9-]+$/.test(device.id)) throw new Error(`Unexpected device identifier: ${device.id}`);
+  return path.join(destDir, device.id);
+}
+
+/** Bytes of data on the device, from lockdown's disk usage; null when not reported. */
+function usedStorage(ideviceinfo: string, udid: string): number | null {
+  const capacity = Number(readLockdownValue(ideviceinfo, udid, 'TotalDataCapacity', 'com.apple.disk_usage'));
+  const available = Number(readLockdownValue(ideviceinfo, udid, 'TotalDataAvailable', 'com.apple.disk_usage'));
+  return capacity > 0 && available >= 0 && capacity >= available ? capacity - available : null;
+}
+
+function formatGB(bytes: number): string {
+  return `${(bytes / 1e9).toFixed(bytes < 10e9 ? 1 : 0)} GB`;
+}
+
 function toolVersion(binary: string): string | null {
   try {
     return execFileSync(binary, ['--version'], { encoding: 'utf-8' }).trim() || null;
@@ -269,10 +369,24 @@ function toolVersion(binary: string): string | null {
 
 /** What idevicebackup2 prints while a backup waits for the device's passcode. */
 const BACKUP_PASSCODE_PROMPT = 'Waiting for passcode to be entered on the device';
+const STATS_INTERVAL_MS = 5_000;
+/** No new data for this long while receiving: tell the user to check the device. */
+export const STALL_WARNING_MS = 3 * 60_000;
+/** After Cancel, how long idevicebackup2 gets to stop cleanly before it is killed. */
+const CANCEL_GRACE_MS = 30_000;
+/** Output kept for the error message; bars are redrawn constantly, so it is capped. */
+const OUTPUT_TAIL_CHARS = 64 * 1024;
+
+interface RunControl {
+  /** The running backup process, so Cancel can stop it. */
+  setProcess: (proc: ChildProcess | null) => void;
+  cancelled: () => boolean;
+}
 
 /**
- * Runs `idevicebackup2 backup --full`. Lines before "Receiving files" are
- * setup ('preparing'), so the device-action banner stays up until files
+ * Runs `idevicebackup2 backup --full`, reporting its lines, its overall
+ * percentage and the data received so far. Lines before "Receiving files"
+ * are setup ('preparing'), so the device-action banner stays up until files
  * arrive. Rejects with the device's reason when it fails.
  */
 function runBackup(
@@ -280,40 +394,95 @@ function runBackup(
   device: DeviceInfo,
   destDir: string,
   password: string,
-  onProgress: (progress: BackupProgress) => void
-): Promise<void> {
+  onProgress: (progress: BackupProgress) => void,
+  onStats: (stats: BackupStats) => void,
+  estimatedBytes: number | null,
+  control: RunControl
+): Promise<number> {
   return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const backupDir = backupFolder(destDir, device);
+    const stats: BackupStats = { startedAt, receivedBytes: 0, lastDataAt: null, percent: null, estimatedBytes };
     const proc = spawn(idevicebackup2, ['backup', '--full', destDir, '-u', device.id], {
       env: { ...process.env, BACKUP_PASSWORD: password },
     });
+    control.setProcess(proc);
+    onStats({ ...stats });
 
     let output = '';
     let receiving = false;
+    let stallWarned = false;
+    const parser = new OutputParser();
+    const handle = (events: OutputEvent[]) => {
+      for (const event of events) {
+        if (event.kind === 'percent') {
+          stats.percent = event.value;
+          onStats({ ...stats });
+        } else if (event.text.includes(BACKUP_PASSCODE_PROMPT)) {
+          onProgress({ phase: 'device-action', message: `Enter the passcode on ${device.name} now to start the backup.` });
+        } else {
+          if (event.text === 'Receiving files') receiving = true;
+          onProgress({ phase: receiving ? 'transferring' : 'preparing', message: event.text });
+        }
+      }
+    };
+    const keep = (text: string) => {
+      output = (output + text).slice(-OUTPUT_TAIL_CHARS);
+    };
     proc.stdout.on('data', (chunk: Buffer) => {
       const text = chunk.toString('utf-8');
-      output += text;
-      for (const line of text.split('\n')) {
-        const trimmed = line.trim();
-        if (trimmed.length === 0) continue;
-        if (trimmed.includes(BACKUP_PASSCODE_PROMPT)) {
-          onProgress({ phase: 'device-action', message: `Enter the passcode on ${device.name} now to start the backup.` });
-          continue;
-        }
-        if (trimmed === 'Receiving files') receiving = true;
-        onProgress({ phase: receiving ? 'transferring' : 'preparing', message: trimmed });
-      }
+      keep(text);
+      handle(parser.push(text));
     });
-    proc.stderr.on('data', (chunk: Buffer) => {
-      output += chunk.toString('utf-8');
-    });
+    proc.stderr.on('data', (chunk: Buffer) => keep(chunk.toString('utf-8')));
 
+    // The folder's growth is the honest measure of progress: one large file
+    // can take many minutes and prints nothing until it is done.
+    let measuring = false;
+    const timer = setInterval(async () => {
+      if (measuring) return;
+      measuring = true;
+      try {
+        const received = await folderSize(backupDir, startedAt);
+        const now = Date.now();
+        if (received > stats.receivedBytes) {
+          stats.receivedBytes = received;
+          stats.lastDataAt = now;
+          if (stallWarned) {
+            stallWarned = false;
+            onProgress({ phase: 'transferring', message: `Data is arriving from ${device.name} again.` });
+          }
+        } else if (receiving && !stallWarned && now - (stats.lastDataAt ?? startedAt) >= STALL_WARNING_MS) {
+          stallWarned = true;
+          onProgress({
+            phase: 'device-action',
+            message: `No data from ${device.name} for ${STALL_WARNING_MS / 60_000} minutes. Make sure it's connected and unlocked.`,
+          });
+        }
+        onStats({ ...stats });
+      } finally {
+        measuring = false;
+      }
+    }, STATS_INTERVAL_MS);
+
+    const finish = () => {
+      clearInterval(timer);
+      control.setProcess(null);
+      handle(parser.flush());
+    };
     const fail = (message: string) => {
       onProgress({ phase: 'error', message });
       reject(new Error(message));
     };
-    proc.once('error', (err: Error) => fail(err.message));
-    proc.once('close', (code: number | null) => {
-      if (code === 0) resolve();
+    proc.once('error', (err: Error) => {
+      finish();
+      fail(err.message);
+    });
+    proc.once('close', async (code: number | null) => {
+      finish();
+      const received = await folderSize(backupDir, startedAt);
+      if (control.cancelled()) fail(`The backup of ${device.name} was cancelled.`);
+      else if (code === 0) resolve(received);
       else fail(failureMessage(`The backup of ${device.name} failed.`, lastLines(output), device.name, code));
     });
   });
