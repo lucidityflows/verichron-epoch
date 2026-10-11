@@ -6,23 +6,26 @@ import { lastLines } from './toolchain/process';
  * the user has agreed to it.
  *
  * iOS asks for the device's passcode on the device before it changes this
- * setting. idevicebackup2 prints PASSCODE_PROMPT while it waits, and the user
- * is told to enter the passcode on the device. EPOCH-101's version ran this
- * with its output discarded, so the passcode request was never shown and
- * the command looked broken.
+ * setting, so the caller tells the user to look at the device before this
+ * starts: the tool's own hint arrives late or not at all (it is printed only
+ * when the device reports a passcode). When the device refuses, the tool
+ * prints the device's reason as an `ErrorCode <n>: <description>` line before
+ * a generic "Could not enable backup encryption."; `reason` is that line.
  *
  * The password reaches idevicebackup2 only through BACKUP_PASSWORD, never as
  * an argument, so it can't be seen in the process table.
  */
-export const PASSCODE_PROMPT = 'Waiting for passcode to be entered on the device';
 export const PASSCODE_TIMEOUT_MS = 2 * 60_000;
+
+/** The device's own reason for a failure, else the tool's last line. */
+export function failureReason(tail: string[]): string | undefined {
+  return [...tail].reverse().find((line) => /^ErrorCode \d+:/.test(line)) ?? tail[tail.length - 1];
+}
 
 export interface EnableEncryptionOptions {
   idevicebackup2: string;
   udid: string;
   password: string;
-  /** Called once, when the device is waiting for its passcode. */
-  onPasscodeRequested: () => void;
   timeoutMs?: number;
 }
 
@@ -34,10 +37,9 @@ export interface EnableEncryptionResult {
 }
 
 export function enableBackupEncryption(options: EnableEncryptionOptions): Promise<EnableEncryptionResult> {
-  const { idevicebackup2, udid, password, onPasscodeRequested, timeoutMs = PASSCODE_TIMEOUT_MS } = options;
+  const { idevicebackup2, udid, password, timeoutMs = PASSCODE_TIMEOUT_MS } = options;
   return new Promise((resolve) => {
     let output = '';
-    let prompted = false;
     let timedOut = false;
     const child = spawn(idevicebackup2, ['-u', udid, 'encryption', 'on'], {
       env: { ...process.env, BACKUP_PASSWORD: password },
@@ -48,10 +50,6 @@ export function enableBackupEncryption(options: EnableEncryptionOptions): Promis
     }, timeoutMs);
     const take = (chunk: Buffer) => {
       output += chunk.toString('utf-8');
-      if (!prompted && output.includes(PASSCODE_PROMPT)) {
-        prompted = true;
-        onPasscodeRequested();
-      }
     };
     child.stdout.on('data', take);
     child.stderr.on('data', take);

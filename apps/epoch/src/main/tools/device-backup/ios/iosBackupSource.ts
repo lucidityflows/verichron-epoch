@@ -7,7 +7,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { manifestMatchesPins, readManifest } from './toolchain';
-import { enableBackupEncryption } from './encryption';
+import { enableBackupEncryption, failureReason, PASSCODE_TIMEOUT_MS } from './encryption';
 import { appendPullRecord, type PullRecord } from './pullRecord';
 
 export interface DecryptionOptions {
@@ -219,19 +219,17 @@ export class IosBackupSource implements DeviceBackupSource {
           fail(`Encrypted backups are off on ${device.name}. Turn them on to continue.`);
         }
         record.backup_encryption = 'turn-on-failed';
-        onProgress({ phase: 'preparing', message: `Turning on encrypted backups for ${device.name}…` });
-        const result = await enableBackupEncryption({
-          idevicebackup2,
-          udid: device.id,
-          password,
-          onPasscodeRequested: () =>
-            onProgress({ phase: 'device-action', message: `Unlock ${device.name} and enter its passcode to allow encrypted backups.` }),
+        onProgress({
+          phase: 'device-action',
+          message: `Look at ${device.name} now: unlock it and enter its passcode to allow encrypted backups. Epoch waits up to ${PASSCODE_TIMEOUT_MS / 60_000} minutes.`,
         });
+        const result = await enableBackupEncryption({ idevicebackup2, udid: device.id, password });
         if (result.timedOut) {
           fail(`The passcode wasn't entered on ${device.name} in time, so encrypted backups are still off. Try again.`);
         }
         if (result.code !== 0 || !(await this.backupEncryptionEnabled(device))) {
-          const detail = result.tail.length > 0 ? ` idevicebackup2: ${result.tail[result.tail.length - 1]}` : '';
+          const reason = failureReason(result.tail);
+          const detail = reason ? ` idevicebackup2: ${reason}` : '';
           fail(`Encrypted backups couldn't be turned on for ${device.name}.${detail}`);
         }
         record.backup_encryption = 'turned-on-by-epoch';
@@ -239,7 +237,7 @@ export class IosBackupSource implements DeviceBackupSource {
       }
 
       onProgress({ phase: 'preparing', message: `Starting the encrypted backup of ${device.name}…` });
-      await runBackup(idevicebackup2, device.id, destDir, password, onProgress);
+      await runBackup(idevicebackup2, device, destDir, password, onProgress);
       record.outcome = 'completed';
       onProgress({ phase: 'done', message: 'Backup complete.' });
       return destDir;
@@ -264,23 +262,32 @@ function toolVersion(binary: string): string | null {
   }
 }
 
+/** What idevicebackup2 prints while a backup waits for the device's passcode. */
+const BACKUP_PASSCODE_PROMPT = 'Waiting for passcode to be entered on the device';
+
 /** Runs `idevicebackup2 backup --full`; rejects with its error output when it fails. */
 function runBackup(
   idevicebackup2: string,
-  udid: string,
+  device: DeviceInfo,
   destDir: string,
   password: string,
   onProgress: (progress: BackupProgress) => void
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(idevicebackup2, ['backup', '--full', destDir, '-u', udid], {
+    const proc = spawn(idevicebackup2, ['backup', '--full', destDir, '-u', device.id], {
       env: { ...process.env, BACKUP_PASSWORD: password },
     });
 
     proc.stdout.on('data', (chunk: Buffer) => {
       for (const line of chunk.toString('utf-8').split('\n')) {
         const trimmed = line.trim();
-        if (trimmed.length > 0) onProgress({ phase: 'transferring', message: trimmed });
+        if (trimmed.length === 0) continue;
+        // iOS 16.1 and later ask for the passcode on the device to start a backup.
+        if (trimmed.includes(BACKUP_PASSCODE_PROMPT)) {
+          onProgress({ phase: 'device-action', message: `Look at ${device.name} now: unlock it and enter its passcode to start the backup.` });
+        } else {
+          onProgress({ phase: 'transferring', message: trimmed });
+        }
       }
     });
 
