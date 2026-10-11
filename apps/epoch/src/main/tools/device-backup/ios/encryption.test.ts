@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
-import { enableBackupEncryption, PASSCODE_PROMPT } from './encryption';
+import { enableBackupEncryption, failureReason } from './encryption';
 import { appendPullRecord, PULL_RECORD_FILE, type PullRecord } from './pullRecord';
 
 let tmp: string;
@@ -33,59 +33,51 @@ function fakeTool(body: string): string {
   return file;
 }
 
+// Output shapes from idevicebackup2 1.4.0 (tools/idevicebackup2.c, CMD_CHANGEPW). The
+// ErrorCode number and text below are examples; the device supplies the real ones.
+const CONFIRM_ON_DEVICE = 'Please confirm enabling the backup encryption by entering the passcode on the device.';
+
 describe('enableBackupEncryption', () => {
-  it('passes the password only through BACKUP_PASSWORD and reports the passcode request', async () => {
-    const idevicebackup2 = fakeTool(`echo "*** ${PASSCODE_PROMPT} ***"\necho "Operation Successful."`);
-    let requested = 0;
-    const result = await enableBackupEncryption({
-      idevicebackup2,
-      udid: 'UDID-1',
-      password: 's3cret',
-      onPasscodeRequested: () => requested++,
+  it('passes the password only through BACKUP_PASSWORD', async () => {
+    const idevicebackup2 = fakeTool(`echo "${CONFIRM_ON_DEVICE}"\necho "Backup encryption has been enabled successfully."`);
+    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: 's3cret' });
+    assert.deepEqual(result, {
+      code: 0,
+      timedOut: false,
+      tail: [CONFIRM_ON_DEVICE, 'Backup encryption has been enabled successfully.'],
     });
-    assert.deepEqual(result, { code: 0, timedOut: false, tail: [`*** ${PASSCODE_PROMPT} ***`, 'Operation Successful.'] });
-    assert.equal(requested, 1);
     assert.equal(fs.readFileSync(path.join(tmp, 'args'), 'utf-8').trim(), '-u UDID-1 encryption on');
     assert.equal(fs.readFileSync(path.join(tmp, 'password'), 'utf-8'), 's3cret');
   });
 
   it('stops waiting at the timeout and says so', async () => {
-    const idevicebackup2 = fakeTool(`echo "*** ${PASSCODE_PROMPT} ***"\nexec sleep 30`);
+    const idevicebackup2 = fakeTool(`echo "${CONFIRM_ON_DEVICE}"\nexec sleep 30`);
     const started = Date.now();
-    const result = await enableBackupEncryption({
-      idevicebackup2,
-      udid: 'UDID-1',
-      password: 's3cret',
-      onPasscodeRequested: () => {},
-      timeoutMs: 300,
-    });
+    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: 's3cret', timeoutMs: 300 });
     assert.equal(result.timedOut, true);
     assert.notEqual(result.code, 0);
     assert.ok(Date.now() - started < 10_000);
   });
 
-  it("returns the tool's failure and its last lines", async () => {
-    const idevicebackup2 = fakeTool('echo "ERROR: Backup encryption is already enabled. Aborting." >&2\nexit 255');
-    const result = await enableBackupEncryption({
-      idevicebackup2,
-      udid: 'UDID-1',
-      password: 's3cret',
-      onPasscodeRequested: () => assert.fail('no passcode was requested'),
-    });
-    assert.deepEqual(result, {
-      code: 255,
-      timedOut: false,
-      tail: ['ERROR: Backup encryption is already enabled. Aborting.'],
-    });
+  it("names the device's reason, not the generic last line", async () => {
+    const idevicebackup2 = fakeTool(
+      `echo "${CONFIRM_ON_DEVICE}"\necho "ErrorCode 211: Passcode entry was cancelled"\necho "Could not enable backup encryption."\nexit 1`
+    );
+    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: 's3cret' });
+    assert.equal(result.code, 1);
+    assert.equal(failureReason(result.tail), 'ErrorCode 211: Passcode entry was cancelled');
+  });
+
+  it('falls back to the last line when the device gave no reason', () => {
+    assert.equal(
+      failureReason(['ERROR: Backup encryption is already enabled. Aborting.']),
+      'ERROR: Backup encryption is already enabled. Aborting.'
+    );
+    assert.equal(failureReason([]), undefined);
   });
 
   it('reports a missing tool as code 127', async () => {
-    const result = await enableBackupEncryption({
-      idevicebackup2: path.join(tmp, 'missing'),
-      udid: 'UDID-1',
-      password: 's3cret',
-      onPasscodeRequested: () => {},
-    });
+    const result = await enableBackupEncryption({ idevicebackup2: path.join(tmp, 'missing'), udid: 'UDID-1', password: 's3cret' });
     assert.equal(result.code, 127);
   });
 });

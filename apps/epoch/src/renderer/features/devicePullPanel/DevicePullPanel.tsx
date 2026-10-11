@@ -417,9 +417,17 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
           )}
  
           {deviceAction && phase === 'pulling' && (
-            <div className="flex items-center gap-3 text-data text-foreground bg-accent/10 border border-accent/30 shadow-elevation-1 rounded-lg p-4 mt-5">
-              <Smartphone size="1.125rem" className="text-accent shrink-0" />
-              <span className="flex-1">{deviceAction}</span>
+            <div
+              role="alert"
+              className="flex items-center gap-4 bg-accent/10 border-2 border-accent/60 shadow-elevation-2 rounded-lg p-5 mt-5"
+            >
+              <div className="p-3 rounded-full bg-accent/15 text-accent shrink-0">
+                <Smartphone size="1.5rem" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-display text-heading text-accent">Action Needed on {selectedDevice?.name ?? 'the iPhone'}</h3>
+                <p className="text-data text-foreground mt-1">{deviceAction}</p>
+              </div>
               <Loader className="text-accent" />
             </div>
           )}
