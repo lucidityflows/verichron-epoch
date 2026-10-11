@@ -95,6 +95,7 @@ describe('appendPullRecord', () => {
       started_at: '2026-10-10T00:00:00.000Z',
       finished_at: '2026-10-10T00:05:00.000Z',
       backup_encryption: 'turned-on-by-epoch',
+      received_bytes: 1024,
       outcome: 'completed',
     };
     await appendPullRecord(tmp, record);

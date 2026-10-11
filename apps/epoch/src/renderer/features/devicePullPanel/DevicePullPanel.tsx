@@ -22,6 +22,7 @@ import { PasswordField } from '../../components/ui/PasswordField';
 import { FieldError } from '../../components/ui/FieldError';
 import { ToolSetup } from './ToolSetup';
 import { CopyButton } from '../../components/ui/CopyButton';
+import { BackupProgressCard, IncompleteBackupNotice } from './BackupProgressCard';
 import type { DeviceInfo } from '../../../shared/types/tools';
  
 /** What the Copy button on a pull error copies: enough to diagnose it elsewhere. */
@@ -56,6 +57,12 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
     encryptionConsent,
     cancelEncryptionConsent,
     deviceAction,
+    pullStats,
+    cancelPull,
+    cancelling,
+    incomplete,
+    deleteIncomplete,
+    deletingIncomplete,
     runCompileFromSource,
     setupStatus,
     setupRun,
@@ -71,6 +78,7 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
 
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [keptIncomplete, setKeptIncomplete] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const terminalRef = useRef<HTMLPreElement>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
@@ -442,6 +450,10 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
             </div>
           )}
 
+          {phase === 'pulling' && pullStats && (
+            <BackupProgressCard stats={pullStats} cancelling={cancelling} onCancel={cancelPull} />
+          )}
+
           {pullProgress.length > 0 && (
             <pre className="bg-background/90 shadow-elevation-1 rounded-xl p-4 text-data font-mono whitespace-pre-wrap overflow-auto max-h-48 text-foreground/80 mt-5 leading-relaxed">
               {pullProgress.map((p) => p.message).join('\n')}
@@ -462,6 +474,15 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
                 }
               />
             </div>
+          )}
+          {incomplete && phase !== 'pulling' && selectedDevice && keptIncomplete !== incomplete.path && (
+            <IncompleteBackupNotice
+              deviceName={selectedDevice.name}
+              incomplete={incomplete}
+              deleting={deletingIncomplete}
+              onDelete={deleteIncomplete}
+              onKeep={() => setKeptIncomplete(incomplete.path)}
+            />
           )}
           {phase === 'pulled' && (
             <div className="text-data text-accent bg-accent/10 border border-accent/30 shadow-elevation-1 rounded-lg p-4 mt-4 flex items-center gap-2">

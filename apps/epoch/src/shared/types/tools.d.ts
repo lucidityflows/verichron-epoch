@@ -56,6 +56,25 @@ export interface BackupProgress {
   message: string;
 }
 
+/** How a running backup is going (EPOCH-466), sent every few seconds. */
+export interface BackupStats {
+  startedAt: number;
+  /** Bytes written to the backup folder by this pull so far. */
+  receivedBytes: number;
+  /** When the folder last grew; null before any data arrived. */
+  lastDataAt: number | null;
+  /** The tool's overall percentage; null until it reports one. */
+  percent: number | null;
+  /** The device's used storage, a rough size for the backup; null when unknown. */
+  estimatedBytes: number | null;
+}
+
+/** A backup folder left by a pull that didn't finish. */
+export interface IncompleteBackup {
+  path: string;
+  bytes: number;
+}
+
 export interface PullOptions {
   /** The backup password: the device's existing one, or the new one when encryption is turned on. */
   password: string;
@@ -74,8 +93,13 @@ export interface DeviceBackupSource {
     device: DeviceInfo,
     destDir: string,
     onProgress: (progress: BackupProgress) => void,
+    onStats: (stats: BackupStats) => void,
     options: PullOptions
   ): Promise<string>;
+  /** Stops the running pull; false when none is running. */
+  cancelPull(): boolean;
+  incompleteBackup(destDir: string, device: DeviceInfo): Promise<IncompleteBackup | null>;
+  deleteIncompleteBackup(destDir: string, device: DeviceInfo): Promise<void>;
 }
 
 export type ToolAcquisitionAction =
