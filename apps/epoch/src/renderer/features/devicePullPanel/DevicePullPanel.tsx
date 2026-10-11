@@ -78,7 +78,8 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
 
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [keptIncomplete, setKeptIncomplete] = useState<string | null>(null);
+  // Incomplete backups the user chose to keep; not offered again this session.
+  const [keptIncomplete, setKeptIncomplete] = useState<string[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const terminalRef = useRef<HTMLPreElement>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
@@ -475,15 +476,20 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
               />
             </div>
           )}
-          {incomplete && phase !== 'pulling' && selectedDevice && keptIncomplete !== incomplete.path && (
-            <IncompleteBackupNotice
-              deviceName={selectedDevice.name}
-              incomplete={incomplete}
-              deleting={deletingIncomplete}
-              onDelete={deleteIncomplete}
-              onKeep={() => setKeptIncomplete(incomplete.path)}
-            />
-          )}
+          {phase !== 'pulling' &&
+            selectedDevice &&
+            incomplete
+              .filter((backup) => !keptIncomplete.includes(backup.path))
+              .map((backup) => (
+                <IncompleteBackupNotice
+                  key={backup.path}
+                  deviceName={selectedDevice.name}
+                  incomplete={backup}
+                  deleting={deletingIncomplete === backup.path}
+                  onDelete={() => deleteIncomplete(backup)}
+                  onKeep={() => setKeptIncomplete((prev) => [...prev, backup.path])}
+                />
+              ))}
           {phase === 'pulled' && (
             <div className="text-data text-accent bg-accent/10 border border-accent/30 shadow-elevation-1 rounded-lg p-4 mt-4 flex items-center gap-2">
               <CheckCircle2 size="1.125rem" className="shrink-0" />

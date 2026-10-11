@@ -119,7 +119,7 @@ declare global {
       getBackupEncryption: (sourceId: string, device: DeviceInfo) => Promise<boolean>;
       pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) => Promise<string>;
       cancelDeviceBackup: (sourceId: string) => Promise<boolean>;
-      getIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) => Promise<IncompleteBackup | null>;
+      listIncompleteBackups: (sourceId: string, device: DeviceInfo, destDir: string | null) => Promise<IncompleteBackup[]>;
       deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) => Promise<void>;
       onDeviceBackupStats: (callback: (stats: BackupStats) => void) => () => void;
       runToolAcquisitionSteps: (

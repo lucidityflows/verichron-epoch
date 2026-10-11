@@ -1,4 +1,5 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { app, ipcMain, dialog, BrowserWindow } from 'electron';
+import { addPullDestination, readPullDestinations } from '../tools/device-backup/pullDestinations';
 import path from 'path';
 import fs from 'fs/promises';
 import { spawn } from 'child_process';
@@ -8,6 +9,7 @@ import type {
   ToolAcquisitionCommand,
   BackupProgress,
   BackupStats,
+  IncompleteBackup,
   PullOptions,
   ToolAcquisitionResult,
   ToolSetupEvent,
@@ -68,11 +70,23 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     return source.cancelPull();
   });
 
-  ipcMain.handle('epoch:getIncompleteBackup', async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
-    const source = getDeviceBackupSource(sourceId);
-    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
-    return source.incompleteBackup(destDir, device);
-  });
+  // Incomplete backups in every folder pulls have written to, plus the
+  // chosen one, so leftovers are found after the user picks another folder.
+  ipcMain.handle(
+    'epoch:listIncompleteBackups',
+    async (_event, sourceId: string, device: DeviceInfo, destDir: string | null): Promise<IncompleteBackup[]> => {
+      const source = getDeviceBackupSource(sourceId);
+      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+      const known = await readPullDestinations(app.getPath('userData'));
+      const folders = [...new Set([...(destDir ? [destDir] : []), ...known])];
+      const found: IncompleteBackup[] = [];
+      for (const folder of folders) {
+        const incomplete = await source.incompleteBackup(folder, device);
+        if (incomplete) found.push(incomplete);
+      }
+      return found;
+    }
+  );
 
   ipcMain.handle('epoch:deleteIncompleteBackup', async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
     if (deviceBackupInFlight) throw new Error('A device backup is running; cancel it before deleting.');
@@ -98,6 +112,7 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
 
       deviceBackupInFlight = true;
       try {
+        await addPullDestination(app.getPath('userData'), destDir);
         return await source.pullBackup(
           device,
           destDir,

@@ -118,10 +118,29 @@ const LOCKED_BACKUP = [
   'Backup Failed (Error Code 208).',
 ];
 
+// A real failure (same device, 2026-10-11, 90.3 GB free in the destination).
+const NO_SPACE_BACKUP = [
+  'Full backup mode.',
+  'ErrorCode 105: Insufficient free disk space on drive to back up (MBErrorDomain/105)',
+  'Received 0 files from device.',
+  'Backup Failed (Error Code 105).',
+];
+
 describe('failureMessage', () => {
+  const ctx = { device: 'iPhone', destDir: '/home/user/Downloads', freeBytes: 90_300_000_000 };
+
+  it('explains a full destination with its free space', () => {
+    assert.equal(
+      failureMessage('The backup of iPhone failed.', NO_SPACE_BACKUP, 105, ctx),
+      'iPhone needs more free space on this computer than the 90.3 GB free in /home/user/Downloads. ' +
+        'Free up space or choose a folder on a larger drive. ' +
+        'idevicebackup2: ErrorCode 105: Insufficient free disk space on drive to back up (MBErrorDomain/105)'
+    );
+  });
+
   it('explains a known device code and keeps the tool line', () => {
     assert.equal(
-      failureMessage('The backup of iPhone failed.', LOCKED_BACKUP, 'iPhone', 48),
+      failureMessage('The backup of iPhone failed.', LOCKED_BACKUP, 48, ctx),
       'iPhone was locked, so it refused the backup. Unlock it, keep it unlocked, and try again. ' +
         'idevicebackup2: ErrorCode 208: Device locked (MBErrorDomain/208)'
     );
@@ -129,14 +148,14 @@ describe('failureMessage', () => {
 
   it("uses the tool's ERROR line when the device gave no code", () => {
     assert.equal(
-      failureMessage('The backup of iPhone failed.', ['ERROR: Could not connect to lockdownd, error code -17', 'Done.'], 'iPhone', 255),
+      failureMessage('The backup of iPhone failed.', ['ERROR: Could not connect to lockdownd, error code -17', 'Done.'], 255, ctx),
       'The backup of iPhone failed. idevicebackup2: ERROR: Could not connect to lockdownd, error code -17'
     );
   });
 
   it('falls back to the exit code when there was no output', () => {
     assert.equal(
-      failureMessage('The backup of iPhone failed.', [], 'iPhone', 255),
+      failureMessage('The backup of iPhone failed.', [], 255, ctx),
       'The backup of iPhone failed. idevicebackup2 exited with code 255.'
     );
   });

@@ -10,23 +10,35 @@ export function failureReason(lines: string[]): string | undefined {
   return [...lines].reverse().find((line) => /^(ErrorCode \d+:|ERROR:)/.test(line)) ?? lines[lines.length - 1];
 }
 
+export interface FailureContext {
+  device: string;
+  destDir: string;
+  /** Free space in destDir when the step failed; null when unknown. */
+  freeBytes: number | null;
+}
+
+const gb = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`;
+
 /**
  * Plain-language causes for device error codes Epoch has seen (MBErrorDomain).
  * Add a code only after seeing it from a real device.
  */
-const KNOWN_CODES: Record<number, (device: string) => string> = {
-  208: (device) => `${device} was locked, so it refused the backup. Unlock it, keep it unlocked, and try again.`,
+const KNOWN_CODES: Record<number, (ctx: FailureContext) => string> = {
+  105: ({ device, destDir, freeBytes }) =>
+    `${device} needs more free space on this computer than ${freeBytes === null ? 'is free' : `the ${gb(freeBytes)} free`} in ${destDir}. ` +
+    `Free up space or choose a folder on a larger drive.`,
+  208: ({ device }) => `${device} was locked, so it refused the backup. Unlock it, keep it unlocked, and try again.`,
 };
 
 /** A plain-language cause when the reason is a known device error code. */
-export function explainFailure(reason: string | undefined, device: string): string | undefined {
+export function explainFailure(reason: string | undefined, ctx: FailureContext): string | undefined {
   const code = reason?.match(/^ErrorCode (\d+):/)?.[1];
-  return code ? KNOWN_CODES[Number(code)]?.(device) : undefined;
+  return code ? KNOWN_CODES[Number(code)]?.(ctx) : undefined;
 }
 
 /** The message for a failed step: the cause when known, and always the tool's own line. */
-export function failureMessage(summary: string, lines: string[], device: string, exitCode: number | null): string {
+export function failureMessage(summary: string, lines: string[], exitCode: number | null, ctx: FailureContext): string {
   const reason = failureReason(lines);
   const toolLine = reason ? `idevicebackup2: ${reason}` : `idevicebackup2 exited with code ${exitCode}.`;
-  return `${explainFailure(reason, device) ?? summary} ${toolLine}`;
+  return `${explainFailure(reason, ctx) ?? summary} ${toolLine}`;
 }
