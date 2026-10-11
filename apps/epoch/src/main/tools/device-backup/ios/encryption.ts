@@ -10,17 +10,12 @@ import { lastLines } from './toolchain/process';
  * starts: the tool's own hint arrives late or not at all (it is printed only
  * when the device reports a passcode). When the device refuses, the tool
  * prints the device's reason as an `ErrorCode <n>: <description>` line before
- * a generic "Could not enable backup encryption."; `reason` is that line.
+ * a generic "Could not enable backup encryption." (see deviceErrors.ts).
  *
  * The password reaches idevicebackup2 only through BACKUP_PASSWORD, never as
  * an argument, so it can't be seen in the process table.
  */
 export const PASSCODE_TIMEOUT_MS = 2 * 60_000;
-
-/** The device's own reason for a failure, else the tool's last line. */
-export function failureReason(tail: string[]): string | undefined {
-  return [...tail].reverse().find((line) => /^ErrorCode \d+:/.test(line)) ?? tail[tail.length - 1];
-}
 
 export interface EnableEncryptionOptions {
   idevicebackup2: string;

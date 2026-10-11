@@ -7,7 +7,9 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { manifestMatchesPins, readManifest } from './toolchain';
-import { enableBackupEncryption, failureReason, PASSCODE_TIMEOUT_MS } from './encryption';
+import { enableBackupEncryption, PASSCODE_TIMEOUT_MS } from './encryption';
+import { failureMessage } from './deviceErrors';
+import { lastLines } from './toolchain/process';
 import { appendPullRecord, type PullRecord } from './pullRecord';
 
 export interface DecryptionOptions {
@@ -228,15 +230,18 @@ export class IosBackupSource implements DeviceBackupSource {
           fail(`The passcode wasn't entered on ${device.name} in time, so encrypted backups are still off. Try again.`);
         }
         if (result.code !== 0 || !(await this.backupEncryptionEnabled(device))) {
-          const reason = failureReason(result.tail);
-          const detail = reason ? ` idevicebackup2: ${reason}` : '';
-          fail(`Encrypted backups couldn't be turned on for ${device.name}.${detail}`);
+          fail(failureMessage(`Encrypted backups couldn't be turned on for ${device.name}.`, result.tail, device.name, result.code));
         }
         record.backup_encryption = 'turned-on-by-epoch';
         onProgress({ phase: 'preparing', message: `Encrypted backups are on for ${device.name}.` });
       }
 
-      onProgress({ phase: 'preparing', message: `Starting the encrypted backup of ${device.name}…` });
+      // iOS refuses a backup from a locked device (ErrorCode 208), and 16.1 and
+      // later ask for the passcode to start one: say so before it starts.
+      onProgress({
+        phase: 'device-action',
+        message: `Unlock ${device.name} and keep it unlocked until the backup finishes. It will ask for its passcode to start.`,
+      });
       await runBackup(idevicebackup2, device, destDir, password, onProgress);
       record.outcome = 'completed';
       onProgress({ phase: 'done', message: 'Backup complete.' });
@@ -265,7 +270,11 @@ function toolVersion(binary: string): string | null {
 /** What idevicebackup2 prints while a backup waits for the device's passcode. */
 const BACKUP_PASSCODE_PROMPT = 'Waiting for passcode to be entered on the device';
 
-/** Runs `idevicebackup2 backup --full`; rejects with its error output when it fails. */
+/**
+ * Runs `idevicebackup2 backup --full`. Lines before "Receiving files" are
+ * setup ('preparing'), so the device-action banner stays up until files
+ * arrive. Rejects with the device's reason when it fails.
+ */
 function runBackup(
   idevicebackup2: string,
   device: DeviceInfo,
@@ -278,22 +287,24 @@ function runBackup(
       env: { ...process.env, BACKUP_PASSWORD: password },
     });
 
+    let output = '';
+    let receiving = false;
     proc.stdout.on('data', (chunk: Buffer) => {
-      for (const line of chunk.toString('utf-8').split('\n')) {
+      const text = chunk.toString('utf-8');
+      output += text;
+      for (const line of text.split('\n')) {
         const trimmed = line.trim();
         if (trimmed.length === 0) continue;
-        // iOS 16.1 and later ask for the passcode on the device to start a backup.
         if (trimmed.includes(BACKUP_PASSCODE_PROMPT)) {
-          onProgress({ phase: 'device-action', message: `Look at ${device.name} now: unlock it and enter its passcode to start the backup.` });
-        } else {
-          onProgress({ phase: 'transferring', message: trimmed });
+          onProgress({ phase: 'device-action', message: `Enter the passcode on ${device.name} now to start the backup.` });
+          continue;
         }
+        if (trimmed === 'Receiving files') receiving = true;
+        onProgress({ phase: receiving ? 'transferring' : 'preparing', message: trimmed });
       }
     });
-
-    let stderrOutput = '';
     proc.stderr.on('data', (chunk: Buffer) => {
-      stderrOutput += chunk.toString('utf-8');
+      output += chunk.toString('utf-8');
     });
 
     const fail = (message: string) => {
@@ -303,7 +314,7 @@ function runBackup(
     proc.once('error', (err: Error) => fail(err.message));
     proc.once('close', (code: number | null) => {
       if (code === 0) resolve();
-      else fail(stderrOutput.trim() || `idevicebackup2 exited with code ${code}`);
+      else fail(failureMessage(`The backup of ${device.name} failed.`, lastLines(output), device.name, code));
     });
   });
 }
