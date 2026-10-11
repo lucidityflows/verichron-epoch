@@ -145,7 +145,10 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       }
     });
     const unsubProgress = devicesApi.onDeviceBackupProgress((progress) => {
-      setDeviceAction(progress.phase === 'device-action' ? progress.message : null);
+      // The banner stays up through setup lines and clears once files arrive or the pull ends.
+      setDeviceAction((prev) =>
+        progress.phase === 'device-action' ? progress.message : progress.phase === 'preparing' ? prev : null
+      );
       // An error is shown once, as the pull error, not also in the log.
       if (progress.phase !== 'error') setPullProgress((prev) => [...prev, progress]);
       if (progress.phase === 'done') {

@@ -9,7 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
-import { enableBackupEncryption, failureReason } from './encryption';
+import { failureMessage, failureReason } from './deviceErrors';
+import { enableBackupEncryption } from './encryption';
 import { appendPullRecord, PULL_RECORD_FILE, type PullRecord } from './pullRecord';
 
 let tmp: string;
@@ -102,6 +103,40 @@ describe('appendPullRecord', () => {
     assert.deepEqual(
       lines.map((line) => JSON.parse(line).backup_encryption),
       ['turned-on-by-epoch', 'already-on']
+    );
+  });
+});
+
+// A real failure (iPhone17,5, iOS 26.6.1, idevicebackup2 1.4.0, 2026-10-11).
+const LOCKED_BACKUP = [
+  'Requesting backup from device...',
+  'Full backup mode.',
+  '*** Waiting for passcode to be entered on the device ***',
+  'ErrorCode 208: Device locked (MBErrorDomain/208)',
+  'Received 0 files from device.',
+  'Backup Failed (Error Code 208).',
+];
+
+describe('failureMessage', () => {
+  it('explains a known device code and keeps the tool line', () => {
+    assert.equal(
+      failureMessage('The backup of iPhone failed.', LOCKED_BACKUP, 'iPhone', 48),
+      'iPhone was locked, so it refused the backup. Unlock it, keep it unlocked, and try again. ' +
+        'idevicebackup2: ErrorCode 208: Device locked (MBErrorDomain/208)'
+    );
+  });
+
+  it("uses the tool's ERROR line when the device gave no code", () => {
+    assert.equal(
+      failureMessage('The backup of iPhone failed.', ['ERROR: Could not connect to lockdownd, error code -17', 'Done.'], 'iPhone', 255),
+      'The backup of iPhone failed. idevicebackup2: ERROR: Could not connect to lockdownd, error code -17'
+    );
+  });
+
+  it('falls back to the exit code when there was no output', () => {
+    assert.equal(
+      failureMessage('The backup of iPhone failed.', [], 'iPhone', 255),
+      'The backup of iPhone failed. idevicebackup2 exited with code 255.'
     );
   });
 });

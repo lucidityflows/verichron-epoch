@@ -40,6 +40,13 @@ for no reason other than having been written at different times. Fixed
 in that file (see §5); the rule going forward is that every state-color
 banner gets both, uniformly.
 
+**Error banners carry a Copy button** (`components/ui/CopyButton`). It
+copies the error with what's needed to diagnose it elsewhere: the step,
+the device, and the log or tool output that led to it. It never copies
+secrets such as passwords. In place: the iPhone pull error and the setup
+failure banner (EPOCH-466); other views' error banners follow in the
+EPOCH-464 review.
+
 ## 2. Type scale — four tiers, by role not by size
 
 Each tier is a **composite** Tailwind v4 utility (`text-display`,

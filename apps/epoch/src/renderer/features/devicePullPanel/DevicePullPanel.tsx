@@ -21,7 +21,17 @@ import { useDevicePull } from '../../hooks/useDevicePull';
 import { PasswordField } from '../../components/ui/PasswordField';
 import { FieldError } from '../../components/ui/FieldError';
 import { ToolSetup } from './ToolSetup';
+import { CopyButton } from '../../components/ui/CopyButton';
+import type { DeviceInfo } from '../../../shared/types/tools';
  
+/** What the Copy button on a pull error copies: enough to diagnose it elsewhere. */
+function pullDiagnostics(error: string, device: DeviceInfo | null, log: string[]): string {
+  const deviceLine = device
+    ? `${device.name}${device.model ? ` (${device.model})` : ''}${device.osVersion ? `, iOS ${device.osVersion}` : ''}`
+    : 'none selected';
+  return [`Epoch iPhone pull failed`, `Device: ${deviceLine}`, `Error: ${error}`, '', 'Log:', ...log].join('\n');
+}
+
 interface DevicePullPanelProps {
   onBackupPulled: (destDir: string) => void;
 }
@@ -438,9 +448,19 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
             </pre>
           )}
           {pullError && (
-            <div className="text-data text-danger bg-danger/10 border border-danger/30 shadow-elevation-1 rounded-lg p-4 mt-4 flex items-center gap-2">
-              <XCircle size="1rem" className="shrink-0" />
-              <span>{pullError}</span>
+            <div className="text-data text-danger bg-danger/10 border border-danger/30 shadow-elevation-1 rounded-lg p-4 mt-4 flex items-start gap-2">
+              <XCircle size="1rem" className="shrink-0 mt-0.5" />
+              <span className="flex-1 min-w-0">{pullError}</span>
+              <CopyButton
+                title="Copy the error, device and log"
+                text={() =>
+                  pullDiagnostics(
+                    pullError,
+                    selectedDevice,
+                    pullProgress.map((p) => p.message)
+                  )
+                }
+              />
             </div>
           )}
           {phase === 'pulled' && (

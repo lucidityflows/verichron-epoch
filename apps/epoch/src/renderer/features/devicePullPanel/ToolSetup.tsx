@@ -1,10 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   AlertTriangle,
-  Check,
   CheckCircle2,
   Circle,
-  Copy,
   Download,
   RefreshCw,
   ShieldCheck,
@@ -21,6 +19,7 @@ import type {
 import { Button } from '../../components/ui/Button';
 import { Loader } from '../../components/ui/Loader';
 import { TerminalLog } from '../../components/layout/TerminalLog';
+import { CopyButton } from '../../components/ui/CopyButton';
 
 interface ToolSetupProps {
   status: ToolSetupStatus;
@@ -183,7 +182,17 @@ function FailureBanner({ failure }: { failure: ToolSetupFailure }) {
     <div className="flex items-start gap-3 text-data text-flag bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-lg p-4">
       <AlertTriangle size="1.125rem" className="shrink-0 mt-0.5" />
       <div className="min-w-0 flex-1">
-        <p>{failure.label} failed.</p>
+        <div className="flex items-start gap-3">
+          <p className="flex-1">{failure.label} failed.</p>
+          <CopyButton
+            title="Copy the error and its output"
+            text={() =>
+              [`Epoch setup step failed: ${failure.label}`, failure.hint ?? '', '', 'Output:', ...failure.tail]
+                .filter((line, i) => i !== 1 || line !== '')
+                .join('\n')
+            }
+          />
+        </div>
         {failure.hint && <p className="text-foreground mt-1">{failure.hint}</p>}
         {failure.tail.length > 0 && (
           <pre className="mt-3 bg-background/90 shadow-elevation-1 rounded-lg p-3 text-data font-mono text-foreground/80 whitespace-pre-wrap overflow-auto max-h-48">
@@ -204,13 +213,6 @@ interface ActionCardProps {
 }
 
 function ActionCard({ title, description, command, packages, children }: ActionCardProps) {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    if (!command) return;
-    navigator.clipboard.writeText(command);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
   return (
     <section className="rounded-lg bg-surface/40 shadow-elevation-1 p-5 flex flex-col gap-3">
       <h3 className="font-display text-heading text-foreground">{title}</h3>
@@ -226,22 +228,7 @@ function ActionCard({ title, description, command, packages, children }: ActionC
             <span className="text-accent select-none mr-2">$</span>
             {command}
           </span>
-          <button
-            type="button"
-            onClick={copy}
-            className="flex items-center gap-1 text-label font-sans text-muted-foreground hover:text-foreground bg-surface-raised shadow-elevation-1 px-3 py-1 rounded-md transition-colors shrink-0 cursor-pointer"
-            title="Copy command"
-          >
-            {copied ? (
-              <>
-                <Check size="0.75rem" className="text-accent" /> <span className="text-accent">Copied</span>
-              </>
-            ) : (
-              <>
-                <Copy size="0.75rem" /> <span>Copy</span>
-              </>
-            )}
-          </button>
+          <CopyButton text={command} title="Copy command" />
         </div>
       )}
       <div className="flex items-center gap-3 mt-1">{children}</div>
