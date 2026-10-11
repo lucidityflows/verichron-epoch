@@ -71,6 +71,8 @@ export interface BackupStats {
 
 /** A backup folder left by a pull that didn't finish. */
 export interface IncompleteBackup {
+  /** The folder the pull wrote to; `path` is the device's folder inside it. */
+  destDir: string;
   path: string;
   bytes: number;
 }

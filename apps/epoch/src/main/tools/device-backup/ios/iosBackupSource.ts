@@ -167,7 +167,7 @@ export class IosBackupSource implements DeviceBackupSource {
       return null;
     }
     if ((await snapshotState(plistutil, backupDir)) === 'finished') return null;
-    return { path: backupDir, bytes: await folderSize(backupDir) };
+    return { destDir, path: backupDir, bytes: await folderSize(backupDir) };
   }
 
   /** Deletes an incomplete backup folder, after checking again that it is incomplete. */
@@ -278,6 +278,24 @@ export class IosBackupSource implements DeviceBackupSource {
     if (this.cancelRequested !== null) throw new Error('A backup is already running.');
     this.cancelRequested = false;
     try {
+      // The device checks the computer's free space before it starts and
+      // refuses with ErrorCode 105 when it judges it too small. Check first,
+      // before anything on the device changes.
+      const estimatedBytes = backupSizeEstimate(tools.ideviceinfo, device.id);
+      const freeBytes = await freeSpace(destDir);
+      if (estimatedBytes !== null) {
+        onProgress({
+          phase: 'preparing',
+          message: `${device.name} holds up to about ${formatGB(estimatedBytes)}; ${formatGB(freeBytes)} is free in ${destDir}. A large backup can take an hour or more.`,
+        });
+        if (freeBytes < estimatedBytes) {
+          fail(
+            `${device.name} holds up to about ${formatGB(estimatedBytes)}, but ${destDir} has only ${formatGB(freeBytes)} free. ` +
+              `Free up space or choose a folder on a larger drive.`
+          );
+        }
+      }
+
       onProgress({ phase: 'preparing', message: `Checking the backup settings of ${device.name}…` });
       if (await this.backupEncryptionEnabled(device)) {
         record.backup_encryption = 'already-on';
@@ -296,7 +314,7 @@ export class IosBackupSource implements DeviceBackupSource {
           fail(`The passcode wasn't entered on ${device.name} in time, so encrypted backups are still off. Try again.`);
         }
         if (result.code !== 0 || !(await this.backupEncryptionEnabled(device))) {
-          fail(failureMessage(`Encrypted backups couldn't be turned on for ${device.name}.`, result.tail, device.name, result.code));
+          fail(failureMessage(`Encrypted backups couldn't be turned on for ${device.name}.`, result.tail, result.code, { device: device.name, destDir, freeBytes: null }));
         }
         record.backup_encryption = 'turned-on-by-epoch';
         onProgress({ phase: 'preparing', message: `Encrypted backups are on for ${device.name}.` });
@@ -308,13 +326,6 @@ export class IosBackupSource implements DeviceBackupSource {
         phase: 'device-action',
         message: `Unlock ${device.name} and keep it unlocked until the backup finishes. It will ask for its passcode to start.`,
       });
-      const estimatedBytes = usedStorage(tools.ideviceinfo, device.id);
-      if (estimatedBytes !== null) {
-        onProgress({
-          phase: 'preparing',
-          message: `${device.name} has about ${formatGB(estimatedBytes)} of data to copy. A large backup can take an hour or more.`,
-        });
-      }
       record.received_bytes = await runBackup(idevicebackup2, device, destDir, password, onProgress, onStats, estimatedBytes, {
         setProcess: (proc) => {
           this.running = proc;
@@ -348,11 +359,22 @@ function backupFolder(destDir: string, device: DeviceInfo): string {
   return path.join(destDir, device.id);
 }
 
-/** Bytes of data on the device, from lockdown's disk usage; null when not reported. */
-function usedStorage(ideviceinfo: string, udid: string): number | null {
+/**
+ * An upper bound on the backup's size: the device's data capacity less the
+ * space it has free now (`AmountDataAvailable`). `TotalDataAvailable` also
+ * counts space iOS could purge, such as optimised photos, and understated a
+ * real device's data by about 67 GB. Null when the device doesn't report it.
+ */
+function backupSizeEstimate(ideviceinfo: string, udid: string): number | null {
   const capacity = Number(readLockdownValue(ideviceinfo, udid, 'TotalDataCapacity', 'com.apple.disk_usage'));
-  const available = Number(readLockdownValue(ideviceinfo, udid, 'TotalDataAvailable', 'com.apple.disk_usage'));
+  const available = Number(readLockdownValue(ideviceinfo, udid, 'AmountDataAvailable', 'com.apple.disk_usage'));
   return capacity > 0 && available >= 0 && capacity >= available ? capacity - available : null;
+}
+
+/** Free space for an unprivileged user in `dir`, as idevicebackup2 reports it (f_bavail × block size). */
+async function freeSpace(dir: string): Promise<number> {
+  const stats = await fs.statfs(dir);
+  return stats.bavail * stats.bsize;
 }
 
 function formatGB(bytes: number): string {
@@ -483,7 +505,10 @@ function runBackup(
       const received = await folderSize(backupDir, startedAt);
       if (control.cancelled()) fail(`The backup of ${device.name} was cancelled.`);
       else if (code === 0) resolve(received);
-      else fail(failureMessage(`The backup of ${device.name} failed.`, lastLines(output), device.name, code));
+      else {
+        const free = await freeSpace(destDir).catch(() => null);
+        fail(failureMessage(`The backup of ${device.name} failed.`, lastLines(output), code, { device: device.name, destDir, freeBytes: free }));
+      }
     });
   });
 }

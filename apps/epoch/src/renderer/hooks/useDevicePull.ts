@@ -51,8 +51,9 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   const [pullStats, setPullStats] = useState<BackupStats | null>(null);
   const [cancelling, setCancelling] = useState(false);
   // A backup folder left by a pull that didn't finish, offered for deletion.
-  const [incomplete, setIncomplete] = useState<IncompleteBackup | null>(null);
-  const [deletingIncomplete, setDeletingIncomplete] = useState(false);
+  const [incomplete, setIncomplete] = useState<IncompleteBackup[]>([]);
+  // The path being deleted, if any.
+  const [deletingIncomplete, setDeletingIncomplete] = useState<string | null>(null);
 
   // Maintain refs to prevent effect re-registrations on transient prop/state changes
   const onBackupPulledRef = useRef(onBackupPulled);
@@ -252,14 +253,14 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   };
  
   const refreshIncomplete = useCallback(async () => {
-    if (!sourceId || !selectedDevice || !destDir) {
-      setIncomplete(null);
+    if (!sourceId || !selectedDevice) {
+      setIncomplete([]);
       return;
     }
     try {
-      setIncomplete(await devicesApi.getIncompleteBackup(sourceId, destDir, selectedDevice));
+      setIncomplete(await devicesApi.listIncompleteBackups(sourceId, selectedDevice, destDir));
     } catch (err) {
-      setIncomplete(null);
+      setIncomplete([]);
       setPullError(ipcErrorMessage(err));
     }
   }, [sourceId, selectedDevice, destDir]);
@@ -280,15 +281,15 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     }
   };
 
-  const deleteIncomplete = async () => {
-    if (!sourceId || !selectedDevice || !destDir) return;
-    setDeletingIncomplete(true);
+  const deleteIncomplete = async (backup: IncompleteBackup) => {
+    if (!sourceId || !selectedDevice) return;
+    setDeletingIncomplete(backup.path);
     try {
-      await devicesApi.deleteIncompleteBackup(sourceId, destDir, selectedDevice);
+      await devicesApi.deleteIncompleteBackup(sourceId, backup.destDir, selectedDevice);
     } catch (err) {
       setPullError(ipcErrorMessage(err));
     } finally {
-      setDeletingIncomplete(false);
+      setDeletingIncomplete(null);
       await refreshIncomplete();
     }
   };
@@ -308,7 +309,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     setPullError(null);
     setDeviceAction(null);
     setPullStats(null);
-    setIncomplete(null);
+    setIncomplete([]);
     if (!enableEncryption) {
       try {
         if (!(await devicesApi.getBackupEncryption(sourceId, selectedDevice))) {

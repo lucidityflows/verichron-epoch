@@ -24,8 +24,8 @@ export const devicesApi = {
   pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) =>
     window.epoch.pullDeviceBackup(sourceId, device, destDir, options),
   cancelDeviceBackup: (sourceId: string) => window.epoch.cancelDeviceBackup(sourceId),
-  getIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) =>
-    window.epoch.getIncompleteBackup(sourceId, destDir, device),
+  listIncompleteBackups: (sourceId: string, device: DeviceInfo, destDir: string | null) =>
+    window.epoch.listIncompleteBackups(sourceId, device, destDir),
   deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) =>
     window.epoch.deleteIncompleteBackup(sourceId, destDir, device),
   onDeviceBackupStats: (callback: (stats: BackupStats) => void) => window.epoch.onDeviceBackupStats(callback),

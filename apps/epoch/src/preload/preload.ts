@@ -122,8 +122,8 @@ const dbApi = {
   pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions): Promise<string> =>
     ipcRenderer.invoke('epoch:pullDeviceBackup', sourceId, device, destDir, options),
   cancelDeviceBackup: (sourceId: string): Promise<boolean> => ipcRenderer.invoke('epoch:cancelDeviceBackup', sourceId),
-  getIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo): Promise<IncompleteBackup | null> =>
-    ipcRenderer.invoke('epoch:getIncompleteBackup', sourceId, destDir, device),
+  listIncompleteBackups: (sourceId: string, device: DeviceInfo, destDir: string | null): Promise<IncompleteBackup[]> =>
+    ipcRenderer.invoke('epoch:listIncompleteBackups', sourceId, device, destDir),
   deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo): Promise<void> =>
     ipcRenderer.invoke('epoch:deleteIncompleteBackup', sourceId, destDir, device),
   onDeviceBackupStats: (callback: (stats: BackupStats) => void) => {
