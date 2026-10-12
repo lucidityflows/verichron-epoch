@@ -4,7 +4,8 @@ import path from 'path';
 
 /**
  * Helpers for a running backup (EPOCH-466): reading idevicebackup2's output,
- * measuring what has arrived, and recognising a backup that didn't finish.
+ * measuring what has arrived, and recognising a backup that didn't finish or
+ * a destination that already holds one (EPOCH-483).
  */
 
 export type OutputEvent = { kind: 'line'; text: string } | { kind: 'percent'; value: number };
@@ -104,4 +105,46 @@ export async function snapshotState(plistutil: string, backupDir: string): Promi
   const match = xml.match(/<key>SnapshotState<\/key>\s*<string>([^<]*)<\/string>/);
   if (!match) throw new Error(`Status.plist in ${backupDir} has no SnapshotState.`);
   return match[1];
+}
+
+/**
+ * What a destination already holds for the device (EPOCH-483), or null when
+ * its folder doesn't exist. A pull never writes into an existing folder: a
+ * finished backup is evidence, and an unfinished one can't be resumed (the
+ * iPhone treats it as empty; see docs/architecture.md).
+ */
+export async function existingBackupState(
+  plistutil: string,
+  backupDir: string
+): Promise<'finished' | 'unfinished' | 'unrecognised' | null> {
+  try {
+    await fs.access(backupDir);
+  } catch (err) {
+    // Only a missing folder means a pull may write there. Any other error
+    // (EACCES, EPERM, ELOOP) is raised, so a folder this check couldn't
+    // inspect is never written into.
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return null;
+    throw err;
+  }
+  const state = await snapshotState(plistutil, backupDir);
+  if (state === null) return 'unrecognised';
+  return state === 'finished' ? 'finished' : 'unfinished';
+}
+
+/**
+ * Why a backup the tool reported as successful isn't complete, or null when
+ * it is: Status.plist must say "finished" and Manifest.db must exist.
+ */
+export async function incompleteReason(plistutil: string, backupDir: string): Promise<string | null> {
+  const state = await snapshotState(plistutil, backupDir);
+  if (state !== 'finished') {
+    return state === null ? 'it has no Status.plist' : `its Status.plist says "${state}", not "finished"`;
+  }
+  try {
+    await fs.access(path.join(backupDir, 'Manifest.db'));
+  } catch {
+    return 'it has no Manifest.db';
+  }
+  return null;
 }

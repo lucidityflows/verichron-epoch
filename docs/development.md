@@ -125,6 +125,25 @@ pnpm check:contracts                                 # schema ↔ TS ↔ Python 
 External tools are tested through stub executables and servers (a stub
 `mvt-ios`, `sqlite3`, Ollama), so tests exercise the real process boundary.
 
+### Real-device checks for iPhone pulls
+
+Stub tools can't show what an iPhone does. A ticket that changes the iPhone
+pull is closed only after these run on a real device, with the results (device
+model, iOS version, tool version, what happened) recorded on the ticket:
+
+1. A fresh full pull into an empty folder completes and is verified as finished.
+2. Cancel during the transfer stops the pull and records it as cancelled.
+3. Unplugging the device mid-pull ends the pull with the device's reason.
+4. Starting with the device locked shows the passcode request on screen first.
+5. A destination without enough free space is refused before the device is touched.
+6. A destination holding a finished backup of the device is refused.
+7. A destination holding an unfinished backup is refused until it is deleted or
+   another folder is chosen.
+8. Leaving New Investigation and returning mid-pull shows the running pull, with Cancel.
+
+New device behaviour seen during these checks is added to the verified list in
+[architecture.md](architecture.md#verified-device-behaviour).
+
 ## CI
 
 | Workflow | Runs |

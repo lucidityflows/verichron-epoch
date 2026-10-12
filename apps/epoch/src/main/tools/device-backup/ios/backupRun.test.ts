@@ -8,7 +8,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
-import { folderSize, OutputParser, receivedPercent, snapshotState } from './backupRun';
+import {
+  existingBackupState,
+  folderSize,
+  incompleteReason,
+  OutputParser,
+  receivedPercent,
+  snapshotState,
+} from './backupRun';
 
 let tmp: string;
 
@@ -90,17 +97,17 @@ describe('folderSize', () => {
   });
 });
 
-describe('snapshotState', () => {
-  /** A stand-in plistutil that prints `xml` (idevicebackup2's Status.plist, as XML). */
-  function fakePlistutil(xml: string): string {
-    const file = path.join(tmp, 'plistutil');
-    fs.writeFileSync(file, `#!/bin/sh\ncat <<'XML'\n${xml}\nXML\n`, { mode: 0o755 });
-    return file;
-  }
-  const status = (state: string) =>
-    `<plist version="1.0"><dict><key>IsFullBackup</key><true/><key>BackupState</key><string>empty</string>` +
-    `<key>SnapshotState</key><string>${state}</string></dict></plist>`;
+/** A stand-in plistutil that prints `xml` (idevicebackup2's Status.plist, as XML). */
+function fakePlistutil(xml: string): string {
+  const file = path.join(tmp, 'plistutil');
+  fs.writeFileSync(file, `#!/bin/sh\ncat <<'XML'\n${xml}\nXML\n`, { mode: 0o755 });
+  return file;
+}
+const status = (state: string) =>
+  `<plist version="1.0"><dict><key>IsFullBackup</key><true/><key>BackupState</key><string>empty</string>` +
+  `<key>SnapshotState</key><string>${state}</string></dict></plist>`;
 
+describe('snapshotState', () => {
   it('reads an interrupted backup as uploading', async () => {
     fs.writeFileSync(path.join(tmp, 'Status.plist'), 'bplist00');
     assert.equal(await snapshotState(fakePlistutil(status('uploading')), tmp), 'uploading');
@@ -118,5 +125,80 @@ describe('snapshotState', () => {
   it('refuses a Status.plist without a SnapshotState', async () => {
     fs.writeFileSync(path.join(tmp, 'Status.plist'), 'bplist00');
     await assert.rejects(snapshotState(fakePlistutil('<plist><dict/></plist>'), tmp), /no SnapshotState/);
+  });
+});
+
+describe('existingBackupState', () => {
+  // The plistutil stand-in lives in tmp, so the device folder is a subfolder.
+  const backupDir = () => path.join(tmp, 'DEVICE');
+
+  it('is null when the device has no folder, so a pull may write there', async () => {
+    assert.equal(await existingBackupState(fakePlistutil(status('finished')), backupDir()), null);
+  });
+
+  it('reports a finished backup, which a pull must never write over', async () => {
+    fs.mkdirSync(backupDir());
+    fs.writeFileSync(path.join(backupDir(), 'Status.plist'), 'bplist00');
+    assert.equal(await existingBackupState(fakePlistutil(status('finished')), backupDir()), 'finished');
+  });
+
+  it('reports an interrupted backup as unfinished', async () => {
+    fs.mkdirSync(backupDir());
+    fs.writeFileSync(path.join(backupDir(), 'Status.plist'), 'bplist00');
+    assert.equal(await existingBackupState(fakePlistutil(status('uploading')), backupDir()), 'unfinished');
+  });
+
+  it('reports a folder without a Status.plist as unrecognised', async () => {
+    fs.mkdirSync(backupDir());
+    assert.equal(await existingBackupState(fakePlistutil(status('finished')), backupDir()), 'unrecognised');
+  });
+
+  it('is null when a file stands where the parent folder would be (ENOTDIR)', async () => {
+    fs.writeFileSync(path.join(tmp, 'NOT-A-FOLDER'), '');
+    const dir = path.join(tmp, 'NOT-A-FOLDER', 'DEVICE');
+    assert.equal(await existingBackupState(fakePlistutil(status('finished')), dir), null);
+  });
+
+  it(
+    'raises an error it cannot read past, rather than letting a pull write there',
+    { skip: process.getuid?.() === 0 && 'root ignores folder permissions' },
+    async () => {
+      const locked = path.join(tmp, 'LOCKED');
+      fs.mkdirSync(path.join(locked, 'DEVICE'), { recursive: true });
+      fs.chmodSync(locked, 0o000);
+      try {
+        await assert.rejects(existingBackupState(fakePlistutil(status('finished')), path.join(locked, 'DEVICE')), {
+          code: 'EACCES',
+        });
+      } finally {
+        fs.chmodSync(locked, 0o700);
+      }
+    }
+  );
+});
+
+describe('incompleteReason', () => {
+  it('is null for a finished backup with a Manifest.db', async () => {
+    fs.writeFileSync(path.join(tmp, 'Status.plist'), 'bplist00');
+    fs.writeFileSync(path.join(tmp, 'Manifest.db'), '');
+    assert.equal(await incompleteReason(fakePlistutil(status('finished')), tmp), null);
+  });
+
+  it('names a Status.plist that is not finished', async () => {
+    fs.writeFileSync(path.join(tmp, 'Status.plist'), 'bplist00');
+    fs.writeFileSync(path.join(tmp, 'Manifest.db'), '');
+    assert.equal(
+      await incompleteReason(fakePlistutil(status('uploading')), tmp),
+      'its Status.plist says "uploading", not "finished"'
+    );
+  });
+
+  it('names a missing Manifest.db', async () => {
+    fs.writeFileSync(path.join(tmp, 'Status.plist'), 'bplist00');
+    assert.equal(await incompleteReason(fakePlistutil(status('finished')), tmp), 'it has no Manifest.db');
+  });
+
+  it('names a missing Status.plist', async () => {
+    assert.equal(await incompleteReason(fakePlistutil(status('finished')), tmp), 'it has no Status.plist');
   });
 });

@@ -14,6 +14,7 @@ import type {
   ToolAcquisitionCommand,
   BackupProgress,
   BackupStats,
+  DestinationBackup,
   DevicePullState,
   IncompleteBackup,
   PullOptions,
@@ -103,6 +104,18 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
         if (incomplete) found.push(incomplete);
       }
       return found;
+    }
+  );
+
+  // What the chosen destination already holds for the device (EPOCH-483); a pull refuses it.
+  ipcMain.handle(
+    'epoch:checkPullDestination',
+    async (_event, sourceId: string, device: DeviceInfo, destDir: string): Promise<DestinationBackup | null> => {
+      const source = getDeviceBackupSource(sourceId);
+      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+      // The running pull's own folder is the backup being written, not one to warn about.
+      if (pull.writes(destDir, device.id)) return null;
+      return source.destinationBackup(destDir, device);
     }
   );
 

@@ -2,6 +2,7 @@ import { spawn, execFileSync, type ChildProcess } from 'child_process';
 import type {
   BackupProgress,
   BackupStats,
+  DestinationBackup,
   DeviceBackupSource,
   DeviceInfo,
   IncompleteBackup,
@@ -11,25 +12,22 @@ import type {
 import { bundledToolPath, detectBinary } from '../detection';
 import { idevicebackup2InstallPrefix } from './iosAcquisitionStrategy';
 
-import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { manifestMatchesPins, readManifest } from './toolchain';
 import { enableBackupEncryption, PASSCODE_TIMEOUT_MS } from './encryption';
 import { failureMessage } from './deviceErrors';
 import { lastLines, StreamLines } from './toolchain/process';
-import { folderSize, OutputParser, receivedPercent, snapshotState, type OutputEvent } from './backupRun';
+import {
+  existingBackupState,
+  folderSize,
+  incompleteReason,
+  OutputParser,
+  receivedPercent,
+  snapshotState,
+  type OutputEvent,
+} from './backupRun';
 import { appendPullRecord, type PullRecord } from './pullRecord';
-
-export interface DecryptionOptions {
-  backupPath: string;
-  passwordBuffer: Buffer;
-}
-
-/**
- * Securely handles iOS backup decryption parameters, ensuring keys are processed
- * via mutable Buffers and explicitly scrubbed from memory immediately after execution.
- */
 
 /**
  * NOTE (EPOCH-103 review): the password captured here (used as
@@ -48,46 +46,6 @@ export interface DecryptionOptions {
  * explicitly-scoped handoff (not a shared module-level cache) -- revisit
  * deliberately, don't just wire it through.
  */
-
-export async function decryptAndValidateBackup(options: DecryptionOptions): Promise<boolean> {
-  const { backupPath, passwordBuffer } = options;
-
-  try {
-    const manifestPath = path.join(backupPath, 'Manifest.plist');
-    await fs.access(manifestPath);
-
-    const isValid = await verifyBackupCredentials(manifestPath, passwordBuffer);
-    return isValid;
-  } finally {
-    // Explicitly overwrite the password buffer in memory to prevent leakage
-    if (passwordBuffer && Buffer.isBuffer(passwordBuffer)) {
-      passwordBuffer.fill(0);
-    }
-  }
-}
-
-async function verifyBackupCredentials(manifestPath: string, passwordBuffer: Buffer): Promise<boolean> {
-  if (!passwordBuffer || passwordBuffer.length === 0) {
-    return false;
-  }
-
-  // Derive verification hash using memory-hard functions without converting to string primitives
-  const salt = crypto.randomBytes(16);
-  const derivedKey = crypto.scryptSync(passwordBuffer, salt, 32, {
-    N: 16384,
-    r: 8,
-    p: 1,
-  });
-
-  try {
-    // Perform secure validation comparison
-    return derivedKey.length > 0;
-  } finally {
-    // Scrub intermediate key buffers immediately
-    derivedKey.fill(0);
-    salt.fill(0);
-  }
-}
 
 /**
  * The tools-folder copy of a binary, when it may be used. On Linux and macOS
@@ -153,9 +111,21 @@ export class IosBackupSource implements DeviceBackupSource {
   }
 
   /**
+   * What `destDir` already holds for the device (EPOCH-483); null when its
+   * folder doesn't exist and a pull may write there.
+   */
+  async destinationBackup(destDir: string, device: DeviceInfo): Promise<DestinationBackup | null> {
+    const plistutil = trustedToolPath('plistutil');
+    if (!plistutil) throw new Error('plistutil is not available -- complete the iPhone tool setup first.');
+    const backupDir = backupFolder(destDir, device);
+    const state = await existingBackupState(plistutil, backupDir);
+    return state === null ? null : { destDir, path: backupDir, state };
+  }
+
+  /**
    * The device's backup folder in `destDir` when it holds a backup that
    * didn't finish (it has a Status.plist whose SnapshotState isn't "finished"). Such a
-   * folder can't be used; the next pull starts over in it.
+   * folder can't be used or resumed, and a pull refuses to write into it.
    */
   async incompleteBackup(destDir: string, device: DeviceInfo): Promise<IncompleteBackup | null> {
     const backupDir = backupFolder(destDir, device);
@@ -235,6 +205,11 @@ export class IosBackupSource implements DeviceBackupSource {
   /**
    * Pulls a full, encrypted backup. Epoch never makes an unencrypted one.
    *
+   * The pull writes only into a new folder: a destination that already
+   * holds anything for the device is refused before the device is touched
+   * (EPOCH-483). Success is reported only once the backup's Status.plist
+   * says "finished" and its Manifest.db exists.
+   *
    * When the device's encrypted backups are off, the pull stops unless the
    * user has agreed to turn them on (`options.enableEncryption`). Turning
    * them on needs the device's passcode, entered on the device
@@ -285,6 +260,9 @@ export class IosBackupSource implements DeviceBackupSource {
     this.cancelRequested = false;
     let recorded = false;
     try {
+      const existing = await this.destinationBackup(destDir, device);
+      if (existing) fail(destinationRefusal(device, existing));
+
       // The device checks the computer's free space before it starts and
       // refuses with ErrorCode 105 when it judges it too small. Check first,
       // before anything on the device changes.
@@ -354,6 +332,13 @@ export class IosBackupSource implements DeviceBackupSource {
           cancelled: () => this.cancelRequested === true,
         }
       );
+      const plistutil = trustedToolPath('plistutil');
+      if (!plistutil) return fail('plistutil is not available, so the backup could not be checked.');
+      const backupDir = backupFolder(destDir, device);
+      const reason = await incompleteReason(plistutil, backupDir);
+      if (reason) {
+        fail(`idevicebackup2 reported success, but the backup in ${backupDir} isn't complete: ${reason}.`);
+      }
       record.outcome = 'completed';
       record.finished_at = new Date().toISOString();
       // The record is written before "done", so a completed pull is never
@@ -369,7 +354,7 @@ export class IosBackupSource implements DeviceBackupSource {
         );
       }
       recorded = true;
-      onProgress({ phase: 'done', message: 'Backup complete.' });
+      onProgress({ phase: 'done', message: `Backup complete and verified as finished: ${backupDir}` });
       return destDir;
     } catch (err) {
       if (this.cancelRequested) record.outcome = 'cancelled';
@@ -384,6 +369,18 @@ export class IosBackupSource implements DeviceBackupSource {
         await appendPullRecord(destDir, record).catch((err) => console.error('Failed to record the device pull', err));
       }
     }
+  }
+}
+
+/** Why a pull refuses a destination that already holds something for the device (EPOCH-483). */
+function destinationRefusal(device: DeviceInfo, existing: DestinationBackup): string {
+  switch (existing.state) {
+    case 'finished':
+      return `${existing.path} already holds a finished backup of ${device.name}. Epoch never writes over a backup: choose another folder.`;
+    case 'unfinished':
+      return `${existing.path} holds a backup of ${device.name} that didn't finish. It can't be resumed: delete it or choose another folder.`;
+    case 'unrecognised':
+      return `${existing.path} already exists and isn't a backup Epoch can read. Choose another folder.`;
   }
 }
 
