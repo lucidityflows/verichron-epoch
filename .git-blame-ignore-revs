@@ -1,0 +1,4 @@
+# Commits that only reformat code, skipped by `git blame` (docs/development.md).
+
+# Prettier reformat of the TypeScript (EPOCH-469)
+46942520206a93f026722e8cd5c35c22b73a196d
