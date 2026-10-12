@@ -339,3 +339,19 @@ describe('evidence sidecar contract', () => {
     assert.deepEqual([...jsonSchema.required].sort(), Object.keys(jsonSchema.properties).sort());
   });
 });
+
+describe('hashTree progress (EPOCH-487)', () => {
+  it('reports the bytes and files covered so far, hashed or reused from the cache', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hash-progress-'));
+    try {
+      fs.writeFileSync(path.join(root, 'a'), 'xxx');
+      fs.writeFileSync(path.join(root, 'b'), 'yyyyy');
+      const seen: Array<[number, number]> = [];
+      await hashTree(root, { onProgress: (bytes, files) => seen.push([bytes, files]) });
+      assert.equal(seen.length, 2);
+      assert.deepEqual(seen[1], [8, 2]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

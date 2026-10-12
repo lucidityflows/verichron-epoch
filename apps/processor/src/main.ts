@@ -26,6 +26,7 @@ import {
 
 import { parseFlags, type Config } from './utils/cli.js';
 import { pathExists, writeFileAtomic, writeMarker } from './utils/fs.js';
+import { PROGRESS_INTERVAL_MS, throttled, withDecryptProgress } from './utils/progress.js';
 import { ileappInputType, ileappToolVersion, runIleapp } from './utils/ileapp.js';
 import { checkBackup, decryptBackup, isWrongPasswordError, MVT_COLUMNS } from './utils/mvt.js';
 import { hashTree } from './utils/manifest.js';
@@ -137,8 +138,9 @@ async function runBackups(
     console.log(`=== ${name} ===`);
 
     let contentRoot: string;
+    let backupBytes: number;
     try {
-      contentRoot = await hashBackup(cfg, name, src);
+      ({ contentRoot, totalBytes: backupBytes } = await hashBackup(cfg, name, src));
     } catch (err) {
       console.error(`  [hash] error: ${err instanceof Error ? err.message : err}`);
       failedBackups.add(name);
@@ -211,7 +213,9 @@ async function runBackups(
         }
 
         try {
-          await decryptBackup({ mvtBin: cfg.mvtBin, env: mvtEnv(cfg), src, dest: decDir, password: pw });
+          await withDecryptProgress(decDir, backupBytes, () =>
+            decryptBackup({ mvtBin: cfg.mvtBin, env: mvtEnv(cfg), src, dest: decDir, password: pw })
+          );
           decrypted = true;
         } catch (err) {
           // Never keep retrying every later backup with a password we
@@ -371,7 +375,8 @@ async function runBackups(
           inputType,
           outputDir: ileDir,
           logPath: path.join(cfg.workspace, 'logs', `${name}.ileapp.log`),
-          timeoutMs: cfg.ileappTimeoutMs,
+          modulesPath: path.join(cfg.workspace, 'logs', `${name}.ileapp-modules.json`),
+          moduleTimeoutMs: cfg.ileappModuleTimeoutMs,
         });
         await writeFileAtomic(
           path.join(ileDir, ILEAPP_MARKER),
@@ -531,9 +536,19 @@ async function ensureIOCs(cfg: Config): Promise<void> {
  * place), then the sidecar is atomically replaced to point at it. At every
  * instant the sidecar on disk names a root whose manifest exists and matches.
  */
-async function hashBackup(cfg: Config, name: string, src: string): Promise<string> {
+async function hashBackup(
+  cfg: Config,
+  name: string,
+  src: string
+): Promise<{ contentRoot: string; totalBytes: number }> {
   const paths = deriveEvidencePath(cfg.workspace, name);
-  const result = await hashTree(src, { cachePath: paths.fingerprints, verify: cfg.verify });
+  const report = throttled(PROGRESS_INTERVAL_MS);
+  const result = await hashTree(src, {
+    cachePath: paths.fingerprints,
+    verify: cfg.verify,
+    // Progress the app shows while a large backup is hashed (EPOCH-487).
+    onProgress: (bytes, files) => report(() => console.log(`  [hash]    progress ${bytes} bytes, ${files} files`)),
+  });
 
   const manifestPath = paths.manifestFor(result.contentRoot);
   await writeFileAtomic(manifestPath, result.manifest);
@@ -558,7 +573,7 @@ async function hashBackup(cfg: Config, name: string, src: string): Promise<strin
     `  [hash]    done -> ${paths.sidecar}` +
       ` (${result.fileCount} files, ${result.hashed} hashed, ${result.reused} cached, root ${result.contentRoot})`
   );
-  return result.contentRoot;
+  return { contentRoot: result.contentRoot, totalBytes: result.totalBytes };
 }
 
 function runInherited(bin: string, args: string[], env: NodeJS.ProcessEnv): Promise<void> {

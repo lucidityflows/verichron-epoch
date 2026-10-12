@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Inbox, Layers, RefreshCw } from 'lucide-react';
 import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
-import type { MvtLogEntry, MvtFinishedResult } from '../../shared/types/window';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { TerminalLog } from '../components/layout/TerminalLog';
 import { pipelineApi } from '../api/pipeline';
+import { useAnalysisState } from '../hooks/usePipelineState';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -72,39 +72,36 @@ export function RunsView({
   onRefreshStages,
   onRefreshRun,
 }: RunsViewProps) {
-  const [retrying, setRetrying] = useState(false);
-  const [retryError, setRetryError] = useState<string | null>(null);
-  const [retryLog, setRetryLog] = useState<MvtLogEntry[]>([]);
+  const [startError, setStartError] = useState<string | null>(null);
 
+  // A retry is an analysis run kept in the main process (EPOCH-487), so it is
+  // still shown after leaving this view and coming back.
+  const { state: analysis, log: analysisLog } = useAnalysisState();
+  const retryingThis = analysis?.kind === 'retry' && analysis.target === selectedRun?.backup_source;
+  const retrying = retryingThis && analysis?.status === 'running';
+  const retryLog = retryingThis ? analysisLog : [];
+  const retryResult = retryingThis && analysis?.status === 'finished' ? analysis.result : null;
+  const retryError =
+    startError ?? (retryResult && !retryResult.success ? (retryResult.error ?? 'Retry failed.') : null);
+
+  // When this run's retry ends, read the run and its stages again.
+  const wasRetrying = useRef(false);
   useEffect(() => {
-    const unsubLog = pipelineApi.onOrchestratorLog((entry) => {
-      setRetryLog((prev) => [...prev, entry]);
-    });
-    const unsubFinished = pipelineApi.onOrchestratorFinished((result: MvtFinishedResult) => {
-      setRetrying(false);
-      setRetryError(result.success ? null : (result.error ?? 'Retry failed.'));
-      if (selectedRun) {
-        onRefreshRun?.(selectedRun.run_id);
-        onRefreshStages?.(selectedRun.run_id);
-      }
-    });
-    return () => {
-      unsubLog();
-      unsubFinished();
-    };
+    if (wasRetrying.current && !retrying && selectedRun) {
+      onRefreshRun?.(selectedRun.run_id);
+      onRefreshStages?.(selectedRun.run_id);
+    }
+    wasRetrying.current = retrying;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRun?.run_id]);
+  }, [retrying]);
 
   const handleRetry = async () => {
     if (!selectedRun || retrying) return;
-    setRetrying(true);
-    setRetryError(null);
-    setRetryLog([]);
+    setStartError(null);
     try {
       await pipelineApi.retryRun(selectedRun.backup_source);
     } catch (err) {
-      setRetrying(false);
-      setRetryError(err instanceof Error ? err.message : 'Failed to start retry.');
+      setStartError(err instanceof Error ? err.message : 'Failed to start retry.');
     }
   };
 

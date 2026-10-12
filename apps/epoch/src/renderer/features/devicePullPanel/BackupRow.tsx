@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Smartphone, Circle, Loader2, CheckCircle2, XCircle, KeyRound } from 'lucide-react';
 import type { Backup } from '@verichron/contracts';
-import { STAGE_ORDER, STAGE_LABELS, type BackupProgress } from '../../libs/mvtLogParser';
+import { STAGE_ORDER, STAGE_LABELS, type BackupProgress, type StageName } from '../../../shared/prepareProgress';
 
 interface BackupRowProps {
   backup: Backup;
@@ -55,6 +55,49 @@ export function BackupRow({
   );
 }
 
+function formatGB(bytes: number): string {
+  return `${(bytes / 1e9).toFixed(1)} GB`;
+}
+
+function formatDuration(ms: number): string {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return 'under a minute';
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+}
+
+/** The current time, every second while `active`, for the time a step has taken. */
+function useNow(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+  return now;
+}
+
+/**
+ * What the running step has done so far (EPOCH-487): bytes hashed, bytes
+ * decrypted of the backup's size, or the iLEAPP module running now, with the
+ * time the step (or module) has taken.
+ */
+function stepDetail(progress: BackupProgress, stage: StageName, now: number): string {
+  const startedAt = progress.stageStartedAt[stage];
+  const elapsed = startedAt ? formatDuration(now - startedAt) : null;
+  if (stage === 'hash' && progress.hashed) {
+    return `${formatGB(progress.hashed.bytes)} read, ${progress.hashed.files.toLocaleString()} files${elapsed ? ` · ${elapsed}` : ''}`;
+  }
+  if (stage === 'decrypt' && progress.decrypted) {
+    return `${formatGB(progress.decrypted.bytes)} of ${formatGB(progress.decrypted.total)}${elapsed ? ` · ${elapsed}` : ''}`;
+  }
+  if (stage === 'ileapp' && progress.ileappModule) {
+    const { index, total, name, startedAt: moduleStartedAt } = progress.ileappModule;
+    return `module ${index} of ${total}: ${name} · ${formatDuration(now - moduleStartedAt)} in this module`;
+  }
+  return elapsed ?? '';
+}
+
 function LiveBackupRow({
   backup,
   progress,
@@ -66,6 +109,13 @@ function LiveBackupRow({
 }) {
   const failedStage = STAGE_ORDER.find((s) => progress.stages[s] === 'error');
   const runningStage = STAGE_ORDER.find((s) => progress.stages[s] === 'running');
+  const now = useNow(progress.overall === 'running');
+  const detail = progress.overall === 'running' && runningStage ? stepDetail(progress, runningStage, now) : '';
+  // The decrypt's share of the backup's size, held below 100 until it is done.
+  const decryptPercent =
+    runningStage === 'decrypt' && progress.decrypted && progress.decrypted.total > 0
+      ? Math.min(99, Math.floor((progress.decrypted.bytes / progress.decrypted.total) * 100))
+      : null;
 
   let icon = <Circle size="1.125rem" className="text-muted-foreground shrink-0" />;
   let statusText = 'Waiting in queue';
@@ -108,7 +158,21 @@ function LiveBackupRow({
         <div className="font-mono text-foreground truncate font-medium" title={backup.path}>
           {backup.label}
         </div>
-        <div className={`text-label truncate mt-0.5 ${statusClass}`}>{statusText}</div>
+        <div className={`text-label truncate mt-0.5 ${statusClass}`}>
+          {statusText}
+          {detail && <span className="text-muted-foreground"> · {detail}</span>}
+        </div>
+        {decryptPercent !== null && (
+          <div className="mt-2 flex items-center gap-2" aria-label={`Decrypted ${decryptPercent}%`}>
+            <div className="h-1.5 flex-1 rounded-full bg-inset overflow-hidden">
+              <div
+                className="h-full rounded-full bg-accent transition-[width]"
+                style={{ width: `${decryptPercent}%` }}
+              />
+            </div>
+            <span className="text-label font-mono text-accent">{decryptPercent}%</span>
+          </div>
+        )}
       </div>
     </div>
   );

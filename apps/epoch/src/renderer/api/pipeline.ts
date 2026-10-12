@@ -1,8 +1,9 @@
 import type {
   StartPipelineOptions,
   MvtLogEntry,
-  MvtFinishedResult,
   AnalysisRunStatus,
+  AnalysisState,
+  PrepareState,
 } from '../../shared/types/window';
 
 export const pipelineApi = {
@@ -12,13 +13,13 @@ export const pipelineApi = {
   retryRun: (backupSource: string) => window.epoch.retryRun(backupSource),
   submitMvtPassword: (password: string) => window.epoch.submitMvtPassword(password),
   onMvtLog: (callback: (entry: MvtLogEntry) => void) => window.epoch.onMvtLog(callback),
-  onMvtPasswordRequired: (callback: (backupName: string) => void) => window.epoch.onMvtPasswordRequired(callback),
-  onMvtFinished: (callback: (result: MvtFinishedResult) => void) => window.epoch.onMvtFinished(callback),
+  getPrepareState: () => window.epoch.getPrepareState(),
+  onPrepareState: (callback: (state: PrepareState) => void) => window.epoch.onPrepareState(callback),
 
   startAnalysis: (workspace: string) => window.epoch.startAnalysis(workspace),
   cancelAnalysis: () => window.epoch.cancelAnalysis(),
   getAnalysisRunStatus: (workspace: string) => window.epoch.getAnalysisRunStatus(workspace),
   onOrchestratorLog: (callback: (entry: MvtLogEntry) => void) => window.epoch.onOrchestratorLog(callback),
-  onOrchestratorFinished: (callback: (result: MvtFinishedResult) => void) =>
-    window.epoch.onOrchestratorFinished(callback),
+  getAnalysisState: () => window.epoch.getAnalysisState(),
+  onAnalysisState: (callback: (state: AnalysisState) => void) => window.epoch.onAnalysisState(callback),
 };

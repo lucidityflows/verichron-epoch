@@ -25,7 +25,8 @@ export interface Config {
   sqliteBin: string;
   ileappDir: string;
   ileappPython: string;
-  ileappTimeoutMs: number;
+  /** How long one iLEAPP module (or its setup, or its report) may run before iLEAPP is stopped. */
+  ileappModuleTimeoutMs: number;
   force: boolean;
   forceDecrypt: boolean;
   verify: boolean;
@@ -51,7 +52,7 @@ export function parseFlags(): Config {
       'sqlite-bin': { type: 'string', default: 'sqlite3' },
       'ileapp-dir': { type: 'string', default: DEFAULT_ILEAPP_DIR },
       'ileapp-python': { type: 'string', default: DEFAULT_ILEAPP_PYTHON },
-      'ileapp-timeout': { type: 'string', default: '30m' },
+      'ileapp-module-timeout': { type: 'string', default: '60m' },
       force: { type: 'boolean', default: false },
       'force-decrypt': { type: 'boolean', default: false },
       verify: { type: 'boolean', default: false },
@@ -75,7 +76,7 @@ export function parseFlags(): Config {
   }
 
   const iocMaxAgeMs = durationFlag('ioc-max-age', values['ioc-max-age'] as string);
-  const ileappTimeoutMs = durationFlag('ileapp-timeout', values['ileapp-timeout'] as string);
+  const ileappModuleTimeoutMs = durationFlag('ileapp-module-timeout', values['ileapp-module-timeout'] as string);
 
   return {
     source: values.source as string,
@@ -85,7 +86,7 @@ export function parseFlags(): Config {
     sqliteBin: values['sqlite-bin'] as string,
     ileappDir: path.resolve(values['ileapp-dir'] as string),
     ileappPython: values['ileapp-python'] as string,
-    ileappTimeoutMs,
+    ileappModuleTimeoutMs,
     force: values.force as boolean,
     forceDecrypt: values['force-decrypt'] as boolean,
     verify: values.verify as boolean,
@@ -121,7 +122,9 @@ Options:
   --ileapp-dir <dir>       the iLEAPP checkout to run (default: <repo-root>/tools/ileapp/iLEAPP, the submodule)
   --ileapp-python <path>   interpreter for iLEAPP (default: <repo-root>/tools/ileapp/.venv/bin/python,
                            the pinned environment "mise run setup" creates)
-  --ileapp-timeout <dur>   stop iLEAPP if it runs longer than this, e.g. "45m" (default: 30m)
+  --ileapp-module-timeout <dur>
+                           stop iLEAPP if one of its modules, its setup or its report runs longer than
+                           this, e.g. "90m" (default: 60m)
   --force                  re-run check-backup and iLEAPP even if already done (does NOT touch decrypt/repair state)
   --force-decrypt          re-run decrypt-backup, repair, check-backup and iLEAPP even if already done
   --verify                 re-hash every file for the evidence manifest, ignoring the stat cache

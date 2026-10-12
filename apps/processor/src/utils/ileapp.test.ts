@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
@@ -60,7 +60,8 @@ mkdir "$7/$9"
     inputType: 'itunes',
     outputDir: path.join(tmp, 'ws', 'ileapp', name),
     logPath: path.join(tmp, `${name}.log`),
-    timeoutMs: 30_000,
+    modulesPath: path.join(tmp, `${name}.modules.json`),
+    moduleTimeoutMs: 30_000,
   });
 
   it('resolves relative paths against the processor, not the iLEAPP checkout it runs in', async () => {
@@ -106,6 +107,100 @@ mkdir "$7/$9"
     await assert.rejects(
       runIleapp({ ...base('full-log'), logPath: '/dev/full' }),
       /could not write the iLEAPP log \/dev\/full/
+    );
+  });
+});
+
+describe('per-module limit (EPOCH-487)', () => {
+  // A stub iLEAPP that prints iLEAPP's own module lines: three modules of
+  // STUB_STEP seconds each, where module STUB_STALL never finishes.
+  const ileappDir = path.join(tmp, 'modules-checkout');
+  const python = path.join(tmp, 'python-modules-stub');
+  const envFile = path.join(tmp, 'modules-env');
+  mkdirSync(ileappDir, { recursive: true });
+  writeFileSync(path.join(ileappDir, 'ileapp.py'), '');
+  writeFileSync(
+    python,
+    `#!/bin/sh
+echo "$PYTHONUNBUFFERED" > "${envFile}"
+mkdir -p "$7/$9"
+for m in 1 2 3; do
+  echo "[$m/3] Module $m [mod$m] artifact started"
+  [ "$STUB_STALL" = "$m" ] && sleep 30
+  sleep "\${STUB_STEP:-0.4}"
+  echo "Module $m [mod$m] artifact completed"
+done
+echo "Processes completed."
+echo "Report generation Completed."
+`
+  );
+  chmodSync(python, 0o755);
+  const decrypt = backup('modules-decrypt', ['Manifest.db']);
+
+  async function runWith(name: string, env: Record<string, string>, moduleTimeoutMs: number) {
+    const saved = { ...process.env };
+    Object.assign(process.env, env);
+    const printed: string[] = [];
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string | Uint8Array, ...rest: unknown[]) => {
+      printed.push(String(chunk));
+      return (write as (...a: unknown[]) => boolean)(chunk, ...rest);
+    }) as typeof process.stdout.write;
+    const modulesPath = path.join(tmp, `${name}.modules.json`);
+    try {
+      const outcome = await runIleapp({
+        python,
+        ileappDir,
+        decryptedDir: decrypt,
+        inputType: 'itunes',
+        outputDir: path.join(tmp, 'ws', 'ileapp', name),
+        logPath: path.join(tmp, `${name}.log`),
+        modulesPath,
+        moduleTimeoutMs,
+      }).then(
+        () => null,
+        (err: Error) => err
+      );
+      return { outcome, printed: printed.join(''), timings: JSON.parse(readFileSync(modulesPath, 'utf8')) };
+    } finally {
+      process.stdout.write = write;
+      process.env = saved;
+    }
+  }
+
+  it('lets a run longer than the limit finish when each module stays under it', async () => {
+    // Three modules of 0.4 s against a 1 s limit: the run takes about 1.2 s.
+    const { outcome, printed, timings } = await runWith('slow-but-moving', { STUB_STEP: '0.4' }, 1000);
+    assert.equal(outcome, null);
+    assert.equal(readFileSync(envFile, 'utf8').trim(), '1', 'iLEAPP runs unbuffered');
+    assert.match(printed, /\[ileapp\]  module 2 of 3: Module 2/);
+    assert.equal(timings.stopped, null);
+    assert.deepEqual(
+      timings.modules.map((m: { module: string; status: string }) => [m.module, m.status]),
+      [
+        ['mod1', 'completed'],
+        ['mod2', 'completed'],
+        ['mod3', 'completed'],
+      ]
+    );
+    assert.ok(timings.total_seconds >= 1, 'the whole run outlasted the limit');
+  });
+
+  it('stops a stuck module, names it and what did not run, and records the timings', async () => {
+    const started = Date.now();
+    const { outcome, timings } = await runWith('stuck', { STUB_STEP: '0.1', STUB_STALL: '2' }, 1000);
+    assert.ok(Date.now() - started < 10_000, 'stopped at the limit, not left to finish');
+    assert.match(
+      String(outcome?.message),
+      /^iLEAPP module 2 of 3, Module 2 \[mod2\], ran past the 1 s limit and was stopped; module 3 did not run$/
+    );
+    assert.equal(timings.stopped, outcome?.message);
+    assert.deepEqual(
+      timings.modules.map((m: { module: string; status: string }) => [m.module, m.status]),
+      [
+        ['mod1', 'completed'],
+        ['mod2', 'stopped'],
+      ]
     );
   });
 });

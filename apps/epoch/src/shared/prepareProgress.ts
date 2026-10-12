@@ -7,7 +7,11 @@
 //
 // Depends on the processor's log format staying banner/prefix-based
 // (`=== <name> ===`, `  [stage]  <detail>`) -- see apps/processor/src/main.ts's
-// run() loop, which is what actually produces these lines.
+// run() loop, which is what actually produces these lines, and the table in
+// apps/processor/README.md.
+//
+// Shared (EPOCH-487): the main process keeps a run's progress, so leaving and
+// returning to New Investigation shows it; the renderer only displays it.
 
 export type StageName = 'hash' | 'decrypt' | 'repair' | 'check' | 'ileapp';
 export type StageState = 'pending' | 'running' | 'done' | 'skipped' | 'error';
@@ -18,6 +22,14 @@ export interface BackupProgress {
   overall: BackupOverallState;
   stages: Record<StageName, StageState>;
   errorMessage?: string;
+  /** When each step started (ms since the epoch), for the time it has taken. */
+  stageStartedAt: Partial<Record<StageName, number>>;
+  /** Bytes and files hashed so far. */
+  hashed?: { bytes: number; files: number };
+  /** Bytes the decrypt has written, against the backup's size. */
+  decrypted?: { bytes: number; total: number };
+  /** The iLEAPP module running now. */
+  ileappModule?: { index: number; total: number; name: string; startedAt: number };
 }
 
 export interface MvtRunProgress {
@@ -48,7 +60,7 @@ function emptyStages(): Record<StageName, StageState> {
 export function initMvtRunProgress(labels: string[]): MvtRunProgress {
   const byLabel: Record<string, BackupProgress> = {};
   for (const label of labels) {
-    byLabel[label] = { label, overall: 'queued', stages: emptyStages() };
+    byLabel[label] = { label, overall: 'queued', stages: emptyStages(), stageStartedAt: {} };
   }
   return { order: [...labels], byLabel, currentLabel: null };
 }
@@ -56,8 +68,11 @@ export function initMvtRunProgress(labels: string[]): MvtRunProgress {
 const BACKUP_START_RE = /^=== (.+) ===$/;
 const STAGE_LINE_RE = /^\s*\[(hash|decrypt|repair|check|ileapp)\]\s*(.*)$/;
 const STAGE_ERROR_RE = /^\s*\[(hash|decrypt|repair|check|ileapp)\]\s*error\b:?\s*(.*)$/i;
+const HASH_PROGRESS_RE = /^\s*\[hash\]\s+progress (\d+) bytes, (\d+) files$/;
+const DECRYPT_PROGRESS_RE = /^\s*\[decrypt\]\s+progress (\d+) of (\d+) bytes$/;
+const ILEAPP_MODULE_RE = /^\s*\[ileapp\]\s+module (\d+) of (\d+): (.+)$/;
 
-export function applyMvtLogLine(state: MvtRunProgress, rawLine: string): MvtRunProgress {
+export function applyMvtLogLine(state: MvtRunProgress, rawLine: string, now: number = Date.now()): MvtRunProgress {
   const line = rawLine.replace(/\s+$/, '');
 
   const startMatch = BACKUP_START_RE.exec(line);
@@ -71,7 +86,12 @@ export function applyMvtLogLine(state: MvtRunProgress, rawLine: string): MvtRunP
       currentLabel: label,
       byLabel: {
         ...state.byLabel,
-        [label]: { ...current, overall: 'running', stages: { ...current.stages, hash: 'running' } },
+        [label]: {
+          ...current,
+          overall: 'running',
+          stages: { ...current.stages, hash: 'running' },
+          stageStartedAt: { hash: now },
+        },
       },
     };
   }
@@ -79,6 +99,26 @@ export function applyMvtLogLine(state: MvtRunProgress, rawLine: string): MvtRunP
   if (!state.currentLabel) return state;
   const current = state.byLabel[state.currentLabel];
   if (!current) return state;
+
+  const update = (patch: Partial<BackupProgress>): MvtRunProgress => ({
+    ...state,
+    byLabel: { ...state.byLabel, [state.currentLabel as string]: { ...current, ...patch } },
+  });
+  const hashed = HASH_PROGRESS_RE.exec(line);
+  if (hashed) return update({ hashed: { bytes: Number(hashed[1]), files: Number(hashed[2]) } });
+  const decrypted = DECRYPT_PROGRESS_RE.exec(line);
+  if (decrypted) return update({ decrypted: { bytes: Number(decrypted[1]), total: Number(decrypted[2]) } });
+  const ileappModule = ILEAPP_MODULE_RE.exec(line);
+  if (ileappModule) {
+    return update({
+      ileappModule: {
+        index: Number(ileappModule[1]),
+        total: Number(ileappModule[2]),
+        name: ileappModule[3],
+        startedAt: now,
+      },
+    });
+  }
 
   const errorMatch = STAGE_ERROR_RE.exec(line);
   if (errorMatch) {
@@ -107,10 +147,12 @@ export function applyMvtLogLine(state: MvtRunProgress, rawLine: string): MvtRunP
     if (!isDone) return state;
 
     const stages: Record<StageName, StageState> = { ...current.stages, [stage]: isSkipped ? 'skipped' : 'done' };
+    const stageStartedAt = { ...current.stageStartedAt };
     const idx = STAGE_ORDER.indexOf(stage);
     const isLastStage = idx === STAGE_ORDER.length - 1;
     if (!isLastStage) {
       stages[STAGE_ORDER[idx + 1]] = 'running';
+      stageStartedAt[STAGE_ORDER[idx + 1]] = now;
     }
 
     return {
@@ -120,6 +162,7 @@ export function applyMvtLogLine(state: MvtRunProgress, rawLine: string): MvtRunP
         [state.currentLabel]: {
           ...current,
           stages,
+          stageStartedAt,
           // A failed check doesn't stop iLEAPP, but the backup still failed.
           overall: isLastStage && current.overall !== 'failed' ? 'done' : current.overall,
         },
