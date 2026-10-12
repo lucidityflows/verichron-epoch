@@ -139,8 +139,8 @@ export function DataTable<TData extends Record<string, any>>({
                 isExpanded
                   ? 'bg-surface shadow-elevation-1'
                   : isSelected
-                  ? 'bg-surface shadow-[inset_0.125rem_0_0_hsl(var(--accent))]'
-                  : 'hover:bg-surface/60'
+                    ? 'bg-surface shadow-[inset_0.125rem_0_0_hsl(var(--accent))]'
+                    : 'hover:bg-surface/60'
               }`}
             >
               <div className="grid" style={{ gridTemplateColumns }}>
@@ -155,9 +155,7 @@ export function DataTable<TData extends Record<string, any>>({
                 ))}
               </div>
               {expandedContent && (
-                <div className="px-4 py-4 border-b border-border/40 bg-surface">
-                  {expandedContent}
-                </div>
+                <div className="px-4 py-4 border-b border-border/40 bg-surface">{expandedContent}</div>
               )}
             </div>
           );

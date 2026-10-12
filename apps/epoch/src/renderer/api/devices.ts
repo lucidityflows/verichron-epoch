@@ -14,8 +14,7 @@ import type {
 
 export const devicesApi = {
   listDeviceBackupSources: () => window.epoch.listDeviceBackupSources(),
-  checkDeviceBackupToolAvailable: (sourceId: string) =>
-    window.epoch.checkDeviceBackupToolAvailable(sourceId),
+  checkDeviceBackupToolAvailable: (sourceId: string) => window.epoch.checkDeviceBackupToolAvailable(sourceId),
   listConnectedDevices: (sourceId: string) => window.epoch.listConnectedDevices(sourceId),
   getToolAcquisitionActions: (sourceId: string): Promise<ToolAcquisitionAction[]> =>
     window.epoch.getToolAcquisitionActions(sourceId),

@@ -12,7 +12,11 @@ import { EmptyState } from '../components/ui/EmptyState';
 
 /** Labels for run_completeness states. The state itself comes from the
  * database (EPOCH-404); this view never derives it from stage rows. */
-const RUN_STATE_LABEL: Record<PipelineRunRow['state'], string> = { running: 'in progress', incomplete: 'incomplete', complete: 'complete' };
+const RUN_STATE_LABEL: Record<PipelineRunRow['state'], string> = {
+  running: 'in progress',
+  incomplete: 'incomplete',
+  complete: 'complete',
+};
 
 function stageDurationMs(stage: StageStatusRow): number | null {
   if (!stage.started_at || !stage.finished_at) return null;
@@ -78,7 +82,7 @@ export function RunsView({
     });
     const unsubFinished = pipelineApi.onOrchestratorFinished((result: MvtFinishedResult) => {
       setRetrying(false);
-      setRetryError(result.success ? null : result.error ?? 'Retry failed.');
+      setRetryError(result.success ? null : (result.error ?? 'Retry failed.'));
       if (selectedRun) {
         onRefreshRun?.(selectedRun.run_id);
         onRefreshStages?.(selectedRun.run_id);
@@ -125,9 +129,7 @@ export function RunsView({
       accessorKey: 'run_id',
       header: 'Run ID',
       meta: { width: 'minmax(8rem, 0.5fr)' },
-      cell: ({ row }) => (
-        <span className="font-mono text-muted-foreground">{row.original.run_id.slice(0, 8)}</span>
-      ),
+      cell: ({ row }) => <span className="font-mono text-muted-foreground">{row.original.run_id.slice(0, 8)}</span>,
     },
     {
       accessorKey: 'backup_source',
@@ -166,7 +168,10 @@ export function RunsView({
       header: 'Started',
       meta: { width: 'minmax(12rem, 0.8fr)' },
       cell: ({ row }) => (
-        <span className="font-mono tabular-nums tracking-tight text-muted-foreground" title={new Date(row.original.started_at).toISOString()}>
+        <span
+          className="font-mono tabular-nums tracking-tight text-muted-foreground"
+          title={new Date(row.original.started_at).toISOString()}
+        >
           {new Date(row.original.started_at).toLocaleString()}
         </span>
       ),
@@ -201,9 +206,7 @@ export function RunsView({
           </div>
         )}
 
-        {(retrying || retryLog.length > 0) && (
-          <TerminalLog lines={retryLog} live={retrying} label="Retry details" />
-        )}
+        {(retrying || retryLog.length > 0) && <TerminalLog lines={retryLog} live={retrying} label="Retry details" />}
 
         {stages.length === 0 ? (
           <EmptyState icon={Layers} title="No stages initialized for this run" />
@@ -239,7 +242,10 @@ export function RunsView({
                       <p className="text-data text-flag font-mono mb-2 break-words">Error: {stage.error_message}</p>
                     )}
                     <p className="text-data text-muted-foreground font-mono">
-                      Duration: <strong className="text-foreground">{durationMs !== null ? formatDuration(durationMs) : '—'}</strong>
+                      Duration:{' '}
+                      <strong className="text-foreground">
+                        {durationMs !== null ? formatDuration(durationMs) : '—'}
+                      </strong>
                     </p>
                   </div>
                 </div>
@@ -255,9 +261,9 @@ export function RunsView({
     <ViewLayout
       title="Investigations"
       titleAside={
-        !loading && !error && runs.length > 0 && (
-          <span className="font-mono text-label text-muted-foreground">{runs.length}</span>
-        )
+        !loading &&
+        !error &&
+        runs.length > 0 && <span className="font-mono text-label text-muted-foreground">{runs.length}</span>
       }
       className="overflow-hidden"
     >

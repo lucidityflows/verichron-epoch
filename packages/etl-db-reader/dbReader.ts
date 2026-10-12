@@ -281,7 +281,15 @@ export interface ForensicRecordPage {
 }
 
 const QUERY_KEYS = new Set<keyof ForensicRecordQuery>([
-  'sourceType', 'eventTimeFrom', 'eventTimeTo', 'text', 'sort', 'direction', 'history', 'limit', 'cursor',
+  'sourceType',
+  'eventTimeFrom',
+  'eventTimeTo',
+  'text',
+  'sort',
+  'direction',
+  'history',
+  'limit',
+  'cursor',
 ]);
 
 interface CursorState {
@@ -410,11 +418,8 @@ export async function getForensicRecords(
   const fetched = result.rows.filter((row) => row.id !== null);
   const pageRows = fetched.slice(0, limit);
   const last = pageRows.at(-1);
-  const nextCursor =
-    fetched.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
-  const rows = pageRows.map(
-    ({ total: _total, sort_value: _cursorOnly, ...row }) => row as ForensicRecordRow
-  );
+  const nextCursor = fetched.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
+  const rows = pageRows.map(({ total: _total, sort_value: _cursorOnly, ...row }) => row as ForensicRecordRow);
   return { rows, total, nextCursor };
 }
 

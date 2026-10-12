@@ -14,8 +14,7 @@
  * apps/epoch/src/main.ts would have executed successfully against this
  * schema as written.
  */
- 
- 
+
 export type {
   PipelineRunRow,
   StageStatusRow,
@@ -39,4 +38,3 @@ export {
   CORRELATION_WINDOW_MINUTES,
   MAX_RECORDS_PAGE,
 } from './dbReader.js';
- 

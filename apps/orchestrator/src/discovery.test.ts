@@ -9,7 +9,14 @@ import { describe, it } from 'node:test';
 
 import { discoverStages, isStageManifest } from './discovery.js';
 
-const VALID = { entrypoint: 'main.py', runtime: 'python', order: 10, reads: 'decrypted', parserVersion: 1, enabled: true };
+const VALID = {
+  entrypoint: 'main.py',
+  runtime: 'python',
+  order: 10,
+  reads: 'decrypted',
+  parserVersion: 1,
+  enabled: true,
+};
 
 describe('stage manifests', () => {
   it('accepts each derivative kind as what a stage reads', () => {

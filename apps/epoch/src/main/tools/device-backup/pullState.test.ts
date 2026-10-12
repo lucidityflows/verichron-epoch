@@ -8,7 +8,12 @@ import { describe, it } from 'node:test';
 import type { DeviceInfo } from '../../../shared/types/tools';
 import { nextDeviceAction, PULL_STATE_PROGRESS_LIMIT, PullStateTracker } from './pullState';
 
-const IPHONE: DeviceInfo = { id: '00008140-0000000000000000', name: 'iPhone', model: 'iPhone17,5', osVersion: '26.6.1' };
+const IPHONE: DeviceInfo = {
+  id: '00008140-0000000000000000',
+  name: 'iPhone',
+  model: 'iPhone17,5',
+  osVersion: '26.6.1',
+};
 
 describe('PullStateTracker', () => {
   it('has no state until a pull starts, and none after it ends', () => {
@@ -54,7 +59,8 @@ describe('PullStateTracker', () => {
   it('keeps only the newest progress lines', () => {
     const pull = new PullStateTracker();
     pull.start('ios', IPHONE, '/backups');
-    for (let i = 0; i < PULL_STATE_PROGRESS_LIMIT + 5; i++) pull.progress({ phase: 'transferring', message: `line ${i}` });
+    for (let i = 0; i < PULL_STATE_PROGRESS_LIMIT + 5; i++)
+      pull.progress({ phase: 'transferring', message: `line ${i}` });
     const progress = pull.current()?.progress ?? [];
     assert.equal(progress.length, PULL_STATE_PROGRESS_LIMIT);
     assert.equal(progress[0].message, 'line 5');
@@ -81,8 +87,14 @@ describe('PullStateTracker', () => {
 
 describe('nextDeviceAction', () => {
   it('stays up through setup lines and clears on any other phase', () => {
-    assert.equal(nextDeviceAction(null, { phase: 'device-action', message: 'Enter the passcode.' }), 'Enter the passcode.');
-    assert.equal(nextDeviceAction('Enter the passcode.', { phase: 'preparing', message: 'Full backup mode.' }), 'Enter the passcode.');
+    assert.equal(
+      nextDeviceAction(null, { phase: 'device-action', message: 'Enter the passcode.' }),
+      'Enter the passcode.'
+    );
+    assert.equal(
+      nextDeviceAction('Enter the passcode.', { phase: 'preparing', message: 'Full backup mode.' }),
+      'Enter the passcode.'
+    );
     assert.equal(nextDeviceAction('Enter the passcode.', { phase: 'done', message: 'Backup complete.' }), null);
   });
 });

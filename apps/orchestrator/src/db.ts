@@ -1,9 +1,9 @@
-import { Client } from "pg";
-import { randomUUID } from "node:crypto";
-import type { StageSet } from "./types.js";
-import { derivativeFor, type Registration, type RegisteredDerivatives } from "./registration.js";
+import { Client } from 'pg';
+import { randomUUID } from 'node:crypto';
+import type { StageSet } from './types.js';
+import { derivativeFor, type Registration, type RegisteredDerivatives } from './registration.js';
 
-export type RunState = "running" | "incomplete" | "complete";
+export type RunState = 'running' | 'incomplete' | 'complete';
 
 /**
  * Whether this evidence has already been fully processed, as these stages
@@ -19,8 +19,8 @@ export type RunState = "running" | "incomplete" | "complete";
  */
 export async function hasCompleteRunFor(
   client: Client,
-  registration: Pick<Registration, "evidenceId"> & RegisteredDerivatives,
-  enabled: StageSet["enabled"]
+  registration: Pick<Registration, 'evidenceId'> & RegisteredDerivatives,
+  enabled: StageSet['enabled']
 ): Promise<boolean> {
   const { rows } = await client.query(
     `SELECT 1 FROM run_completeness c
@@ -48,10 +48,9 @@ export async function hasCompleteRunFor(
 
 /** A run's state from the canonical predicate, or null if no such run. */
 export async function getRunState(client: Client, runId: string): Promise<RunState | null> {
-  const { rows } = await client.query<{ state: RunState }>(
-    `SELECT state FROM run_completeness WHERE run_id = $1`,
-    [runId]
-  );
+  const { rows } = await client.query<{ state: RunState }>(`SELECT state FROM run_completeness WHERE run_id = $1`, [
+    runId,
+  ]);
   return rows[0]?.state ?? null;
 }
 
@@ -74,7 +73,7 @@ export async function createRun(
   backupPath: string,
   stages: StageSet,
   provenance: RunProvenance,
-  registration: Pick<Registration, "evidenceId"> & RegisteredDerivatives
+  registration: Pick<Registration, 'evidenceId'> & RegisteredDerivatives
 ): Promise<string> {
   const runId = randomUUID();
   await client.query(
@@ -111,10 +110,10 @@ export async function markStage(
   client: Client,
   runId: string,
   stageName: string,
-  status: "running" | "succeeded" | "failed",
+  status: 'running' | 'succeeded' | 'failed',
   errorMessage?: string
 ): Promise<void> {
-  const timestampCol = status === "running" ? "started_at" : "finished_at";
+  const timestampCol = status === 'running' ? 'started_at' : 'finished_at';
   await client.query(
     `UPDATE pipeline_stage_status
      SET status = $1, error_message = $2, ${timestampCol} = now()

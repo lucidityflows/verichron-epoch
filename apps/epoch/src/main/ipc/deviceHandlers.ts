@@ -4,7 +4,11 @@ import { PullStateTracker } from '../tools/device-backup/pullState';
 import path from 'path';
 import fs from 'fs/promises';
 import { spawn } from 'child_process';
-import { listDeviceBackupSources, getDeviceBackupSource, getAcquisitionStrategy } from '../tools/device-backup/registry';
+import {
+  listDeviceBackupSources,
+  getDeviceBackupSource,
+  getAcquisitionStrategy,
+} from '../tools/device-backup/registry';
 import type {
   DeviceInfo,
   ToolAcquisitionCommand,
@@ -102,15 +106,18 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     }
   );
 
-  ipcMain.handle('epoch:deleteIncompleteBackup', async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
-    if (pull.running()) throw new Error('A device backup is running; cancel it before deleting.');
-    const source = getDeviceBackupSource(sourceId);
-    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
-    // Only a folder an earlier pull wrote to, so the renderer can't name an arbitrary one.
-    const known = await readPullDestinations(app.getPath('userData'));
-    if (!known.includes(destDir)) throw new Error(`${destDir} isn't a folder Epoch has pulled a backup to.`);
-    return source.deleteIncompleteBackup(destDir, device);
-  });
+  ipcMain.handle(
+    'epoch:deleteIncompleteBackup',
+    async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
+      if (pull.running()) throw new Error('A device backup is running; cancel it before deleting.');
+      const source = getDeviceBackupSource(sourceId);
+      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+      // Only a folder an earlier pull wrote to, so the renderer can't name an arbitrary one.
+      const known = await readPullDestinations(app.getPath('userData'));
+      if (!known.includes(destDir)) throw new Error(`${destDir} isn't a folder Epoch has pulled a backup to.`);
+      return source.deleteIncompleteBackup(destDir, device);
+    }
+  );
 
   ipcMain.handle(
     'epoch:pullDeviceBackup',
@@ -155,54 +162,57 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
 
   let acquisitionInFlight = false;
 
-  ipcMain.handle('epoch:runToolAcquisitionSteps', async (_event, steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> => {
-    if (acquisitionInFlight) {
-      throw new Error('A tool acquisition run is already in progress.');
-    }
-    acquisitionInFlight = true;
-
-    try {
-      if (steps.length > 0) {
-        const buildRoot = steps[0].cwd;
-        if (buildRoot) await fs.mkdir(buildRoot, { recursive: true }).catch(() => undefined);
+  ipcMain.handle(
+    'epoch:runToolAcquisitionSteps',
+    async (_event, steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> => {
+      if (acquisitionInFlight) {
+        throw new Error('A tool acquisition run is already in progress.');
       }
-      await fs.mkdir(installPrefix, { recursive: true }).catch(() => undefined);
+      acquisitionInFlight = true;
 
-      for (const step of steps) {
-        sendToRenderer('epoch:toolAcquisitionStepStarted', step.label);
-        const pkgConfigPath = path.join(installPrefix, 'lib', 'pkgconfig');
-        
-        const env: NodeJS.ProcessEnv = {
-          ...process.env,
-          PKG_CONFIG_PATH: [pkgConfigPath, process.env.PKG_CONFIG_PATH].filter(Boolean).join(path.delimiter),
-        };
-
-        const exitCode = await new Promise<number>((resolve, reject) => {
-          const child = spawn(step.command, step.args, { cwd: step.cwd, env });
-          child.stdout?.on('data', (chunk: Buffer) => {
-            sendToRenderer('epoch:toolAcquisitionOutput', { step: step.label, line: chunk.toString('utf-8') });
-          });
-          child.stderr?.on('data', (chunk: Buffer) => {
-            sendToRenderer('epoch:toolAcquisitionOutput', { step: step.label, line: chunk.toString('utf-8') });
-          });
-          child.once('error', reject);
-          child.once('close', (code) => resolve(code ?? 1));
-        });
-
-        if (exitCode !== 0) {
-          const result: ToolAcquisitionResult = { success: false, failedStep: step.label };
-          sendToRenderer('epoch:toolAcquisitionFinished', result);
-          return result;
+      try {
+        if (steps.length > 0) {
+          const buildRoot = steps[0].cwd;
+          if (buildRoot) await fs.mkdir(buildRoot, { recursive: true }).catch(() => undefined);
         }
-      }
+        await fs.mkdir(installPrefix, { recursive: true }).catch(() => undefined);
 
-      const result: ToolAcquisitionResult = { success: true };
-      sendToRenderer('epoch:toolAcquisitionFinished', result);
-      return result;
-    } finally {
-      acquisitionInFlight = false;
+        for (const step of steps) {
+          sendToRenderer('epoch:toolAcquisitionStepStarted', step.label);
+          const pkgConfigPath = path.join(installPrefix, 'lib', 'pkgconfig');
+
+          const env: NodeJS.ProcessEnv = {
+            ...process.env,
+            PKG_CONFIG_PATH: [pkgConfigPath, process.env.PKG_CONFIG_PATH].filter(Boolean).join(path.delimiter),
+          };
+
+          const exitCode = await new Promise<number>((resolve, reject) => {
+            const child = spawn(step.command, step.args, { cwd: step.cwd, env });
+            child.stdout?.on('data', (chunk: Buffer) => {
+              sendToRenderer('epoch:toolAcquisitionOutput', { step: step.label, line: chunk.toString('utf-8') });
+            });
+            child.stderr?.on('data', (chunk: Buffer) => {
+              sendToRenderer('epoch:toolAcquisitionOutput', { step: step.label, line: chunk.toString('utf-8') });
+            });
+            child.once('error', reject);
+            child.once('close', (code) => resolve(code ?? 1));
+          });
+
+          if (exitCode !== 0) {
+            const result: ToolAcquisitionResult = { success: false, failedStep: step.label };
+            sendToRenderer('epoch:toolAcquisitionFinished', result);
+            return result;
+          }
+        }
+
+        const result: ToolAcquisitionResult = { success: true };
+        sendToRenderer('epoch:toolAcquisitionFinished', result);
+        return result;
+      } finally {
+        acquisitionInFlight = false;
+      }
     }
-  });
+  );
 
   // Guided setup (EPOCH-465): Linux and macOS. One run at a time, shared with
   // the Windows acquisition steps above.

@@ -51,10 +51,7 @@ export async function discoverBackups(source: string, only?: string): Promise<Ba
       // (matching the wrong one, or both). The full relative path is
       // unique per root by construction, since findBackupRoots never
       // returns the same directory twice.
-      const label =
-        roots.length > 1
-          ? `${e.name}__${path.relative(topPath, root).split(path.sep).join('__')}`
-          : e.name;
+      const label = roots.length > 1 ? `${e.name}__${path.relative(topPath, root).split(path.sep).join('__')}` : e.name;
 
       // Matched against either the final (possibly disambiguated) label
       // or the plain top-level directory name. The latter preserves the

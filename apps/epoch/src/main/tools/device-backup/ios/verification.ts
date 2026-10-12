@@ -8,7 +8,7 @@ export interface BackupVerificationResult {
 }
 
 /**
- * Verifies backup artifacts, documenting and recording missing or corrupted state 
+ * Verifies backup artifacts, documenting and recording missing or corrupted state
  * rather than hard-failing, allowing partial analysis of available files.
  */
 export async function verifyBackupArtifacts(backupPath: string): Promise<BackupVerificationResult> {

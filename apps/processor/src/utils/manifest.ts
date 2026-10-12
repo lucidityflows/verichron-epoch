@@ -27,12 +27,12 @@
  * the files that actually exist, and works in every case.
  */
 
-import * as crypto from "node:crypto";
-import * as fs from "node:fs";
-import * as fsp from "node:fs/promises";
-import * as path from "node:path";
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
+import * as fsp from 'node:fs/promises';
+import * as path from 'node:path';
 
-import { walkFiles, writeFileAtomic } from "./fs.js";
+import { walkFiles, writeFileAtomic } from './fs.js';
 
 export interface ManifestEntry {
   /** Canonical relative path: NFC, `/`-separated. */
@@ -43,9 +43,9 @@ export interface ManifestEntry {
 
 /** Relative path -> canonical form. `sep` is the separator the input uses. */
 export function canonicalPath(relative: string, sep: string = path.sep): string {
-  const slashed = sep === "/" ? relative : relative.split(sep).join("/");
-  const canonical = slashed.normalize("NFC");
-  if (canonical.includes("\n") || canonical.includes("\r")) {
+  const slashed = sep === '/' ? relative : relative.split(sep).join('/');
+  const canonical = slashed.normalize('NFC');
+  if (canonical.includes('\n') || canonical.includes('\r')) {
     // A newline would forge an extra manifest line. Refuse rather than
     // escape: no real backup path contains one, and escaping would make the
     // manifest diverge from sha256sum's format.
@@ -56,7 +56,7 @@ export function canonicalPath(relative: string, sep: string = path.sep): string 
 
 /** Byte-wise comparison of the UTF-8 encoding of two canonical paths. */
 export function comparePaths(a: string, b: string): number {
-  return Buffer.compare(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"));
+  return Buffer.compare(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
 }
 
 /** Canonical manifest text for a set of entries, in any input order. */
@@ -69,20 +69,20 @@ export function renderManifest(entries: Iterable<ManifestEntry>): string {
       throw new Error(`two files normalize to the same canonical path: ${sorted[i].path}`);
     }
   }
-  return sorted.map((e) => `${e.sha256}  ${e.path}\n`).join("");
+  return sorted.map((e) => `${e.sha256}  ${e.path}\n`).join('');
 }
 
 export function contentRoot(manifest: string): string {
-  return crypto.createHash("sha256").update(manifest, "utf8").digest("hex");
+  return crypto.createHash('sha256').update(manifest, 'utf8').digest('hex');
 }
 
 export function sha256File(p: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const hash = crypto.createHash("sha256");
+    const hash = crypto.createHash('sha256');
     const stream = fs.createReadStream(p);
-    stream.on("data", (chunk) => hash.update(chunk));
-    stream.on("end", () => resolve(hash.digest("hex")));
-    stream.on("error", reject);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('end', () => resolve(hash.digest('hex')));
+    stream.on('error', reject);
   });
 }
 
@@ -101,14 +101,18 @@ const SHA256_RE = /^[0-9a-f]{64}$/;
 const DIGITS_RE = /^\d+$/;
 
 function isFingerprint(value: unknown): value is Fingerprint {
-  if (typeof value !== "object" || value === null) return false;
+  if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   return (
-    typeof v.sha256 === "string" && SHA256_RE.test(v.sha256) &&
-    typeof v.size === "string" && DIGITS_RE.test(v.size) &&
+    typeof v.sha256 === 'string' &&
+    SHA256_RE.test(v.sha256) &&
+    typeof v.size === 'string' &&
+    DIGITS_RE.test(v.size) &&
     // mtime can be negative: files dated before 1970 are valid evidence.
-    typeof v.mtimeNs === "string" && /^-?\d+$/.test(v.mtimeNs) &&
-    typeof v.ino === "string" && DIGITS_RE.test(v.ino)
+    typeof v.mtimeNs === 'string' &&
+    /^-?\d+$/.test(v.mtimeNs) &&
+    typeof v.ino === 'string' &&
+    DIGITS_RE.test(v.ino)
   );
 }
 
@@ -122,8 +126,8 @@ function isFingerprint(value: unknown): value is Fingerprint {
 async function readCache(cachePath: string): Promise<Map<string, Fingerprint>> {
   const cache = new Map<string, Fingerprint>();
   try {
-    const parsed = JSON.parse(await fsp.readFile(cachePath, "utf8"));
-    if (parsed?.version !== 1 || typeof parsed.entries !== "object" || parsed.entries === null) return cache;
+    const parsed = JSON.parse(await fsp.readFile(cachePath, 'utf8'));
+    if (parsed?.version !== 1 || typeof parsed.entries !== 'object' || parsed.entries === null) return cache;
     for (const [rel, fp] of Object.entries(parsed.entries)) {
       if (isFingerprint(fp)) cache.set(rel, fp);
     }
@@ -192,7 +196,7 @@ export async function hashTree(root: string, opts: HashTreeOptions = {}): Promis
     // Object.fromEntries defines own properties, so a `__proto__` key is
     // serialized as data rather than setting a prototype.
     const serialized = { version: 1, entries: Object.fromEntries(nextCache) };
-    await writeFileAtomic(opts.cachePath, JSON.stringify(serialized) + "\n");
+    await writeFileAtomic(opts.cachePath, JSON.stringify(serialized) + '\n');
   }
 
   return { manifest, contentRoot: contentRoot(manifest), fileCount: entries.length, totalBytes, hashed, reused };
@@ -220,8 +224,8 @@ export interface VerifyResult {
  */
 export async function verifyManifest(root: string, manifest: string): Promise<VerifyResult> {
   const expected = new Map<string, string>();
-  for (const line of manifest.split("\n")) {
-    if (line === "") continue;
+  for (const line of manifest.split('\n')) {
+    if (line === '') continue;
     const match = /^([0-9a-f]{64})  (.+)$/.exec(line);
     if (!match) throw new Error(`malformed manifest line: ${JSON.stringify(line)}`);
     expected.set(match[2], match[1]);

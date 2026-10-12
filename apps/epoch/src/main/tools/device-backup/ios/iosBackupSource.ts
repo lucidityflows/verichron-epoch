@@ -175,7 +175,7 @@ export class IosBackupSource implements DeviceBackupSource {
 
   /** Deletes an incomplete backup folder, after checking again that it is incomplete. */
   async deleteIncompleteBackup(destDir: string, device: DeviceInfo): Promise<void> {
-    if (this.running) throw new Error("A backup is running; cancel it before deleting.");
+    if (this.running) throw new Error('A backup is running; cancel it before deleting.');
     const incomplete = await this.incompleteBackup(destDir, device);
     if (!incomplete) throw new Error('There is no incomplete backup to delete.');
     await fs.rm(incomplete.path, { recursive: true });
@@ -225,7 +225,9 @@ export class IosBackupSource implements DeviceBackupSource {
     if (!tools.ideviceinfo) throw new Error('ideviceinfo is not available -- call checkToolAvailable() first.');
     const value = readLockdownValue(tools.ideviceinfo, device.id, 'WillEncrypt', 'com.apple.mobile.backup');
     if (value === undefined) {
-      throw new Error(`Couldn't read the backup settings of ${device.name}. Unlock it, make sure it trusts this computer, then try again.`);
+      throw new Error(
+        `Couldn't read the backup settings of ${device.name}. Unlock it, make sure it trusts this computer, then try again.`
+      );
     }
     return value === 'true';
   }
@@ -319,7 +321,13 @@ export class IosBackupSource implements DeviceBackupSource {
           fail(`The passcode wasn't entered on ${device.name} in time, so encrypted backups are still off. Try again.`);
         }
         if (result.code !== 0 || !(await this.backupEncryptionEnabled(device))) {
-          fail(failureMessage(`Encrypted backups couldn't be turned on for ${device.name}.`, result.tail, result.code, { device: device.name, destDir, freeBytes: null }));
+          fail(
+            failureMessage(`Encrypted backups couldn't be turned on for ${device.name}.`, result.tail, result.code, {
+              device: device.name,
+              destDir,
+              freeBytes: null,
+            })
+          );
         }
         record.backup_encryption = 'turned-on-by-epoch';
         onProgress({ phase: 'preparing', message: `Encrypted backups are on for ${device.name}.` });
@@ -331,12 +339,21 @@ export class IosBackupSource implements DeviceBackupSource {
         phase: 'device-action',
         message: `Unlock ${device.name} and keep it unlocked until the backup finishes. It will ask for its passcode to start.`,
       });
-      record.received_bytes = await runBackup(idevicebackup2, device, destDir, password, onProgress, onStats, estimatedBytes, {
-        setProcess: (proc) => {
-          this.running = proc;
-        },
-        cancelled: () => this.cancelRequested === true,
-      });
+      record.received_bytes = await runBackup(
+        idevicebackup2,
+        device,
+        destDir,
+        password,
+        onProgress,
+        onStats,
+        estimatedBytes,
+        {
+          setProcess: (proc) => {
+            this.running = proc;
+          },
+          cancelled: () => this.cancelRequested === true,
+        }
+      );
       record.outcome = 'completed';
       record.finished_at = new Date().toISOString();
       // The record is written before "done", so a completed pull is never
@@ -463,7 +480,10 @@ function runBackup(
             onStats({ ...stats });
           }
         } else if (event.text.includes(BACKUP_PASSCODE_PROMPT)) {
-          onProgress({ phase: 'device-action', message: `Enter the passcode on ${device.name} now to start the backup.` });
+          onProgress({
+            phase: 'device-action',
+            message: `Enter the passcode on ${device.name} now to start the backup.`,
+          });
         } else {
           if (event.text === 'Receiving files') receiving = true;
           onProgress({ phase: receiving ? 'transferring' : 'preparing', message: event.text });
@@ -530,10 +550,18 @@ function runBackup(
         else if (code === 0) resolve(received);
         else {
           const free = await freeSpace(destDir).catch(() => null);
-          fail(failureMessage(`The backup of ${device.name} failed.`, lastLines(output.output()), code, { device: device.name, destDir, freeBytes: free }));
+          fail(
+            failureMessage(`The backup of ${device.name} failed.`, lastLines(output.output()), code, {
+              device: device.name,
+              destDir,
+              freeBytes: free,
+            })
+          );
         }
       } catch (err) {
-        fail(`The backup of ${device.name} ended, but its folder couldn't be read: ${err instanceof Error ? err.message : String(err)}`);
+        fail(
+          `The backup of ${device.name} ended, but its folder couldn't be read: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
     });
   });

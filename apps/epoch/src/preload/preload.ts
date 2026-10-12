@@ -17,7 +17,7 @@ import type {
   ToolSetupStatus,
   ToolAvailabilityStatus,
 } from '../shared/types/tools';
- 
+
 // This file previously created its own `pg.Pool` and issued its own SQL
 // directly from the preload script, bypassing main.ts's `ipcMain.handle`
 // channels entirely -- those handlers existed but nothing ever called
@@ -33,11 +33,12 @@ interface StartPipelineOptions {
   refreshIOCs?: boolean;
   only?: string[];
 }
- 
+
 const dbApi = {
   platform: process.platform,
   selectBackupDirectory: () => ipcRenderer.invoke('epoch:selectBackupDirectory'),
-  selectDeviceBackupDestination: (): Promise<string | null> => ipcRenderer.invoke('epoch:selectDeviceBackupDestination'),
+  selectDeviceBackupDestination: (): Promise<string | null> =>
+    ipcRenderer.invoke('epoch:selectDeviceBackupDestination'),
   discoverBackups: (source: string): Promise<Backup[]> => ipcRenderer.invoke('epoch:discoverBackups', source),
   startPipeline: (source: string, options?: StartPipelineOptions): Promise<{ started: boolean; workspace: string }> =>
     ipcRenderer.invoke('epoch:startPipeline', source, options),
@@ -77,10 +78,9 @@ const dbApi = {
   // backups succeeded -- orchestrator discovers that itself.
   startAnalysis: (workspace: string): Promise<{ started: boolean }> =>
     ipcRenderer.invoke('epoch:startAnalysis', workspace),
-    // EPOCH-308: retries the orchestrator against a single previously-run
+  // EPOCH-308: retries the orchestrator against a single previously-run
   // backup_source rather than a whole workspace.
-  retryRun: (backupSource: string): Promise<{ started: boolean }> =>
-    ipcRenderer.invoke('epoch:retryRun', backupSource),
+  retryRun: (backupSource: string): Promise<{ started: boolean }> => ipcRenderer.invoke('epoch:retryRun', backupSource),
   // EPOCH-305: lets the renderer break out of a stalled/deadlocked run
   // without restarting the app. Resolves { cancelled: false } (rather than
   // rejecting) when nothing was actually running, since "there was nothing
@@ -100,7 +100,9 @@ const dbApi = {
     ipcRenderer.on('epoch:orchestratorLog', listener);
     return () => ipcRenderer.removeListener('epoch:orchestratorLog', listener);
   },
-  onOrchestratorFinished: (callback: (result: { success: boolean; exitCode?: number | null; error?: string }) => void) => {
+  onOrchestratorFinished: (
+    callback: (result: { success: boolean; exitCode?: number | null; error?: string }) => void
+  ) => {
     const listener = (
       _event: Electron.IpcRendererEvent,
       result: { success: boolean; exitCode?: number | null; error?: string }
@@ -133,17 +135,13 @@ const dbApi = {
     ipcRenderer.on('epoch:deviceBackupStats', listener);
     return () => ipcRenderer.removeListener('epoch:deviceBackupStats', listener);
   },
-  runToolAcquisitionSteps: (
-    steps: ToolAcquisitionCommand[],
-    installPrefix: string
-  ): Promise<ToolAcquisitionResult> =>
+  runToolAcquisitionSteps: (steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> =>
     ipcRenderer.invoke('epoch:runToolAcquisitionSteps', steps, installPrefix),
   getToolSetupStatus: (sourceId: string): Promise<ToolSetupStatus | null> =>
     ipcRenderer.invoke('epoch:getToolSetupStatus', sourceId),
   installToolSetupRequirements: (sourceId: string): Promise<ToolSetupResult> =>
     ipcRenderer.invoke('epoch:installToolSetupRequirements', sourceId),
-  buildToolSetup: (sourceId: string): Promise<ToolSetupResult> =>
-    ipcRenderer.invoke('epoch:buildToolSetup', sourceId),
+  buildToolSetup: (sourceId: string): Promise<ToolSetupResult> => ipcRenderer.invoke('epoch:buildToolSetup', sourceId),
   onToolSetupEvent: (callback: (event: ToolSetupEvent) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, event: ToolSetupEvent) => callback(event);
     ipcRenderer.on('epoch:toolSetupEvent', listener);
@@ -165,11 +163,10 @@ const dbApi = {
     return () => ipcRenderer.removeListener('epoch:toolAcquisitionOutput', listener);
   },
   onToolAcquisitionFinished: (callback: (result: ToolAcquisitionResult) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, result: ToolAcquisitionResult) =>
-      callback(result);
+    const listener = (_event: Electron.IpcRendererEvent, result: ToolAcquisitionResult) => callback(result);
     ipcRenderer.on('epoch:toolAcquisitionFinished', listener);
     return () => ipcRenderer.removeListener('epoch:toolAcquisitionFinished', listener);
   },
 };
- 
+
 contextBridge.exposeInMainWorld('epoch', dbApi);

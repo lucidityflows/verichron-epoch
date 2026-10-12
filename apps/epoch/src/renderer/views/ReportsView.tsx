@@ -6,16 +6,16 @@ import { Button } from '../components/ui/Button';
 import { reportsApi } from '../api/reports';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
- 
+
 interface ReportsViewProps {
   selectedRun: PipelineRunRow | null;
 }
- 
+
 export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
   const [report, setReport] = useState<ReportResult | null>(null);
   const [reportLoadError, setReportLoadError] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
- 
+
   const loadReport = async (run: PipelineRunRow) => {
     setReportLoading(true);
     setReportLoadError(null);
@@ -29,7 +29,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
       setReportLoading(false);
     }
   };
- 
+
   useEffect(() => {
     if (selectedRun) {
       loadReport(selectedRun);
@@ -37,13 +37,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
       setReport(null);
     }
   }, [selectedRun]);
- 
+
   const openReportFile = async () => {
     if (!selectedRun) return;
     const opened = await reportsApi.openReport(selectedRun.run_id);
     if (!opened) console.error('Failed to open report in default app');
   };
- 
+
   return (
     <ViewLayout title="Reports">
       {!selectedRun ? (

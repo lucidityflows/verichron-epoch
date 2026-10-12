@@ -70,9 +70,9 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
       return;
     }
     setExpandedPivotId(pivot.id);
-    
+
     if (correlatedContext[pivot.id] || !selectedRun || !pivot.event_time) return;
-    
+
     setCorrelatedLoading(pivot.id);
     try {
       const data = await runsApi.getCorrelatedContext(selectedRun.run_id, pivot.event_time, pivot.id);
@@ -99,7 +99,11 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
           detail="Select an investigation in Investigations to see its indicator matches."
         />
       ) : !selectedRun.evidence_id ? (
-        <EmptyState icon={FileQuestion} title="Evidence not registered" detail="This investigation's evidence isn't registered yet, so its facts haven't been read. This is not the same as finding nothing." />
+        <EmptyState
+          icon={FileQuestion}
+          title="Evidence not registered"
+          detail="This investigation's evidence isn't registered yet, so its facts haven't been read. This is not the same as finding nothing."
+        />
       ) : pivotsError ? (
         <div className="text-flag bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-md px-4 py-3 text-data">
           Could not load indicator matches: {pivotsError}
@@ -125,9 +129,7 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
             return (
               <div
                 key={rec.id}
-                className={`rounded-lg ${
-                  matched ? 'bg-flag/10 shadow-elevation-1' : 'bg-surface shadow-elevation-1'
-                }`}
+                className={`rounded-lg ${matched ? 'bg-flag/10 shadow-elevation-1' : 'bg-surface shadow-elevation-1'}`}
               >
                 <div
                   className={`p-4 ${expandable ? 'cursor-pointer' : ''}`}
@@ -186,12 +188,8 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
                             <span className="font-mono text-muted-foreground">
                               {ctx.event_time ? new Date(ctx.event_time).toLocaleString() : '—'}
                             </span>
-                            {ctx.process_name && (
-                              <span className="font-mono text-foreground">{ctx.process_name}</span>
-                            )}
-                            {ctx.bundle_id && (
-                              <span className="font-mono text-muted-foreground">{ctx.bundle_id}</span>
-                            )}
+                            {ctx.process_name && <span className="font-mono text-foreground">{ctx.process_name}</span>}
+                            {ctx.bundle_id && <span className="font-mono text-muted-foreground">{ctx.bundle_id}</span>}
                           </div>
                         ))}
                       </div>

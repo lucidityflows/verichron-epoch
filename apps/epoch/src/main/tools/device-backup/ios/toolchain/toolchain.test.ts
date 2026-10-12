@@ -30,7 +30,10 @@ interface Call {
 }
 
 /** A machine with `tools` installed; `extra` answers anything else first. */
-function machine(tools: string[], extra?: (call: Call, options: RunOptions) => { code: number; output: string } | undefined) {
+function machine(
+  tools: string[],
+  extra?: (call: Call, options: RunOptions) => { code: number; output: string } | undefined
+) {
   const calls: Call[] = [];
   const has = (name: string) => tools.includes(name);
   const runStub: Run = async (command, args, options = {}) => {
@@ -46,7 +49,9 @@ function machine(tools: string[], extra?: (call: Call, options: RunOptions) => {
       return { code: names.every(has) ? 0 : 1, output: '' };
     }
     if (command === 'pkg-config' && args[0] === '--modversion') {
-      return has('pkg-config') && has(args[1]) ? { code: 0, output: '3.5.0\n' } : { code: 1, output: `Package ${args[1]} was not found` };
+      return has('pkg-config') && has(args[1])
+        ? { code: 0, output: '3.5.0\n' }
+        : { code: 1, output: `Package ${args[1]} was not found` };
     }
     if (['cc', 'make', 'pkg-config'].includes(command)) {
       return has(command) ? { code: 0, output: `${command} 1.0\n` } : { code: 127, output: `${command}: not found\n` };
@@ -78,13 +83,21 @@ function context(run: Run, overrides: Partial<SetupContext> = {}): SetupContext 
 
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 function component(name: string, version = '1.0.0'): PinnedComponent {
-  return { name, version, url: `https://example.invalid/${name}`, sha256: sha(`${name}-${version}`), configureArgs: [] };
+  return {
+    name,
+    version,
+    url: `https://example.invalid/${name}`,
+    sha256: sha(`${name}-${version}`),
+    configureArgs: [],
+  };
 }
 /** Writes each component's expected bytes, or `override` for a named one. */
-const downloads = (override: Record<string, string> = {}): Download => async (url, dest) => {
-  const name = url.split('/').pop()!;
-  fs.writeFileSync(dest, override[name] ?? `${name}-1.0.0`);
-};
+const downloads =
+  (override: Record<string, string> = {}): Download =>
+  async (url, dest) => {
+    const name = url.split('/').pop()!;
+    fs.writeFileSync(dest, override[name] ?? `${name}-1.0.0`);
+  };
 
 /** Build commands: tar creates the source directory; configure and make succeed unless `fail` says otherwise. */
 function builds(fail?: (call: Call) => string | undefined, version = '1.0.0') {
@@ -135,13 +148,20 @@ describe('requirements', () => {
     fs.mkdirSync(ctx.prefix, { recursive: true });
     fs.writeFileSync(
       path.join(ctx.prefix, MANIFEST_FILE),
-      JSON.stringify({ schema_version: 1, components: [{ name: 'libplist', version: '1.0.0', sha256: components[0].sha256 }] })
+      JSON.stringify({
+        schema_version: 1,
+        components: [{ name: 'libplist', version: '1.0.0', sha256: components[0].sha256 }],
+      })
     );
     assert.equal((await checkRequirements(ctx)).installed, true);
-    assert.equal((await checkRequirements({ ...ctx, components: [component('libplist', '2.0.0')] })).installed, false, 'a different pin is not installed');
+    assert.equal(
+      (await checkRequirements({ ...ctx, components: [component('libplist', '2.0.0')] })).installed,
+      false,
+      'a different pin is not installed'
+    );
   });
 
-  it('on macOS, offers Apple\'s Command Line Tools installer first', async () => {
+  it("on macOS, offers Apple's Command Line Tools installer first", async () => {
     const status = await checkRequirements(context(machine([]).run, { platform: 'darwin' }));
     assert.equal(status.install?.command, 'xcode-select --install');
     assert.ok(!status.requirements.some((r) => r.id === 'usbmuxd'), 'macOS has its own usbmuxd');
@@ -151,13 +171,18 @@ describe('requirements', () => {
 describe('installing system tools', () => {
   it('runs apt-get once through pkexec, and reports a cancelled prompt plainly', async () => {
     const { run, calls } = machine(['make', 'pkexec'], (call) =>
-      call.command === 'pkexec' ? { code: 126, output: 'Error executing command as another user: Request dismissed\n' } : undefined
+      call.command === 'pkexec'
+        ? { code: 126, output: 'Error executing command as another user: Request dismissed\n' }
+        : undefined
     );
     const events: ToolSetupEvent[] = [];
     const result = await installSystemRequirements(context(run, { exists: () => false }), (e) => events.push(e));
     const pkexec = calls.filter((c) => c.command === 'pkexec');
     assert.equal(pkexec.length, 1, 'one administrator prompt');
-    assert.match(pkexec[0].args.join(' '), /apt-get update && apt-get install -y build-essential pkg-config libssl-dev libcurl4-openssl-dev usbmuxd/);
+    assert.match(
+      pkexec[0].args.join(' '),
+      /apt-get update && apt-get install -y build-essential pkg-config libssl-dev libcurl4-openssl-dev usbmuxd/
+    );
     assert.equal(result.success, false);
     assert.equal(result.failure?.hint, 'The administrator request was cancelled.');
     assert.deepEqual(events.at(-1), { type: 'step', id: 'system', status: 'failed' });
@@ -189,7 +214,10 @@ describe('building the libraries', () => {
     const configured = calls.filter((c) => c.command === './configure').map((c) => path.basename(c.cwd!));
     assert.deepEqual(configured, ['libplist-1.0.0', 'libimobiledevice-glue-1.0.0', 'libimobiledevice-1.0.0']);
     assert.ok(calls.some((c) => c.command === './configure' && c.args[0] === `--prefix=${ctx.prefix}`));
-    assert.deepEqual(readManifest(ctx.prefix)?.components.map((c) => c.name), components.map((c) => c.name));
+    assert.deepEqual(
+      readManifest(ctx.prefix)?.components.map((c) => c.name),
+      components.map((c) => c.name)
+    );
     assert.ok(!fs.existsSync(path.join(ctx.buildDir, PROGRESS_FILE)));
     const plan = events.find((e) => e.type === 'plan');
     assert.equal(plan?.type === 'plan' && plan.steps.at(-1)?.label, 'Verify the installation');
@@ -219,7 +247,10 @@ describe('building the libraries', () => {
     const events: ToolSetupEvent[] = [];
     const second = await buildToolchain(ctx, (e) => events.push(e), downloads());
     assert.equal(second.success, true);
-    assert.ok(events.some((e) => e.type === 'step' && e.id === 'libplist' && e.status === 'skipped'), 'libplist was not rebuilt');
+    assert.ok(
+      events.some((e) => e.type === 'step' && e.id === 'libplist' && e.status === 'skipped'),
+      'libplist was not rebuilt'
+    );
     assert.ok(readManifest(ctx.prefix));
   });
 
@@ -251,7 +282,8 @@ describe('failure hints', () => {
     it(`explains: ${line}`, () => assert.match(hintFor([line])!, expected));
   }
 
-  it('says nothing rather than guess', () => assert.equal(hintFor(['make[2]: *** [Makefile:400: all] Error 2']), undefined));
+  it('says nothing rather than guess', () =>
+    assert.equal(hintFor(['make[2]: *** [Makefile:400: all] Error 2']), undefined));
 
   it('reads pkexec exit codes', () => {
     assert.equal(adminPromptHint(126), 'The administrator request was cancelled.');

@@ -1,12 +1,12 @@
-import { execFileSync, spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
-import * as fsp from "node:fs/promises";
-import * as path from "node:path";
-import { Client } from "pg";
-import type { StageDefinition, StageSet, RunConfig } from "./types.js";
-import { createRun, hasCompleteRunFor, markStage, markRunFailed, type RunProvenance } from "./db.js";
-import { derivativeFor, registerEvidence, RegistrationError, type Registration } from "./registration.js";
-import { contractVersion, deriveIleappPath, deriveResultsPath, type DerivativeKind } from "@verichron/contracts";
+import { execFileSync, spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import * as fsp from 'node:fs/promises';
+import * as path from 'node:path';
+import { Client } from 'pg';
+import type { StageDefinition, StageSet, RunConfig } from './types.js';
+import { createRun, hasCompleteRunFor, markStage, markRunFailed, type RunProvenance } from './db.js';
+import { derivativeFor, registerEvidence, RegistrationError, type Registration } from './registration.js';
+import { contractVersion, deriveIleappPath, deriveResultsPath, type DerivativeKind } from '@verichron/contracts';
 
 async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!backupPath || backupPath.startsWith('-')) {
@@ -16,8 +16,15 @@ async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { 
   if (!stat?.isDirectory()) {
     return { ok: false, reason: `does not exist or is not a directory: "${backupPath}"` };
   }
-  const hasManifest = await fsp.access(path.join(backupPath, 'Manifest.db')).then(() => true).catch(() => false)
-    || await fsp.access(path.join(backupPath, 'Info.plist')).then(() => true).catch(() => false);
+  const hasManifest =
+    (await fsp
+      .access(path.join(backupPath, 'Manifest.db'))
+      .then(() => true)
+      .catch(() => false)) ||
+    (await fsp
+      .access(path.join(backupPath, 'Info.plist'))
+      .then(() => true)
+      .catch(() => false));
   if (!hasManifest) {
     return { ok: false, reason: `missing Manifest.db/Info.plist — not a decrypted backup root` };
   }
@@ -26,9 +33,9 @@ async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { 
 
 /** What each derivative kind is, for a stage whose input is missing. */
 const DERIVATIVE_NAMES: Record<DerivativeKind, string> = {
-  decrypted: "the decrypted backup",
-  mvt_results: "mvt-ios results",
-  ileapp_output: "iLEAPP output",
+  decrypted: 'the decrypted backup',
+  mvt_results: 'mvt-ios results',
+  ileapp_output: 'iLEAPP output',
 };
 
 /**
@@ -56,38 +63,47 @@ function runStage(
       success: false,
       stderr:
         `stage "${stage.name}" reads ${DERIVATIVE_NAMES[stage.manifest.reads]}, but none is registered for ` +
-        "this backup; run the processor to complete it",
+        'this backup; run the processor to complete it',
     });
   }
 
   return new Promise((resolve) => {
     const extraArgs = [
-      "--run-id", runId,
-      "--evidence-id", registration.evidenceId,
-      "--backup-path", config.backupPath,
-      "--db-url", config.dbUrl,
-      "--derivative-id", derivativeId,
-      "--derivative-path", derivativePath,
+      '--run-id',
+      runId,
+      '--evidence-id',
+      registration.evidenceId,
+      '--backup-path',
+      config.backupPath,
+      '--db-url',
+      config.dbUrl,
+      '--derivative-id',
+      derivativeId,
+      '--derivative-path',
+      derivativePath,
     ];
-    if (stage.manifest.parserVersion !== undefined) extraArgs.push("--parser-version", String(stage.manifest.parserVersion));
-    if (config.resultsPath) extraArgs.push("--results-path", config.resultsPath);
-    
+    if (stage.manifest.parserVersion !== undefined)
+      extraArgs.push('--parser-version', String(stage.manifest.parserVersion));
+    if (config.resultsPath) extraArgs.push('--results-path', config.resultsPath);
+
     const entrypointPath = path.join(stage.dir, stage.manifest.entrypoint);
-    const bin = stage.manifest.runtime === "python" ? config.pythonBin : process.execPath;
-    
-    const child = spawn(bin, [entrypointPath, ...extraArgs], { stdio: ["ignore", "pipe", "pipe"] });
- 
-    let stderr = "";
+    const bin = stage.manifest.runtime === 'python' ? config.pythonBin : process.execPath;
+
+    const child = spawn(bin, [entrypointPath, ...extraArgs], { stdio: ['ignore', 'pipe', 'pipe'] });
+
+    let stderr = '';
     child.stdout?.pipe(process.stdout);
-    child.stderr?.on("data", (chunk) => { stderr += chunk.toString(); });
-    child.on("error", (err) => resolve({ success: false, stderr: err.message }));
-    child.on("close", (code) => resolve({ success: code === 0, stderr: stderr.trim() }));
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on('error', (err) => resolve({ success: false, stderr: err.message }));
+    child.on('close', (code) => resolve({ success: code === 0, stderr: stderr.trim() }));
   });
 }
- 
+
 /** ../package.json resolves from both src/ (tsx) and dist/. */
 const ORCHESTRATOR_VERSION: string = JSON.parse(
-  readFileSync(new URL("../package.json", import.meta.url), "utf8")
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 ).version;
 
 /**
@@ -96,10 +112,12 @@ const ORCHESTRATOR_VERSION: string = JSON.parse(
  * EPOCH-406.
  */
 export function collectProvenance(pythonBin: string): RunProvenance {
-  let python = "unavailable";
+  let python = 'unavailable';
   try {
     // "Python 3.12.3" -> "3.12.3"
-    python = execFileSync(pythonBin, ["--version"], { encoding: "utf8" }).trim().replace(/^Python\s+/, "");
+    python = execFileSync(pythonBin, ['--version'], { encoding: 'utf8' })
+      .trim()
+      .replace(/^Python\s+/, '');
   } catch {
     // Recorded as unavailable rather than failing the run here: the Python
     // stages will fail on their own and say why.
@@ -144,7 +162,12 @@ export async function runPipelineForBackup(
   const ileappPath = deriveIleappPath(backupPath);
   let registration: Registration;
   try {
-    registration = await registerEvidence(client, { backupPath, resultsPath, ileappPath, secretPath: options.secretPath });
+    registration = await registerEvidence(client, {
+      backupPath,
+      resultsPath,
+      ileappPath,
+      secretPath: options.secretPath,
+    });
   } catch (err) {
     if (err instanceof RegistrationError) return { success: false, error: err.message };
     throw err;
@@ -163,13 +186,18 @@ export async function runPipelineForBackup(
 
   try {
     for (const stage of stages.enabled) {
-      await markStage(client, runId, stage.name, "running");
-      const { success, stderr } = await runStage(stage, { backupPath, resultsPath, ileappPath, dbUrl, pythonBin }, runId, registration);
+      await markStage(client, runId, stage.name, 'running');
+      const { success, stderr } = await runStage(
+        stage,
+        { backupPath, resultsPath, ileappPath, dbUrl, pythonBin },
+        runId,
+        registration
+      );
 
       if (success) {
-        await markStage(client, runId, stage.name, "succeeded");
+        await markStage(client, runId, stage.name, 'succeeded');
       } else {
-        await markStage(client, runId, stage.name, "failed", stderr || "unknown error");
+        await markStage(client, runId, stage.name, 'failed', stderr || 'unknown error');
       }
       results.push({ stage: stage.name, success });
     }

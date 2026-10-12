@@ -24,7 +24,7 @@ const RULES: Array<{ test: RegExp; hint: (match: RegExpMatchArray) => string }> 
   },
   {
     test: /C compiler cannot create executables|no acceptable C compiler|cc: (?:not found|command not found)/i,
-    hint: () => "No working C compiler was found. Install the system tools, then try again.",
+    hint: () => 'No working C compiler was found. Install the system tools, then try again.',
   },
   {
     test: /make: (?:not found|command not found)/i,
@@ -44,7 +44,8 @@ const RULES: Array<{ test: RegExp; hint: (match: RegExpMatchArray) => string }> 
   },
   {
     test: /SHA-256 mismatch/,
-    hint: () => "A download didn't match its expected checksum, so it wasn't used. Try again; if it repeats, the download source has changed.",
+    hint: () =>
+      "A download didn't match its expected checksum, so it wasn't used. Try again; if it repeats, the download source has changed.",
   },
   {
     test: /fetch failed|ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN|HTTP \d{3}/,

@@ -96,10 +96,7 @@ export function TerminalLog({ lines, live, defaultOpen = false, label = 'Technic
               <p className="text-muted-foreground italic">No output yet.</p>
             ) : (
               lines.map((entry, i) => (
-                <div
-                  key={i}
-                  className={entry.stream === 'stderr' ? 'text-danger' : 'text-foreground/80'}
-                >
+                <div key={i} className={entry.stream === 'stderr' ? 'text-danger' : 'text-foreground/80'}>
                   {entry.line || '\u00A0'}
                 </div>
               ))

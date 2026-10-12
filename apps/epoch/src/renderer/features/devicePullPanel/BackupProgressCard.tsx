@@ -60,7 +60,14 @@ export function BackupProgressCard({ stats, cancelling, onCancel }: BackupProgre
         <h3 className="font-display text-heading text-foreground flex-1">
           Backing Up{percent !== null ? ` · about ${percent}%` : '…'}
         </h3>
-        <Button variant="outline" tone="danger" size="sm" onClick={onCancel} loading={cancelling} loadingText="Cancelling…">
+        <Button
+          variant="outline"
+          tone="danger"
+          size="sm"
+          onClick={onCancel}
+          loading={cancelling}
+          loadingText="Cancelling…"
+        >
           <XCircle size="0.875rem" /> Cancel Backup
         </Button>
       </div>
@@ -91,7 +98,13 @@ interface IncompleteBackupNoticeProps {
 }
 
 /** Offers to delete a backup folder left by a pull that didn't finish (EPOCH-466). */
-export function IncompleteBackupNotice({ deviceName, incomplete, deleting, onDelete, onKeep }: IncompleteBackupNoticeProps) {
+export function IncompleteBackupNotice({
+  deviceName,
+  incomplete,
+  deleting,
+  onDelete,
+  onKeep,
+}: IncompleteBackupNoticeProps) {
   return (
     <section className="rounded-lg bg-flag/10 border border-flag/30 shadow-elevation-1 p-5 mt-4 flex flex-col gap-3">
       <h3 className="font-display text-heading text-flag">Incomplete Backup</h3>

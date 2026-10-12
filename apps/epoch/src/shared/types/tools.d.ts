@@ -41,9 +41,7 @@ export interface DeviceInfo {
   osVersion?: string;
 }
 
-export type ToolAvailabilityStatus =
-  | { available: true; path: string }
-  | { available: false; reason: string };
+export type ToolAvailabilityStatus = { available: true; path: string } | { available: false; reason: string };
 
 /** `device-action`: the pull is waiting for the user to do something on the device. */
 export type BackupProgressPhase = 'preparing' | 'device-action' | 'transferring' | 'verifying' | 'done' | 'error';

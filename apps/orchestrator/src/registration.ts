@@ -224,13 +224,13 @@ function verifySidecar(workspace: string, label: string): VerifiedSidecar {
   }
   const parsed = EvidenceSidecar.safeParse(raw);
   if (!parsed.success) {
-    throw new RegistrationError(`${paths.sidecar} does not match the evidence sidecar contract: ${parsed.error.message}`);
+    throw new RegistrationError(
+      `${paths.sidecar} does not match the evidence sidecar contract: ${parsed.error.message}`
+    );
   }
   const sidecar = parsed.data;
   if (sidecar.evidence_name !== label) {
-    throw new RegistrationError(
-      `${paths.sidecar} describes "${sidecar.evidence_name}", not "${label}"`
-    );
+    throw new RegistrationError(`${paths.sidecar} describes "${sidecar.evidence_name}", not "${label}"`);
   }
 
   // The manifest must be the content-addressed one for this very root, inside
@@ -337,10 +337,12 @@ async function appendEvent(
   host: string,
   detail: Record<string, unknown>
 ): Promise<void> {
-  await client.query(
-    `INSERT INTO evidence_events (evidence_id, kind, host, detail) VALUES ($1, $2, $3, $4)`,
-    [evidenceId, kind, host, detail]
-  );
+  await client.query(`INSERT INTO evidence_events (evidence_id, kind, host, detail) VALUES ($1, $2, $3, $4)`, [
+    evidenceId,
+    kind,
+    host,
+    detail,
+  ]);
 }
 
 /**
@@ -453,17 +455,33 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
     }
 
     const decryptedDerivativeId = await upsertDerivative(
-      client, evidenceId, 'decrypted', decryptedPath, null, host, derivatives.decrypt
+      client,
+      evidenceId,
+      'decrypted',
+      decryptedPath,
+      null,
+      host,
+      derivatives.decrypt
     );
     const resultsDerivativeId = derivatives.results
       ? await upsertDerivative(
-          client, evidenceId, 'mvt_results', derivatives.results.path, decryptedDerivativeId, host,
+          client,
+          evidenceId,
+          'mvt_results',
+          derivatives.results.path,
+          decryptedDerivativeId,
+          host,
           derivatives.results.provenance
         )
       : null;
     const ileappDerivativeId = derivatives.ileapp
       ? await upsertDerivative(
-          client, evidenceId, 'ileapp_output', derivatives.ileapp.path, decryptedDerivativeId, host,
+          client,
+          evidenceId,
+          'ileapp_output',
+          derivatives.ileapp.path,
+          decryptedDerivativeId,
+          host,
           derivatives.ileapp.provenance
         )
       : null;

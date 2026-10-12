@@ -44,7 +44,9 @@ const CONFIRM_ON_DEVICE = 'Please confirm enabling the backup encryption by ente
 
 describe('enableBackupEncryption', () => {
   it('passes the password only through BACKUP_PASSWORD', async () => {
-    const idevicebackup2 = fakeTool(`echo "${CONFIRM_ON_DEVICE}"\necho "Backup encryption has been enabled successfully."`);
+    const idevicebackup2 = fakeTool(
+      `echo "${CONFIRM_ON_DEVICE}"\necho "Backup encryption has been enabled successfully."`
+    );
     const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: FIXTURE });
     assert.deepEqual(result, {
       code: 0,
@@ -67,7 +69,13 @@ describe('enableBackupEncryption', () => {
   it('ends the wait even when the tool ignores SIGTERM', async () => {
     const idevicebackup2 = fakeTool(`trap '' TERM\nwhile true; do sleep 1; done`);
     const started = Date.now();
-    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: FIXTURE, timeoutMs: 200, killGraceMs: 200 });
+    const result = await enableBackupEncryption({
+      idevicebackup2,
+      udid: 'UDID-1',
+      password: FIXTURE,
+      timeoutMs: 200,
+      killGraceMs: 200,
+    });
     assert.equal(result.timedOut, true);
     assert.ok(Date.now() - started < 5_000);
   });
@@ -90,7 +98,11 @@ describe('enableBackupEncryption', () => {
   });
 
   it('reports a missing tool as code 127', async () => {
-    const result = await enableBackupEncryption({ idevicebackup2: path.join(tmp, 'missing'), udid: 'UDID-1', password: FIXTURE });
+    const result = await enableBackupEncryption({
+      idevicebackup2: path.join(tmp, 'missing'),
+      udid: 'UDID-1',
+      password: FIXTURE,
+    });
     assert.equal(result.code, 127);
   });
 });
@@ -100,14 +112,20 @@ describe('StreamLines', () => {
     const lines = new StreamLines();
     lines.take('stdout', 'Receiving files');
     lines.take('stderr', 'ErrorCode 208: Device locked (MBErrorDomain/208)\n');
-    assert.deepEqual(lastLines(lines.output()), ['ErrorCode 208: Device locked (MBErrorDomain/208)', 'Receiving files']);
+    assert.deepEqual(lastLines(lines.output()), [
+      'ErrorCode 208: Device locked (MBErrorDomain/208)',
+      'Receiving files',
+    ]);
     assert.equal(failureReason(lastLines(lines.output())), 'ErrorCode 208: Device locked (MBErrorDomain/208)');
   });
 
   it('ends a line at a progress-bar carriage return', () => {
     const lines = new StreamLines();
     lines.take('stdout', '[==   ]  40% Finished\rErrorCode 105: Insufficient free disk space\n');
-    assert.deepEqual(lastLines(lines.output()), ['[==   ]  40% Finished', 'ErrorCode 105: Insufficient free disk space']);
+    assert.deepEqual(lastLines(lines.output()), [
+      '[==   ]  40% Finished',
+      'ErrorCode 105: Insufficient free disk space',
+    ]);
   });
 });
 
@@ -177,7 +195,12 @@ describe('failureMessage', () => {
 
   it("uses the tool's ERROR line when the device gave no code", () => {
     assert.equal(
-      failureMessage('The backup of iPhone failed.', ['ERROR: Could not connect to lockdownd, error code -17', 'Done.'], 255, ctx),
+      failureMessage(
+        'The backup of iPhone failed.',
+        ['ERROR: Could not connect to lockdownd, error code -17', 'Done.'],
+        255,
+        ctx
+      ),
       'The backup of iPhone failed. idevicebackup2: ERROR: Could not connect to lockdownd, error code -17'
     );
   });

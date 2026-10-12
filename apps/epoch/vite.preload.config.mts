@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 
-
 export default defineConfig({
   build: {
     lib: {
@@ -9,8 +8,7 @@ export default defineConfig({
       fileName: 'preload',
     },
     rollupOptions: {
-      external: ["electron", "@verichron/contracts", "@verichron/etl-db-reader", "pg", /^node:.+/],
+      external: ['electron', '@verichron/contracts', '@verichron/etl-db-reader', 'pg', /^node:.+/],
     },
-  }
+  },
 });
-

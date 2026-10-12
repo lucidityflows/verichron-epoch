@@ -34,7 +34,11 @@ export const BREW_FORMULAS = ['pkg-config', 'openssl@3', 'curl'];
 const USBMUXD_PATHS = ['/usr/sbin/usbmuxd', '/usr/bin/usbmuxd', '/usr/local/sbin/usbmuxd'];
 const MAC_BIN_PATHS = ['/opt/homebrew/bin', '/usr/local/bin'];
 
-const firstLine = (text: string) => text.split('\n').find((l) => l.trim().length > 0)?.trim();
+const firstLine = (text: string) =>
+  text
+    .split('\n')
+    .find((l) => l.trim().length > 0)
+    ?.trim();
 
 /** The environment builds and checks run in: the tools folder's own .pc
  * files first, and on macOS Homebrew's tools and its keg-only OpenSSL/curl. */
@@ -87,7 +91,13 @@ async function pkgConfigRequirement(
   purpose: string
 ): Promise<ToolSetupRequirement> {
   if (!havePkgConfig) {
-    return { id, group: 'system', label, ok: false, detail: `Can't be checked until pkg-config is installed. ${purpose}` };
+    return {
+      id,
+      group: 'system',
+      label,
+      ok: false,
+      detail: `Can't be checked until pkg-config is installed. ${purpose}`,
+    };
   }
   const result = await ctx.run('pkg-config', ['--modversion', module], { env });
   return result.code === 0
@@ -101,18 +111,60 @@ async function systemRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): Pr
     const clt = await ctx.run('xcode-select', ['-p'], { env });
     reqs.push(
       clt.code === 0
-        ? { id: 'clt', group: 'system', label: 'Xcode Command Line Tools', ok: true, detail: 'The C compiler and make.' }
-        : { id: 'clt', group: 'system', label: 'Xcode Command Line Tools', ok: false, detail: 'Not installed. Provides the C compiler and make.' }
+        ? {
+            id: 'clt',
+            group: 'system',
+            label: 'Xcode Command Line Tools',
+            ok: true,
+            detail: 'The C compiler and make.',
+          }
+        : {
+            id: 'clt',
+            group: 'system',
+            label: 'Xcode Command Line Tools',
+            ok: false,
+            detail: 'Not installed. Provides the C compiler and make.',
+          }
     );
-    reqs.push(await commandRequirement(ctx, env, 'brew', 'Homebrew', 'brew', ['--version'], 'Installs the remaining tools.'));
+    reqs.push(
+      await commandRequirement(ctx, env, 'brew', 'Homebrew', 'brew', ['--version'], 'Installs the remaining tools.')
+    );
   } else {
     reqs.push(await commandRequirement(ctx, env, 'cc', 'C compiler', 'cc', ['--version'], 'Compiles the libraries.'));
-    reqs.push(await commandRequirement(ctx, env, 'make', 'make', 'make', ['--version'], 'Runs each library\'s build.'));
+    reqs.push(await commandRequirement(ctx, env, 'make', 'make', 'make', ['--version'], "Runs each library's build."));
   }
-  const pkgConfig = await commandRequirement(ctx, env, 'pkg-config', 'pkg-config', 'pkg-config', ['--version'], 'Lets each library find the others.');
+  const pkgConfig = await commandRequirement(
+    ctx,
+    env,
+    'pkg-config',
+    'pkg-config',
+    'pkg-config',
+    ['--version'],
+    'Lets each library find the others.'
+  );
   reqs.push(pkgConfig);
-  reqs.push(await pkgConfigRequirement(ctx, env, pkgConfig.ok, 'openssl', 'OpenSSL development files', 'openssl', 'Secures the connection to the device.'));
-  reqs.push(await pkgConfigRequirement(ctx, env, pkgConfig.ok, 'libcurl', 'libcurl development files', 'libcurl', 'Required by libtatsu.'));
+  reqs.push(
+    await pkgConfigRequirement(
+      ctx,
+      env,
+      pkgConfig.ok,
+      'openssl',
+      'OpenSSL development files',
+      'openssl',
+      'Secures the connection to the device.'
+    )
+  );
+  reqs.push(
+    await pkgConfigRequirement(
+      ctx,
+      env,
+      pkgConfig.ok,
+      'libcurl',
+      'libcurl development files',
+      'libcurl',
+      'Required by libtatsu.'
+    )
+  );
   const bzip2 = await ctx.run('/bin/sh', ['-c', 'command -v tar && command -v bzip2'], { env });
   reqs.push({
     id: 'archive',
@@ -128,17 +180,27 @@ async function serviceRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): P
   if (ctx.platform === 'darwin') return []; // macOS runs its own usbmuxd
   const found = USBMUXD_PATHS.find((p) => ctx.exists(p));
   if (!found) {
-    return [{ id: 'usbmuxd', group: 'service', label: 'usbmuxd', ok: false, detail: 'Not installed. Connects to the iPhone over USB.' }];
+    return [
+      {
+        id: 'usbmuxd',
+        group: 'service',
+        label: 'usbmuxd',
+        ok: false,
+        detail: 'Not installed. Connects to the iPhone over USB.',
+      },
+    ];
   }
   const version = await ctx.run(found, ['--version'], { env });
-  return [{
-    id: 'usbmuxd',
-    group: 'service',
-    label: 'usbmuxd',
-    ok: true,
-    version: version.code === 0 ? firstLine(version.output) : undefined,
-    detail: 'Connects to the iPhone over USB.',
-  }];
+  return [
+    {
+      id: 'usbmuxd',
+      group: 'service',
+      label: 'usbmuxd',
+      ok: true,
+      version: version.code === 0 ? firstLine(version.output) : undefined,
+      detail: 'Connects to the iPhone over USB.',
+    },
+  ];
 }
 
 function libraryRequirements(ctx: SetupContext, installed: boolean): ToolSetupRequirement[] {
@@ -162,7 +224,11 @@ function isDebianLike(osRelease: string | null): boolean {
   return /\b(debian|ubuntu)\b/.test(`${field('ID')} ${field('ID_LIKE')}`);
 }
 
-function installPlan(ctx: SetupContext, missing: ToolSetupRequirement[], havePkexec: boolean): ToolSetupInstallPlan | null {
+function installPlan(
+  ctx: SetupContext,
+  missing: ToolSetupRequirement[],
+  havePkexec: boolean
+): ToolSetupInstallPlan | null {
   if (missing.length === 0) return null;
   if (ctx.platform === 'darwin') {
     if (missing.some((r) => r.id === 'clt')) {
@@ -189,7 +255,7 @@ function installPlan(ctx: SetupContext, missing: ToolSetupRequirement[], havePke
       packages: APT_PACKAGES,
       command,
       automatic: false,
-      note: "Automatic install supports Debian and Ubuntu. On this distribution, install the equivalent packages with its package manager, then choose Check Again.",
+      note: 'Automatic install supports Debian and Ubuntu. On this distribution, install the equivalent packages with its package manager, then choose Check Again.',
     };
   }
   return {
@@ -219,7 +285,8 @@ export async function checkRequirements(ctx: SetupContext): Promise<ToolSetupSta
   const system = [...(await systemRequirements(ctx, env)), ...(await serviceRequirements(ctx, env))];
   const installed = manifestMatchesPins(readManifest(ctx.prefix), ctx.components);
   const missing = system.filter((r) => !r.ok);
-  const havePkexec = ctx.platform === 'linux' && (await ctx.run('/bin/sh', ['-c', 'command -v pkexec'], { env })).code === 0;
+  const havePkexec =
+    ctx.platform === 'linux' && (await ctx.run('/bin/sh', ['-c', 'command -v pkexec'], { env })).code === 0;
   return {
     supported: true,
     requirements: [...system, ...libraryRequirements(ctx, installed)],

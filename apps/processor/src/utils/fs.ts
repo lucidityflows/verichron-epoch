@@ -1,5 +1,5 @@
-import * as fsp from "node:fs/promises";
-import * as path from "node:path";
+import * as fsp from 'node:fs/promises';
+import * as path from 'node:path';
 
 export async function pathExists(p: string): Promise<boolean> {
   try {
@@ -35,7 +35,7 @@ export async function writeFileAtomic(p: string, data: string): Promise<void> {
   await fsp.mkdir(path.dirname(p), { recursive: true });
   const tmp = path.join(path.dirname(p), `.${path.basename(p)}.${process.pid}.${Date.now()}.tmp`);
   try {
-    const handle = await fsp.open(tmp, "w");
+    const handle = await fsp.open(tmp, 'w');
     try {
       await handle.writeFile(data);
       await handle.sync();

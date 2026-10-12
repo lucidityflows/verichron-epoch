@@ -1,20 +1,20 @@
-import { parseArgs } from "node:util";
-import * as path from "node:path";
-import * as os from "node:os";
-import { fileURLToPath } from "node:url";
+import { parseArgs } from 'node:util';
+import * as path from 'node:path';
+import * as os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 // src/utils/ and dist/utils/ are both four levels below the repository root.
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 /**
  * mvt-ios from its own pinned environment, tools/mvt (EPOCH-458). It is never
  * looked up anywhere else, so every machine runs the same mvt version.
  */
-export const DEFAULT_MVT_BIN = path.join(REPO_ROOT, "tools", "mvt", ".venv", "bin", "mvt-ios");
+export const DEFAULT_MVT_BIN = path.join(REPO_ROOT, 'tools', 'mvt', '.venv', 'bin', 'mvt-ios');
 
 /** iLEAPP: the submodule, and the interpreter of its own pinned environment, tools/ileapp. */
-export const DEFAULT_ILEAPP_DIR = path.join(REPO_ROOT, "tools", "ileapp", "iLEAPP");
-export const DEFAULT_ILEAPP_PYTHON = path.join(REPO_ROOT, "tools", "ileapp", ".venv", "bin", "python");
+export const DEFAULT_ILEAPP_DIR = path.join(REPO_ROOT, 'tools', 'ileapp', 'iLEAPP');
+export const DEFAULT_ILEAPP_PYTHON = path.join(REPO_ROOT, 'tools', 'ileapp', '.venv', 'bin', 'python');
 
 export interface Config {
   source: string;
@@ -39,27 +39,27 @@ export function parseFlags(): Config {
   const home = os.homedir();
 
   const rawArgs = process.argv.slice(2);
-  const args = rawArgs[0] === "--" ? rawArgs.slice(1) : rawArgs;
+  const args = rawArgs[0] === '--' ? rawArgs.slice(1) : rawArgs;
 
   const { values } = parseArgs({
     args,
     options: {
-      source: { type: "string", default: "" },
-      workspace: { type: "string", default: path.join(home, "verichron-workspace") },
-      "mvt-bin": { type: "string", default: DEFAULT_MVT_BIN },
-      "mvt-home": { type: "string", default: defaultMvtHome() },
-      "sqlite-bin": { type: "string", default: "sqlite3" },
-      "ileapp-dir": { type: "string", default: DEFAULT_ILEAPP_DIR },
-      "ileapp-python": { type: "string", default: DEFAULT_ILEAPP_PYTHON },
-      "ileapp-timeout": { type: "string", default: "30m" },
-      force: { type: "boolean", default: false },
-      "force-decrypt": { type: "boolean", default: false },
-      verify: { type: "boolean", default: false },
-      "refresh-iocs": { type: "boolean", default: false },
-      "ioc-max-age": { type: "string", default: "168h" },
-      only: { type: "string", default: "" },
-      "different-passwords": { type: "boolean", default: false },
-      help: { type: "boolean", default: false },
+      source: { type: 'string', default: '' },
+      workspace: { type: 'string', default: path.join(home, 'verichron-workspace') },
+      'mvt-bin': { type: 'string', default: DEFAULT_MVT_BIN },
+      'mvt-home': { type: 'string', default: defaultMvtHome() },
+      'sqlite-bin': { type: 'string', default: 'sqlite3' },
+      'ileapp-dir': { type: 'string', default: DEFAULT_ILEAPP_DIR },
+      'ileapp-python': { type: 'string', default: DEFAULT_ILEAPP_PYTHON },
+      'ileapp-timeout': { type: 'string', default: '30m' },
+      force: { type: 'boolean', default: false },
+      'force-decrypt': { type: 'boolean', default: false },
+      verify: { type: 'boolean', default: false },
+      'refresh-iocs': { type: 'boolean', default: false },
+      'ioc-max-age': { type: 'string', default: '168h' },
+      only: { type: 'string', default: '' },
+      'different-passwords': { type: 'boolean', default: false },
+      help: { type: 'boolean', default: false },
     },
   });
 
@@ -69,30 +69,30 @@ export function parseFlags(): Config {
   }
 
   if (!values.source) {
-    console.error("error: --source is required");
+    console.error('error: --source is required');
     printUsage();
     process.exit(2);
   }
 
-  const iocMaxAgeMs = durationFlag("ioc-max-age", values["ioc-max-age"] as string);
-  const ileappTimeoutMs = durationFlag("ileapp-timeout", values["ileapp-timeout"] as string);
+  const iocMaxAgeMs = durationFlag('ioc-max-age', values['ioc-max-age'] as string);
+  const ileappTimeoutMs = durationFlag('ileapp-timeout', values['ileapp-timeout'] as string);
 
   return {
     source: values.source as string,
     workspace: values.workspace as string,
-    mvtBin: values["mvt-bin"] as string,
-    mvtHome: path.resolve(values["mvt-home"] as string),
-    sqliteBin: values["sqlite-bin"] as string,
-    ileappDir: path.resolve(values["ileapp-dir"] as string),
-    ileappPython: values["ileapp-python"] as string,
+    mvtBin: values['mvt-bin'] as string,
+    mvtHome: path.resolve(values['mvt-home'] as string),
+    sqliteBin: values['sqlite-bin'] as string,
+    ileappDir: path.resolve(values['ileapp-dir'] as string),
+    ileappPython: values['ileapp-python'] as string,
     ileappTimeoutMs,
     force: values.force as boolean,
-    forceDecrypt: values["force-decrypt"] as boolean,
+    forceDecrypt: values['force-decrypt'] as boolean,
     verify: values.verify as boolean,
-    refreshIOCs: values["refresh-iocs"] as boolean,
+    refreshIOCs: values['refresh-iocs'] as boolean,
     iocMaxAgeMs,
     only: values.only as string,
-    samePass: !(values["different-passwords"] as boolean),
+    samePass: !(values['different-passwords'] as boolean),
   };
 }
 
@@ -103,8 +103,8 @@ export function parseFlags(): Config {
  */
 function defaultMvtHome(): string {
   if (process.env.VERICHRON_MVT_HOME) return process.env.VERICHRON_MVT_HOME;
-  const dataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share");
-  return path.join(dataHome, "verichron", "mvt");
+  const dataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share');
+  return path.join(dataHome, 'verichron', 'mvt');
 }
 
 function printUsage() {

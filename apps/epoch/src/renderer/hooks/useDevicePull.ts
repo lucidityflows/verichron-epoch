@@ -21,7 +21,7 @@ function ipcErrorMessage(err: unknown): string {
 }
 
 export type Phase = 'checking' | 'unavailable' | 'available' | 'acquiring' | 'pulling' | 'pulled';
- 
+
 export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   const [sources, setSources] = useState<Array<{ id: string; label: string }>>([]);
   const [sourceId, setSourceId] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   const [setupOutput, setSetupOutput] = useState<string[]>([]);
   const [setupFailure, setSetupFailure] = useState<ToolSetupFailure | null>(null);
   const [setupNote, setSetupNote] = useState<string | null>(null);
- 
+
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<DeviceInfo | null>(null);
   const [destDir, setDestDir] = useState<string | null>(null);
@@ -66,14 +66,14 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   useEffect(() => {
     destDirRef.current = destDir;
   }, [destDir]);
- 
+
   useEffect(() => {
     window.epoch.listDeviceBackupSources().then((found) => {
       setSources(found);
       if (found.length > 0) setSourceId(found[0].id);
     });
   }, []);
- 
+
   /**
    * Shows a pull the main process is already running (EPOCH-467): the panel
    * remounted, e.g. after the user left New Investigation, and lost its own
@@ -98,53 +98,56 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     }
   }, []);
 
-  const checkTool = useCallback(async (id: string) => {
-    setPhase('checking');
-    setAcquisitionStep(null);
-    setAcquisitionError(null);
-    setDevices([]);
-    setSelectedDevice(null);
-    setActions([]);
-
-    try {
-      const status = await window.epoch.checkDeviceBackupToolAvailable(id);
-      setToolStatus(status);
-      if (status.available) {
-        // A pull already running owns the device: show it, and don't query the device.
-        const running = await devicesApi.getDevicePullState();
-        if (running && running.sourceId === id) {
-          setDevices([running.device]);
-          restorePull(running);
-          return;
-        }
-        setPhase('available');
-        const found = await window.epoch.listConnectedDevices(id);
-        setDevices(found);
-      } else {
-        const guided = await devicesApi.getToolSetupStatus(id);
-        setSetupStatus(guided);
-        if (!guided) setActions(await window.epoch.getToolAcquisitionActions(id));
-        setPhase('unavailable');
-      }
-    } catch (error: unknown) {
-      setPhase('unavailable');
+  const checkTool = useCallback(
+    async (id: string) => {
+      setPhase('checking');
       setAcquisitionStep(null);
-      setAcquisitionError(error instanceof Error ? error.message : 'Failed to communicate with the device service.');
-    }
-  }, [restorePull]);
- 
+      setAcquisitionError(null);
+      setDevices([]);
+      setSelectedDevice(null);
+      setActions([]);
+
+      try {
+        const status = await window.epoch.checkDeviceBackupToolAvailable(id);
+        setToolStatus(status);
+        if (status.available) {
+          // A pull already running owns the device: show it, and don't query the device.
+          const running = await devicesApi.getDevicePullState();
+          if (running && running.sourceId === id) {
+            setDevices([running.device]);
+            restorePull(running);
+            return;
+          }
+          setPhase('available');
+          const found = await window.epoch.listConnectedDevices(id);
+          setDevices(found);
+        } else {
+          const guided = await devicesApi.getToolSetupStatus(id);
+          setSetupStatus(guided);
+          if (!guided) setActions(await window.epoch.getToolAcquisitionActions(id));
+          setPhase('unavailable');
+        }
+      } catch (error: unknown) {
+        setPhase('unavailable');
+        setAcquisitionStep(null);
+        setAcquisitionError(error instanceof Error ? error.message : 'Failed to communicate with the device service.');
+      }
+    },
+    [restorePull]
+  );
+
   useEffect(() => {
     if (sourceId) checkTool(sourceId);
   }, [sourceId, checkTool]);
- 
+
   const checkAvailability = useCallback(() => {
     if (sourceId) checkTool(sourceId);
   }, [sourceId, checkTool]);
- 
+
   useEffect(() => {
     let outputBuffer: string[] = [];
     let outputRafId: number | null = null;
- 
+
     const flushOutputBuffer = () => {
       if (outputBuffer.length > 0) {
         const batch = [...outputBuffer];
@@ -156,7 +159,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       }
       outputRafId = null;
     };
- 
+
     const unsubStep = window.epoch.onToolAcquisitionStepStarted((label) => {
       setAcquisitionStep(label);
       outputBuffer.push(`\n--- ${label} ---`);
@@ -203,7 +206,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
         setPhase('available');
       }
     });
- 
+
     const unsubStats = devicesApi.onDeviceBackupStats(setPullStats);
 
     const unsubSetup = devicesApi.onToolSetupEvent((event) => {
@@ -233,16 +236,19 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       unsubStats();
     };
   }, [sourceId, checkTool]);
- 
+
   const runCompileFromSource = async (action: Extract<ToolAcquisitionAction, { kind: 'compile-from-source' }>) => {
     setPhase('acquiring');
     setAcquisitionOutput([]);
     setAcquisitionError(null);
     setAcquisitionStep('Preparing build...');
-    
+
     try {
-      const prefixArg = action.steps.find((s: ToolAcquisitionCommand) => s.args.some((a: string) => a.startsWith('--prefix=')));
-      const installPrefix = prefixArg?.args.find((a: string) => a.startsWith('--prefix='))?.slice('--prefix='.length) ?? '';
+      const prefixArg = action.steps.find((s: ToolAcquisitionCommand) =>
+        s.args.some((a: string) => a.startsWith('--prefix='))
+      );
+      const installPrefix =
+        prefixArg?.args.find((a: string) => a.startsWith('--prefix='))?.slice('--prefix='.length) ?? '';
       await devicesApi.runToolAcquisitionSteps(action.steps, installPrefix);
     } catch (error: unknown) {
       setPhase('unavailable');
@@ -250,7 +256,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       setAcquisitionError(error instanceof Error ? error.message : 'IPC rejection during tool acquisition.');
     }
   };
- 
+
   /** Runs a guided setup step (install system tools, or build the
    * libraries), then re-checks everything so the checklist reflects the
    * machine as it is now. */
@@ -288,7 +294,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     setDestDir(dir);
     return true;
   };
- 
+
   const refreshIncomplete = useCallback(async () => {
     if (!sourceId || !selectedDevice) {
       setIncomplete([]);
@@ -382,7 +388,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   };
 
   const cancelEncryptionConsent = () => setEncryptionConsent(false);
- 
+
   return {
     sources,
     sourceId,
@@ -421,4 +427,3 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     checkAvailability,
   };
 }
- 
