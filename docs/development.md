@@ -28,6 +28,7 @@ Each version is declared once, in the file the enforcing tool reads:
 | Electron | 44.7.0 | `apps/epoch/package.json` |
 | mvt | 2026.10.5 | `tools/mvt/pyproject.toml` |
 | iLEAPP | v2026.3.1 (submodule) | `.gitmodules` pin; its dependencies in `tools/ileapp/pyproject.toml` |
+| Prettier | 3.9.6 | `devDependencies` in `package.json` |
 
 Dependabot proposes updates to the npm and uv dependencies, the CI actions and
 the iLEAPP submodule. `mise.toml` and `.python-version` are updated by hand.
@@ -130,7 +131,7 @@ External tools are tested through stub executables and servers (a stub
 | Workflow | Runs |
 |---|---|
 | `.github/workflows/python-tests.yml` | Migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, the index-usage check for evidence reads, and a check that the tool lockfiles match their manifests |
-| `.github/workflows/ts-tests.yml` | Typecheck and tests for the processor, the reader and the orchestrator, with real PostgreSQL |
+| `.github/workflows/ts-tests.yml` | The formatting check, then typecheck and tests for the processor, the reader and the orchestrator, with real PostgreSQL |
 
 Both workflows install the toolchain from `mise.toml` and Python from
 `.python-version`, the same files a development machine uses. All Actions are
@@ -149,5 +150,11 @@ tested in CI yet (EPOCH-454).
   `migrate.py`. Never edit a merged migration; add a new one.
 - **Contracts:** add a `source_type` to `normalized-record.schema.json` first,
   then run `pnpm sync:contracts`.
+- **Formatting:** Prettier formats the TypeScript (`.ts`, `.tsx`, `.mts`) with
+  the settings in `.prettierrc.json`. Run `pnpm format` before committing; CI
+  runs `pnpm format:check`. Markdown, YAML and JSON aren't formatted. The
+  one-time reformat is listed in `.git-blame-ignore-revs`; run
+  `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so `git blame`
+  skips it (GitHub's blame view does this already).
 - **Fail fast:** no fallbacks, backfills or legacy-compatibility paths for
   development data.

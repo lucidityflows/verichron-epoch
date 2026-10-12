@@ -114,12 +114,11 @@ def render_python_enum(values: list[str]) -> str:
 
 
 def render_ts_enum(values: list[str]) -> str:
-    """The whole `as const` object, values aligned past the longest key."""
-    width = max(len(value) for value in values) + 1  # +1 for the colon
+    """The whole `as const` object, in the layout Prettier gives it (EPOCH-469)."""
     lines = [f"// {_GENERATED_NOTE}", "export const SourceType = {"]
     for value in values:
-        lines.append(f"  {value.upper() + ':':<{width}} '{value}',")
-    lines.append("} as const")
+        lines.append(f"  {value.upper()}: '{value}',")
+    lines.append("} as const;")
     return "\n".join(lines)
 
 
