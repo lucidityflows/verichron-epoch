@@ -32,6 +32,10 @@ signal the same thing (accent-color left-borders like `RunsView`'s
 status indicator are a different signal — state color, not elevation —
 and can coexist with a shadow tier).
 
+**Table rows:** a selected row has the accent bar (an inset accent shadow),
+an expanded row has `shadow-elevation-1`, and a row that is both has both
+(EPOCH-470). Selection is never hidden by expansion.
+
 **State-color banners (flag/danger/accent) are always `shadow-elevation-1`
 + the state-color border together, never border alone.** This was
 previously inconsistent — e.g. `DevicePullPanel.tsx` had two flag-toned
