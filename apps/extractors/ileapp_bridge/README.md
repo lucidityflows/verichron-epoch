@@ -10,10 +10,9 @@ backup at `<workspace>/ileapp/<label>/`, marked with `.ileapp_ok`, and the
 orchestrator registers it and passes its directory as `--derivative-path`.
 This stage reads that directory and nothing else.
 
-> **Runs end to end, with known issues.** `test_end_to_end.py` runs the real
-> iLEAPP from its pinned environment, `tools/ileapp` (VER-16), against a
-> synthetic backup, with the processor's arguments, and ingests the result. The
-> known issues below are ticketed and ordered under VER-24.
+> **Known issues** are ticketed and ordered under VER-24. Its tests use
+> recorded LAVA output (`test_integration.py`); CI doesn't run the real iLEAPP
+> (EPOCH-482).
 
 ## How it works
 
