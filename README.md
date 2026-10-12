@@ -31,10 +31,11 @@ Read [docs/architecture.md](docs/architecture.md) for the full picture.
 | [docs/rules.md](docs/rules.md) | The architecture rules (R1–R35) every change must respect |
 | [docs/decisions.md](docs/decisions.md) | Settled decisions and why they were made |
 | [docs/development.md](docs/development.md) | Setting up, running the pipeline, testing, CI |
+| [docs/roadmap.md](docs/roadmap.md) | How the public roadmap is published from Linear, and what may appear on it |
 | [packages/contracts/EXTRACTOR_CONTRACT.md](packages/contracts/EXTRACTOR_CONTRACT.md) | What every pipeline stage must do |
 | [apps/epoch/DESIGN.md](apps/epoch/DESIGN.md) | The desktop app's visual design system |
 | [AGENTS.md](AGENTS.md) | How AI coding agents work in this repo |
-| [Roadmap](https://claude.ai/code/artifact/44e87cfa-27da-47cd-87ae-d6ef351b9ff6) (external) | A visual, living view of progress: dependency map, rule-by-rule status, open questions. The docs here win any disagreement |
+| [Roadmap](https://claude.ai/code/artifact/44e87cfa-27da-47cd-87ae-d6ef351b9ff6) (external) | The earlier visual view of progress, being replaced by the public roadmap (EPOCH-480). The docs here win any disagreement |
 
 Each package has a short README covering only what is specific to it.
 
