@@ -17,7 +17,7 @@ import * as path from 'node:path';
 import { manifestMatchesPins, readManifest } from './toolchain';
 import { enableBackupEncryption, PASSCODE_TIMEOUT_MS } from './encryption';
 import { failureMessage } from './deviceErrors';
-import { lastLines } from './toolchain/process';
+import { lastLines, StreamLines } from './toolchain/process';
 import { folderSize, OutputParser, receivedPercent, snapshotState, type OutputEvent } from './backupRun';
 import { appendPullRecord, type PullRecord } from './pullRecord';
 
@@ -431,7 +431,7 @@ function runBackup(
     control.setProcess(proc);
     onStats({ ...stats });
 
-    let output = '';
+    const output = new StreamLines(OUTPUT_TAIL_CHARS);
     let receiving = false;
     let stallWarned = false;
     let finished = false;
@@ -453,15 +453,12 @@ function runBackup(
         }
       }
     };
-    const keep = (text: string) => {
-      output = (output + text).slice(-OUTPUT_TAIL_CHARS);
-    };
     proc.stdout.on('data', (chunk: Buffer) => {
       const text = chunk.toString('utf-8');
-      keep(text);
+      output.take('stdout', text);
       handle(parser.push(text));
     });
-    proc.stderr.on('data', (chunk: Buffer) => keep(chunk.toString('utf-8')));
+    proc.stderr.on('data', (chunk: Buffer) => output.take('stderr', chunk.toString('utf-8')));
 
     // The folder's growth is the honest measure of progress: one large file
     // can take many minutes and prints nothing until it is done.
@@ -508,12 +505,18 @@ function runBackup(
     });
     proc.once('close', async (code: number | null) => {
       finish();
-      const received = await folderSize(backupDir, startedAt);
-      if (control.cancelled()) fail(`The backup of ${device.name} was cancelled.`);
-      else if (code === 0) resolve(received);
-      else {
-        const free = await freeSpace(destDir).catch(() => null);
-        fail(failureMessage(`The backup of ${device.name} failed.`, lastLines(output), code, { device: device.name, destDir, freeBytes: free }));
+      // Whatever happens here, the pull settles: an unsettled pull would hold
+      // the running guard and refuse every later pull.
+      try {
+        const received = await folderSize(backupDir, startedAt);
+        if (control.cancelled()) fail(`The backup of ${device.name} was cancelled.`);
+        else if (code === 0) resolve(received);
+        else {
+          const free = await freeSpace(destDir).catch(() => null);
+          fail(failureMessage(`The backup of ${device.name} failed.`, lastLines(output.output()), code, { device: device.name, destDir, freeBytes: free }));
+        }
+      } catch (err) {
+        fail(`The backup of ${device.name} ended, but its folder couldn't be read: ${err instanceof Error ? err.message : String(err)}`);
       }
     });
   });

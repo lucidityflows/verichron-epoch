@@ -12,6 +12,10 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import { failureMessage, failureReason } from './deviceErrors';
 import { enableBackupEncryption } from './encryption';
 import { appendPullRecord, PULL_RECORD_FILE, type PullRecord } from './pullRecord';
+import { lastLines, StreamLines } from './toolchain/process';
+
+/** A test value passed where the backup password goes; not a credential. */
+const FIXTURE = 'fixture-value';
 
 let tmp: string;
 
@@ -41,30 +45,38 @@ const CONFIRM_ON_DEVICE = 'Please confirm enabling the backup encryption by ente
 describe('enableBackupEncryption', () => {
   it('passes the password only through BACKUP_PASSWORD', async () => {
     const idevicebackup2 = fakeTool(`echo "${CONFIRM_ON_DEVICE}"\necho "Backup encryption has been enabled successfully."`);
-    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: 's3cret' });
+    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: FIXTURE });
     assert.deepEqual(result, {
       code: 0,
       timedOut: false,
       tail: [CONFIRM_ON_DEVICE, 'Backup encryption has been enabled successfully.'],
     });
     assert.equal(fs.readFileSync(path.join(tmp, 'args'), 'utf-8').trim(), '-u UDID-1 encryption on');
-    assert.equal(fs.readFileSync(path.join(tmp, 'password'), 'utf-8'), 's3cret');
+    assert.equal(fs.readFileSync(path.join(tmp, 'password'), 'utf-8'), FIXTURE);
   });
 
   it('stops waiting at the timeout and says so', async () => {
     const idevicebackup2 = fakeTool(`echo "${CONFIRM_ON_DEVICE}"\nexec sleep 30`);
     const started = Date.now();
-    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: 's3cret', timeoutMs: 300 });
+    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: FIXTURE, timeoutMs: 300 });
     assert.equal(result.timedOut, true);
     assert.notEqual(result.code, 0);
     assert.ok(Date.now() - started < 10_000);
+  });
+
+  it('ends the wait even when the tool ignores SIGTERM', async () => {
+    const idevicebackup2 = fakeTool(`trap '' TERM\nwhile true; do sleep 1; done`);
+    const started = Date.now();
+    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: FIXTURE, timeoutMs: 200, killGraceMs: 200 });
+    assert.equal(result.timedOut, true);
+    assert.ok(Date.now() - started < 5_000);
   });
 
   it("names the device's reason, not the generic last line", async () => {
     const idevicebackup2 = fakeTool(
       `echo "${CONFIRM_ON_DEVICE}"\necho "ErrorCode 211: Passcode entry was cancelled"\necho "Could not enable backup encryption."\nexit 1`
     );
-    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: 's3cret' });
+    const result = await enableBackupEncryption({ idevicebackup2, udid: 'UDID-1', password: FIXTURE });
     assert.equal(result.code, 1);
     assert.equal(failureReason(result.tail), 'ErrorCode 211: Passcode entry was cancelled');
   });
@@ -78,8 +90,24 @@ describe('enableBackupEncryption', () => {
   });
 
   it('reports a missing tool as code 127', async () => {
-    const result = await enableBackupEncryption({ idevicebackup2: path.join(tmp, 'missing'), udid: 'UDID-1', password: 's3cret' });
+    const result = await enableBackupEncryption({ idevicebackup2: path.join(tmp, 'missing'), udid: 'UDID-1', password: FIXTURE });
     assert.equal(result.code, 127);
+  });
+});
+
+describe('StreamLines', () => {
+  it("keeps a stdout line without a line break apart from stderr's next line", () => {
+    const lines = new StreamLines();
+    lines.take('stdout', 'Receiving files');
+    lines.take('stderr', 'ErrorCode 208: Device locked (MBErrorDomain/208)\n');
+    assert.deepEqual(lastLines(lines.output()), ['ErrorCode 208: Device locked (MBErrorDomain/208)', 'Receiving files']);
+    assert.equal(failureReason(lastLines(lines.output())), 'ErrorCode 208: Device locked (MBErrorDomain/208)');
+  });
+
+  it('ends a line at a progress-bar carriage return', () => {
+    const lines = new StreamLines();
+    lines.take('stdout', '[==   ]  40% Finished\rErrorCode 105: Insufficient free disk space\n');
+    assert.deepEqual(lastLines(lines.output()), ['[==   ]  40% Finished', 'ErrorCode 105: Insufficient free disk space']);
   });
 });
 
