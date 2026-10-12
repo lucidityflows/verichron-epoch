@@ -73,6 +73,8 @@ from a real device's output, with the date, model, iOS version and tool version.
 | The device judges the computer's free space itself and refuses when it decides there isn't enough | `ErrorCode 105: Insufficient free disk space on drive to back up (MBErrorDomain/105)`, with 90.3 GB free | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-11 |
 | An interrupted backup is not resumed. Run again without `--full` over the unfinished folder (`Status.plist`: `BackupState` empty, `SnapshotState` uploading), the tool chose incremental mode; the device read `Status.plist`, refused with ErrorCode 105 (19 GB free), and sent no files. The folder was unchanged (92,158,497,093 bytes before and after) | `Incremental backup mode.` … `Sending '<device>/Status.plist' (192 Bytes)` … `ErrorCode 105` … `Received 0 files from device.` | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-12 |
 | The tool's overall percentage doesn't follow the data received | Shown in the app as 35–50% when 86 of about 96 GB had arrived | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-11 |
+| A full pull into a new folder finished and passed the completion check, in 3 h 14 min, receiving 77,217,764,077 bytes against an estimate of about 96 GB | `Status.plist`: `SnapshotState` finished; `Manifest.db` present; `Manifest.plist`: `IsEncrypted` true | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-12 |
+| `IsFullBackup` in `Status.plist` is false after a full backup, so it isn't a measure of completeness. The tool was run with `--full` (it sends `ForceFullBackup`) into a folder that didn't exist; idevicebackup2 never writes the key, so the device sets it. Published Finder and iTunes backups also show false | `IsFullBackup` false, `BackupState` new, `Version` 3.3 | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-12 |
 
 ## Components
 
