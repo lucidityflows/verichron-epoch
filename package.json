@@ -11,8 +11,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,mts}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,mts}\"",
     "gen:fake-iocs": "python3 scripts/generate_fake_iocs.py",
-    "gen:fake-stix": "pnpm gen:fake-iocs && cd scripts/fixtures/fake_iocs && python3 ../../generate_stix.py",
-    "gen:synthetic-backup": "python3 scripts/synthetic_backup_generator.py"
+    "gen:fake-stix": "pnpm gen:fake-iocs && cd scripts/fixtures/fake_iocs && python3 ../../generate_stix.py"
   },
   "devDependencies": {
     "dotenv": "^18.0.3",

@@ -3,7 +3,7 @@
 Each test writes a small report the way iLEAPP's `scripts/lavafuncs.py` does:
 `_lava_artifacts.db` with one table per artifact (sanitized column names,
 `datetime` columns as INTEGER Unix seconds) and the `_lava_data.lava`
-manifest describing them. Real iLEAPP output is covered by test_end_to_end.py.
+manifest describing them.
 """
 
 from __future__ import annotations
