@@ -54,7 +54,7 @@ before(() => {
 
   // version                          -> "Version: $STUB_MVT_VERSION" (default 9.9.0)
   // download-iocs                    -> $MVT_DATA_FOLDER/indicators/feed.stix2
-  // decrypt-backup -p PW -d DEST SRC  -> DEST/from-<version>.txt
+  // decrypt-backup -d DEST SRC      -> DEST/from-<version>.txt (the password arrives in MVT_IOS_BACKUP_PASSWORD)
   // check-backup --output OUT DIR     -> OUT/, plus OUT/mvt-env recording the IOC folder it was given
   // STUB_DECRYPT=fail: write part of the decrypt, then fail (not a password error).
   // STUB_DECRYPT=mutate: decrypt, then change the source, as if it changed mid-decrypt.
@@ -68,11 +68,11 @@ case "$1" in
   version) printf '\n\tMVT - Mobile Verification Toolkit\n\thttps://mvt.re\n\tVersion: %s\n' "\${STUB_MVT_VERSION:-9.9.0}" ;;
   download-iocs) mkdir -p "$MVT_DATA_FOLDER/indicators" && echo ioc-v1 > "$MVT_DATA_FOLDER/indicators/feed.stix2" ;;
   decrypt-backup)
-    mkdir -p "$5" && touch "$5/from-$(cat "$6/version.txt").txt" "$5/Manifest.db"
+    mkdir -p "$3" && touch "$3/from-$(cat "$4/version.txt").txt" "$3/Manifest.db"
     if [ "$STUB_DECRYPT" = fail ]; then echo "disk error mid-decrypt" >&2; exit 2; fi
-    if [ "$STUB_DECRYPT" = mutate ]; then echo "mutated" > "$6/version.txt"; fi
+    if [ "$STUB_DECRYPT" = mutate ]; then echo "mutated" > "$4/version.txt"; fi
     if [ "$STUB_DECRYPT" = refresh ]; then echo late > "$STUB_SHARED_IOCS/late.stix2"; fi
-    if [ "$STUB_DECRYPT" = unplug ] && [ "$(basename "$6")" = BK1 ]; then rm -rf "$6"; fi ;;
+    if [ "$STUB_DECRYPT" = unplug ] && [ "$(basename "$4")" = BK1 ]; then rm -rf "$4"; fi ;;
   check-backup) mkdir -p "$3" && echo "$MVT_DATA_FOLDER|\${MVT_STIX2:-}" > "$3/mvt-env" && ls "$MVT_DATA_FOLDER/indicators" > "$3/iocs-seen" ;;
 esac
 exit 0

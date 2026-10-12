@@ -95,4 +95,4 @@ Known violations are ticketed and fixed, never waived.
 |---|---|---|
 | R28 | `resolve_database_url()` falls back to a hard-coded dev credential | EPOCH-424 |
 | R29 | Extractors check their own environment (`fatal_if_missing_venv()`), and the orchestrator falls back to `python3` on PATH when `.venv` is missing | EPOCH-456 |
-| R30 | The backup password and the database URL are passed on the command line | EPOCH-423 |
+| R30 | The database URL is passed on the command line (the orchestrator to the report generator, `--db-url`). The backup password reaches mvt-ios only in `MVT_IOS_BACKUP_PASSWORD` since EPOCH-486 | EPOCH-423 |

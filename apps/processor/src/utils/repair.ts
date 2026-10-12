@@ -1,6 +1,7 @@
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
+import { pipeline } from 'node:stream';
 import { walkFiles, pathExists } from './fs.js';
 import type { RepairProvenance } from '@verichron/contracts';
 import { sqliteVersion } from './resolver.js';
@@ -110,40 +111,91 @@ function sqliteQuickCheck(sqliteBin: string, dbPath: string): Promise<boolean> {
   });
 }
 
-function runProcess(
-  bin: string,
-  args: string[],
-  input?: string
-): Promise<{ stdout: string; stderr: string; code: number | null }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { stdio: [input !== undefined ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
-    let stdout = '';
-    let stderr = '';
-    child.stdout!.on('data', (d) => (stdout += d.toString()));
-    child.stderr!.on('data', (d) => (stderr += d.toString()));
-    child.on('error', reject);
-    child.on('close', (code) => resolve({ stdout, stderr, code }));
-    if (input !== undefined) {
-      child.stdin!.write(input);
-      child.stdin!.end();
+/** Most distinct warning messages a summary names; the line count is always complete. */
+const MAX_WARNING_KINDS = 20;
+/** How much of `.recover`'s own stderr is kept for an error message. */
+const MAX_RECOVER_STDERR = 64 * 1024;
+
+/** Counts sqlite3's warning lines as they arrive, by message, without keeping the stream. */
+class WarningCounter {
+  private carry = '';
+  private lines = 0;
+  private readonly counts = new Map<string, number>();
+
+  push(chunk: Buffer): void {
+    const parts = (this.carry + chunk.toString('utf8')).split('\n');
+    this.carry = parts.pop() ?? '';
+    parts.forEach((line) => this.add(line));
+  }
+
+  summary(): string {
+    this.add(this.carry);
+    this.carry = '';
+    if (this.lines === 0) return '';
+    const parts = [...this.counts.entries()].map(([msg, n]) => (n > 1 ? `${msg} (x${n})` : msg));
+    return `${this.lines} warning line(s) applying recovered SQL:${parts.join('; ')}`;
+  }
+
+  private add(raw: string): void {
+    const line = raw.trim();
+    if (!line) return;
+    this.lines++;
+    const msg = line.replace(/^Parse error near line \d+:\s*/, '');
+    if (this.counts.has(msg) || this.counts.size < MAX_WARNING_KINDS) {
+      this.counts.set(msg, (this.counts.get(msg) ?? 0) + 1);
     }
-  });
+  }
 }
 
-function summarizeSqliteWarnings(stderr: string): string {
-  const lines = stderr
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (lines.length === 0) return '';
+/**
+ * Pipes `sqlite3 <db> .recover` straight into a second sqlite3 that builds
+ * `repairedPath` (EPOCH-486). The recovered SQL is never held in memory: for
+ * a large database it can be longer than the longest string V8 allows, which
+ * would end the processor. Either process failing, or the pipe between them
+ * breaking, stops both and rejects.
+ */
+function recoverInto(
+  sqliteBin: string,
+  dbPath: string,
+  repairedPath: string
+): Promise<{ producedSql: boolean; recoverStderr: string; applyWarnings: string }> {
+  return new Promise((resolve, reject) => {
+    const recover = spawn(sqliteBin, [dbPath, '.recover'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const apply = spawn(sqliteBin, [repairedPath], { stdio: ['pipe', 'ignore', 'pipe'] });
+    const warnings = new WarningCounter();
+    let recoverStderr = '';
+    let producedSql = false;
+    let settled = false;
+    let pending = 3; // the pipe, and both processes
+    const fail = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      recover.kill('SIGKILL');
+      apply.kill('SIGKILL');
+      reject(err);
+    };
+    const doneOne = () => {
+      if (--pending === 0 && !settled) {
+        settled = true;
+        resolve({ producedSql, recoverStderr, applyWarnings: warnings.summary() });
+      }
+    };
 
-  const counts = new Map<string, number>();
-  for (const line of lines) {
-    const msg = line.replace(/^Parse error near line \d+:\s*/, '');
-    counts.set(msg, (counts.get(msg) ?? 0) + 1);
-  }
-  const parts = [...counts.entries()].map(([msg, n]) => (n > 1 ? `${msg} (x${n})` : msg));
-  return `${lines.length} warning line(s) applying recovered SQL:${parts.join('; ')}`;
+    recover.stdout.on('data', (chunk: Buffer) => {
+      if (!producedSql && chunk.toString('utf8').trim() !== '') producedSql = true;
+    });
+    recover.stderr.on('data', (chunk: Buffer) => {
+      if (recoverStderr.length < MAX_RECOVER_STDERR) recoverStderr += chunk.toString('utf8');
+    });
+    apply.stderr.on('data', (chunk: Buffer) => warnings.push(chunk));
+    pipeline(recover.stdout, apply.stdin, (err) =>
+      err ? fail(new Error(`the recovered SQL could not be passed to sqlite3: ${err.message}`)) : doneOne()
+    );
+    recover.on('error', (err) => fail(err));
+    apply.on('error', (err) => fail(err));
+    recover.on('close', doneOne);
+    apply.on('close', doneOne);
+  });
 }
 
 async function sqliteRecoverInPlace(
@@ -151,22 +203,24 @@ async function sqliteRecoverInPlace(
   dbPath: string,
   onPreserved: (preservedPath: string) => void
 ): Promise<{ applyWarnings: string }> {
-  const recoverResult = await runProcess(sqliteBin, [dbPath, '.recover']);
-  if (recoverResult.stdout.trim() === '') {
-    throw new Error(
-      `sqlite3 .recover produced no output` + (recoverResult.stderr.trim() ? `: ${recoverResult.stderr.trim()}` : '')
-    );
-  }
-
   const repairedPath = `${dbPath}.repaired-${process.pid}-${Date.now()}`;
   await fsp.rm(repairedPath, { force: true });
-  const applyResult = await runProcess(sqliteBin, [repairedPath], recoverResult.stdout);
+  let recovered: Awaited<ReturnType<typeof recoverInto>>;
+  try {
+    recovered = await recoverInto(sqliteBin, dbPath, repairedPath);
+  } catch (err) {
+    await fsp.rm(repairedPath, { force: true });
+    throw err;
+  }
+  const { producedSql, recoverStderr, applyWarnings } = recovered;
+
+  if (!producedSql) {
+    await fsp.rm(repairedPath, { force: true });
+    throw new Error(`sqlite3 .recover produced no output` + (recoverStderr.trim() ? `: ${recoverStderr.trim()}` : ''));
+  }
 
   if (!(await pathExists(repairedPath))) {
-    await fsp.rm(repairedPath, { force: true });
-    throw new Error(
-      `sqlite3 did not produce a repaired file` + (applyResult.stderr.trim() ? `: ${applyResult.stderr.trim()}` : '')
-    );
+    throw new Error(`sqlite3 did not produce a repaired file` + (applyWarnings ? `: ${applyWarnings}` : ''));
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -179,5 +233,5 @@ async function sqliteRecoverInPlace(
   await fsp.rm(`${dbPath}-wal`, { force: true });
   await fsp.rm(`${dbPath}-shm`, { force: true });
 
-  return { applyWarnings: summarizeSqliteWarnings(applyResult.stderr) };
+  return { applyWarnings };
 }
