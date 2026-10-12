@@ -36,8 +36,8 @@ interface BackupProgressCardProps {
 }
 
 /**
- * A running backup (EPOCH-466): the tool's overall percentage, the data
- * received, when data last arrived, and the elapsed time, with Cancel.
+ * A running backup (EPOCH-466): the data received as a share of the size
+ * estimate, when data last arrived, and the elapsed time, with Cancel.
  */
 export function BackupProgressCard({ stats, cancelling, onCancel }: BackupProgressCardProps) {
   const now = useNow(true);
@@ -58,7 +58,7 @@ export function BackupProgressCard({ stats, cancelling, onCancel }: BackupProgre
       <div className="flex items-center gap-3">
         <HardDriveDownload size="1.125rem" className="text-accent shrink-0" />
         <h3 className="font-display text-heading text-foreground flex-1">
-          Backing Up{percent !== null ? ` · ${percent}%` : '…'}
+          Backing Up{percent !== null ? ` · about ${percent}%` : '…'}
         </h3>
         <Button variant="outline" tone="danger" size="sm" onClick={onCancel} loading={cancelling} loadingText="Cancelling…">
           <XCircle size="0.875rem" /> Cancel Backup

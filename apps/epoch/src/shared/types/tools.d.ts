@@ -63,7 +63,7 @@ export interface BackupStats {
   receivedBytes: number;
   /** When the folder last grew; null before any data arrived. */
   lastDataAt: number | null;
-  /** The tool's overall percentage; null until it reports one. */
+  /** Received bytes as a percentage of the estimate, at most 99 until the backup finishes; null without an estimate. */
   percent: number | null;
   /** The device's used storage, a rough size for the backup; null when unknown. */
   estimatedBytes: number | null;
