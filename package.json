@@ -8,12 +8,15 @@
     "build:contracts": "pnpm --filter @verichron/contracts build",
     "sync:contracts": "python3 scripts/sync_contracts.py --write",
     "check:contracts": "python3 scripts/sync_contracts.py --check",
+    "format": "prettier --write \"**/*.{ts,tsx,mts}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,mts}\"",
     "gen:fake-iocs": "python3 scripts/generate_fake_iocs.py",
     "gen:fake-stix": "pnpm gen:fake-iocs && cd scripts/fixtures/fake_iocs && python3 ../../generate_stix.py",
     "gen:synthetic-backup": "python3 scripts/synthetic_backup_generator.py"
   },
   "devDependencies": {
     "dotenv": "^18.0.3",
+    "prettier": "3.9.6",
     "typescript": "^6.0.3",
     "zod": "^4.5.2"
   },

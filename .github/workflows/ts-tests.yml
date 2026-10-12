@@ -47,7 +47,12 @@ jobs:
           version: 2026.10.4
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter "@verichron/processor..." --filter "@verichron/etl-db-writer..." --filter "@verichron/etl-db-reader..." --filter "@verichron/orchestrator..."
+        run: pnpm install --frozen-lockfile --filter verichron-epoch --filter "@verichron/processor..." --filter "@verichron/etl-db-writer..." --filter "@verichron/etl-db-reader..." --filter "@verichron/orchestrator..."
+
+      # EPOCH-469: every TypeScript file in the repo, the desktop app included,
+      # in the layout .prettierrc.json gives it.
+      - name: Check formatting
+        run: pnpm format:check
 
       # The processor resolves @verichron/contracts through its built dist/.
       - name: Build contracts
