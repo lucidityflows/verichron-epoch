@@ -3,13 +3,17 @@
 :root {
   /* current dark values -- this is the DEFAULT, not a "dark" override.
      See DESIGN.md §3 -- do not restructure this when light theme lands. */
-  --background: 217 17% 9%;
+  /* Surface tiers (DESIGN.md §9): inset wells < page < cards < raised panels. */
+  --inset: 217 17% 6%;
+  --background: 217 17% 8%;
   --surface: 217 17% 14%;
-  --surface-raised: 217 17% 19%;
+  --surface-raised: 217 17% 21%;
   --foreground: 47 5% 90%;
+  /* Colour roles (DESIGN.md §9); each is at least 4.5:1 on every surface tier. */
   --accent: 186 54% 54%;
+  --success: 152 48% 52%;
   --flag: 34 80% 60%;
-  --danger: 6 78% 62%;
+  --danger: 6 78% 68%;
   --border: 217 16% 23%;
   --muted-foreground: 220 16% 65%;
 
@@ -26,11 +30,13 @@
 }
 
 @theme {
+  --color-inset: hsl(var(--inset));
   --color-background: hsl(var(--background));
   --color-surface: hsl(var(--surface));
   --color-surface-raised: hsl(var(--surface-raised));
   --color-foreground: hsl(var(--foreground));
   --color-accent: hsl(var(--accent));
+  --color-success: hsl(var(--success));
   --color-flag: hsl(var(--flag));
   --color-danger: hsl(var(--danger));
   --color-border: hsl(var(--border));

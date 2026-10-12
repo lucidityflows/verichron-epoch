@@ -54,7 +54,7 @@ export function BackupProgressCard({ stats, cancelling, onCancel }: BackupProgre
   }
 
   return (
-    <section className="rounded-lg bg-surface/40 shadow-elevation-1 p-5 mt-5 flex flex-col gap-3">
+    <section className="rounded-lg bg-surface-raised shadow-elevation-1 p-5 mt-5 flex flex-col gap-3">
       <div className="flex items-center gap-3">
         <HardDriveDownload size="1.125rem" className="text-accent shrink-0" />
         <h3 className="font-display text-heading text-foreground flex-1">
@@ -72,7 +72,7 @@ export function BackupProgressCard({ stats, cancelling, onCancel }: BackupProgre
         </Button>
       </div>
       <div
-        className="h-2 rounded-full bg-background/90 overflow-hidden"
+        className="h-2 rounded-full bg-inset overflow-hidden"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}

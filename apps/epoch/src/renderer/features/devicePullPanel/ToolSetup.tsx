@@ -74,7 +74,7 @@ export function ToolSetup({
 
       <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(16rem, 1fr))' }}>
         {groups.map(({ group, items }) => (
-          <section key={group} className="rounded-lg bg-surface/40 shadow-elevation-1 p-4">
+          <section key={group} className="rounded-lg bg-surface-raised shadow-elevation-1 p-4">
             <h3 className="text-label uppercase tracking-wider text-muted-foreground mb-3">{GROUP_TITLES[group]}</h3>
             <ul className="flex flex-col gap-3">
               {items.map((req) => (
@@ -90,7 +90,7 @@ export function ToolSetup({
       {failure && !running && <FailureBanner failure={failure} />}
 
       {note && !running && (
-        <div className="flex items-start gap-3 text-data text-accent bg-accent/10 border border-accent/30 shadow-elevation-1 rounded-lg p-4">
+        <div className="flex items-start gap-3 text-data text-flag bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-lg p-4">
           <ShieldCheck size="1.125rem" className="shrink-0 mt-0.5" />
           <span>{note}</span>
         </div>
@@ -136,7 +136,7 @@ export function ToolSetup({
 function RequirementRow({ requirement }: { requirement: ToolSetupRequirement }) {
   const { ok, group, label, version, detail } = requirement;
   const Icon = ok ? CheckCircle2 : group === 'libraries' ? Circle : XCircle;
-  const tone = ok ? 'text-accent' : group === 'libraries' ? 'text-muted-foreground' : 'text-flag';
+  const tone = ok ? 'text-success' : group === 'libraries' ? 'text-muted-foreground' : 'text-flag';
   return (
     <li className="flex items-start gap-3">
       <Icon size="1rem" className={`${tone} shrink-0 mt-0.5`} aria-label={ok ? 'Installed' : 'Missing'} />
@@ -154,14 +154,14 @@ function RequirementRow({ requirement }: { requirement: ToolSetupRequirement }) 
 const STEP_ICONS: Record<ToolSetupStep['status'], React.ReactNode> = {
   pending: <Circle size="1rem" className="text-muted-foreground" />,
   running: <Loader className="text-accent" />,
-  done: <CheckCircle2 size="1rem" className="text-accent" />,
-  failed: <XCircle size="1rem" className="text-flag" />,
+  done: <CheckCircle2 size="1rem" className="text-success" />,
+  failed: <XCircle size="1rem" className="text-danger" />,
   skipped: <SkipForward size="1rem" className="text-muted-foreground" />,
 };
 
 function StepList({ steps }: { steps: ToolSetupStep[] }) {
   return (
-    <ol className="rounded-lg bg-surface/40 shadow-elevation-1 divide-y divide-border/40">
+    <ol className="rounded-lg bg-surface-raised shadow-elevation-1 divide-y divide-border/40">
       {steps.map((step) => (
         <li key={step.id} className="flex items-center gap-3 px-4 py-3">
           <span className="w-4 flex justify-center shrink-0">{STEP_ICONS[step.status]}</span>
@@ -177,7 +177,7 @@ function StepList({ steps }: { steps: ToolSetupStep[] }) {
 
 function FailureBanner({ failure }: { failure: ToolSetupFailure }) {
   return (
-    <div className="flex items-start gap-3 text-data text-flag bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-lg p-4">
+    <div className="flex items-start gap-3 text-data text-danger bg-danger/10 border border-danger/30 shadow-elevation-1 rounded-lg p-4">
       <AlertTriangle size="1.125rem" className="shrink-0 mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-3">
@@ -193,7 +193,7 @@ function FailureBanner({ failure }: { failure: ToolSetupFailure }) {
         </div>
         {failure.hint && <p className="text-foreground mt-1">{failure.hint}</p>}
         {failure.tail.length > 0 && (
-          <pre className="mt-3 bg-background/90 shadow-elevation-1 rounded-lg p-3 text-data font-mono text-foreground/80 whitespace-pre-wrap overflow-auto max-h-48">
+          <pre className="mt-3 bg-inset shadow-elevation-1 rounded-lg p-3 text-data font-mono text-foreground/80 whitespace-pre-wrap overflow-auto max-h-48">
             {failure.tail.join('\n')}
           </pre>
         )}
@@ -212,7 +212,7 @@ interface ActionCardProps {
 
 function ActionCard({ title, description, command, packages, children }: ActionCardProps) {
   return (
-    <section className="rounded-lg bg-surface/40 shadow-elevation-1 p-5 flex flex-col gap-3">
+    <section className="rounded-lg bg-surface-raised shadow-elevation-1 p-5 flex flex-col gap-3">
       <h3 className="font-display text-heading text-foreground">{title}</h3>
       {description && <p className="text-data text-muted-foreground">{description}</p>}
       {packages && packages.length > 0 && (
@@ -221,7 +221,7 @@ function ActionCard({ title, description, command, packages, children }: ActionC
         </p>
       )}
       {command && (
-        <div className="flex items-center justify-between gap-3 bg-background/90 shadow-elevation-1 rounded-lg px-4 py-3 font-mono text-data text-foreground/90">
+        <div className="flex items-center justify-between gap-3 bg-inset shadow-elevation-1 rounded-lg px-4 py-3 font-mono text-data text-foreground/90">
           <span className="truncate select-all">
             <span className="text-accent select-none mr-2">$</span>
             {command}

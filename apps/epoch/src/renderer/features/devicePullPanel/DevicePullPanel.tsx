@@ -21,6 +21,7 @@ import { useDevicePull } from '../../hooks/useDevicePull';
 import { PasswordField } from '../../components/ui/PasswordField';
 import { FieldError } from '../../components/ui/FieldError';
 import { ToolSetup } from './ToolSetup';
+import { PullSteps, type PullStep } from './PullSteps';
 import { CopyButton } from '../../components/ui/CopyButton';
 import { BackupProgressCard, DestinationBackupNotice, IncompleteBackupNotice } from './BackupProgressCard';
 import type { DeviceInfo } from '../../../shared/types/tools';
@@ -161,6 +162,24 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
   // there is nothing to ask a password for until another folder is chosen.
   const askPassword = !!selectedDevice && !!destDir && !destinationBackup && phase !== 'pulling' && phase !== 'pulled';
 
+  // The step rail (DESIGN.md §9): each step's state, in order.
+  const started = phase === 'pulling' || phase === 'pulled';
+  const pullSteps: PullStep[] = [
+    { label: 'Device', state: selectedDevice ? 'done' : 'current' },
+    {
+      label: 'Destination',
+      state: !selectedDevice ? 'pending' : destinationBackup ? 'blocked' : destDir ? 'done' : 'current',
+    },
+    {
+      label: 'Password',
+      state: started ? 'done' : !askPassword ? 'pending' : passwordProvided ? 'done' : 'current',
+    },
+    {
+      label: 'Pull',
+      state: phase === 'pulled' ? 'done' : started || (askPassword && passwordProvided) ? 'current' : 'pending',
+    },
+  ];
+
   if (!sourceId) return null;
 
   return (
@@ -235,11 +254,11 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           </div>
 
           {acquisitionError && (
-            <div className="bg-flag/10 border border-flag/30 shadow-elevation-1 p-4 rounded-xl text-data text-flag mb-5">
+            <div className="bg-danger/10 border border-danger/30 shadow-elevation-1 p-4 rounded-xl text-data text-danger mb-5">
               <div className="flex items-start gap-3">
                 <AlertTriangle size="1.125rem" className="shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-flag">Setup failed</p>
+                  <p className="text-danger">Setup failed</p>
                   <p className="text-foreground/90 mt-1 font-mono">{acquisitionError}</p>
                 </div>
               </div>
@@ -249,7 +268,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           {actions.map((action, i) => (
             <div
               key={i}
-              className="rounded-xl p-5 mb-4 bg-surface/40 shadow-elevation-1 hover:shadow-elevation-2 hover:bg-surface/60 transition-all"
+              className="rounded-xl p-5 mb-4 bg-surface-raised shadow-elevation-1 hover:shadow-elevation-2 hover:bg-surface transition-all"
             >
               <div className="flex items-start justify-between gap-4 mb-2">
                 <div>
@@ -279,7 +298,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                     {action.commands.map((c: string, j: number) => (
                       <div
                         key={j}
-                        className="flex items-center justify-between gap-3 bg-background/90 shadow-elevation-1 rounded-lg px-4 py-3 font-mono text-data text-foreground/90 group"
+                        className="flex items-center justify-between gap-3 bg-inset shadow-elevation-1 rounded-lg px-4 py-3 font-mono text-data text-foreground/90 group"
                       >
                         <span className="truncate select-all">
                           <span className="text-accent select-none mr-2">$</span>
@@ -296,8 +315,8 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                         >
                           {copiedIndex === j ? (
                             <>
-                              <Check size="0.75rem" className="text-accent" />
-                              <span className="text-accent">Copied</span>
+                              <Check size="0.75rem" className="text-success" />
+                              <span className="text-success">Copied</span>
                             </>
                           ) : (
                             <>
@@ -345,7 +364,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
             <pre
               ref={terminalRef}
               onScroll={handleTerminalScroll}
-              className="bg-background/90 shadow-elevation-1 rounded-xl p-4 text-data font-mono whitespace-pre-wrap overflow-auto max-h-72 text-foreground/80 leading-relaxed"
+              className="bg-inset shadow-elevation-1 rounded-xl p-4 text-data font-mono whitespace-pre-wrap overflow-auto max-h-72 text-foreground/80 leading-relaxed"
             >
               {acquisitionOutput.join('\n')}
             </pre>
@@ -364,21 +383,23 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
 
       {(phase === 'available' || phase === 'pulling' || phase === 'pulled') && toolStatus?.available && (
         <div>
-          <div className="flex items-center gap-2 text-label text-accent uppercase tracking-wider mb-4">
+          <div className="flex items-center gap-2 text-label text-success uppercase tracking-wider mb-4">
             <CheckCircle2 size="1rem" /> Device service ready
           </div>
 
+          <PullSteps steps={pullSteps} />
+
           {devices.length === 0 ? (
-            <div className="p-4 rounded-lg bg-surface/50 shadow-elevation-1 text-data text-muted-foreground">
+            <div className="p-4 rounded-lg bg-surface-raised shadow-elevation-1 text-data text-muted-foreground">
               No devices connected. Plug your iPhone in via USB and unlock the screen.
             </div>
           ) : (
-            <div className="rounded-xl divide-y divide-border/60 mb-5 bg-surface/40 shadow-elevation-1 overflow-hidden">
+            <div className="rounded-xl divide-y divide-border/60 mb-5 bg-surface-raised shadow-elevation-1 overflow-hidden">
               {devices.map((d) => (
                 <label
                   key={d.id}
                   className={`flex items-center gap-4 px-4 py-4 text-data cursor-pointer transition-colors ${
-                    selectedDevice?.id === d.id ? 'bg-accent/5' : 'hover:bg-surface/80'
+                    selectedDevice?.id === d.id ? 'bg-accent/10' : 'hover:bg-surface'
                   }`}
                 >
                   <input
@@ -398,7 +419,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           )}
 
           {selectedDevice && (
-            <div className="flex flex-col gap-3 mb-5 p-4 rounded-lg bg-surface/60 shadow-elevation-1">
+            <div className="flex flex-col gap-3 mb-5 p-4 rounded-lg bg-surface-raised shadow-elevation-1">
               <div className="flex items-center gap-3">
                 <Button variant="outline" size="sm" onClick={onChooseDestination} disabled={pullLocked}>
                   <FolderOpen size="0.875rem" />
@@ -440,9 +461,9 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           )}
 
           {selectedDevice && encryptionConsent && (
-            <section className="rounded-lg bg-accent/10 border border-accent/30 shadow-elevation-1 p-5 flex flex-col gap-3">
+            <section className="rounded-lg bg-flag/10 border border-flag/30 shadow-elevation-1 p-5 flex flex-col gap-3">
               <h3 className="flex items-center gap-2 font-display text-heading text-foreground">
-                <ShieldCheck size="1.125rem" className="text-accent" /> Turn On Encrypted Backups?
+                <ShieldCheck size="1.125rem" className="text-flag" /> Turn On Encrypted Backups?
               </h3>
               <p className="text-data text-foreground">
                 Encrypted backups are off on {selectedDevice.name}. To continue, Epoch will turn them on with the
@@ -485,18 +506,18 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           {deviceAction && phase === 'pulling' && (
             <div
               role="alert"
-              className="flex items-center gap-4 bg-accent/10 border border-accent/30 shadow-elevation-1 rounded-lg p-5 mt-5"
+              className="flex items-center gap-4 bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-lg p-5 mt-5"
             >
-              <div className="p-3 rounded-full bg-accent/15 text-accent shrink-0">
+              <div className="p-3 rounded-full bg-flag/20 text-flag shrink-0">
                 <Smartphone size="1.5rem" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-display text-heading text-accent">
+                <h3 className="font-display text-heading text-flag">
                   Action Needed on {selectedDevice?.name ?? 'the iPhone'}
                 </h3>
                 <p className="text-data text-foreground mt-1">{deviceAction}</p>
               </div>
-              <Loader className="text-accent" />
+              <Loader className="text-flag" />
             </div>
           )}
 
@@ -505,7 +526,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           )}
 
           {pullProgress.length > 0 && (
-            <pre className="bg-background/90 shadow-elevation-1 rounded-xl p-4 text-data font-mono whitespace-pre-wrap overflow-auto max-h-48 text-foreground/80 mt-5 leading-relaxed">
+            <pre className="bg-inset shadow-elevation-1 rounded-xl p-4 text-data font-mono whitespace-pre-wrap overflow-auto max-h-48 text-foreground/80 mt-5 leading-relaxed">
               {pullProgress.map((p) => p.message).join('\n')}
             </pre>
           )}
@@ -562,7 +583,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                 );
               })}
           {phase === 'pulled' && (
-            <div className="text-data text-accent bg-accent/10 border border-accent/30 shadow-elevation-1 rounded-lg p-4 mt-4 flex items-center gap-2">
+            <div className="text-data text-success bg-success/10 border border-success/30 shadow-elevation-1 rounded-lg p-4 mt-4 flex items-center gap-2">
               <CheckCircle2 size="1.125rem" className="shrink-0" />
               <span>
                 {pullProgress[pullProgress.length - 1]?.message ?? 'Backup complete and verified as finished.'}

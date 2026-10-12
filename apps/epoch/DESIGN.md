@@ -242,3 +242,59 @@ pull had anywhere to go.
 - **A running operation locks its inputs.** While it runs, the choice, its
   steps and Change are disabled, and leaving the view and coming back shows
   the operation still running (its state lives in the main process).
+
+## 9. Colour roles — one meaning per colour
+
+Decided 2026-10-12 (EPOCH-484), after the New Investigation page read as
+dull: one cyan marked selection, progress, information and success alike (30
+times as text on that page), the three surface tiers barely separated
+(1.14:1 and 1.17:1), and 13 improvised surface opacities layered panels
+unevenly.
+
+**Each colour has one meaning.** A state uses its role's colour, never
+another state's.
+
+| Token | Means | Examples |
+|---|---|---|
+| `accent` | Interactive, selected, current, in progress | Primary button, selected device, the current step, a running pull or analysis |
+| `success` | Done and verified | A backup verified as finished, installed tools, a completed step |
+| `flag` | You must act, or caution | "Action Needed" on the iPhone, an unfinished backup, encryption consent |
+| `danger` | Failed or destructive | A failed pull, setup failure, Delete |
+| `foreground` / `muted-foreground` | Information | Notes, paths, explanations |
+
+**Role tints have three strengths:** `/10` for a banner or row fill, `/20`
+for an icon chip on a tinted banner, `/30` for a state banner's border (§1).
+
+**Surfaces have four tiers, lightest on top:** `inset` (wells: logs, inputs,
+command lines, progress tracks), `background` (the page), `surface` (cards),
+`surface-raised` (panels inside a card). Components use these tokens, never a
+`bg-surface/NN` opacity. The one exception is the dimmed scrim behind a
+modal (`bg-background/80`).
+
+**Contrast is measured, not judged.** Every role colour is at least 4.5:1
+(WCAG AA for body text) on every surface tier. Values on 2026-10-12, as
+contrast against inset / background / surface / surface-raised:
+
+| Token | HSL | Contrast |
+|---|---|---|
+| `foreground` | 47 5% 90% | 15.4 / 14.9 / 12.8 / 10.2 |
+| `muted-foreground` | 220 16% 65% | 7.4 / 7.1 / 6.1 / 4.9 |
+| `accent` | 186 54% 54% | 8.6 / 8.3 / 7.1 / 5.6 |
+| `success` | 152 48% 52% | 8.4 / 8.1 / 6.9 / 5.5 |
+| `flag` | 34 80% 60% | 9.1 / 8.7 / 7.5 / 6.0 |
+| `danger` | 6 78% 68% | 7.0 / 6.7 / 5.8 / 4.6 |
+
+The surface tiers are `inset` 6%, `background` 8%, `surface` 14% and
+`surface-raised` 21% lightness, at hue 217, saturation 17%. A new colour
+token is added only with its contrast on every tier recorded here, and is
+defined in `:root` so the light theme (§4) stays a same-file change.
+
+**Steps show their state.** A multi-step flow (§8) shows its steps as a
+numbered rail: pending (muted), current (accent ring), done (success check),
+blocked (flag). The iPhone pull uses it (`PullSteps`).
+
+**Applied so far:** the New Investigation page (`WorkspaceView`,
+`DevicePullPanel`, `BackupProgressCard`, `BackupRow`, `ToolSetup`). The
+token changes (the surface lightness steps and `danger`) apply app-wide;
+the other views still use surface opacities and adopt the roles as they are
+next changed.

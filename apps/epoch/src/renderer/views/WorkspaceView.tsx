@@ -364,6 +364,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             title="Pull from a Connected iPhone"
             description="Make a new encrypted backup of an iPhone connected to this computer by USB."
             action="Connect an iPhone"
+            tone="accent"
             onChoose={() => setImportSource('device')}
           />
           <ImportChoice
@@ -371,6 +372,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             title="Use an Existing Backup"
             description="Choose the folder containing your iPhone backups. Epoch will identify compatible backups automatically."
             action="Choose Backup Folder"
+            tone="neutral"
             onChoose={handleSelectDirectory}
           />
         </div>
@@ -447,7 +449,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             )}
 
             {!discoveringBackups && backups.length > 0 && (
-              <div className="rounded-xl divide-y divide-border/60 max-h-80 overflow-auto bg-surface/40 shadow-inner">
+              <div className="rounded-xl divide-y divide-border/60 max-h-80 overflow-auto bg-surface-raised shadow-inner">
                 {backups.map((b) => {
                   const progress = runProgress?.byLabel[b.label];
                   const isLive = busy && !!progress;
@@ -476,7 +478,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                 Advanced Settings
               </Button>
               {showOptions && (
-                <div className="mt-4 flex flex-col gap-4 p-4 rounded-xl bg-surface/30 shadow-elevation-1">
+                <div className="mt-4 flex flex-col gap-4 p-4 rounded-xl bg-surface-raised shadow-elevation-1">
                   <label className="flex flex-col gap-2">
                     <span className="text-label uppercase tracking-wider text-muted-foreground">
                       Analysis workspace (optional)
@@ -487,7 +489,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       onChange={(e) => setWorkspace(e.target.value)}
                       disabled={busy}
                       placeholder="Use the default workspace"
-                      className="bg-background/90 border border-border/80 focus:border-accent focus:outline-none rounded-lg px-4 py-2 text-data font-mono text-foreground placeholder:text-muted-foreground/60 disabled:opacity-50 transition-colors"
+                      className="bg-inset border border-border/80 focus:border-accent focus:outline-none rounded-lg px-4 py-2 text-data font-mono text-foreground placeholder:text-muted-foreground/60 disabled:opacity-50 transition-colors"
                     />
                   </label>
                   <label className="flex items-center gap-3 text-data cursor-pointer select-none">
@@ -532,16 +534,16 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       {finishResult && runProgress && (
         <div
           className={`flex items-start gap-4 rounded-xl p-5 shadow-elevation-1 ${
-            failedCount === 0 ? 'bg-accent/10 border border-accent/30' : 'bg-danger/10 border border-danger/30'
+            failedCount === 0 ? 'bg-success/10 border border-success/30' : 'bg-danger/10 border border-danger/30'
           }`}
         >
           {failedCount === 0 ? (
-            <CheckCircle2 className="text-accent shrink-0 mt-1" size="1.25rem" />
+            <CheckCircle2 className="text-success shrink-0 mt-1" size="1.25rem" />
           ) : (
             <XCircle className="text-danger shrink-0 mt-1" size="1.25rem" />
           )}
           <div className="text-data">
-            <p className={failedCount === 0 ? 'text-accent' : 'text-danger'}>
+            <p className={failedCount === 0 ? 'text-success' : 'text-danger'}>
               {failedCount === 0
                 ? `Analysis completed for all ${doneCount} backup${doneCount === 1 ? '' : 's'}.`
                 : `${doneCount} of ${runProgress.order.length} backup${
@@ -592,8 +594,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
           {analysisRunning && (
             <div className="flex items-center justify-between gap-3 py-3">
-              <div className="flex items-center gap-1.5 text-data text-flag">
-                <Loader className="text-flag" />
+              <div className="flex items-center gap-1.5 text-data text-accent">
+                <Loader className="text-accent" />
                 <span>{analysisCancelling ? 'Stopping analysis…' : 'Examining the imported evidence…'}</span>
               </div>
               {/* EPOCH-305: always available while running, so a stalled or
@@ -617,7 +619,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             <div>
               {analysisResult.success && analysisFailedCount === 0 ? (
                 <div>
-                  <p className="text-data text-accent flex items-center gap-1.5 mb-3">
+                  <p className="text-data text-success flex items-center gap-1.5 mb-3">
                     <CheckCircle2 size="1rem" /> Analysis complete.
                   </p>
                   {analysisResult.analysis && (
@@ -679,8 +681,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       )}
 
       {!selectedPath && (
-        <div className="flex items-start gap-4 bg-surface-raised/40 shadow-elevation-1 rounded-xl p-4 sm:p-5">
-          <AlertCircle className="text-accent shrink-0 mt-1" size="1.125rem" />
+        <div className="flex items-start gap-4 bg-surface-raised shadow-elevation-1 rounded-xl p-4 sm:p-5">
+          <AlertCircle className="text-muted-foreground shrink-0 mt-1" size="1.125rem" />
           <p className="text-data text-muted-foreground">
             <strong className="text-foreground font-semibold">Tip:</strong> Connect an iPhone by USB to import a fresh
             backup, or choose an existing backup folder from your computer.
@@ -724,18 +726,24 @@ interface ImportChoiceProps {
   title: string;
   description: string;
   action: string;
+  /** The icon chip's colour, so the two paths read apart at a glance (DESIGN.md §9). */
+  tone: 'accent' | 'neutral';
   onChoose: () => void;
 }
 
 /** One way to import evidence; choosing it hides the other (EPOCH-467). */
-function ImportChoice({ icon, title, description, action, onChoose }: ImportChoiceProps) {
+function ImportChoice({ icon, title, description, action, tone, onChoose }: ImportChoiceProps) {
   return (
     <button
       type="button"
       onClick={onChoose}
       className="group flex flex-col items-center text-center p-8 rounded-2xl bg-surface shadow-elevation-1 hover:shadow-elevation-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
-      <div className="p-4 rounded-full bg-accent/10 text-accent mb-4 group-hover:scale-105 transition-transform">
+      <div
+        className={`p-4 rounded-full mb-4 group-hover:scale-105 transition-transform ${
+          tone === 'accent' ? 'bg-accent/10 text-accent' : 'bg-surface-raised text-foreground'
+        }`}
+      >
         {icon}
       </div>
       <h2 className="font-display text-heading text-foreground mb-1">{title}</h2>
