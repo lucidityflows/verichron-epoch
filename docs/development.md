@@ -131,7 +131,7 @@ External tools are tested through stub executables and servers (a stub
 | Workflow | Runs |
 |---|---|
 | `.github/workflows/python-tests.yml` | Migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, the index-usage check for evidence reads, and a check that the tool lockfiles match their manifests |
-| `.github/workflows/ts-tests.yml` | The formatting check, then typecheck and tests for the processor, the reader and the orchestrator, with real PostgreSQL |
+| `.github/workflows/ts-tests.yml` | The formatting check, then typecheck and tests for the processor, the writer, the reader and the orchestrator, with real PostgreSQL |
 
 Both workflows install the toolchain from `mise.toml` and Python from
 `.python-version`, the same files a development machine uses. All Actions are
