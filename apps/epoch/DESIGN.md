@@ -289,6 +289,13 @@ The surface tiers are `inset` 6%, `background` 8%, `surface` 14% and
 token is added only with its contrast on every tier recorded here, and is
 defined in `:root` so the light theme (§4) stays a same-file change.
 
+**Choices look choosable.** A selectable option (an iPhone to back up) is a
+card with a 2px `accent/30` outline at rest, the full `accent` outline on
+hover, and an `accent/10` fill with the `accent` outline once selected. Its
+action reads **Select**, as a filled accent button, while choosing is the
+current step. The current step's action is always the primary (filled)
+button; it becomes an outline button once the step is done.
+
 **Steps show their state.** A multi-step flow (§8) shows its steps as a
 numbered rail: pending (muted), current (accent ring), done (success check),
 blocked (flag). The iPhone pull uses it (`PullSteps`).

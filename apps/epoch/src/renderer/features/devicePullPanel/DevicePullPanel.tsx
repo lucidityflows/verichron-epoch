@@ -394,34 +394,74 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
               No devices connected. Plug your iPhone in via USB and unlock the screen.
             </div>
           ) : (
-            <div className="rounded-xl divide-y divide-border/60 mb-5 bg-surface-raised shadow-elevation-1 overflow-hidden">
-              {devices.map((d) => (
-                <label
-                  key={d.id}
-                  className={`flex items-center gap-4 px-4 py-4 text-data cursor-pointer transition-colors ${
-                    selectedDevice?.id === d.id ? 'bg-accent/10' : 'hover:bg-surface'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="device"
-                    checked={selectedDevice?.id === d.id}
-                    onChange={() => onChooseDevice(d)}
-                    disabled={pullLocked}
-                    className="accent-accent"
-                  />
-                  <span className="text-foreground">{d.name}</span>
-                  {d.model && <Badge variant="neutral">{d.model}</Badge>}
-                  {d.osVersion && <span className="text-label text-muted-foreground font-mono">iOS {d.osVersion}</span>}
-                </label>
-              ))}
+            <div className="mb-5">
+              <p className="text-label text-foreground mb-2">Choose the iPhone to back up</p>
+              <div className="flex flex-col gap-3" role="radiogroup" aria-label="iPhone to back up">
+                {devices.map((d) => {
+                  const selected = selectedDevice?.id === d.id;
+                  // A selectable option (DESIGN.md §9): an accent outline on hover, filled when selected.
+                  return (
+                    <label
+                      key={d.id}
+                      className={`group flex items-center gap-4 rounded-xl border-2 px-4 py-4 text-data transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent ${
+                        pullLocked ? 'cursor-not-allowed' : 'cursor-pointer'
+                      } ${
+                        selected
+                          ? 'border-accent bg-accent/10 shadow-elevation-2'
+                          : 'border-accent/30 bg-surface-raised shadow-elevation-1 hover:border-accent hover:shadow-elevation-2'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="device"
+                        checked={selected}
+                        onChange={() => onChooseDevice(d)}
+                        disabled={pullLocked}
+                        className="sr-only"
+                      />
+                      <span
+                        className={`p-2 rounded-lg shrink-0 ${selected ? 'bg-accent text-background' : 'bg-accent/10 text-accent'}`}
+                      >
+                        <Smartphone size="1.25rem" />
+                      </span>
+                      <span className="flex flex-1 min-w-0 items-center gap-3">
+                        <span className="font-display text-heading text-foreground truncate">{d.name}</span>
+                        {d.model && <Badge variant="neutral">{d.model}</Badge>}
+                        {d.osVersion && (
+                          <span className="text-label text-muted-foreground font-mono">iOS {d.osVersion}</span>
+                        )}
+                      </span>
+                      <span
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-label transition-colors ${
+                          selected ? 'bg-accent/20 text-accent' : 'bg-accent text-background shadow-elevation-2'
+                        }`}
+                      >
+                        {selected ? (
+                          <>
+                            <Check size="0.875rem" /> Selected
+                          </>
+                        ) : (
+                          'Select'
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           )}
 
           {selectedDevice && (
             <div className="flex flex-col gap-3 mb-5 p-4 rounded-lg bg-surface-raised shadow-elevation-1">
+              <p className="text-label text-foreground">Choose where to save the backup</p>
               <div className="flex items-center gap-3">
-                <Button variant="outline" size="sm" onClick={onChooseDestination} disabled={pullLocked}>
+                {/* The current step's action is the primary button (DESIGN.md §9). */}
+                <Button
+                  variant={destDir ? 'outline' : 'accent'}
+                  size="sm"
+                  onClick={onChooseDestination}
+                  disabled={pullLocked}
+                >
                   <FolderOpen size="0.875rem" />
                   {destDir ? 'Change Destination' : 'Choose Destination'}
                 </Button>
