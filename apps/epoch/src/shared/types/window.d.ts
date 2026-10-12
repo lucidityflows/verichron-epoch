@@ -13,6 +13,7 @@ import type {
   DeviceInfo,
   PullOptions,
   BackupStats,
+  DevicePullState,
   IncompleteBackup,
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
@@ -116,6 +117,8 @@ declare global {
       checkDeviceBackupToolAvailable: (sourceId: string) => Promise<ToolAvailabilityStatus>;
       listConnectedDevices: (sourceId: string) => Promise<DeviceInfo[]>;
       getToolAcquisitionActions: (sourceId: string) => Promise<ToolAcquisitionAction[]>;
+      /** The running device pull, or null (EPOCH-467). */
+      getDevicePullState: () => Promise<DevicePullState | null>;
       getBackupEncryption: (sourceId: string, device: DeviceInfo) => Promise<boolean>;
       pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) => Promise<string>;
       cancelDeviceBackup: (sourceId: string) => Promise<boolean>;

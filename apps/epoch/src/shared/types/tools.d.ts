@@ -77,6 +77,24 @@ export interface IncompleteBackup {
   bytes: number;
 }
 
+/**
+ * The running device pull, as the main process tracks it (EPOCH-467), so a
+ * panel that mounts mid-pull can show it.
+ */
+export interface DevicePullState {
+  sourceId: string;
+  device: DeviceInfo;
+  destDir: string;
+  startedAt: number;
+  /** Progress so far, oldest first; the newest 500 are kept. */
+  progress: BackupProgress[];
+  stats: BackupStats | null;
+  /** The "Action Needed" banner's message, if one is up. */
+  deviceAction: string | null;
+  /** True once the pull has reported done or an error. */
+  ended: boolean;
+}
+
 export interface PullOptions {
   /** The backup password: the device's existing one, or the new one when encryption is turned on. */
   password: string;

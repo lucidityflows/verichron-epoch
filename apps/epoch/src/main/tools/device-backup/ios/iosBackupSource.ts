@@ -268,6 +268,7 @@ export class IosBackupSource implements DeviceBackupSource {
       backup_encryption: 'unknown',
       received_bytes: null,
       outcome: 'failed',
+      error: null,
     };
 
     const fail = (message: string): never => {
@@ -337,6 +338,7 @@ export class IosBackupSource implements DeviceBackupSource {
       return destDir;
     } catch (err) {
       if (this.cancelRequested) record.outcome = 'cancelled';
+      record.error = err instanceof Error ? err.message : String(err);
       throw err;
     } finally {
       this.running = null;

@@ -1,5 +1,6 @@
 import { app, ipcMain, dialog, BrowserWindow } from 'electron';
 import { addPullDestination, readPullDestinations } from '../tools/device-backup/pullDestinations';
+import { PullStateTracker } from '../tools/device-backup/pullState';
 import path from 'path';
 import fs from 'fs/promises';
 import { spawn } from 'child_process';
@@ -9,6 +10,7 @@ import type {
   ToolAcquisitionCommand,
   BackupProgress,
   BackupStats,
+  DevicePullState,
   IncompleteBackup,
   PullOptions,
   ToolAcquisitionResult,
@@ -18,6 +20,9 @@ import type {
 } from '../../shared/types/tools';
 
 export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null) {
+  // The running pull, so a panel that mounts mid-pull can show it (EPOCH-467).
+  const pull = new PullStateTracker();
+
   function sendToRenderer(channel: string, ...args: unknown[]) {
     const win = getMainWindow();
     if (win) {
@@ -58,7 +63,11 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     return strategy.availableActions();
   });
 
+  ipcMain.handle('epoch:getDevicePullState', async (): Promise<DevicePullState | null> => pull.current());
+
   ipcMain.handle('epoch:getBackupEncryption', async (_event, sourceId: string, device: DeviceInfo) => {
+    // A device query during a backup would compete with it for the device.
+    if (pull.running()) throw new Error('A device backup is running. Wait for it to finish or cancel it first.');
     const source = getDeviceBackupSource(sourceId);
     if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
     return source.backupEncryptionEnabled(device);
@@ -81,6 +90,8 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
       const folders = [...new Set([...(destDir ? [destDir] : []), ...known])];
       const found: IncompleteBackup[] = [];
       for (const folder of folders) {
+        // The backup being written isn't finished yet, but it isn't left over either.
+        if (pull.writes(folder, device.id)) continue;
         const incomplete = await source.incompleteBackup(folder, device);
         if (incomplete) found.push(incomplete);
       }
@@ -89,13 +100,11 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
   );
 
   ipcMain.handle('epoch:deleteIncompleteBackup', async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
-    if (deviceBackupInFlight) throw new Error('A device backup is running; cancel it before deleting.');
+    if (pull.running()) throw new Error('A device backup is running; cancel it before deleting.');
     const source = getDeviceBackupSource(sourceId);
     if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
     return source.deleteIncompleteBackup(destDir, device);
   });
-
-  let deviceBackupInFlight = false;
 
   ipcMain.handle(
     'epoch:pullDeviceBackup',
@@ -103,29 +112,37 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
       if (!options?.password || options.password.trim() === '') {
         throw new Error('A backup password is required.');
       }
-
-      if (deviceBackupInFlight) {
-        throw new Error('A device backup is already in progress -- wait for it to finish before starting another.');
-      }
       const source = getDeviceBackupSource(sourceId);
       if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
 
-      deviceBackupInFlight = true;
+      pull.start(sourceId, device, destDir);
       try {
         await addPullDestination(app.getPath('userData'), destDir);
         return await source.pullBackup(
           device,
           destDir,
           (progress: BackupProgress) => {
+            pull.progress(progress);
             sendToRenderer('epoch:deviceBackupProgress', progress);
           },
           (stats: BackupStats) => {
+            pull.stats(stats);
             sendToRenderer('epoch:deviceBackupStats', stats);
           },
           options
         );
+      } catch (err) {
+        // Every pull ends with done or an error on the progress channel, so a
+        // panel that mounted mid-pull (and isn't awaiting this call) sees it end.
+        if (!pull.reportedEnd()) {
+          sendToRenderer('epoch:deviceBackupProgress', {
+            phase: 'error',
+            message: err instanceof Error ? err.message : String(err),
+          } satisfies BackupProgress);
+        }
+        throw err;
       } finally {
-        deviceBackupInFlight = false;
+        pull.end();
       }
     }
   );

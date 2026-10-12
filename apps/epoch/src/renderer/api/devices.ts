@@ -20,6 +20,7 @@ export const devicesApi = {
   getToolAcquisitionActions: (sourceId: string): Promise<ToolAcquisitionAction[]> =>
     window.epoch.getToolAcquisitionActions(sourceId),
   selectDeviceBackupDestination: () => window.epoch.selectDeviceBackupDestination(),
+  getDevicePullState: () => window.epoch.getDevicePullState(),
   getBackupEncryption: (sourceId: string, device: DeviceInfo) => window.epoch.getBackupEncryption(sourceId, device),
   pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) =>
     window.epoch.pullDeviceBackup(sourceId, device, destDir, options),
