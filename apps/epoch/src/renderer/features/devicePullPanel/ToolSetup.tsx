@@ -68,8 +68,8 @@ export function ToolSetup({
   return (
     <div className="flex flex-col gap-5">
       <p className="text-data text-muted-foreground">
-        iPhone import needs a few components on this computer. Epoch checks what's already here and installs
-        what's missing.
+        iPhone import needs a few components on this computer. Epoch checks what's already here and installs what's
+        missing.
       </p>
 
       <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(16rem, 1fr))' }}>
@@ -128,9 +128,7 @@ export function ToolSetup({
         </ActionCard>
       )}
 
-      {(running || output.length > 0) && (
-        <TerminalLog lines={logLines} live={running !== null} label="Setup details" />
-      )}
+      {(running || output.length > 0) && <TerminalLog lines={logLines} live={running !== null} label="Setup details" />}
     </div>
   );
 }

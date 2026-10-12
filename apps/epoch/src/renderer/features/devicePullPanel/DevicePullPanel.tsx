@@ -24,7 +24,7 @@ import { ToolSetup } from './ToolSetup';
 import { CopyButton } from '../../components/ui/CopyButton';
 import { BackupProgressCard, IncompleteBackupNotice } from './BackupProgressCard';
 import type { DeviceInfo } from '../../../shared/types/tools';
- 
+
 /**
  * What the Copy button on a pull error copies: enough to diagnose it
  * elsewhere. The device's UDID is replaced, since the copy may be pasted
@@ -43,7 +43,7 @@ interface DevicePullPanelProps {
   /** Returns to the choice of import source; unavailable while a pull runs. */
   onChangeSource: () => void;
 }
- 
+
 export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPanelProps) {
   const {
     sources,
@@ -90,7 +90,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const terminalRef = useRef<HTMLPreElement>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
- 
+
   const passwordProvided = password.trim() !== '';
 
   // The password is asked for only once there is a device and a folder to pull
@@ -108,26 +108,26 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
   const onChooseDestination = async () => {
     if (await handleSelectDestination()) clearPassword();
   };
- 
+
   const handleCopy = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
- 
+
   useEffect(() => {
     if (stickToBottom && terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [acquisitionOutput, stickToBottom]);
- 
+
   const handleTerminalScroll = () => {
     const el = terminalRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     setStickToBottom(distanceFromBottom <= 64);
   };
- 
+
   const jumpToLatest = () => {
     setStickToBottom(true);
     if (terminalRef.current) {
@@ -159,7 +159,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
   const askPassword = !!selectedDevice && !!destDir && phase !== 'pulling' && phase !== 'pulled';
 
   if (!sourceId) return null;
- 
+
   return (
     <div className="bg-surface shadow-elevation-1 rounded-xl p-6">
       <div className="flex items-center gap-3 mb-5">
@@ -192,7 +192,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           Change
         </Button>
       </div>
- 
+
       {phase === 'checking' && !setupStatus && (
         <p className="text-data text-muted-foreground flex items-center gap-2 py-2">
           <Loader className="text-accent" /> Checking for the required tool…
@@ -230,7 +230,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
             <XCircle size="1.125rem" className="shrink-0" />
             <span>iPhone import is not set up on this computer yet.</span>
           </div>
- 
+
           {acquisitionError && (
             <div className="bg-flag/10 border border-flag/30 shadow-elevation-1 p-4 rounded-xl text-data text-flag mb-5">
               <div className="flex items-start gap-3">
@@ -242,28 +242,31 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
               </div>
             </div>
           )}
- 
+
           {actions.map((action, i) => (
-            <div key={i} className="rounded-xl p-5 mb-4 bg-surface/40 shadow-elevation-1 hover:shadow-elevation-2 hover:bg-surface/60 transition-all">
+            <div
+              key={i}
+              className="rounded-xl p-5 mb-4 bg-surface/40 shadow-elevation-1 hover:shadow-elevation-2 hover:bg-surface/60 transition-all"
+            >
               <div className="flex items-start justify-between gap-4 mb-2">
                 <div>
                   <h3 className="font-display text-heading text-foreground">
                     {action.kind === 'install-instructions'
                       ? 'Install the Required System Tools'
                       : action.kind === 'compile-from-source'
-                      ? 'Set Up iPhone Import Automatically'
-                      : 'Use a Verified Tool Package'}
+                        ? 'Set Up iPhone Import Automatically'
+                        : 'Use a Verified Tool Package'}
                   </h3>
                   <p className="text-data text-muted-foreground mt-1">
                     {action.kind === 'install-instructions'
                       ? 'Complete this one-time setup in your terminal, then return here to import a backup directly from your iPhone.'
                       : action.kind === 'compile-from-source'
-                      ? 'Epoch can build and configure the required components locally on this computer.'
-                      : 'A verified package can provide the components needed for direct iPhone import.'}
+                        ? 'Epoch can build and configure the required components locally on this computer.'
+                        : 'A verified package can provide the components needed for direct iPhone import.'}
                   </p>
                 </div>
               </div>
-              
+
               {action.kind === 'install-instructions' && (
                 <div className="mt-4 pt-3 shadow-elevation-1">
                   <div className="text-label text-muted-foreground mb-2 flex items-center gap-1.5">
@@ -305,7 +308,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                   </div>
                 </div>
               )}
- 
+
               {action.kind === 'compile-from-source' && (
                 <div className="mt-4">
                   <Button onClick={() => runCompileFromSource(action)}>
@@ -313,7 +316,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                   </Button>
                 </div>
               )}
- 
+
               {action.kind === 'download-verified-release' && (
                 <p className="text-data text-muted-foreground italic mt-3">
                   This option is not available yet. You can import an existing backup folder below instead.
@@ -321,7 +324,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
               )}
             </div>
           ))}
-          
+
           <div className="mt-5">
             <Button variant="outline" size="sm" onClick={checkAvailability}>
               <RefreshCw size="0.875rem" /> Check Again
@@ -329,7 +332,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           </div>
         </div>
       )}
- 
+
       {phase === 'acquiring' && (
         <div>
           <p className="text-data text-foreground flex items-center gap-2 mb-3">
@@ -355,13 +358,13 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           </div>
         </div>
       )}
- 
+
       {(phase === 'available' || phase === 'pulling' || phase === 'pulled') && toolStatus?.available && (
         <div>
           <div className="flex items-center gap-2 text-label text-accent uppercase tracking-wider mb-4">
             <CheckCircle2 size="1rem" /> Device service ready
           </div>
- 
+
           {devices.length === 0 ? (
             <div className="p-4 rounded-lg bg-surface/50 shadow-elevation-1 text-data text-muted-foreground">
               No devices connected. Plug your iPhone in via USB and unlock the screen.
@@ -390,16 +393,11 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
               ))}
             </div>
           )}
- 
+
           {selectedDevice && (
             <div className="flex flex-col gap-3 mb-5 p-4 rounded-lg bg-surface/60 shadow-elevation-1">
               <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onChooseDestination}
-                  disabled={pullLocked}
-                >
+                <Button variant="outline" size="sm" onClick={onChooseDestination} disabled={pullLocked}>
                   <FolderOpen size="0.875rem" />
                   {destDir ? 'Change Destination' : 'Choose Destination'}
                 </Button>
@@ -424,7 +422,10 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                   </p>
                   <PasswordField
                     value={password}
-                    onChange={(e) => { setPassword(e.target.value); if (passwordError) setPasswordError(null); }}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (passwordError) setPasswordError(null);
+                    }}
                     disabled={pullLocked}
                     placeholder="Backup password"
                     invalid={!!passwordError}
@@ -434,7 +435,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
               )}
             </div>
           )}
- 
+
           {selectedDevice && encryptionConsent && (
             <section className="rounded-lg bg-accent/10 border border-accent/30 shadow-elevation-1 p-5 flex flex-col gap-3">
               <h3 className="flex items-center gap-2 font-display text-heading text-foreground">
@@ -471,7 +472,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
               Pull Encrypted Backup
             </Button>
           )}
- 
+
           {deviceAction && phase === 'pulling' && (
             <div
               role="alert"
@@ -481,7 +482,9 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                 <Smartphone size="1.5rem" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-display text-heading text-accent">Action Needed on {selectedDevice?.name ?? 'the iPhone'}</h3>
+                <h3 className="font-display text-heading text-accent">
+                  Action Needed on {selectedDevice?.name ?? 'the iPhone'}
+                </h3>
                 <p className="text-data text-foreground mt-1">{deviceAction}</p>
               </div>
               <Loader className="text-accent" />

@@ -29,7 +29,11 @@ export async function sha256Of(file: string): Promise<string> {
 const VERIFY_STEP = 'verify';
 
 class StepFailure extends Error {
-  constructor(readonly label: string, readonly tail: string[], readonly hint?: string) {
+  constructor(
+    readonly label: string,
+    readonly tail: string[],
+    readonly hint?: string
+  ) {
     super(label);
   }
 }

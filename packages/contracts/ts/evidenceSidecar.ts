@@ -8,13 +8,13 @@
  * sidecar against the JSON Schema itself.
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
 export const EvidenceSidecar = z
   .object({
     schema_version: z.literal(1),
     evidence_name: z.string().min(1),
-    algorithm: z.literal("sha256"),
+    algorithm: z.literal('sha256'),
     content_root: z.string().regex(/^[0-9a-f]{64}$/),
     manifest_path: z.string().min(1),
     file_count: z.int().nonnegative(),

@@ -34,9 +34,9 @@ export const SourceType = {
 } as const;
 // END SOURCE_TYPE
 
-export type SourceType = typeof SourceType[keyof typeof SourceType]
+export type SourceType = (typeof SourceType)[keyof typeof SourceType];
 
 /** Type guard — narrows an unknown string to SourceType at runtime. */
 export function isSourceType(value: string): value is SourceType {
-  return Object.values(SourceType).includes(value as SourceType)
+  return Object.values(SourceType).includes(value as SourceType);
 }

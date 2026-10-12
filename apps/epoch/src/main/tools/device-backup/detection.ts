@@ -49,9 +49,7 @@ export function detectBinary(binaryName: string, bundledPath?: string): ToolAvai
 
   return {
     available: false,
-    reason: bundledPath
-      ? `Not found at the expected bundled path (${bundledPath}) or on PATH.`
-      : 'Not found on PATH.',
+    reason: bundledPath ? `Not found at the expected bundled path (${bundledPath}) or on PATH.` : 'Not found on PATH.',
   };
 }
 

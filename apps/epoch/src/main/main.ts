@@ -30,16 +30,15 @@ process.on('unhandledRejection', (reason) => {
   console.error('-----------------------------------\n');
 });
 
-
 const dbPool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'forensics',
-  user: process.env.DB_USER || 'forensics', 
+  user: process.env.DB_USER || 'forensics',
   password: process.env.DB_PASSWORD || 'forensics_dev_only',
-  connectionString: resolveDatabaseUrl(), 
+  connectionString: resolveDatabaseUrl(),
   max: 10,
- });
+});
 
 let mainWindow: BrowserWindowType | null = null;
 const getMainWindow = () => mainWindow;

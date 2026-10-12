@@ -55,7 +55,12 @@ after(async () => {
 describe('ingest() identity', () => {
   it('uses the IDs from entry even if the caller mutates its context mid-ingest', async () => {
     const calls: Call[] = [];
-    const ctx: IngestContext = { evidenceId: 'evidence-A', derivativeId: 'derivative-A', runId: 'run-A', parserVersion: 1 };
+    const ctx: IngestContext = {
+      evidenceId: 'evidence-A',
+      derivativeId: 'derivative-A',
+      runId: 'run-A',
+      parserVersion: 1,
+    };
 
     await ingest(
       fakeClient(calls) as never,

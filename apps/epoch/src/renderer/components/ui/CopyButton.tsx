@@ -15,9 +15,12 @@ interface CopyButtonProps {
 export function CopyButton({ text, title = 'Copy', className = '' }: CopyButtonProps) {
   const [result, setResult] = useState<'copied' | 'failed' | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    []
+  );
 
   const copy = async () => {
     try {

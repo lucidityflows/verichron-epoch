@@ -49,7 +49,11 @@ export class OutputParser {
  * arrived. The estimate is an upper bound, so this stays at 99 until the
  * tool reports the backup finished. Null when there is no estimate.
  */
-export function receivedPercent(receivedBytes: number, estimatedBytes: number | null, finished: boolean): number | null {
+export function receivedPercent(
+  receivedBytes: number,
+  estimatedBytes: number | null,
+  finished: boolean
+): number | null {
   if (finished) return 100;
   if (!estimatedBytes || estimatedBytes <= 0) return null;
   return Math.min(99, Math.floor((receivedBytes / estimatedBytes) * 100));

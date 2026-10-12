@@ -82,13 +82,18 @@ before(async () => {
   db = new pg.Client({ connectionString: url.toString() });
   await db.connect();
 
-  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()) {
+  for (const file of readdirSync(MIGRATIONS)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()) {
     await db.query(readFileSync(path.join(MIGRATIONS, file), 'utf8'));
   }
 
   await db.query(`INSERT INTO devices (device_id, device_key, label) VALUES
     ('99999999-9999-9999-9999-999999999999', repeat('a', 64), 'test device')`);
-  for (const [evidence, root] of [[EVIDENCE, 'b'], [OTHER, 'c']]) {
+  for (const [evidence, root] of [
+    [EVIDENCE, 'b'],
+    [OTHER, 'c'],
+  ]) {
     await db.query(
       `INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes)
        VALUES ($1, repeat($2, 64), '99999999-9999-9999-9999-999999999999', 0, 0)`,
@@ -214,18 +219,31 @@ describe('getForensicRecords', live, () => {
 
     const ranged = await walk({ eventTimeFrom: '2024-01-15T00:00:00Z', eventTimeTo: '2024-01-15T23:59:59Z' }, 3);
     assert.ok(ranged.length > 0);
-    assert.ok(ranged.every((r) => r.event_time !== null), 'a range never matches untimed records');
+    assert.ok(
+      ranged.every((r) => r.event_time !== null),
+      'a range never matches untimed records'
+    );
 
     const text = await walk({ text: '100%' }, 3);
-    assert.deepEqual(text.map((r) => r.process_name), ['Pegasus_100%'], '% is matched literally, not as a wildcard');
-    assert.deepEqual((await walk({ text: 'EVIL_' }, 3)).map((r) => r.bundle_id), ['com.evil_app']);
+    assert.deepEqual(
+      text.map((r) => r.process_name),
+      ['Pegasus_100%'],
+      '% is matched literally, not as a wildcard'
+    );
+    assert.deepEqual(
+      (await walk({ text: 'EVIL_' }, 3)).map((r) => r.bundle_id),
+      ['com.evil_app']
+    );
   });
 
   it('returns only the latest completed parse by default, every parse in history mode', async () => {
     const names = async (history: boolean) =>
       (await walk({ history, text: '_parse' }, 5)).map((r) => [r.process_name, r.parser_version]);
     assert.deepEqual(await names(false), [['new_parse', 2]]);
-    assert.deepEqual((await names(true)).sort(), [['new_parse', 2], ['old_parse', 1]]);
+    assert.deepEqual((await names(true)).sort(), [
+      ['new_parse', 2],
+      ['old_parse', 1],
+    ]);
   });
 
   it('never returns records of an incomplete unit or of other evidence', async () => {
@@ -288,7 +306,11 @@ describe('getForensicRecords', live, () => {
       { cursor: 'not-a-cursor' },
     ];
     for (const query of bad) {
-      await assert.rejects(getForensicRecords(db, EVIDENCE, query as ForensicRecordQuery), Error, JSON.stringify(query));
+      await assert.rejects(
+        getForensicRecords(db, EVIDENCE, query as ForensicRecordQuery),
+        Error,
+        JSON.stringify(query)
+      );
     }
   });
 });

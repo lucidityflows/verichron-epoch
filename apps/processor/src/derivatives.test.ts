@@ -9,7 +9,16 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -102,9 +111,26 @@ function runCli(extraArgs: string[] = [], stubMode = '', extraEnv: Record<string
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ['--import', 'tsx', path.resolve(import.meta.dirname, 'main.ts'),
-        '--source', source, '--workspace', workspace, '--mvt-bin', stub, '--sqlite-bin', '/nonexistent/sqlite3',
-        '--mvt-home', mvtHome, '--ileapp-dir', ileappDir, '--ileapp-python', ileappPython, ...extraArgs],
+      [
+        '--import',
+        'tsx',
+        path.resolve(import.meta.dirname, 'main.ts'),
+        '--source',
+        source,
+        '--workspace',
+        workspace,
+        '--mvt-bin',
+        stub,
+        '--sqlite-bin',
+        '/nonexistent/sqlite3',
+        '--mvt-home',
+        mvtHome,
+        '--ileapp-dir',
+        ileappDir,
+        '--ileapp-python',
+        ileappPython,
+        ...extraArgs,
+      ],
       { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, STUB_DECRYPT: stubMode, STUB_ILEAPP: '', ...extraEnv } }
     );
     let out = '';
@@ -192,7 +218,11 @@ describe('derivative provenance (EPOCH-406)', () => {
     await runCli();
     const decrypt = readDecryptMarker(decrypted())!;
     assert.deepEqual(decrypt.tool, { name: 'mvt-ios', version: '9.9.0' });
-    assert.equal(decrypt.params.repair.status, 'skipped', 'no sqlite3: recorded as skipped, not as "nothing to repair"');
+    assert.equal(
+      decrypt.params.repair.status,
+      'skipped',
+      'no sqlite3: recorded as skipped, not as "nothing to repair"'
+    );
     const check = readCheckMarker(results())!;
     assert.deepEqual(check.tool, { name: 'mvt-ios', version: '9.9.0' });
     assert.match(check.params.ioc_set_hash, /^[0-9a-f]{64}$/);
@@ -259,7 +289,11 @@ describe('iLEAPP output (EPOCH-416)', () => {
     assert.equal(marker.content_root, readDecryptMarker(decrypted())!.content_root);
     assert.deepEqual(marker.tool, { name: 'iLEAPP', version: ileappGit('rev-parse', 'HEAD') });
     assert.deepEqual(marker.params, { input_type: 'itunes' }, 'the decrypt has a top-level Manifest.db');
-    assert.equal(readFileSync(path.join(ileapp(), 'input-type'), 'utf8').trim(), 'itunes', 'the report is ileapp/<label> itself');
+    assert.equal(
+      readFileSync(path.join(ileapp(), 'input-type'), 'utf8').trim(),
+      'itunes',
+      'the report is ileapp/<label> itself'
+    );
   });
 
   it('reuses current output', async () => {

@@ -95,8 +95,8 @@ export function RecordsView({
         // A capped list must say so (R25). Filters below apply only to the
         // loaded rows until the server-side grid lands (EPOCH-411).
         <p className="text-data text-muted-foreground mb-4 shrink-0">
-          Showing the first {loadedCount.toLocaleString()} of {totalCount.toLocaleString()} records for this
-          evidence. Filters apply to the loaded records only.
+          Showing the first {loadedCount.toLocaleString()} of {totalCount.toLocaleString()} records for this evidence.
+          Filters apply to the loaded records only.
         </p>
       )}
 
@@ -107,9 +107,17 @@ export function RecordsView({
           detail="Select an investigation in Investigations to see its forensic records."
         />
       ) : !evidenceRegistered ? (
-        <EmptyState icon={FileQuestion} title="Evidence not registered" detail="This investigation's evidence isn't registered yet, so its facts haven't been read. This is not the same as finding nothing." />
+        <EmptyState
+          icon={FileQuestion}
+          title="Evidence not registered"
+          detail="This investigation's evidence isn't registered yet, so its facts haven't been read. This is not the same as finding nothing."
+        />
       ) : records.length === 0 && !sourceTypeFilter ? (
-        <EmptyState icon={Database} title="No records" detail="No forensic records were found for this investigation." />
+        <EmptyState
+          icon={Database}
+          title="No records"
+          detail="No forensic records were found for this investigation."
+        />
       ) : (
         <>
           <div className="flex gap-2 mb-5 shrink-0">

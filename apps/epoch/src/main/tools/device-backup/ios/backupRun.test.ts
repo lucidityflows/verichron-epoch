@@ -23,7 +23,8 @@ afterEach(() => {
 describe('OutputParser', () => {
   // The shapes print_progress_real writes: `\r[` + 50 cells + `] %3.0f%%`,
   // with " Finished\n" after the overall bar.
-  const bar = (percent: number) => `\r[${'='.repeat(percent / 2)}${' '.repeat(50 - percent / 2)}] ${String(percent).padStart(3)}%`;
+  const bar = (percent: number) =>
+    `\r[${'='.repeat(percent / 2)}${' '.repeat(50 - percent / 2)}] ${String(percent).padStart(3)}%`;
 
   it('turns the overall bar into a percentage and drops per-file bars', () => {
     const parser = new OutputParser();
@@ -77,13 +78,15 @@ describe('folderSize', () => {
     fs.writeFileSync(path.join(tmp, 'Snapshot', 'ab', 'new'), Buffer.alloc(300));
     fs.writeFileSync(path.join(tmp, 'Status.plist'), Buffer.alloc(20));
 
-    return Promise.all([folderSize(tmp), folderSize(tmp, Date.now() - 60_000), folderSize(path.join(tmp, 'missing'))]).then(
-      ([all, recent, missing]) => {
-        assert.equal(all, 820);
-        assert.equal(recent, 320);
-        assert.equal(missing, 0);
-      }
-    );
+    return Promise.all([
+      folderSize(tmp),
+      folderSize(tmp, Date.now() - 60_000),
+      folderSize(path.join(tmp, 'missing')),
+    ]).then(([all, recent, missing]) => {
+      assert.equal(all, 820);
+      assert.equal(recent, 320);
+      assert.equal(missing, 0);
+    });
   });
 });
 

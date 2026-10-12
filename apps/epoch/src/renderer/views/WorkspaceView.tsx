@@ -1,5 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FolderOpen, HardDrive, Play, Smartphone, AlertCircle, ChevronDown, ChevronRight, CheckCircle2, XCircle, Pencil, Microscope, ArrowRight } from 'lucide-react';
+import {
+  FolderOpen,
+  HardDrive,
+  Play,
+  Smartphone,
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  Pencil,
+  Microscope,
+  ArrowRight,
+} from 'lucide-react';
 import { BackupRow } from '../features/devicePullPanel/BackupRow';
 import { TerminalLog } from '../components/layout/TerminalLog';
 import { DevicePullPanel } from '../features/devicePullPanel/DevicePullPanel';
@@ -11,7 +24,6 @@ import { applyMvtLogLine, initMvtRunProgress, type MvtRunProgress } from '../lib
 import { pipelineApi } from '../api/pipeline';
 import { devicesApi } from '../api/devices';
 import { ViewLayout } from '../components/layout/ViewLayout';
-
 
 export interface WorkspaceViewProps {
   onAnalysisComplete: () => void;
@@ -328,10 +340,12 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
   const completedBackups = finishResult?.backups?.filter((backup) => backup.success && backup.decrypted);
   const failedBackups = finishResult?.backups?.filter((backup) => !backup.success);
-  const doneCount = completedBackups?.length ?? (runProgress ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'done').length : 0);
-  const failedCount = failedBackups?.length ?? (runProgress
-    ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'failed').length
-    : 0);
+  const doneCount =
+    completedBackups?.length ??
+    (runProgress ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'done').length : 0);
+  const failedCount =
+    failedBackups?.length ??
+    (runProgress ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'failed').length : 0);
   const analysisFailedCount = analysisResult?.analysis?.filter((result) => result.status === 'failed').length ?? 0;
 
   return (
@@ -418,7 +432,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
               </div>
             </div>
 
-            {discoveringBackups && <p className="text-data text-muted-foreground">Looking for compatible iPhone backups…</p>}
+            {discoveringBackups && (
+              <p className="text-data text-muted-foreground">Looking for compatible iPhone backups…</p>
+            )}
 
             {!discoveringBackups && discoverError && (
               <p className="text-data text-danger">Could not scan directory: {discoverError}</p>
@@ -455,12 +471,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             )}
 
             <div className="mt-6 pt-5 shadow-elevation-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowOptions((v) => !v)}
-                disabled={busy}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setShowOptions((v) => !v)} disabled={busy}>
                 {showOptions ? <ChevronDown size="0.9rem" /> : <ChevronRight size="0.9rem" />}
                 Advanced Settings
               </Button>
@@ -487,7 +498,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       disabled={busy}
                       className="accent-accent w-4 h-4 rounded"
                     />
-                    <span className="text-foreground/90">Process backups again, even if they were previously imported</span>
+                    <span className="text-foreground/90">
+                      Process backups again, even if they were previously imported
+                    </span>
                   </label>
                   <label className="flex items-center gap-3 text-data cursor-pointer select-none">
                     <input
@@ -552,7 +565,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             </div>
             <div>
               <h2 className="font-display text-heading text-foreground">Run Forensic Analysis</h2>
-              <p className="text-data text-muted-foreground">Examine prepared data for threat indicators and timeline anomalies.</p>
+              <p className="text-data text-muted-foreground">
+                Examine prepared data for threat indicators and timeline anomalies.
+              </p>
             </div>
           </div>
 
@@ -608,7 +623,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                   {analysisResult.analysis && (
                     <p className="text-data text-muted-foreground mb-3">
                       {analysisResult.analysis.filter((result) => result.status === 'succeeded').length} investigation
-                      {analysisResult.analysis.filter((result) => result.status === 'succeeded').length === 1 ? '' : 's'}
+                      {analysisResult.analysis.filter((result) => result.status === 'succeeded').length === 1
+                        ? ''
+                        : 's'}
                       analyzed
                       {analysisResult.analysis.filter((result) => result.status === 'skipped').length > 0
                         ? `, ${analysisResult.analysis.filter((result) => result.status === 'skipped').length} already up to date`
@@ -631,7 +648,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                     {analysisResult.cancelled
                       ? 'Analysis was cancelled.'
                       : analysisResult.timedOut
-                        ? analysisResult.error ?? 'Analysis timed out and was stopped.'
+                        ? (analysisResult.error ?? 'Analysis timed out and was stopped.')
                         : analysisFailedCount > 0
                           ? `Analysis completed with ${analysisFailedCount} investigation${analysisFailedCount === 1 ? '' : 's'} needing attention.`
                           : `Analysis failed${analysisResult.error ? `: ${analysisResult.error}` : '.'}`}
@@ -665,8 +682,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         <div className="flex items-start gap-4 bg-surface-raised/40 shadow-elevation-1 rounded-xl p-4 sm:p-5">
           <AlertCircle className="text-accent shrink-0 mt-1" size="1.125rem" />
           <p className="text-data text-muted-foreground">
-            <strong className="text-foreground font-semibold">Tip:</strong> Connect an iPhone by USB to import a fresh backup,
-            or choose an existing backup folder from your computer.
+            <strong className="text-foreground font-semibold">Tip:</strong> Connect an iPhone by USB to import a fresh
+            backup, or choose an existing backup folder from your computer.
           </p>
         </div>
       )}

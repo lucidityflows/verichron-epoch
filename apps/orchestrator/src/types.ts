@@ -1,8 +1,8 @@
-import type { DerivativeKind } from "@verichron/contracts";
+import type { DerivativeKind } from '@verichron/contracts';
 
 export interface StageManifest {
   entrypoint: string;
-  runtime: "python" | "node";
+  runtime: 'python' | 'node';
   order: number;
   /** The derivative this stage reads; the orchestrator passes its id and path (EPOCH-416). */
   reads: DerivativeKind;

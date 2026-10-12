@@ -65,8 +65,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         accent: 'bg-accent text-background shadow-elevation-2 hover:bg-accent/90 active:scale-[0.99]',
-        outline:
-          'bg-surface-raised shadow-elevation-1 hover:shadow-elevation-2 text-foreground active:scale-[0.99]',
+        outline: 'bg-surface-raised shadow-elevation-1 hover:shadow-elevation-2 text-foreground active:scale-[0.99]',
         ghost: 'text-muted-foreground hover:text-foreground',
         danger: 'bg-danger text-background shadow-elevation-2 hover:bg-danger/90 active:scale-[0.99]',
       },
@@ -104,8 +103,7 @@ const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   /** Shows a spinner and disables the button. Mirrors the current
    * "Prepare evidence" -> "Running..." pattern in WorkspaceView.tsx. */
   loading?: boolean;
@@ -125,7 +123,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {loading && <Loader size={size === 'sm' ? 'sm' : 'md'} />}
-        {loading ? loadingText ?? children : children}
+        {loading ? (loadingText ?? children) : children}
       </button>
     );
   }

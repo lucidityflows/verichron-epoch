@@ -23,19 +23,19 @@ import type {
   ToolSetupStatus,
   ToolAvailabilityStatus,
 } from './tools';
- 
+
 export type ReportResult =
   | { status: 'ok'; content: string; path: string }
   | { status: 'not-found'; path: string }
   | { status: 'no-results-path' };
- 
+
 export interface StartPipelineOptions {
   workspace?: string;
   forceDecrypt?: boolean;
   refreshIOCs?: boolean;
   only?: string[];
 }
- 
+
 export interface MvtLogEntry {
   stream: 'stdout' | 'stderr';
   line: string;
@@ -56,7 +56,7 @@ export interface MvtLogEntry {
 export interface AnalysisRunStatus {
   status: 'idle' | 'running' | 'interrupted';
 }
- 
+
 export interface MvtFinishedResult {
   success: boolean;
   exitCode?: number | null;
@@ -77,7 +77,7 @@ export interface MvtFinishedResult {
   cancelled?: boolean;
   timedOut?: boolean;
 }
- 
+
 declare global {
   interface Window {
     epoch: {
@@ -85,7 +85,10 @@ declare global {
       selectBackupDirectory: () => Promise<string | null>;
       selectDeviceBackupDestination: () => Promise<string | null>;
       discoverBackups: (source: string) => Promise<Backup[]>;
-      startPipeline: (source: string, options?: StartPipelineOptions) => Promise<{ started: boolean; workspace: string }>;
+      startPipeline: (
+        source: string,
+        options?: StartPipelineOptions
+      ) => Promise<{ started: boolean; workspace: string }>;
       submitMvtPassword: (password: string) => Promise<void>;
       onMvtLog: (callback: (entry: MvtLogEntry) => void) => () => void;
       onMvtPasswordRequired: (callback: (backupName: string) => void) => () => void;
@@ -120,9 +123,18 @@ declare global {
       /** The running device pull, or null (EPOCH-467). */
       getDevicePullState: () => Promise<DevicePullState | null>;
       getBackupEncryption: (sourceId: string, device: DeviceInfo) => Promise<boolean>;
-      pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) => Promise<string>;
+      pullDeviceBackup: (
+        sourceId: string,
+        device: DeviceInfo,
+        destDir: string,
+        options: PullOptions
+      ) => Promise<string>;
       cancelDeviceBackup: (sourceId: string) => Promise<boolean>;
-      listIncompleteBackups: (sourceId: string, device: DeviceInfo, destDir: string | null) => Promise<IncompleteBackup[]>;
+      listIncompleteBackups: (
+        sourceId: string,
+        device: DeviceInfo,
+        destDir: string | null
+      ) => Promise<IncompleteBackup[]>;
       deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) => Promise<void>;
       onDeviceBackupStats: (callback: (stats: BackupStats) => void) => () => void;
       runToolAcquisitionSteps: (
@@ -140,5 +152,5 @@ declare global {
     };
   }
 }
- 
+
 export {};

@@ -73,7 +73,11 @@ function LiveBackupRow({
 
   if (progress.overall === 'running') {
     icon = <Loader2 size="1.125rem" className="text-flag shrink-0 animate-spin" />;
-    statusText = awaitingPassword ? 'Waiting for password' : runningStage ? `${STAGE_LABELS[runningStage]}…` : 'Working…';
+    statusText = awaitingPassword
+      ? 'Waiting for password'
+      : runningStage
+        ? `${STAGE_LABELS[runningStage]}…`
+        : 'Working…';
     statusClass = 'text-flag';
   } else if (progress.overall === 'done') {
     icon = <CheckCircle2 size="1.125rem" className="text-accent shrink-0" />;
@@ -93,10 +97,10 @@ function LiveBackupRow({
         progress.overall === 'running'
           ? 'bg-flag/5'
           : progress.overall === 'done'
-          ? 'bg-accent/5'
-          : progress.overall === 'failed'
-          ? 'bg-danger/5'
-          : ''
+            ? 'bg-accent/5'
+            : progress.overall === 'failed'
+              ? 'bg-danger/5'
+              : ''
       }`}
     >
       {awaitingPassword ? <KeyRound size="1.125rem" className="text-flag shrink-0 animate-bounce" /> : icon}

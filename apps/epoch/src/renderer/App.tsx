@@ -11,7 +11,6 @@ import { TooltipProvider } from './components/ui/Tooltip';
 import { useEpochStore } from './store/useEpochStore';
 import { runsApi } from './api/runs';
 
-
 const IOC_SOURCE_TYPES = ['mvt_ioc_detection', 'timestamp_anomaly'] as const;
 
 export const App: React.FC = () => {
@@ -84,21 +83,24 @@ export const App: React.FC = () => {
     }
   };
 
-  const refreshRun = useCallback(async (runId: string) => {
-    try {
-      const data = await runsApi.getPipelineRuns();
-      setRuns(data);
-      const refreshedRun = data.find((run) => run.run_id === runId);
-      const currentSelectedRun = useEpochStore.getState().selectedRun;
-      if (refreshedRun && currentSelectedRun?.run_id === runId) {
-        setSelectedRun(refreshedRun);
+  const refreshRun = useCallback(
+    async (runId: string) => {
+      try {
+        const data = await runsApi.getPipelineRuns();
+        setRuns(data);
+        const refreshedRun = data.find((run) => run.run_id === runId);
+        const currentSelectedRun = useEpochStore.getState().selectedRun;
+        if (refreshedRun && currentSelectedRun?.run_id === runId) {
+          setSelectedRun(refreshedRun);
+        }
+        setDbStatus('connected');
+      } catch (err) {
+        console.error('Failed to refresh run:', err);
+        setDbStatus('error');
       }
-      setDbStatus('connected');
-    } catch (err) {
-      console.error('Failed to refresh run:', err);
-      setDbStatus('error');
-    }
-  }, [setDbStatus, setRuns, setSelectedRun]);
+    },
+    [setDbStatus, setRuns, setSelectedRun]
+  );
 
   const loadRecords = async (run: PipelineRunRow) => {
     if (!run.evidence_id) {
@@ -179,15 +181,9 @@ export const App: React.FC = () => {
               />
             )}
 
-            {section === 'iocs' && (
-              <IocsView selectedRun={selectedRun} />
-            )}
+            {section === 'iocs' && <IocsView selectedRun={selectedRun} />}
 
-            {section === 'reports' && (
-              <ReportsView 
-                selectedRun={selectedRun} 
-              />
-            )}
+            {section === 'reports' && <ReportsView selectedRun={selectedRun} />}
           </div>
         </div>
       </div>

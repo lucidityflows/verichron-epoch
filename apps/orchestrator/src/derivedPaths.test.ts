@@ -10,7 +10,7 @@ import { describe, it } from 'node:test';
 import { deriveIleappPath, deriveResultsPath } from '@verichron/contracts';
 
 describe('derivative paths beside a decrypt', () => {
-  it('replace the decrypt\'s own parent', () => {
+  it("replace the decrypt's own parent", () => {
     assert.equal(deriveResultsPath('/ws/decrypted/BK1'), '/ws/results/BK1');
     assert.equal(deriveIleappPath('/ws/decrypted/BK1'), '/ws/ileapp/BK1');
     assert.equal(deriveIleappPath('/ws/decrypted/BK1/'), '/ws/ileapp/BK1');

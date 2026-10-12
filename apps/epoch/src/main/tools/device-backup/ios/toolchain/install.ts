@@ -1,7 +1,14 @@
 import type { ToolSetupEvent, ToolSetupResult } from '../../../../../shared/types/tools';
 import { adminPromptHint, hintFor } from './hints';
 import { lastLines } from './process';
-import { APT_PACKAGES, BREW_FORMULAS, brewPrefixOf, checkRequirements, toolchainEnv, type SetupContext } from './requirements';
+import {
+  APT_PACKAGES,
+  BREW_FORMULAS,
+  brewPrefixOf,
+  checkRequirements,
+  toolchainEnv,
+  type SetupContext,
+} from './requirements';
 
 const STEP = 'system';
 

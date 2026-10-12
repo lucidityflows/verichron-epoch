@@ -23,16 +23,20 @@ export function Sidebar({ active, onSelect, dbStatus }: SidebarProps) {
       <div className="p-6 shadow-elevation-1">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-display text-foreground tracking-tight">Epoch</h1>
-          <span className="text-2xs font-mono text-muted-foreground uppercase tracking-widest px-1.5 py-0.5 rounded bg-surface-raised shadow-elevation-1">v0.1</span>
+          <span className="text-2xs font-mono text-muted-foreground uppercase tracking-widest px-1.5 py-0.5 rounded bg-surface-raised shadow-elevation-1">
+            v0.1
+          </span>
         </div>
         <div className="flex items-center gap-2 mt-3 px-2.5 py-1 rounded-md bg-surface-raised/60 shadow-elevation-1 w-fit">
-          <div className={`w-2 h-2 rounded-full shrink-0 ${
-            dbStatus === 'connected'
-              ? 'bg-accent shadow-xs shadow-accent/50'
-              : dbStatus === 'error'
-              ? 'bg-danger shadow-xs shadow-danger/50'
-              : 'bg-muted-foreground animate-pulse'
-          }`} />
+          <div
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              dbStatus === 'connected'
+                ? 'bg-accent shadow-xs shadow-accent/50'
+                : dbStatus === 'error'
+                  ? 'bg-danger shadow-xs shadow-danger/50'
+                  : 'bg-muted-foreground animate-pulse'
+            }`}
+          />
           <span className="text-2xs font-mono text-muted-foreground font-medium tracking-wider">
             {dbStatus === 'connected' ? 'DB CONNECTED' : dbStatus === 'error' ? 'DB ERROR' : 'CONNECTING…'}
           </span>

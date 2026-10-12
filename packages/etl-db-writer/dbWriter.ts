@@ -32,18 +32,18 @@
  * `writeRecord`/`writeRecords` are still exported for use inside a unit and no
  * longer manage transactions themselves.
  */
- 
+
 import * as crypto from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import type { Client, PoolClient } from 'pg';
- 
+
 import { NormalizedRecord as NormalizedRecordSchema } from '@verichron/contracts';
 import type { NormalizedRecord as NormalizedRecordShape } from '@verichron/contracts';
- 
+
 export const DEFAULT_DB_URL = 'postgresql://forensics:forensics_dev_only@localhost:5432/forensics';
- 
+
 type Db = Client | PoolClient;
- 
+
 /**
  * sha256 of file contents — the idempotency key for ingested_files.
  *
@@ -56,14 +56,14 @@ type Db = Client | PoolClient;
 export async function computeFileHash(filePath: string): Promise<string> {
   const hash = crypto.createHash('sha256');
   const stream = createReadStream(filePath, { highWaterMark: 1024 * 1024 });
- 
+
   return new Promise<string>((resolve, reject) => {
     stream.on('data', (chunk) => hash.update(chunk));
     stream.on('error', reject);
     stream.on('end', () => resolve(hash.digest('hex')));
   });
 }
- 
+
 /**
  * Who an ingest is stamped with: the evidence, the derivative being read, and
  * the run doing the reading. Built once from the orchestrator's arguments and
@@ -438,9 +438,7 @@ export async function writeRecords(
  * rather than infer them, since the failure mode being fixed never announced
  * itself.
  */
-export async function incompleteIngests(
-  client: Db
-): Promise<{ fileHash: string; filePath: string }[]> {
+export async function incompleteIngests(client: Db): Promise<{ fileHash: string; filePath: string }[]> {
   const result = await client.query<{ file_hash: string; file_path: string }>(
     `SELECT file_hash, file_path
        FROM ingested_files

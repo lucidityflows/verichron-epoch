@@ -27,8 +27,18 @@ export class PullStateTracker {
 
   /** Starts tracking a pull; refuses while another is tracked. */
   start(sourceId: string, device: DeviceInfo, destDir: string, now = Date.now()): void {
-    if (this.state) throw new Error('A device backup is already in progress -- wait for it to finish before starting another.');
-    this.state = { sourceId, device, destDir, startedAt: now, progress: [], stats: null, deviceAction: null, ended: false };
+    if (this.state)
+      throw new Error('A device backup is already in progress -- wait for it to finish before starting another.');
+    this.state = {
+      sourceId,
+      device,
+      destDir,
+      startedAt: now,
+      progress: [],
+      stats: null,
+      deviceAction: null,
+      ended: false,
+    };
   }
 
   progress(progress: BackupProgress): void {

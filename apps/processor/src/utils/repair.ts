@@ -1,12 +1,12 @@
-import * as fsp from "node:fs/promises";
-import * as path from "node:path";
-import { spawn } from "node:child_process";
-import { walkFiles, pathExists } from "./fs.js";
-import type { RepairProvenance } from "@verichron/contracts";
-import { sqliteVersion } from "./resolver.js";
-import type { Config } from "./cli.js";
+import * as fsp from 'node:fs/promises';
+import * as path from 'node:path';
+import { spawn } from 'node:child_process';
+import { walkFiles, pathExists } from './fs.js';
+import type { RepairProvenance } from '@verichron/contracts';
+import { sqliteVersion } from './resolver.js';
+import type { Config } from './cli.js';
 
-const SQLITE_MAGIC = Buffer.from("SQLite format 3\0", "ascii");
+const SQLITE_MAGIC = Buffer.from('SQLite format 3\0', 'ascii');
 
 let sqliteChecked = false;
 let sqliteToolVersion: string | null = null;
@@ -23,7 +23,7 @@ export async function repairDecrypted(cfg: Config, decDir: string): Promise<Repa
     sqliteToolVersion = await sqliteVersion(cfg.sqliteBin);
   }
   if (!sqliteToolVersion) {
-    return { status: "skipped", reason: `sqlite3 not available (${cfg.sqliteBin})` };
+    return { status: 'skipped', reason: `sqlite3 not available (${cfg.sqliteBin})` };
   }
 
   let scanned = 0;
@@ -32,8 +32,8 @@ export async function repairDecrypted(cfg: Config, decDir: string): Promise<Repa
   const preserved: string[] = [];
 
   for await (const p of walkFiles(decDir)) {
-    if (path.basename(p).startsWith(".mvt_")) continue;
-    if (p.endsWith("-wal") || p.endsWith("-shm") || p.includes(".corrupt-")) continue;
+    if (path.basename(p).startsWith('.mvt_')) continue;
+    if (p.endsWith('-wal') || p.endsWith('-shm') || p.includes('.corrupt-')) continue;
 
     if (!(await looksLikeSqlite(p))) continue;
     scanned++;
@@ -52,26 +52,30 @@ export async function repairDecrypted(cfg: Config, decDir: string): Promise<Repa
       if (okNow) {
         console.log(
           `  [repair]  recovered: ${path.relative(decDir, p)}` +
-            (applyWarnings ? ` (${applyWarnings} — typically harmless: SQLite's own bookkeeping tables, not your data)` : "")
+            (applyWarnings
+              ? ` (${applyWarnings} — typically harmless: SQLite's own bookkeeping tables, not your data)`
+              : '')
         );
         repaired++;
       } else {
         console.warn(
           `  [repair]  WARNING: ran .recover on ${path.relative(decDir, p)} but it still fails quick_check ` +
             `(some data may be permanently lost; original preserved as .corrupt-<timestamp>)` +
-            (applyWarnings ? ` [${applyWarnings}]` : "")
+            (applyWarnings ? ` [${applyWarnings}]` : '')
         );
         failedFiles.push(path.relative(decDir, p));
       }
     } catch (err) {
-      console.error(`  [repair]  ERROR recovering ${path.relative(decDir, p)}:${err instanceof Error ? err.message : err}`);
+      console.error(
+        `  [repair]  ERROR recovering ${path.relative(decDir, p)}:${err instanceof Error ? err.message : err}`
+      );
       failedFiles.push(path.relative(decDir, p));
     }
   }
 
   return {
-    status: "ran",
-    tool: { name: "sqlite3", version: sqliteToolVersion },
+    status: 'ran',
+    tool: { name: 'sqlite3', version: sqliteToolVersion },
     scanned,
     repaired,
     failed_files: failedFiles,
@@ -82,7 +86,7 @@ export async function repairDecrypted(cfg: Config, decDir: string): Promise<Repa
 async function looksLikeSqlite(p: string): Promise<boolean> {
   let fh: fsp.FileHandle | undefined;
   try {
-    fh = await fsp.open(p, "r");
+    fh = await fsp.open(p, 'r');
     const buf = Buffer.alloc(16);
     const { bytesRead } = await fh.read(buf, 0, 16, 0);
     if (bytesRead < 16) return false;
@@ -96,12 +100,12 @@ async function looksLikeSqlite(p: string): Promise<boolean> {
 
 function sqliteQuickCheck(sqliteBin: string, dbPath: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const child = spawn(sqliteBin, [dbPath, "PRAGMA quick_check;"], { stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    child.stdout.on("data", (d) => (stdout += d.toString()));
-    child.on("error", () => resolve(false));
-    child.on("close", (code) => {
-      resolve(code === 0 && stdout.trim() === "ok");
+    const child = spawn(sqliteBin, [dbPath, 'PRAGMA quick_check;'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    child.stdout.on('data', (d) => (stdout += d.toString()));
+    child.on('error', () => resolve(false));
+    child.on('close', (code) => {
+      resolve(code === 0 && stdout.trim() === 'ok');
     });
   });
 }
@@ -112,13 +116,13 @@ function runProcess(
   input?: string
 ): Promise<{ stdout: string; stderr: string; code: number | null }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { stdio: [input !== undefined ? "pipe" : "ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout!.on("data", (d) => (stdout += d.toString()));
-    child.stderr!.on("data", (d) => (stderr += d.toString()));
-    child.on("error", reject);
-    child.on("close", (code) => resolve({ stdout, stderr, code }));
+    const child = spawn(bin, args, { stdio: [input !== undefined ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    child.stdout!.on('data', (d) => (stdout += d.toString()));
+    child.stderr!.on('data', (d) => (stderr += d.toString()));
+    child.on('error', reject);
+    child.on('close', (code) => resolve({ stdout, stderr, code }));
     if (input !== undefined) {
       child.stdin!.write(input);
       child.stdin!.end();
@@ -128,18 +132,18 @@ function runProcess(
 
 function summarizeSqliteWarnings(stderr: string): string {
   const lines = stderr
-    .split("\n")
+    .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
-  if (lines.length === 0) return "";
+  if (lines.length === 0) return '';
 
   const counts = new Map<string, number>();
   for (const line of lines) {
-    const msg = line.replace(/^Parse error near line \d+:\s*/, "");
+    const msg = line.replace(/^Parse error near line \d+:\s*/, '');
     counts.set(msg, (counts.get(msg) ?? 0) + 1);
   }
   const parts = [...counts.entries()].map(([msg, n]) => (n > 1 ? `${msg} (x${n})` : msg));
-  return `${lines.length} warning line(s) applying recovered SQL:${parts.join("; ")}`;
+  return `${lines.length} warning line(s) applying recovered SQL:${parts.join('; ')}`;
 }
 
 async function sqliteRecoverInPlace(
@@ -147,10 +151,10 @@ async function sqliteRecoverInPlace(
   dbPath: string,
   onPreserved: (preservedPath: string) => void
 ): Promise<{ applyWarnings: string }> {
-  const recoverResult = await runProcess(sqliteBin, [dbPath, ".recover"]);
-  if (recoverResult.stdout.trim() === "") {
+  const recoverResult = await runProcess(sqliteBin, [dbPath, '.recover']);
+  if (recoverResult.stdout.trim() === '') {
     throw new Error(
-      `sqlite3 .recover produced no output` + (recoverResult.stderr.trim() ? `: ${recoverResult.stderr.trim()}` : "")
+      `sqlite3 .recover produced no output` + (recoverResult.stderr.trim() ? `: ${recoverResult.stderr.trim()}` : '')
     );
   }
 
@@ -161,11 +165,11 @@ async function sqliteRecoverInPlace(
   if (!(await pathExists(repairedPath))) {
     await fsp.rm(repairedPath, { force: true });
     throw new Error(
-      `sqlite3 did not produce a repaired file` + (applyResult.stderr.trim() ? `: ${applyResult.stderr.trim()}` : "")
+      `sqlite3 did not produce a repaired file` + (applyResult.stderr.trim() ? `: ${applyResult.stderr.trim()}` : '')
     );
   }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const corruptBackupPath = `${dbPath}.corrupt-${timestamp}`;
   await fsp.copyFile(dbPath, corruptBackupPath);
   onPreserved(corruptBackupPath);
