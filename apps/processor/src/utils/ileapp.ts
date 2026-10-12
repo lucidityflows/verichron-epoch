@@ -5,6 +5,9 @@ import * as path from 'node:path';
 import { promisify } from 'node:util';
 import type { IleappParams, ToolVersion } from '@verichron/contracts';
 
+import { closeWriteStream } from './fs.js';
+import { killProcessGroup, trackProcessGroup } from './processGroup.js';
+
 /**
  * Running iLEAPP over a decrypt, the processor's third derivative (EPOCH-416).
  *
@@ -95,25 +98,25 @@ export async function runIleapp(opts: IleappRun): Promise<void> {
   ];
   await fsp.mkdir(path.dirname(outputDir), { recursive: true });
   const logStream = fs.createWriteStream(resolve(opts.logPath));
+  // Set by a timeout or a log write failure, including one that only
+  // surfaces when the log is flushed after iLEAPP has exited.
+  let stopReason: Error | null = null;
 
   try {
     await new Promise<void>((resolveRun, reject) => {
       // Its own process group, so a timeout or a failed log can stop
-      // everything iLEAPP started.
+      // everything iLEAPP started; trackProcessGroup forwards a stop sent to
+      // the processor.
       const child = spawn(python, args, {
         cwd: ileappDir,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: true,
       });
-      let stopReason: Error | null = null;
+      const untrack = trackProcessGroup(child.pid);
       const stop = (reason: Error) => {
         if (stopReason) return;
         stopReason = reason;
-        try {
-          process.kill(-child.pid!, 'SIGKILL');
-        } catch {
-          // not started, or already gone
-        }
+        killProcessGroup(child.pid);
       };
       const timer = setTimeout(
         () => stop(new Error(`iLEAPP did not finish within ${opts.timeoutMs / 1000}s and was stopped`)),
@@ -133,18 +136,21 @@ export async function runIleapp(opts: IleappRun): Promise<void> {
       }
       child.on('error', (err) => {
         clearTimeout(timer);
+        untrack();
         reject(stopReason ?? err);
       });
       child.on('close', (code) => {
         clearTimeout(timer);
+        untrack();
         if (stopReason) reject(stopReason);
         else if (code === 0) resolveRun();
         else reject(new Error(`iLEAPP exited with code ${code}`));
       });
     });
   } finally {
-    if (!logStream.destroyed) await new Promise((done) => logStream.end(done));
+    await closeWriteStream(logStream);
   }
+  if (stopReason) throw stopReason;
   if (!fs.existsSync(outputDir)) {
     throw new Error(`iLEAPP exited cleanly but wrote no report at ${outputDir}`);
   }

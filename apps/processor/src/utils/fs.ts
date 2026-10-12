@@ -1,3 +1,4 @@
+import type * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -47,4 +48,17 @@ export async function writeFileAtomic(p: string, data: string): Promise<void> {
     await fsp.rm(tmp, { force: true });
     throw err;
   }
+}
+
+/**
+ * Ends a write stream and waits until it has closed, after its last write is
+ * flushed or after it failed. A failure is reported through the stream's own
+ * `error` listener, which the caller must have attached.
+ */
+export function closeWriteStream(stream: fs.WriteStream): Promise<void> {
+  return new Promise((resolve) => {
+    if (stream.closed) return resolve();
+    stream.once('close', () => resolve());
+    if (!stream.writableEnded) stream.end();
+  });
 }

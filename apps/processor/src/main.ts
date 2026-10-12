@@ -27,6 +27,7 @@ import {
 import { parseFlags, type Config } from './utils/cli.js';
 import { pathExists, writeFileAtomic, writeMarker } from './utils/fs.js';
 import { ileappInputType, ileappToolVersion, runIleapp } from './utils/ileapp.js';
+import { checkBackup, decryptBackup, isWrongPasswordError, MVT_COLUMNS } from './utils/mvt.js';
 import { hashTree } from './utils/manifest.js';
 import { repairDecrypted } from './utils/repair.js';
 import { promptPassword } from './utils/prompt.js';
@@ -41,39 +42,6 @@ import { writeSummary } from './utils/summary.js';
 const TOOL_VERSION: string = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
 const MAX_PASSWORD_ATTEMPTS = 3;
-
-// mvt-ios/libimobiledevice's own wording for a bad decryption password,
-// observed across versions. Kept as patterns rather than one exact string
-// since this isn't a documented, stable interface -- if the underlying
-// tool changes its phrasing, worst case we fall through to "give up after
-// one attempt" rather than silently retrying on the wrong signal.
-const WRONG_PASSWORD_PATTERNS = [
-  /invalid.*password/i,
-  /wrong.*password/i,
-  /incorrect.*password/i,
-  /unable to decrypt/i,
-  /bad password/i,
-];
-
-/**
- * Carries the captured stderr alongside the usual exit-code failure, so a
- * caller can classify *why* decrypt-backup failed instead of only knowing
- * that it did. The previous runInherited() piped stderr straight to the
- * terminal and discarded it, which made a wrong password indistinguishable
- * from any other failure mode and made a graceful retry impossible.
- */
-class DecryptError extends Error {
-  constructor(
-    message: string,
-    public readonly stderr: string
-  ) {
-    super(message);
-  }
-}
-
-function isWrongPasswordError(err: unknown): boolean {
-  return err instanceof DecryptError && WRONG_PASSWORD_PATTERNS.some((re) => re.test(err.stderr));
-}
 
 async function main() {
   const cfg = parseFlags();
@@ -243,7 +211,7 @@ async function runBackups(
         }
 
         try {
-          await decryptBackup(cfg, src, decDir, pw);
+          await decryptBackup({ mvtBin: cfg.mvtBin, env: mvtEnv(cfg), src, dest: decDir, password: pw });
           decrypted = true;
         } catch (err) {
           // Never keep retrying every later backup with a password we
@@ -358,7 +326,13 @@ async function runBackups(
       // check-backup is rewriting them.
       await fsp.rm(resMarker, { force: true });
       try {
-        await checkBackup(cfg, decDir, resDir, logPath, iocs.dataFolder);
+        await checkBackup({
+          mvtBin: cfg.mvtBin,
+          env: mvtEnv(cfg, iocs.dataFolder),
+          decryptedDir: decDir,
+          resultsDir: resDir,
+          logPath,
+        });
         await writeFileAtomic(resMarker, renderCheckMarker(contentRoot, mvtTool, iocSet));
         console.log('  [check]   done ->', resDir);
       } catch (err) {
@@ -443,8 +417,12 @@ function mvtEnv(cfg: Config, dataFolder: string = path.join(cfg.mvtHome, 'data')
     ...process.env,
     MVT_DATA_FOLDER: dataFolder,
     MVT_CONFIG_FOLDER: path.join(cfg.mvtHome, 'config'),
+    // One message per line: rich wraps at 80 columns in a pipe (utils/mvt.ts).
+    COLUMNS: MVT_COLUMNS,
   };
   delete env.MVT_STIX2;
+  // The password reaches decrypt-backup only through its own call (utils/mvt.ts).
+  delete env.MVT_IOS_BACKUP_PASSWORD;
   return env;
 }
 
@@ -581,69 +559,6 @@ async function hashBackup(cfg: Config, name: string, src: string): Promise<strin
       ` (${result.fileCount} files, ${result.hashed} hashed, ${result.reused} cached, root ${result.contentRoot})`
   );
   return result.contentRoot;
-}
-
-/**
- * Same visible behavior as the old runInherited() call this replaces for
- * decrypt-backup specifically: stdout/stderr still stream live to the
- * console as they arrive. The difference is stderr is also buffered so a
- * failure can be classified afterward (see DecryptError / isWrongPasswordError)
- * instead of being discarded the moment it hit the terminal.
- */
-function runCaptured(bin: string, args: string[], env: NodeJS.ProcessEnv): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { stdio: ['inherit', 'pipe', 'pipe'], env });
-    let stderr = '';
-    child.stdout.on('data', (chunk) => process.stdout.write(chunk));
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-      process.stderr.write(chunk);
-    });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new DecryptError(`${bin} exited with code ${code}`, stderr));
-    });
-  });
-}
-
-async function decryptBackup(cfg: Config, src: string, dest: string, password: string): Promise<void> {
-  await fsp.mkdir(dest, { recursive: true });
-  await runCaptured(cfg.mvtBin, ['decrypt-backup', '-p', password, '-d', dest, src], mvtEnv(cfg));
-}
-
-async function checkBackup(
-  cfg: Config,
-  decryptedDir: string,
-  resultsDir: string,
-  logPath: string,
-  iocDataFolder: string
-): Promise<void> {
-  await fsp.mkdir(resultsDir, { recursive: true });
-  const logStream = fs.createWriteStream(logPath);
-
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(cfg.mvtBin, ['check-backup', '--output', resultsDir, decryptedDir], {
-      stdio: ['inherit', 'pipe', 'pipe'],
-      env: mvtEnv(cfg, iocDataFolder),
-    });
-
-    child.stdout.on('data', (chunk) => {
-      process.stdout.write(chunk);
-      logStream.write(chunk);
-    });
-    child.stderr.on('data', (chunk) => {
-      process.stderr.write(chunk);
-      logStream.write(chunk);
-    });
-
-    child.on('error', reject);
-    child.on('close', (code) => {
-      logStream.end();
-      if (code === 0) resolve();
-      else reject(new Error(`mvt-ios check-backup exited with code ${code}`));
-    });
-  });
 }
 
 function runInherited(bin: string, args: string[], env: NodeJS.ProcessEnv): Promise<void> {
