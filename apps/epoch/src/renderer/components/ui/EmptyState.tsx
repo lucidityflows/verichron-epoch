@@ -14,19 +14,19 @@ interface EmptyStateProps {
 /**
  * What a view or panel shows when it has no data to show: nothing selected,
  * nothing loaded yet, or nothing found (EPOCH-464, DESIGN.md §6). One look
- * everywhere: centered in the space it fills, an icon (or spinner) in an
- * accent chip, the state in one line, and an optional muted detail. Errors are not empty states; they use the
- * flag banner (§1).
+ * everywhere: centered in the space it fills, an icon (or spinner) in a chip
+ * of the view's section colour (§9), the state in one line, and an optional
+ * muted detail. Errors are not empty states; they use the flag banner (§1).
  */
 export function EmptyState({ icon: Icon, title, detail, loading = false }: EmptyStateProps) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center py-16">
-      {/* The accent icon chip, as on New Investigation's panels (§1: elevation, not borders). */}
-      <div className="mb-2 p-3 rounded-full bg-accent/10 text-accent shadow-elevation-1">
-        {loading ? <Loader size="md" label={title} /> : Icon && <Icon size="1.5rem" strokeWidth={1.5} />}
+      {/* The section-coloured icon chip (§9); elevation, not borders (§1). */}
+      <div className="mb-2 p-5 rounded-full bg-section/20 text-section shadow-elevation-2 ring-1 ring-section/40">
+        {loading ? <Loader size="md" label={title} /> : Icon && <Icon size="1.75rem" strokeWidth={1.75} />}
       </div>
-      <p className="text-data text-foreground">{title}</p>
-      {detail && <p className="text-data font-mono text-muted-foreground max-w-xl">{detail}</p>}
+      <p className="font-display text-heading text-foreground">{title}</p>
+      {detail && <p className="text-data text-muted-foreground max-w-xl">{detail}</p>}
     </div>
   );
 }

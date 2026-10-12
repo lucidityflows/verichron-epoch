@@ -91,7 +91,7 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
   const iocRecords = pivots.filter((r) => isIocSourceType(r.source_type));
 
   return (
-    <ViewLayout title="Indicator Matches">
+    <ViewLayout section="iocs" title="Indicator Matches">
       {!selectedRun ? (
         <EmptyState
           icon={MousePointerClick}

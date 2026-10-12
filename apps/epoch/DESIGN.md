@@ -82,6 +82,13 @@ semibold) and titles ended up smaller than their own descriptions.
 only. Content stays `text-data`; labels stay `text-label`. In order of size:
 `text-display` > `text-heading` > `text-data` > `text-label`.
 
+*Fixed 2026-10-12 (EPOCH-484):* `cn()` merges classes with tailwind-merge,
+which didn't know these names. It read them as text colours and dropped
+`text-label` from `text-label text-background`, so every `Button` rendered at
+the inherited 16px and outranked the card titles above it. `libs/utils.ts`
+now registers the scale as font sizes. A new type-scale class is added there
+too.
+
 ## 3. Spacing scale — 4px grid, with one named exception
 
 Unlike elevation and type scale, Tailwind's default spacing utilities
@@ -179,8 +186,10 @@ content edge or the title (EPOCH-464).
   outer padding or margin of its own; doing so is what made the edge jump
   between 32px and 64px.
 - **Title:** `ViewLayout` renders the view's one `text-display` title (§2) as
-  an `h1` in `text-accent`, with 24px (`mb-6`) below the header. An optional
-  description sits under it, and an optional aside (e.g. a count) beside it.
+  an `h1` in the foreground colour, beside an icon chip in the view's section
+  colour (§9), with 24px (`mb-6`) below the header. An optional description
+  sits under it, and an optional aside (e.g. a count) beside it. Each view
+  passes its `section`.
 - **Width:** `full` by default. Form-like views use `readable`, which caps the
   width at `max-w-4xl` (896px) but stays left-aligned, so the left edge
   matches every other view. Views are never centered.
@@ -191,9 +200,9 @@ content edge or the title (EPOCH-464).
 - **No data:** every state with nothing to show (nothing selected, still
   loading, nothing found, evidence not registered) is an `EmptyState`
   (`components/ui/EmptyState.tsx`): centered in the space it fills, its icon
-  (or a spinner while loading) in an accent chip (`bg-accent/10 text-accent`,
-  the same chip as New Investigation's panels), the state in one `text-data`
-  line in the foreground color, and an optional muted detail. A view never
+  (or a spinner while loading) in a chip of the view's section colour
+  (`bg-section/20 text-section`, §9), the state as one `text-heading` line in
+  the foreground colour, and an optional muted `text-data` detail. A view never
   shows a bare line of text for these. One exception: a view that is loading
   *into a table* shows a skeleton of that table (as `RunsView` does), so the
   layout doesn't jump from a centered spinner to a full table when the rows
@@ -242,3 +251,100 @@ pull had anywhere to go.
 - **A running operation locks its inputs.** While it runs, the choice, its
   steps and Change are disabled, and leaving the view and coming back shows
   the operation still running (its state lives in the main process).
+
+## 9. Colour roles — one meaning per colour
+
+Decided 2026-10-12 (EPOCH-484), after the New Investigation page read as
+dull: one cyan marked selection, progress, information and success alike (30
+times as text on that page), the three surface tiers barely separated
+(1.14:1 and 1.17:1), and 13 improvised surface opacities layered panels
+unevenly.
+
+**Each colour has one meaning.** A state uses its role's colour, never
+another state's.
+
+| Token | Means | Examples |
+|---|---|---|
+| `accent` | Interactive, selected, current, in progress | Primary button, selected device, the current step, a running pull or analysis |
+| `success` | Done and verified | A backup verified as finished, installed tools, a completed step |
+| `flag` | You must act, or caution | "Action Needed" on the iPhone, an unfinished backup, encryption consent |
+| `danger` | Failed or destructive | A failed pull, setup failure, Delete |
+| `foreground` / `muted-foreground` | Information | Notes, paths, explanations |
+
+**Role tints have three strengths:** `/10` for a banner or row fill, `/20`
+for an icon chip on a tinted banner, `/30` for a state banner's border (§1).
+
+**Surfaces have four tiers, lightest on top:** `inset` (wells: logs, inputs,
+command lines, progress tracks), `background` (the page), `surface` (cards),
+`surface-raised` (panels inside a card). Components use these tokens, never a
+`bg-surface/NN` opacity. The one exception is the dimmed scrim behind a
+modal (`bg-background/80`).
+
+**Contrast is measured, not judged.** Every role and section colour is at
+least 4.5:1 (WCAG AA for body text) on every surface tier. Values on
+2026-10-12, as contrast against inset / background / surface / surface-raised:
+
+| Token | HSL | Contrast |
+|---|---|---|
+| `foreground` | 220 15% 92% | 16.1 / 15.6 / 13.7 / 11.2 |
+| `muted-foreground` | 222 18% 68% | 8.1 / 7.8 / 6.9 / 5.7 |
+| `accent` | 188 78% 52% | 9.9 / 9.6 / 8.4 / 6.9 |
+| `success` | 152 60% 50% | 9.4 / 9.1 / 8.0 / 6.5 |
+| `flag` | 36 90% 58% | 9.7 / 9.4 / 8.2 / 6.7 |
+| `danger` | 4 85% 67% | 6.6 / 6.4 / 5.6 / 4.6 |
+| `section-runs` | 268 80% 74% | 7.3 / 7.0 / 6.2 / 5.1 |
+| `section-records` | 212 85% 66% | 7.4 / 7.2 / 6.3 / 5.2 |
+| `section-iocs` | 326 75% 70% | 7.4 / 7.2 / 6.3 / 5.2 |
+| `section-reports` | 244 80% 76% | 7.1 / 6.9 / 6.0 / 4.9 |
+
+Text on a filled accent, success or danger button uses `background`: 9.6,
+9.1 and 6.4:1. The tiers separate by 1.03 (inset to background), 1.14
+(background to surface) and 1.22 (surface to raised).
+
+The surface tiers are `inset` 6%, `background` 8%, `surface` 14% and
+`surface-raised` 21% lightness, at hue 224, saturation 32%: deep blue ink
+rather than grey, so the page itself carries colour. A new colour token is
+added only with its contrast on every tier recorded here, and is defined in
+`:root` so the light theme (§4) stays a same-file change.
+
+**Each section has a colour.** The five sidebar sections each have an
+identity colour, in the hue range 210–330 that no role uses, so a section
+colour never reads as a state:
+
+| Section | Token |
+|---|---|
+| New Investigation | `section-workspace` (the accent) |
+| Investigations | `section-runs`, violet |
+| Forensic Records | `section-records`, blue |
+| Indicator Matches | `section-iocs`, pink |
+| Reports | `section-reports`, periwinkle |
+
+A section colour marks only where you are: the section's icon in the sidebar
+(always), the current section's sidebar tint and bar, the view's title chip
+and the soft glow behind its header, the view's empty states and its tip. It
+is never used for a state, an action or data. Components use it as
+`text-section` and `bg-section/NN`; `ViewLayout` sets `--section` for its view
+(`components/layout/sections.ts`).
+
+**The sidebar recedes.** The sidebar sits on `inset`, the darkest tier, so
+the view beside it leads. Page titles are in the foreground colour, not the
+accent: a title isn't interactive. The brand mark is the one gradient
+(accent, blue, violet) in the app.
+
+**Choices look choosable.** A selectable option (an iPhone to back up) is a
+card with a 2px `accent/30` outline at rest, the full `accent` outline on
+hover, and an `accent/10` fill with the `accent` outline once selected. Its
+action reads **Select**, as a filled accent button, while choosing is the
+current step. The current step's action is always the primary (filled)
+button; it becomes an outline button once the step is done.
+
+**Steps show their state.** A multi-step flow (§8) shows its steps as a
+numbered rail: pending (muted), current (accent ring), done (success check),
+blocked (flag). The iPhone pull uses it (`PullSteps`).
+
+**Applied so far:** the New Investigation page (`WorkspaceView`,
+`DevicePullPanel`, `BackupProgressCard`, `BackupRow`, `ToolSetup`), and
+app-wide the tokens, the sidebar, `ViewLayout`, `EmptyState` and `Badge`
+(running is accent, succeeded and complete are success). The other views'
+own panels still use surface opacities and adopt the roles as they are next
+changed.

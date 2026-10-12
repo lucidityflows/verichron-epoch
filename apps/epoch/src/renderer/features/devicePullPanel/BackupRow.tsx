@@ -34,8 +34,8 @@ export function BackupRow({
 
   return (
     <label
-      className={`flex items-center gap-3.5 px-4 py-3 text-data cursor-pointer select-none transition-colors ${
-        selected ? 'bg-surface-raised/40' : 'hover:bg-surface-raised/30'
+      className={`flex items-center gap-3 px-4 py-3 text-data cursor-pointer select-none transition-colors ${
+        selected ? 'bg-accent/10' : 'hover:bg-surface'
       } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <input
@@ -45,11 +45,11 @@ export function BackupRow({
         disabled={disabled}
         className="accent-accent w-4 h-4 rounded cursor-pointer shrink-0"
       />
-      <Smartphone size="1.125rem" className="text-muted-foreground shrink-0" />
+      <Smartphone size="1.125rem" className={`shrink-0 ${selected ? 'text-accent' : 'text-muted-foreground'}`} />
       <span className="font-mono text-foreground truncate flex-1 font-medium" title={backup.path}>
         {backup.label}
       </span>
-      {lastResult === 'done' && <CheckCircle2 size="1.125rem" className="text-accent shrink-0" />}
+      {lastResult === 'done' && <CheckCircle2 size="1.125rem" className="text-success shrink-0" />}
       {lastResult === 'failed' && <XCircle size="1.125rem" className="text-danger shrink-0" />}
     </label>
   );
@@ -72,17 +72,17 @@ function LiveBackupRow({
   let statusClass = 'text-muted-foreground';
 
   if (progress.overall === 'running') {
-    icon = <Loader2 size="1.125rem" className="text-flag shrink-0 animate-spin" />;
+    icon = <Loader2 size="1.125rem" className="text-accent shrink-0 animate-spin" />;
     statusText = awaitingPassword
       ? 'Waiting for password'
       : runningStage
         ? `${STAGE_LABELS[runningStage]}…`
         : 'Working…';
-    statusClass = 'text-flag';
+    statusClass = awaitingPassword ? 'text-flag' : 'text-accent';
   } else if (progress.overall === 'done') {
-    icon = <CheckCircle2 size="1.125rem" className="text-accent shrink-0" />;
+    icon = <CheckCircle2 size="1.125rem" className="text-success shrink-0" />;
     statusText = 'Complete';
-    statusClass = 'text-accent';
+    statusClass = 'text-success';
   } else if (progress.overall === 'failed') {
     icon = <XCircle size="1.125rem" className="text-danger shrink-0" />;
     statusText = failedStage
@@ -93,13 +93,13 @@ function LiveBackupRow({
 
   return (
     <div
-      className={`flex items-center gap-3.5 px-4 py-3 text-data transition-colors ${
+      className={`flex items-center gap-3 px-4 py-3 text-data transition-colors ${
         progress.overall === 'running'
-          ? 'bg-flag/5'
+          ? 'bg-accent/10'
           : progress.overall === 'done'
-            ? 'bg-accent/5'
+            ? 'bg-success/10'
             : progress.overall === 'failed'
-              ? 'bg-danger/5'
+              ? 'bg-danger/10'
               : ''
       }`}
     >

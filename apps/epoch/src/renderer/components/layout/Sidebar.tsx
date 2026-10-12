@@ -1,7 +1,8 @@
 import React from 'react';
-import { Database, Activity, Target, FileText, PlusCircle } from 'lucide-react';
+import { Hourglass } from 'lucide-react';
+import { SECTIONS, SECTION_ORDER, sectionStyle, type Section } from './sections';
 
-export type Section = 'workspace' | 'runs' | 'records' | 'iocs' | 'reports';
+export type { Section } from './sections';
 
 interface SidebarProps {
   active: Section;
@@ -9,55 +10,70 @@ interface SidebarProps {
   dbStatus: 'connected' | 'error' | 'unknown';
 }
 
+/**
+ * The app's navigation. It sits on the darkest tier (`inset`) so the view
+ * beside it leads; each section's icon carries its section colour, and the
+ * current one is marked with a bar and a tint in that colour (DESIGN.md §9).
+ */
 export function Sidebar({ active, onSelect, dbStatus }: SidebarProps) {
-  const navItems = [
-    { id: 'workspace', label: 'New Investigation', icon: PlusCircle },
-    { id: 'runs', label: 'Investigations', icon: Activity },
-    { id: 'records', label: 'Forensic Records', icon: Database },
-    { id: 'iocs', label: 'Indicator Matches', icon: Target },
-    { id: 'reports', label: 'Reports', icon: FileText },
-  ] as const;
-
   return (
-    <div className="w-64 bg-surface shadow-elevation-2 flex flex-col h-full">
-      <div className="p-6 shadow-elevation-1">
-        <div className="flex items-center justify-between">
-          <h1 className="font-display text-display text-foreground tracking-tight">Epoch</h1>
-          <span className="text-2xs font-mono text-muted-foreground uppercase tracking-widest px-1.5 py-0.5 rounded bg-surface-raised shadow-elevation-1">
+    <div className="w-64 bg-inset shadow-elevation-2 flex flex-col h-full">
+      <div className="px-5 pt-6 pb-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-accent via-section-records to-section-runs text-inset shadow-elevation-2">
+            <Hourglass size="1.125rem" strokeWidth={2.25} />
+          </div>
+          <h1 className="font-display text-display text-foreground tracking-tight flex-1">Epoch</h1>
+          <span className="text-2xs font-mono text-muted-foreground uppercase tracking-widest px-2 py-0.5 rounded bg-surface">
             v0.1
           </span>
         </div>
-        <div className="flex items-center gap-2 mt-3 px-2.5 py-1 rounded-md bg-surface-raised/60 shadow-elevation-1 w-fit">
-          <div
+        <div className="flex items-center gap-2 mt-4 text-label">
+          <span
             className={`w-2 h-2 rounded-full shrink-0 ${
               dbStatus === 'connected'
-                ? 'bg-accent shadow-xs shadow-accent/50'
+                ? 'bg-success shadow-[0_0_6px] shadow-success/70'
                 : dbStatus === 'error'
-                  ? 'bg-danger shadow-xs shadow-danger/50'
+                  ? 'bg-danger shadow-[0_0_6px] shadow-danger/70'
                   : 'bg-muted-foreground animate-pulse'
             }`}
           />
-          <span className="text-2xs font-mono text-muted-foreground font-medium tracking-wider">
-            {dbStatus === 'connected' ? 'DB CONNECTED' : dbStatus === 'error' ? 'DB ERROR' : 'CONNECTING…'}
+          <span
+            className={
+              dbStatus === 'connected' ? 'text-success' : dbStatus === 'error' ? 'text-danger' : 'text-muted-foreground'
+            }
+          >
+            {dbStatus === 'connected'
+              ? 'Database connected'
+              : dbStatus === 'error'
+                ? 'Database unavailable'
+                : 'Connecting to the database…'}
           </span>
         </div>
       </div>
 
-      <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto">
-        {navItems.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => onSelect(id as Section)}
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer select-none ${
-              active === id
-                ? 'bg-accent/15 text-accent font-semibold shadow-elevation-1'
-                : 'text-foreground/70 hover:bg-surface-raised hover:text-foreground'
-            }`}
-          >
-            <Icon size="1.125rem" className="shrink-0" />
-            <span>{label}</span>
-          </button>
-        ))}
+      <nav className="flex-1 px-3 pb-3 flex flex-col gap-1 overflow-y-auto">
+        {SECTION_ORDER.map((id) => {
+          const { label, icon: Icon } = SECTIONS[id];
+          const current = active === id;
+          return (
+            <button
+              key={id}
+              onClick={() => onSelect(id)}
+              style={sectionStyle(id)}
+              aria-current={current ? 'page' : undefined}
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-data font-medium transition-colors cursor-pointer select-none ${
+                current
+                  ? 'bg-section/15 text-section font-semibold'
+                  : 'text-foreground/75 hover:bg-surface hover:text-foreground'
+              }`}
+            >
+              {current && <span aria-hidden className="absolute left-0 top-2 bottom-2 w-1 rounded-r bg-section" />}
+              <Icon size="1.125rem" className="shrink-0 text-section" />
+              <span>{label}</span>
+            </button>
+          );
+        })}
       </nav>
     </div>
   );
