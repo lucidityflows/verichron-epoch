@@ -40,6 +40,8 @@ case "$STUB_MVT" in
     read typed || { echo "no input" >&2; exit 4; } ;;
   slow)
     sleep 30 ;;
+  chatty)
+    echo "INFO           [mvt.ios.modules] Extracting records" ;;
 esac
 exit 0
 `
@@ -107,6 +109,11 @@ describe('checkBackup (EPOCH-486)', () => {
     const log = path.join(tmp, 'check.log');
     await run('ok', log);
     assert.ok(existsSync(log));
+  });
+
+  it('fails the check when a log write fails after mvt has already exited', async () => {
+    // Every write to /dev/full fails with ENOSPC; mvt prints one line and exits at once.
+    await assert.rejects(run('chatty', '/dev/full'), /could not write the check-backup log \/dev\/full/);
   });
 
   it('stops mvt and fails the check when its log cannot be written, instead of exiting the processor', async () => {

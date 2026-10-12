@@ -2,6 +2,10 @@ import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 
+import { closeWriteStream } from './fs.js';
+import { lineReader } from './lines.js';
+import { killProcessGroup, trackProcessGroup } from './processGroup.js';
+
 /**
  * Running mvt-ios's decrypt-backup and check-backup (EPOCH-486).
  *
@@ -41,22 +45,6 @@ export class DecryptError extends Error {
 
 export function isWrongPasswordError(err: unknown): boolean {
   return err instanceof DecryptError && WRONG_PASSWORD_PATTERNS.some((re) => re.test(err.output));
-}
-
-/** Splits a stream into lines as it arrives, keeping the partial last line for the next chunk. */
-function lineReader(onLine: (line: string) => void): { push: (chunk: Buffer) => void; end: () => void } {
-  let carry = '';
-  return {
-    push(chunk) {
-      const parts = (carry + chunk.toString('utf8')).split('\n');
-      carry = parts.pop() ?? '';
-      parts.forEach(onLine);
-    },
-    end() {
-      if (carry) onLine(carry);
-      carry = '';
-    },
-  };
 }
 
 /**
@@ -138,23 +126,23 @@ export async function checkBackup(opts: {
 }): Promise<void> {
   await fsp.mkdir(opts.resultsDir, { recursive: true });
   const logStream = fs.createWriteStream(opts.logPath);
+  // Set by a log write failure, including one that only surfaces when the
+  // log is flushed after mvt has exited: the check fails either way.
+  let logError: Error | null = null;
   try {
     await new Promise<void>((resolve, reject) => {
-      // Its own process group, so a failed log stops everything mvt started.
+      // Its own process group, so a failed log stops everything mvt started;
+      // trackProcessGroup forwards a stop sent to the processor.
       const child = spawn(opts.mvtBin, ['check-backup', '--output', opts.resultsDir, opts.decryptedDir], {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: opts.env,
         detached: true,
       });
-      let stopReason: Error | null = null;
+      const untrack = trackProcessGroup(child.pid);
       logStream.on('error', (err) => {
-        if (stopReason) return;
-        stopReason = new Error(`could not write the check-backup log ${opts.logPath}: ${err.message}`);
-        try {
-          process.kill(-child.pid!, 'SIGKILL');
-        } catch {
-          // not started, or already gone
-        }
+        if (logError) return;
+        logError = new Error(`could not write the check-backup log ${opts.logPath}: ${err.message}`);
+        killProcessGroup(child.pid);
       });
       for (const [stream, out] of [
         [child.stdout, process.stdout],
@@ -165,14 +153,19 @@ export async function checkBackup(opts: {
           if (!logStream.destroyed) logStream.write(chunk);
         });
       }
-      child.on('error', (err) => reject(stopReason ?? err));
+      child.on('error', (err) => {
+        untrack();
+        reject(logError ?? err);
+      });
       child.on('close', (code) => {
-        if (stopReason) reject(stopReason);
+        untrack();
+        if (logError) reject(logError);
         else if (code === 0) resolve();
         else reject(new Error(`mvt-ios check-backup exited with code ${code}`));
       });
     });
   } finally {
-    if (!logStream.destroyed) await new Promise((done) => logStream.end(done));
+    await closeWriteStream(logStream);
   }
+  if (logError) throw logError;
 }

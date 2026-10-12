@@ -141,4 +141,24 @@ describe('streamed recovery (EPOCH-486)', () => {
       'no partial file left'
     );
   });
+
+  it('rejects SQL from a .recover that did not finish, so no partial database replaces the original', async () => {
+    for (const [name, recover] of [
+      ['sqlite3-recover-fails', 'echo "CREATE TABLE t(x);"; exit 3'],
+      ['sqlite3-recover-killed', 'echo "CREATE TABLE t(x);"; kill -9 $$'],
+    ]) {
+      const sqlite = stubSqlite(name, recover, 'cat > /dev/null; touch "$1"');
+      const decDir = path.join(tmp, `${name}-decrypt`);
+      const db = path.join(decDir, 'HomeDomain', 'sms.db');
+      sqliteFile(db);
+
+      const repair = await repairDecrypted({ sqliteBin: sqlite } as Config, decDir);
+
+      assert.equal(repair.status, 'ran');
+      if (repair.status !== 'ran') return;
+      assert.deepEqual(repair.failed_files, ['HomeDomain/sms.db'], name);
+      assert.deepEqual(repair.preserved_originals, [], `${name}: nothing was replaced`);
+      assert.match(readFileSync(db, 'latin1'), /^SQLite format 3/, `${name}: the original is untouched`);
+    }
+  });
 });

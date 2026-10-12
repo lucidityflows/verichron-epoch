@@ -2,7 +2,9 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pipeline } from 'node:stream';
+import { StringDecoder } from 'node:string_decoder';
 import { walkFiles, pathExists } from './fs.js';
+import { lineReader } from './lines.js';
 import type { RepairProvenance } from '@verichron/contracts';
 import { sqliteVersion } from './resolver.js';
 import type { Config } from './cli.js';
@@ -118,19 +120,16 @@ const MAX_RECOVER_STDERR = 64 * 1024;
 
 /** Counts sqlite3's warning lines as they arrive, by message, without keeping the stream. */
 class WarningCounter {
-  private carry = '';
+  private readonly reader = lineReader((line) => this.add(line));
   private lines = 0;
   private readonly counts = new Map<string, number>();
 
   push(chunk: Buffer): void {
-    const parts = (this.carry + chunk.toString('utf8')).split('\n');
-    this.carry = parts.pop() ?? '';
-    parts.forEach((line) => this.add(line));
+    this.reader.push(chunk);
   }
 
   summary(): string {
-    this.add(this.carry);
-    this.carry = '';
+    this.reader.end();
     if (this.lines === 0) return '';
     const parts = [...this.counts.entries()].map(([msg, n]) => (n > 1 ? `${msg} (x${n})` : msg));
     return `${this.lines} warning line(s) applying recovered SQL:${parts.join('; ')}`;
@@ -184,8 +183,9 @@ function recoverInto(
     recover.stdout.on('data', (chunk: Buffer) => {
       if (!producedSql && chunk.toString('utf8').trim() !== '') producedSql = true;
     });
+    const stderrDecoder = new StringDecoder('utf8');
     recover.stderr.on('data', (chunk: Buffer) => {
-      if (recoverStderr.length < MAX_RECOVER_STDERR) recoverStderr += chunk.toString('utf8');
+      if (recoverStderr.length < MAX_RECOVER_STDERR) recoverStderr += stderrDecoder.write(chunk);
     });
     apply.stderr.on('data', (chunk: Buffer) => warnings.push(chunk));
     pipeline(recover.stdout, apply.stdin, (err) =>
@@ -193,8 +193,19 @@ function recoverInto(
     );
     recover.on('error', (err) => fail(err));
     apply.on('error', (err) => fail(err));
-    recover.on('close', doneOne);
-    apply.on('close', doneOne);
+    // .recover exits 0 when it finishes, even for a badly damaged database
+    // (verified with sqlite3 3.46.1). Any other exit means its SQL may stop
+    // short, and a database built from it would pass quick_check while
+    // missing rows. sqlite3's exit code when applying the SQL reflects parse
+    // warnings, counted above, so only a signal fails that side.
+    recover.on('close', (code, signal) =>
+      code === 0 && !signal
+        ? doneOne()
+        : fail(new Error(`sqlite3 .recover did not finish (${signal ?? `exit ${code}`})`))
+    );
+    apply.on('close', (_code, signal) =>
+      signal ? fail(new Error(`sqlite3 was stopped by ${signal} while rebuilding the database`)) : doneOne()
+    );
   });
 }
 

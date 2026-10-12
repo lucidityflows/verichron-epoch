@@ -45,6 +45,7 @@ describe('runIleapp (EPOCH-416)', () => {
     python,
     `#!/bin/sh
 [ "$STUB_ILEAPP" = hang ] && sleep 60
+echo "Processes completed."
 [ -d "$5" ] || { echo "no input at $5 from $(pwd)" >&2; exit 3; }
 mkdir "$7/$9"
 `
@@ -98,5 +99,13 @@ mkdir "$7/$9"
       else process.env.STUB_ILEAPP = previous;
     }
     assert.ok(Date.now() - started < 30_000, 'iLEAPP was stopped, not left running');
+  });
+
+  it('fails the run when a log write fails after iLEAPP has already exited', async () => {
+    // Every write to /dev/full fails with ENOSPC; the stub prints a line and exits at once.
+    await assert.rejects(
+      runIleapp({ ...base('full-log'), logPath: '/dev/full' }),
+      /could not write the iLEAPP log \/dev\/full/
+    );
   });
 });
