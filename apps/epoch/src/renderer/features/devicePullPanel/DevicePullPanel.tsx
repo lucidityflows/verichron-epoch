@@ -25,12 +25,17 @@ import { CopyButton } from '../../components/ui/CopyButton';
 import { BackupProgressCard, IncompleteBackupNotice } from './BackupProgressCard';
 import type { DeviceInfo } from '../../../shared/types/tools';
  
-/** What the Copy button on a pull error copies: enough to diagnose it elsewhere. */
+/**
+ * What the Copy button on a pull error copies: enough to diagnose it
+ * elsewhere. The device's UDID is replaced, since the copy may be pasted
+ * somewhere public; the password never reaches the tool's output (R30).
+ */
 function pullDiagnostics(error: string, device: DeviceInfo | null, log: string[]): string {
   const deviceLine = device
     ? `${device.name}${device.model ? ` (${device.model})` : ''}${device.osVersion ? `, iOS ${device.osVersion}` : ''}`
     : 'none selected';
-  return [`Epoch iPhone pull failed`, `Device: ${deviceLine}`, `Error: ${error}`, '', 'Log:', ...log].join('\n');
+  const text = [`Epoch iPhone pull failed`, `Device: ${deviceLine}`, `Error: ${error}`, '', 'Log:', ...log].join('\n');
+  return device ? text.split(device.id).join('<device UDID>') : text;
 }
 
 interface DevicePullPanelProps {

@@ -44,3 +44,34 @@ export function lastLines(output: string, n = 20): string[] {
     .filter((line) => line.length > 0)
     .slice(-n);
 }
+
+/**
+ * stdout and stderr joined line by line, as they arrive. Each stream keeps
+ * its own unfinished line, so a stdout line without a line break is never
+ * glued to the next stderr line ("Receiving filesErrorCode 208: …").
+ * Progress bars redrawn with `\r` end a line too. Keeps the last `limit`
+ * characters.
+ */
+export class StreamLines {
+  private text = '';
+  private readonly carry: Record<'stdout' | 'stderr', string> = { stdout: '', stderr: '' };
+
+  constructor(private readonly limit = Infinity) {}
+
+  take(stream: 'stdout' | 'stderr', chunk: string): void {
+    const parts = (this.carry[stream] + chunk).split(/[\r\n]/);
+    this.carry[stream] = parts.pop() ?? '';
+    for (const part of parts) this.append(part);
+  }
+
+  /** The output so far, with each stream's unfinished line as its own line. */
+  output(): string {
+    const pending = [this.carry.stdout, this.carry.stderr].filter((line) => line.length > 0);
+    return pending.length > 0 ? `${this.text}${pending.join('\n')}\n` : this.text;
+  }
+
+  private append(line: string): void {
+    if (line.trim().length === 0) return;
+    this.text = (this.text + line + '\n').slice(-this.limit);
+  }
+}

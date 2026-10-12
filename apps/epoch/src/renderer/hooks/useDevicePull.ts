@@ -261,7 +261,8 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       setIncomplete(await devicesApi.listIncompleteBackups(sourceId, selectedDevice, destDir));
     } catch (err) {
       setIncomplete([]);
-      setPullError(ipcErrorMessage(err));
+      // A failed pull's own error stays; this lookup runs right after it.
+      setPullError((prev) => prev ?? ipcErrorMessage(err));
     }
   }, [sourceId, selectedDevice, destDir]);
 
