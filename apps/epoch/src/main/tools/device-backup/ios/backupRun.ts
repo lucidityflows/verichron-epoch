@@ -119,8 +119,13 @@ export async function existingBackupState(
 ): Promise<'finished' | 'unfinished' | 'unrecognised' | null> {
   try {
     await fs.access(backupDir);
-  } catch {
-    return null;
+  } catch (err) {
+    // Only a missing folder means a pull may write there. Any other error
+    // (EACCES, EPERM, ELOOP) is raised, so a folder this check couldn't
+    // inspect is never written into.
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return null;
+    throw err;
   }
   const state = await snapshotState(plistutil, backupDir);
   if (state === null) return 'unrecognised';

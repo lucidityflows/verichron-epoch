@@ -152,6 +152,29 @@ describe('existingBackupState', () => {
     fs.mkdirSync(backupDir());
     assert.equal(await existingBackupState(fakePlistutil(status('finished')), backupDir()), 'unrecognised');
   });
+
+  it('is null when a file stands where the parent folder would be (ENOTDIR)', async () => {
+    fs.writeFileSync(path.join(tmp, 'NOT-A-FOLDER'), '');
+    const dir = path.join(tmp, 'NOT-A-FOLDER', 'DEVICE');
+    assert.equal(await existingBackupState(fakePlistutil(status('finished')), dir), null);
+  });
+
+  it(
+    'raises an error it cannot read past, rather than letting a pull write there',
+    { skip: process.getuid?.() === 0 && 'root ignores folder permissions' },
+    async () => {
+      const locked = path.join(tmp, 'LOCKED');
+      fs.mkdirSync(path.join(locked, 'DEVICE'), { recursive: true });
+      fs.chmodSync(locked, 0o000);
+      try {
+        await assert.rejects(existingBackupState(fakePlistutil(status('finished')), path.join(locked, 'DEVICE')), {
+          code: 'EACCES',
+        });
+      } finally {
+        fs.chmodSync(locked, 0o700);
+      }
+    }
+  );
 });
 
 describe('incompleteReason', () => {
