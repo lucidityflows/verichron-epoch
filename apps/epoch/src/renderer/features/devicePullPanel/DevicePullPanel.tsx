@@ -22,7 +22,7 @@ import { PasswordField } from '../../components/ui/PasswordField';
 import { FieldError } from '../../components/ui/FieldError';
 import { ToolSetup } from './ToolSetup';
 import { CopyButton } from '../../components/ui/CopyButton';
-import { BackupProgressCard, IncompleteBackupNotice } from './BackupProgressCard';
+import { BackupProgressCard, DestinationBackupNotice, IncompleteBackupNotice } from './BackupProgressCard';
 import type { DeviceInfo } from '../../../shared/types/tools';
 
 /**
@@ -70,6 +70,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
     incomplete,
     deleteIncomplete,
     deletingIncomplete,
+    destinationBackup,
     runCompileFromSource,
     setupStatus,
     setupRun,
@@ -85,8 +86,8 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
 
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  // Incomplete backups the user chose to keep; not offered again this session.
-  const [keptIncomplete, setKeptIncomplete] = useState<string[]>([]);
+  // Incomplete backups in other folders the user set aside; not shown again this session.
+  const [setAside, setSetAside] = useState<string[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const terminalRef = useRef<HTMLPreElement>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
@@ -156,7 +157,9 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
   };
 
   const pullLocked = phase === 'pulling' || encryptionConsent;
-  const askPassword = !!selectedDevice && !!destDir && phase !== 'pulling' && phase !== 'pulled';
+  // A destination that already holds a backup of the device is refused (EPOCH-483), so
+  // there is nothing to ask a password for until another folder is chosen.
+  const askPassword = !!selectedDevice && !!destDir && !destinationBackup && phase !== 'pulling' && phase !== 'pulled';
 
   if (!sourceId) return null;
 
@@ -464,10 +467,16 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           {selectedDevice && destDir && phase !== 'pulled' && !encryptionConsent && (
             <Button
               onClick={() => onPullClick()}
-              disabled={!passwordProvided}
+              disabled={!passwordProvided || !!destinationBackup}
               loading={phase === 'pulling'}
               loadingText="Pulling encrypted backup…"
-              title={!passwordProvided ? 'Enter a backup password to continue' : undefined}
+              title={
+                destinationBackup
+                  ? 'This folder already holds a backup of this device'
+                  : !passwordProvided
+                    ? 'Enter a backup password to continue'
+                    : undefined
+              }
             >
               Pull Encrypted Backup
             </Button>
@@ -518,22 +527,46 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           )}
           {phase !== 'pulling' &&
             selectedDevice &&
+            destinationBackup &&
+            // An unfinished backup here is shown below, with Delete It, once its size is known.
+            !(
+              destinationBackup.state === 'unfinished' &&
+              incomplete.some((backup) => backup.path === destinationBackup.path)
+            ) && (
+              <DestinationBackupNotice
+                deviceName={selectedDevice.name}
+                destination={destinationBackup}
+                onChooseAnotherFolder={onChooseDestination}
+              />
+            )}
+          {phase !== 'pulling' &&
+            selectedDevice &&
             incomplete
-              .filter((backup) => !keptIncomplete.includes(backup.path))
-              .map((backup) => (
-                <IncompleteBackupNotice
-                  key={backup.path}
-                  deviceName={selectedDevice.name}
-                  incomplete={backup}
-                  deleting={deletingIncomplete === backup.path}
-                  onDelete={() => deleteIncomplete(backup)}
-                  onKeep={() => setKeptIncomplete((prev) => [...prev, backup.path])}
-                />
-              ))}
+              .filter((backup) => backup.path === destinationBackup?.path || !setAside.includes(backup.path))
+              .map((backup) => {
+                const blocksPull = backup.path === destinationBackup?.path;
+                return (
+                  <IncompleteBackupNotice
+                    key={backup.path}
+                    deviceName={selectedDevice.name}
+                    incomplete={backup}
+                    deleting={deletingIncomplete === backup.path}
+                    blocksPull={blocksPull}
+                    onDelete={() => deleteIncomplete(backup)}
+                    secondary={
+                      blocksPull
+                        ? { label: 'Choose Another Folder', onClick: onChooseDestination }
+                        : { label: 'Not Now', onClick: () => setSetAside((prev) => [...prev, backup.path]) }
+                    }
+                  />
+                );
+              })}
           {phase === 'pulled' && (
             <div className="text-data text-accent bg-accent/10 border border-accent/30 shadow-elevation-1 rounded-lg p-4 mt-4 flex items-center gap-2">
               <CheckCircle2 size="1.125rem" className="shrink-0" />
-              <span>Encrypted backup imported successfully and ready for analysis.</span>
+              <span>
+                {pullProgress[pullProgress.length - 1]?.message ?? 'Backup complete and verified as finished.'}
+              </span>
             </div>
           )}
         </div>

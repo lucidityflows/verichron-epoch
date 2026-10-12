@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import type {
   BackupProgress,
   BackupStats,
+  DestinationBackup,
   DevicePullState,
   IncompleteBackup,
   DeviceInfo,
@@ -55,6 +56,8 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   const [incomplete, setIncomplete] = useState<IncompleteBackup[]>([]);
   // The path being deleted, if any.
   const [deletingIncomplete, setDeletingIncomplete] = useState<string | null>(null);
+  // What the chosen destination already holds for the device (EPOCH-483); a pull there is refused.
+  const [destinationBackup, setDestinationBackup] = useState<DestinationBackup | null>(null);
 
   // Maintain refs to prevent effect re-registrations on transient prop/state changes
   const onBackupPulledRef = useRef(onBackupPulled);
@@ -309,10 +312,26 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     }
   }, [sourceId, selectedDevice, destDir]);
 
-  // An earlier pull may have left an incomplete backup in the chosen folder.
+  const refreshDestination = useCallback(async () => {
+    if (!sourceId || !selectedDevice || !destDir) {
+      setDestinationBackup(null);
+      return;
+    }
+    try {
+      setDestinationBackup(await devicesApi.checkPullDestination(sourceId, selectedDevice, destDir));
+    } catch (err) {
+      setDestinationBackup(null);
+      setPullError((prev) => prev ?? ipcErrorMessage(err));
+    }
+  }, [sourceId, selectedDevice, destDir]);
+
+  // An earlier pull may have left a backup in the chosen folder, or in another one.
   useEffect(() => {
-    if (phase === 'available') void refreshIncomplete();
-  }, [phase, refreshIncomplete]);
+    if (phase === 'available') {
+      void refreshIncomplete();
+      void refreshDestination();
+    }
+  }, [phase, refreshIncomplete, refreshDestination]);
 
   const cancelPull = async () => {
     if (!sourceId) return;
@@ -335,6 +354,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     } finally {
       setDeletingIncomplete(null);
       await refreshIncomplete();
+      await refreshDestination();
     }
   };
 
@@ -349,7 +369,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     enableEncryption = false,
     onStarted?: () => void
   ): Promise<'consent-needed' | 'finished'> => {
-    if (!sourceId || !selectedDevice || !destDir) return 'finished';
+    if (!sourceId || !selectedDevice || !destDir || destinationBackup) return 'finished';
     if (!password || password.trim() === '') {
       setPullError('A backup password is required.');
       return 'finished';
@@ -421,6 +441,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     incomplete,
     deleteIncomplete,
     deletingIncomplete,
+    destinationBackup,
     runCompileFromSource,
     handleSelectDestination,
     handlePull,

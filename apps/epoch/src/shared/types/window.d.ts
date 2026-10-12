@@ -13,6 +13,7 @@ import type {
   DeviceInfo,
   PullOptions,
   BackupStats,
+  DestinationBackup,
   DevicePullState,
   IncompleteBackup,
   ToolAcquisitionAction,
@@ -136,6 +137,11 @@ declare global {
         destDir: string | null
       ) => Promise<IncompleteBackup[]>;
       deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) => Promise<void>;
+      checkPullDestination: (
+        sourceId: string,
+        device: DeviceInfo,
+        destDir: string
+      ) => Promise<DestinationBackup | null>;
       onDeviceBackupStats: (callback: (stats: BackupStats) => void) => () => void;
       runToolAcquisitionSteps: (
         steps: ToolAcquisitionCommand[],

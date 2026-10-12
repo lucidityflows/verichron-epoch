@@ -7,6 +7,7 @@ import type {
   DeviceInfo,
   PullOptions,
   BackupStats,
+  DestinationBackup,
   DevicePullState,
   IncompleteBackup,
   ToolAcquisitionAction,
@@ -130,6 +131,8 @@ const dbApi = {
     ipcRenderer.invoke('epoch:listIncompleteBackups', sourceId, device, destDir),
   deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo): Promise<void> =>
     ipcRenderer.invoke('epoch:deleteIncompleteBackup', sourceId, destDir, device),
+  checkPullDestination: (sourceId: string, device: DeviceInfo, destDir: string): Promise<DestinationBackup | null> =>
+    ipcRenderer.invoke('epoch:checkPullDestination', sourceId, device, destDir),
   onDeviceBackupStats: (callback: (stats: BackupStats) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, stats: BackupStats) => callback(stats);
     ipcRenderer.on('epoch:deviceBackupStats', listener);

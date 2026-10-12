@@ -67,6 +67,18 @@ export interface BackupStats {
   estimatedBytes: number | null;
 }
 
+/**
+ * What a pull destination already holds for the device (EPOCH-483). A pull
+ * never writes into it: a finished backup is evidence, and an unfinished one
+ * can't be resumed.
+ */
+export interface DestinationBackup {
+  destDir: string;
+  /** The device's folder inside destDir. */
+  path: string;
+  state: 'finished' | 'unfinished' | 'unrecognised';
+}
+
 /** A backup folder left by a pull that didn't finish. */
 export interface IncompleteBackup {
   /** The folder the pull wrote to; `path` is the device's folder inside it. */
@@ -116,6 +128,8 @@ export interface DeviceBackupSource {
   ): Promise<string>;
   /** Stops the running pull; false when none is running. */
   cancelPull(): boolean;
+  /** What destDir already holds for the device; null when a pull may write there. */
+  destinationBackup(destDir: string, device: DeviceInfo): Promise<DestinationBackup | null>;
   incompleteBackup(destDir: string, device: DeviceInfo): Promise<IncompleteBackup | null>;
   deleteIncompleteBackup(destDir: string, device: DeviceInfo): Promise<void>;
 }
