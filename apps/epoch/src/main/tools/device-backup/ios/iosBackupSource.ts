@@ -154,7 +154,7 @@ export class IosBackupSource implements DeviceBackupSource {
 
   /**
    * The device's backup folder in `destDir` when it holds a backup that
-   * didn't finish (Status.plist's SnapshotState isn't "finished"). Such a
+   * didn't finish (it has a Status.plist whose SnapshotState isn't "finished"). Such a
    * folder can't be used; the next pull starts over in it.
    */
   async incompleteBackup(destDir: string, device: DeviceInfo): Promise<IncompleteBackup | null> {
@@ -166,7 +166,10 @@ export class IosBackupSource implements DeviceBackupSource {
     } catch {
       return null;
     }
-    if ((await snapshotState(plistutil, backupDir)) === 'finished') return null;
+    // Only a folder a backup wrote its state to counts: a folder without
+    // Status.plist isn't recognisably a backup, so it is never offered for deletion.
+    const state = await snapshotState(plistutil, backupDir);
+    if (state === null || state === 'finished') return null;
     return { destDir, path: backupDir, bytes: await folderSize(backupDir) };
   }
 
@@ -278,6 +281,7 @@ export class IosBackupSource implements DeviceBackupSource {
 
     if (this.cancelRequested !== null) throw new Error('A backup is already running.');
     this.cancelRequested = false;
+    let recorded = false;
     try {
       // The device checks the computer's free space before it starts and
       // refuses with ErrorCode 105 when it judges it too small. Check first,
@@ -334,6 +338,20 @@ export class IosBackupSource implements DeviceBackupSource {
         cancelled: () => this.cancelRequested === true,
       });
       record.outcome = 'completed';
+      record.finished_at = new Date().toISOString();
+      // The record is written before "done", so a completed pull is never
+      // reported without it: it may be the only note that Epoch turned on the
+      // device's encrypted backups.
+      try {
+        await appendPullRecord(destDir, record);
+      } catch (err) {
+        recorded = true; // Not retried in finally.
+        fail(
+          `The backup of ${device.name} completed, but its pull record couldn't be written in ${destDir}: ` +
+            (err instanceof Error ? err.message : String(err))
+        );
+      }
+      recorded = true;
       onProgress({ phase: 'done', message: 'Backup complete.' });
       return destDir;
     } catch (err) {
@@ -343,13 +361,10 @@ export class IosBackupSource implements DeviceBackupSource {
     } finally {
       this.running = null;
       this.cancelRequested = null;
-      record.finished_at = new Date().toISOString();
-      try {
-        await appendPullRecord(destDir, record);
-      } catch (err) {
-        // A completed pull without its record fails; a failed pull keeps its own error.
-        if (record.outcome === 'completed') throw err;
-        console.error('Failed to record the device pull', err);
+      // A failed or cancelled pull keeps its own error if the record can't be written.
+      if (!recorded) {
+        record.finished_at = new Date().toISOString();
+        await appendPullRecord(destDir, record).catch((err) => console.error('Failed to record the device pull', err));
       }
     }
   }

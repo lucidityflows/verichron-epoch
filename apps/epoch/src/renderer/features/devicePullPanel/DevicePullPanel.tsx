@@ -475,7 +475,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           {deviceAction && phase === 'pulling' && (
             <div
               role="alert"
-              className="flex items-center gap-4 bg-accent/10 border-2 border-accent/60 shadow-elevation-2 rounded-lg p-5 mt-5"
+              className="flex items-center gap-4 bg-accent/10 border border-accent/30 shadow-elevation-1 rounded-lg p-5 mt-5"
             >
               <div className="p-3 rounded-full bg-accent/15 text-accent shrink-0">
                 <Smartphone size="1.5rem" />
