@@ -43,6 +43,19 @@ export class OutputParser {
 }
 
 /**
+ * How far the backup has got, as a percentage of the size estimate (EPOCH-466).
+ * The device's own overall figure isn't used: iOS doesn't say what it
+ * measures, and on a real run it read 35–50% when 86 of about 96 GB had
+ * arrived. The estimate is an upper bound, so this stays at 99 until the
+ * tool reports the backup finished. Null when there is no estimate.
+ */
+export function receivedPercent(receivedBytes: number, estimatedBytes: number | null, finished: boolean): number | null {
+  if (finished) return 100;
+  if (!estimatedBytes || estimatedBytes <= 0) return null;
+  return Math.min(99, Math.floor((receivedBytes / estimatedBytes) * 100));
+}
+
+/**
  * Total size of the files under `dir` modified at or after `sinceMs`; 0 when
  * it doesn't exist yet. `sinceMs` leaves out an earlier backup's files that
  * this run hasn't rewritten.

@@ -18,7 +18,7 @@ import { manifestMatchesPins, readManifest } from './toolchain';
 import { enableBackupEncryption, PASSCODE_TIMEOUT_MS } from './encryption';
 import { failureMessage } from './deviceErrors';
 import { lastLines } from './toolchain/process';
-import { folderSize, OutputParser, snapshotState, type OutputEvent } from './backupRun';
+import { folderSize, OutputParser, receivedPercent, snapshotState, type OutputEvent } from './backupRun';
 import { appendPullRecord, type PullRecord } from './pullRecord';
 
 export interface DecryptionOptions {
@@ -406,8 +406,8 @@ interface RunControl {
 }
 
 /**
- * Runs `idevicebackup2 backup --full`, reporting its lines, its overall
- * percentage and the data received so far. Lines before "Receiving files"
+ * Runs `idevicebackup2 backup --full`, reporting its lines, the data
+ * received so far and that as a percentage of the size estimate. Lines before "Receiving files"
  * are setup ('preparing'), so the device-action banner stays up until files
  * arrive. Rejects with the device's reason when it fails.
  */
@@ -434,12 +434,17 @@ function runBackup(
     let output = '';
     let receiving = false;
     let stallWarned = false;
+    let finished = false;
     const parser = new OutputParser();
     const handle = (events: OutputEvent[]) => {
       for (const event of events) {
         if (event.kind === 'percent') {
-          stats.percent = event.value;
-          onStats({ ...stats });
+          // Only the device's "finished" matters; see receivedPercent.
+          if (event.value >= 100 && !finished) {
+            finished = true;
+            stats.percent = receivedPercent(stats.receivedBytes, estimatedBytes, finished);
+            onStats({ ...stats });
+          }
         } else if (event.text.includes(BACKUP_PASSCODE_PROMPT)) {
           onProgress({ phase: 'device-action', message: `Enter the passcode on ${device.name} now to start the backup.` });
         } else {
@@ -470,6 +475,7 @@ function runBackup(
         if (received > stats.receivedBytes) {
           stats.receivedBytes = received;
           stats.lastDataAt = now;
+          stats.percent = receivedPercent(received, estimatedBytes, finished);
           if (stallWarned) {
             stallWarned = false;
             onProgress({ phase: 'transferring', message: `Data is arriving from ${device.name} again.` });

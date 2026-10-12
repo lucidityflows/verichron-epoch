@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
-import { folderSize, OutputParser, snapshotState } from './backupRun';
+import { folderSize, OutputParser, receivedPercent, snapshotState } from './backupRun';
 
 let tmp: string;
 
@@ -46,6 +46,24 @@ describe('OutputParser', () => {
       { kind: 'line', text: 'ErrorCode 208: Device locked (MBErrorDomain/208)' },
     ]);
     assert.deepEqual(parser.flush(), [{ kind: 'line', text: 'Backup' }]);
+  });
+});
+
+describe('receivedPercent', () => {
+  const GB = 1e9;
+
+  it('measures received data against the estimate', () => {
+    assert.equal(receivedPercent(48 * GB, 96 * GB, false), 50);
+  });
+
+  it('stays at 99 until the backup finishes', () => {
+    // The estimate is an upper bound; a real run reached 86 of about 96 GB.
+    assert.equal(receivedPercent(96 * GB, 95.9 * GB, false), 99);
+    assert.equal(receivedPercent(86 * GB, 95.9 * GB, true), 100);
+  });
+
+  it('has no percentage without an estimate', () => {
+    assert.equal(receivedPercent(10 * GB, null, false), null);
   });
 });
 
