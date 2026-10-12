@@ -54,6 +54,9 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
   ipcMain.handle('epoch:listConnectedDevices', async (_event, sourceId: string) => {
     const source = getDeviceBackupSource(sourceId);
     if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    // No device queries during a pull (EPOCH-467): the device being backed up is the one listed.
+    const running = pull.current();
+    if (running) return [running.device];
     return source.listConnectedDevices();
   });
 
@@ -103,6 +106,9 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     if (pull.running()) throw new Error('A device backup is running; cancel it before deleting.');
     const source = getDeviceBackupSource(sourceId);
     if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    // Only a folder an earlier pull wrote to, so the renderer can't name an arbitrary one.
+    const known = await readPullDestinations(app.getPath('userData'));
+    if (!known.includes(destDir)) throw new Error(`${destDir} isn't a folder Epoch has pulled a backup to.`);
     return source.deleteIncompleteBackup(destDir, device);
   });
 
