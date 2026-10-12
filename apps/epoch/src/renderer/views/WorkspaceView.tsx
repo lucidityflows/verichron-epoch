@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FolderOpen, HardDrive, Play, AlertCircle, ChevronDown, ChevronRight, CheckCircle2, XCircle, Pencil, Microscope, ArrowRight } from 'lucide-react';
+import { FolderOpen, HardDrive, Play, Smartphone, AlertCircle, ChevronDown, ChevronRight, CheckCircle2, XCircle, Pencil, Microscope, ArrowRight } from 'lucide-react';
 import { BackupRow } from '../features/devicePullPanel/BackupRow';
 import { TerminalLog } from '../components/layout/TerminalLog';
 import { DevicePullPanel } from '../features/devicePullPanel/DevicePullPanel';
@@ -9,6 +9,7 @@ import type { MvtLogEntry, MvtFinishedResult, StartPipelineOptions } from '../..
 import type { Backup } from '@verichron/contracts';
 import { applyMvtLogLine, initMvtRunProgress, type MvtRunProgress } from '../libs/mvtLogParser';
 import { pipelineApi } from '../api/pipeline';
+import { devicesApi } from '../api/devices';
 import { ViewLayout } from '../components/layout/ViewLayout';
 
 
@@ -18,6 +19,21 @@ export interface WorkspaceViewProps {
 
 export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  // How the evidence is imported (EPOCH-467): null until the user chooses, so
+  // only the chosen path is on screen.
+  const [importSource, setImportSource] = useState<'device' | null>(null);
+
+  // A pull still running from before this view mounted is shown, not hidden
+  // behind the choice.
+  useEffect(() => {
+    let active = true;
+    devicesApi.getDevicePullState().then((running) => {
+      if (active && running) setImportSource('device');
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [backups, setBackups] = useState<Backup[]>([]);
   const [discoveringBackups, setDiscoveringBackups] = useState(false);
@@ -325,30 +341,25 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       width="readable"
       className="gap-7"
     >
-      {!selectedPath ? (
-        <>
-          <DevicePullPanel onBackupPulled={handleBackupPulled} />
-          <div
-            onClick={handleSelectDirectory}
-            className="group relative flex flex-col items-center justify-center p-12 border-2 border-dashed border-border/90 rounded-2xl bg-surface/30 hover:bg-surface/60 hover:border-accent/60 cursor-pointer transition-all shadow-elevation-1"
-          >
-            <div className="bg-surface-raised p-4 rounded-full shadow-elevation-1 mb-4 group-hover:scale-105 group-hover:shadow-elevation-2 transition-all">
-              <FolderOpen size="2rem" className="text-muted-foreground group-hover:text-accent transition-colors" />
-            </div>
-            <h2 className="font-display text-heading text-foreground mb-1">Use an Existing Backup</h2>
-            <p className="text-data text-muted-foreground mb-5 text-center max-w-md">
-              Choose the folder containing your iPhone backups. Epoch will identify compatible backups automatically.
-            </p>
-            {/* Decorative -- the parent div (not this element) owns the click handler and
-                group-hover state, so this stays a plain styled button rather than <Button>. */}
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 bg-surface-raised shadow-elevation-1 group-hover:shadow-elevation-2 group-hover:bg-accent group-hover:text-background text-foreground px-4 py-2 rounded-lg text-label transition-all pointer-events-none"
-            >
-              <FolderOpen size="1rem" /> Choose Backup Folder
-            </button>
-          </div>
-        </>
+      {!selectedPath && importSource === 'device' ? (
+        <DevicePullPanel onBackupPulled={handleBackupPulled} onChangeSource={() => setImportSource(null)} />
+      ) : !selectedPath ? (
+        <div className="grid gap-5 sm:grid-cols-2">
+          <ImportChoice
+            icon={<Smartphone size="2rem" />}
+            title="Pull from a Connected iPhone"
+            description="Make a new encrypted backup of an iPhone connected to this computer by USB."
+            action="Connect an iPhone"
+            onChoose={() => setImportSource('device')}
+          />
+          <ImportChoice
+            icon={<FolderOpen size="2rem" />}
+            title="Use an Existing Backup"
+            description="Choose the folder containing your iPhone backups. Epoch will identify compatible backups automatically."
+            action="Choose Backup Folder"
+            onChoose={handleSelectDirectory}
+          />
+        </div>
       ) : (
         <>
           <div className="flex items-center gap-3 bg-surface shadow-elevation-1 rounded-xl px-4 py-3">
@@ -689,5 +700,32 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         </div>
       )}
     </ViewLayout>
+  );
+}
+interface ImportChoiceProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  action: string;
+  onChoose: () => void;
+}
+
+/** One way to import evidence; choosing it hides the other (EPOCH-467). */
+function ImportChoice({ icon, title, description, action, onChoose }: ImportChoiceProps) {
+  return (
+    <button
+      type="button"
+      onClick={onChoose}
+      className="group flex flex-col items-center text-center p-8 rounded-2xl bg-surface shadow-elevation-1 hover:shadow-elevation-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+    >
+      <div className="p-4 rounded-full bg-accent/10 text-accent mb-4 group-hover:scale-105 transition-transform">
+        {icon}
+      </div>
+      <h2 className="font-display text-heading text-foreground mb-1">{title}</h2>
+      <p className="text-data text-muted-foreground mb-5 max-w-md">{description}</p>
+      <span className="inline-flex items-center gap-1.5 bg-surface-raised shadow-elevation-1 group-hover:bg-accent group-hover:text-background text-foreground px-4 py-2 rounded-lg text-label transition-all">
+        {action}
+      </span>
+    </button>
   );
 }

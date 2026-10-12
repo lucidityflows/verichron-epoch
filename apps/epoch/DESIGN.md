@@ -204,7 +204,7 @@ Decided 2026-10-09 (EPOCH-464), following the common desktop convention
   titles, dialog titles and buttons ("New Investigation", "Backups Found",
   "Pull Encrypted Backup"). Articles, coordinating conjunctions and
   prepositions of four letters or fewer stay lowercase unless first or last
-  ("Import from iPhone", "Install with Homebrew").
+  ("Pull from a Connected iPhone", "Install with Homebrew").
 - **Sentence case for sentences:** descriptions, status lines, empty-state
   lines, banners and their headings, errors, field labels, tooltips and
   placeholders ("No investigation selected", "Setup failed", "Backup
@@ -218,3 +218,23 @@ Decided 2026-10-09 (EPOCH-464), following the common desktop convention
   *investigation*; "run" is a pipeline term and doesn't appear in the UI's
   names.
 
+
+## 8. Progressive disclosure — one step at a time, secrets only while needed
+
+Decided 2026-10-11 (EPOCH-467), after a real-device pull: both import paths
+were on screen at once, and the backup password was asked for before the
+pull had anywhere to go.
+
+- **Choose first.** Where a task has alternative paths (pull from a
+  connected iPhone, or use an existing backup), the view asks which one
+  before showing either. Choosing one hides the others; **Change** goes back
+  to the choice.
+- **Steps appear in order.** A step is shown once the steps before it are
+  complete: device, then destination, then password, then the action.
+- **Sensitive fields appear only while needed.** A password field appears
+  only when the action that uses it is next, and is cleared when it is hidden
+  or its inputs change (another device, another folder, another import path),
+  and as soon as the action has taken it.
+- **A running operation locks its inputs.** While it runs, the choice, its
+  steps and Change are disabled, and leaving the view and coming back shows
+  the operation still running (its state lives in the main process).

@@ -40,9 +40,11 @@ function pullDiagnostics(error: string, device: DeviceInfo | null, log: string[]
 
 interface DevicePullPanelProps {
   onBackupPulled: (destDir: string) => void;
+  /** Returns to the choice of import source; unavailable while a pull runs. */
+  onChangeSource: () => void;
 }
  
-export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
+export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPanelProps) {
   const {
     sources,
     sourceId,
@@ -90,6 +92,22 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
   const [stickToBottom, setStickToBottom] = useState(true);
  
   const passwordProvided = password.trim() !== '';
+
+  // The password is asked for only once there is a device and a folder to pull
+  // to, and it doesn't outlive either (EPOCH-467, DESIGN.md §8): choosing
+  // another device or folder clears it, and so does the pull starting, which
+  // already has it.
+  const clearPassword = () => {
+    setPassword('');
+    setPasswordError(null);
+  };
+  const onChooseDevice = (device: DeviceInfo) => {
+    if (device.id !== selectedDevice?.id) clearPassword();
+    setSelectedDevice(device);
+  };
+  const onChooseDestination = async () => {
+    if (await handleSelectDestination()) clearPassword();
+  };
  
   const handleCopy = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
@@ -125,7 +143,7 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
     setPasswordError(null);
     let result: 'consent-needed' | 'finished' = 'finished';
     try {
-      result = await handlePull(password, enableEncryption);
+      result = await handlePull(password, enableEncryption, clearPassword);
     } finally {
       // Kept while the user decides whether to turn on encrypted backups.
       if (result !== 'consent-needed') setPassword('');
@@ -138,6 +156,7 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
   };
 
   const pullLocked = phase === 'pulling' || encryptionConsent;
+  const askPassword = !!selectedDevice && !!destDir && phase !== 'pulling' && phase !== 'pulled';
 
   if (!sourceId) return null;
  
@@ -147,9 +166,10 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
         <div className="p-2 rounded-lg bg-accent/10 text-accent">
           <Smartphone size="1.25rem" />
         </div>
-        <h2 className="font-display text-heading text-foreground">Import from iPhone</h2>
+        <h2 className="font-display text-heading text-foreground">Pull from a Connected iPhone</h2>
         {sources.length > 1 && (
           <select
+            disabled={pullLocked}
             value={sourceId}
             onChange={(e) => setSourceId(e.target.value)}
             className="ml-auto bg-surface-raised border border-border rounded-lg px-3 py-2 text-label font-mono text-foreground focus:border-accent focus:outline-none"
@@ -161,6 +181,16 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
             ))}
           </select>
         )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onChangeSource}
+          disabled={pullLocked}
+          title={pullLocked ? 'Finish or cancel the pull first' : 'Choose another way to import'}
+          className={sources.length > 1 ? 'shrink-0' : 'ml-auto shrink-0'}
+        >
+          Change
+        </Button>
       </div>
  
       {phase === 'checking' && !setupStatus && (
@@ -349,7 +379,8 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
                     type="radio"
                     name="device"
                     checked={selectedDevice?.id === d.id}
-                    onChange={() => setSelectedDevice(d)}
+                    onChange={() => onChooseDevice(d)}
+                    disabled={pullLocked}
                     className="accent-accent"
                   />
                   <span className="text-foreground">{d.name}</span>
@@ -366,7 +397,7 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleSelectDestination}
+                  onClick={onChooseDestination}
                   disabled={pullLocked}
                 >
                   <FolderOpen size="0.875rem" />
@@ -381,25 +412,26 @@ export function DevicePullPanel({ onBackupPulled }: DevicePullPanelProps) {
                 )}
               </div>
 
-              {/* Secure Backup Password Input */}
-              <div className="mt-2 pt-3 shadow-elevation-1">
-                <label className="text-label text-foreground mb-1 flex items-center gap-2">
-                  <Lock size="0.875rem" className="text-accent" /> Backup password (required)
-                </label>
-                <p className="text-data text-muted-foreground mb-2">
-                  Epoch makes encrypted backups only, because unencrypted ones leave out Keychain and Health data. If
-                  this iPhone already makes encrypted backups, enter its backup password. Otherwise, this becomes its
-                  backup password.
-                </p>
-                <PasswordField
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); if (passwordError) setPasswordError(null); }}
-                  disabled={pullLocked}
-                  placeholder="Backup password"
-                  invalid={!!passwordError}
-                />
-                <FieldError>{passwordError}</FieldError>
-              </div>
+              {askPassword && (
+                <div className="mt-2 pt-3 shadow-elevation-1">
+                  <label className="text-label text-foreground mb-1 flex items-center gap-2">
+                    <Lock size="0.875rem" className="text-accent" /> Backup password (required)
+                  </label>
+                  <p className="text-data text-muted-foreground mb-2">
+                    Epoch makes encrypted backups only, because unencrypted ones leave out Keychain and Health data. If
+                    this iPhone already makes encrypted backups, enter its backup password. Otherwise, this becomes its
+                    backup password.
+                  </p>
+                  <PasswordField
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); if (passwordError) setPasswordError(null); }}
+                    disabled={pullLocked}
+                    placeholder="Backup password"
+                    invalid={!!passwordError}
+                  />
+                  <FieldError>{passwordError}</FieldError>
+                </div>
+              )}
             </div>
           )}
  

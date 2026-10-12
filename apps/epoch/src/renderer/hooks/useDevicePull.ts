@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import type {
   BackupProgress,
   BackupStats,
+  DevicePullState,
   IncompleteBackup,
   DeviceInfo,
   ToolAcquisitionAction,
@@ -73,6 +74,30 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     });
   }, []);
  
+  /**
+   * Shows a pull the main process is already running (EPOCH-467): the panel
+   * remounted, e.g. after the user left New Investigation, and lost its own
+   * state. A pull that ended before its last event arrived is shown ended.
+   */
+  const restorePull = useCallback((running: DevicePullState) => {
+    setSelectedDevice(running.device);
+    setDestDir(running.destDir);
+    destDirRef.current = running.destDir;
+    setPullProgress(running.progress.filter((p) => p.phase !== 'error'));
+    setPullStats(running.stats);
+    setDeviceAction(running.deviceAction);
+    const last = running.progress[running.progress.length - 1];
+    if (running.ended && last?.phase === 'error') {
+      setPullError(last.message);
+      setPhase('available');
+    } else if (running.ended && last?.phase === 'done') {
+      setPhase('pulled');
+      onBackupPulledRef.current?.(running.destDir);
+    } else {
+      setPhase('pulling');
+    }
+  }, []);
+
   const checkTool = useCallback(async (id: string) => {
     setPhase('checking');
     setAcquisitionStep(null);
@@ -85,6 +110,13 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       const status = await window.epoch.checkDeviceBackupToolAvailable(id);
       setToolStatus(status);
       if (status.available) {
+        // A pull already running owns the device: show it, and don't query the device.
+        const running = await devicesApi.getDevicePullState();
+        if (running && running.sourceId === id) {
+          setDevices([running.device]);
+          restorePull(running);
+          return;
+        }
         setPhase('available');
         const found = await window.epoch.listConnectedDevices(id);
         setDevices(found);
@@ -99,7 +131,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       setAcquisitionStep(null);
       setAcquisitionError(error instanceof Error ? error.message : 'Failed to communicate with the device service.');
     }
-  }, []);
+  }, [restorePull]);
  
   useEffect(() => {
     if (sourceId) checkTool(sourceId);
@@ -153,12 +185,14 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       }
     });
     const unsubProgress = devicesApi.onDeviceBackupProgress((progress) => {
-      // The banner stays up through setup lines and clears once files arrive or the pull ends.
+      // The banner stays up through setup lines and clears once files arrive or
+      // the pull ends; the main process keeps it by the same rule (pullState.ts).
       setDeviceAction((prev) =>
         progress.phase === 'device-action' ? progress.message : progress.phase === 'preparing' ? prev : null
       );
       // An error is shown once, as the pull error, not also in the log.
       if (progress.phase !== 'error') setPullProgress((prev) => [...prev, progress]);
+      if (progress.phase === 'done' || progress.phase === 'error') setCancelling(false);
       if (progress.phase === 'done') {
         setPhase('pulled');
         if (destDirRef.current && onBackupPulledRef.current) {
@@ -247,9 +281,12 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     }
   };
 
-  const handleSelectDestination = async () => {
+  /** Asks for a destination folder; true when it changed. */
+  const handleSelectDestination = async (): Promise<boolean> => {
     const dir = await devicesApi.selectDeviceBackupDestination();
-    if (dir) setDestDir(dir);
+    if (!dir || dir === destDir) return false;
+    setDestDir(dir);
+    return true;
   };
  
   const refreshIncomplete = useCallback(async () => {
@@ -298,9 +335,14 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   /**
    * Pulls a backup. When the device's encrypted backups are off, it first
    * asks the user (EPOCH-466) and returns 'consent-needed'; the pull is then
-   * retried with `enableEncryption` once they agree.
+   * retried with `enableEncryption` once they agree. `onStarted` runs once
+   * the pull has the password, so the caller can drop its copy.
    */
-  const handlePull = async (password: string, enableEncryption = false): Promise<'consent-needed' | 'finished'> => {
+  const handlePull = async (
+    password: string,
+    enableEncryption = false,
+    onStarted?: () => void
+  ): Promise<'consent-needed' | 'finished'> => {
     if (!sourceId || !selectedDevice || !destDir) return 'finished';
     if (!password || password.trim() === '') {
       setPullError('A backup password is required.');
@@ -325,7 +367,9 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     setEncryptionConsent(false);
     setPhase('pulling');
     try {
-      await devicesApi.pullDeviceBackup(sourceId, selectedDevice, destDir, { password, enableEncryption });
+      const pulling = devicesApi.pullDeviceBackup(sourceId, selectedDevice, destDir, { password, enableEncryption });
+      onStarted?.();
+      await pulling;
     } catch (err) {
       // The pull usually reported its error as progress already.
       setPullError((prev) => prev ?? ipcErrorMessage(err));

@@ -7,6 +7,7 @@ import type {
   DeviceInfo,
   PullOptions,
   BackupStats,
+  DevicePullState,
   IncompleteBackup,
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
@@ -117,6 +118,7 @@ const dbApi = {
     ipcRenderer.invoke('epoch:listConnectedDevices', sourceId),
   getToolAcquisitionActions: (sourceId: string): Promise<ToolAcquisitionAction[]> =>
     ipcRenderer.invoke('epoch:getToolAcquisitionActions', sourceId),
+  getDevicePullState: (): Promise<DevicePullState | null> => ipcRenderer.invoke('epoch:getDevicePullState'),
   getBackupEncryption: (sourceId: string, device: DeviceInfo): Promise<boolean> =>
     ipcRenderer.invoke('epoch:getBackupEncryption', sourceId, device),
   pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions): Promise<string> =>

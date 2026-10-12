@@ -29,6 +29,8 @@ export interface PullRecord {
   /** Bytes this pull wrote to the backup folder; null when it didn't reach the backup. */
   received_bytes: number | null;
   outcome: 'completed' | 'failed' | 'cancelled';
+  /** Why the pull failed or stopped, as shown to the user; null when it completed. */
+  error: string | null;
 }
 
 export interface IncompleteBackupDeleted {

@@ -125,6 +125,7 @@ describe('appendPullRecord', () => {
       backup_encryption: 'turned-on-by-epoch',
       received_bytes: 1024,
       outcome: 'completed',
+      error: null,
     };
     await appendPullRecord(tmp, record);
     await appendPullRecord(tmp, { ...record, backup_encryption: 'already-on' });
