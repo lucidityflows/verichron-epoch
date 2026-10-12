@@ -34,7 +34,7 @@ export function BackupRow({
 
   return (
     <label
-      className={`flex items-center gap-3.5 px-4 py-3 text-data cursor-pointer select-none transition-colors ${
+      className={`flex items-center gap-3 px-4 py-3 text-data cursor-pointer select-none transition-colors ${
         selected ? 'bg-accent/10' : 'hover:bg-surface'
       } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
     >
@@ -45,7 +45,7 @@ export function BackupRow({
         disabled={disabled}
         className="accent-accent w-4 h-4 rounded cursor-pointer shrink-0"
       />
-      <Smartphone size="1.125rem" className="text-muted-foreground shrink-0" />
+      <Smartphone size="1.125rem" className={`shrink-0 ${selected ? 'text-accent' : 'text-muted-foreground'}`} />
       <span className="font-mono text-foreground truncate flex-1 font-medium" title={backup.path}>
         {backup.label}
       </span>
@@ -93,7 +93,7 @@ function LiveBackupRow({
 
   return (
     <div
-      className={`flex items-center gap-3.5 px-4 py-3 text-data transition-colors ${
+      className={`flex items-center gap-3 px-4 py-3 text-data transition-colors ${
         progress.overall === 'running'
           ? 'bg-accent/10'
           : progress.overall === 'done'

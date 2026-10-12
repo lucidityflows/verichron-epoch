@@ -259,6 +259,7 @@ export function RunsView({
 
   return (
     <ViewLayout
+      section="runs"
       title="Investigations"
       titleAside={
         !loading &&

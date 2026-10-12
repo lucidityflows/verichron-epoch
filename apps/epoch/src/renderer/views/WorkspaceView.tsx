@@ -5,6 +5,7 @@ import {
   Play,
   Smartphone,
   AlertCircle,
+  Lightbulb,
   ChevronDown,
   ChevronRight,
   CheckCircle2,
@@ -350,6 +351,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
   return (
     <ViewLayout
+      section="workspace"
       title="New Investigation"
       description="Import an iPhone backup or connect a device to examine evidence for suspicious activity."
       width="readable"
@@ -472,7 +474,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
               </div>
             )}
 
-            <div className="mt-6 pt-5 shadow-elevation-1">
+            <div className="mt-6 pt-4 border-t border-border/60">
               <Button variant="ghost" size="sm" onClick={() => setShowOptions((v) => !v)} disabled={busy}>
                 {showOptions ? <ChevronDown size="0.9rem" /> : <ChevronRight size="0.9rem" />}
                 Advanced Settings
@@ -680,9 +682,11 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         </div>
       )}
 
-      {!selectedPath && (
-        <div className="flex items-start gap-4 bg-surface-raised shadow-elevation-1 rounded-xl p-4 sm:p-5">
-          <AlertCircle className="text-muted-foreground shrink-0 mt-1" size="1.125rem" />
+      {!selectedPath && importSource === null && (
+        <div className="flex items-start gap-4 bg-surface shadow-elevation-1 rounded-xl p-4 sm:p-5">
+          <div className="p-2 rounded-lg bg-section/15 text-section shrink-0">
+            <Lightbulb size="1.125rem" />
+          </div>
           <p className="text-data text-muted-foreground">
             <strong className="text-foreground font-semibold">Tip:</strong> Connect an iPhone by USB to import a fresh
             backup, or choose an existing backup folder from your computer.
@@ -737,18 +741,18 @@ function ImportChoice({ icon, title, description, action, tone, onChoose }: Impo
     <button
       type="button"
       onClick={onChoose}
-      className="group flex flex-col items-center text-center p-8 rounded-2xl bg-surface shadow-elevation-1 hover:shadow-elevation-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className="group flex flex-col items-center text-center p-8 rounded-2xl bg-surface border-2 border-accent/30 hover:border-accent hover:bg-accent/5 shadow-elevation-1 hover:shadow-elevation-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:border-accent"
     >
       <div
         className={`p-4 rounded-full mb-4 group-hover:scale-105 transition-transform ${
-          tone === 'accent' ? 'bg-accent/10 text-accent' : 'bg-surface-raised text-foreground'
+          tone === 'accent' ? 'bg-accent/15 text-accent ring-1 ring-accent/30' : 'bg-surface-raised text-foreground'
         }`}
       >
         {icon}
       </div>
       <h2 className="font-display text-heading text-foreground mb-1">{title}</h2>
       <p className="text-data text-muted-foreground mb-5 max-w-md">{description}</p>
-      <span className="inline-flex items-center gap-1.5 bg-surface-raised shadow-elevation-1 group-hover:bg-accent group-hover:text-background text-foreground px-4 py-2 rounded-lg text-label transition-all">
+      <span className="inline-flex items-center gap-1.5 bg-accent text-background shadow-elevation-2 group-hover:bg-accent/90 px-4 py-2 rounded-lg text-label font-semibold transition-all">
         {action}
       </span>
     </button>

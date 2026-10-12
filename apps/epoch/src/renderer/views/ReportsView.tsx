@@ -45,7 +45,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
   };
 
   return (
-    <ViewLayout title="Reports">
+    <ViewLayout section="reports" title="Reports">
       {!selectedRun ? (
         <EmptyState
           icon={MousePointerClick}

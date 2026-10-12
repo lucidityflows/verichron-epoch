@@ -3,24 +3,36 @@
 :root {
   /* current dark values -- this is the DEFAULT, not a "dark" override.
      See DESIGN.md §3 -- do not restructure this when light theme lands. */
-  /* Surface tiers (DESIGN.md §9): inset wells < page < cards < raised panels. */
-  --inset: 217 17% 6%;
-  --background: 217 17% 8%;
-  --surface: 217 17% 14%;
-  --surface-raised: 217 17% 21%;
-  --foreground: 47 5% 90%;
+  /* Surface tiers (DESIGN.md §9): inset wells < page < cards < raised panels.
+     Deep blue ink rather than grey, so the page itself carries colour. */
+  --inset: 224 32% 6%;
+  --background: 224 32% 8%;
+  --surface: 224 32% 14%;
+  --surface-raised: 224 32% 21%;
+  --foreground: 220 15% 92%;
   /* Colour roles (DESIGN.md §9); each is at least 4.5:1 on every surface tier. */
-  --accent: 186 54% 54%;
-  --success: 152 48% 52%;
-  --flag: 34 80% 60%;
-  --danger: 6 78% 68%;
-  --border: 217 16% 23%;
-  --muted-foreground: 220 16% 65%;
+  --accent: 188 78% 52%;
+  --success: 152 60% 50%;
+  --flag: 36 90% 58%;
+  --danger: 4 85% 67%;
+  --border: 224 28% 24%;
+  --muted-foreground: 222 18% 68%;
+
+  /* Section colours (DESIGN.md §9): each view's identity, used for its icon in
+     the sidebar, its title chip and its empty states. They sit in the hue
+     range no role uses (210-330), so a section colour never reads as a state. */
+  --section-workspace: var(--accent);
+  --section-runs: 268 80% 74%;
+  --section-records: 212 85% 66%;
+  --section-iocs: 326 75% 70%;
+  --section-reports: 244 80% 76%;
+  /* The current view's section colour; ViewLayout sets it per view. */
+  --section: var(--accent);
 
   /* EPOCH-201: hue-matched shadow tint, not flat black -- keeps shadows
      feeling native to this palette instead of the generic
      rgba(0,0,0,.1) the frontend-design skill flags as an AI-tell. */
-  --shadow-tint: 217 40% 3%;
+  --shadow-tint: 224 50% 3%;
 }
 
 /* Placeholder for the future light/dark toggle (see DESIGN.md §3).
@@ -41,6 +53,11 @@
   --color-danger: hsl(var(--danger));
   --color-border: hsl(var(--border));
   --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-section-workspace: hsl(var(--section-workspace));
+  --color-section-runs: hsl(var(--section-runs));
+  --color-section-records: hsl(var(--section-records));
+  --color-section-iocs: hsl(var(--section-iocs));
+  --color-section-reports: hsl(var(--section-reports));
 
   --font-sans: 'Inter', sans-serif;
   --font-display: 'Space Grotesk', sans-serif;
@@ -77,6 +94,13 @@
                         0 1px 3px hsl(var(--shadow-tint) / 0.3);
   --shadow-elevation-3: 0 12px 32px -6px hsl(var(--shadow-tint) / 0.6),
                         0 2px 6px hsl(var(--shadow-tint) / 0.35);
+}
+
+/* `inline` so `bg-section` resolves `--section` where it is used: ViewLayout
+   sets `--section` on its own element, and a value fixed on :root would ignore
+   that. */
+@theme inline {
+  --color-section: hsl(var(--section));
 }
 
 /* Element defaults live in @layer base, below Tailwind's utilities (EPOCH-464).

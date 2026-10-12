@@ -383,15 +383,27 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
 
       {(phase === 'available' || phase === 'pulling' || phase === 'pulled') && toolStatus?.available && (
         <div>
-          <div className="flex items-center gap-2 text-label text-success uppercase tracking-wider mb-4">
+          <div className="flex items-center gap-1.5 text-label text-success mb-4">
             <CheckCircle2 size="1rem" /> Device service ready
           </div>
 
           <PullSteps steps={pullSteps} />
 
           {devices.length === 0 ? (
-            <div className="p-4 rounded-lg bg-surface-raised shadow-elevation-1 text-data text-muted-foreground">
-              No devices connected. Plug your iPhone in via USB and unlock the screen.
+            // The current step, and the examiner has to act: accent, with its action as the primary button (§9).
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-accent/10 border border-accent/30 shadow-elevation-1">
+              <div className="p-3 rounded-full bg-accent/20 text-accent shrink-0">
+                <Smartphone size="1.25rem" className="animate-pulse" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-display text-heading text-foreground">Connect an iPhone</p>
+                <p className="text-data text-muted-foreground">
+                  Plug the iPhone into this computer by USB and unlock its screen, then check again.
+                </p>
+              </div>
+              <Button size="sm" onClick={checkAvailability} className="shrink-0">
+                <RefreshCw size="0.875rem" /> Check Again
+              </Button>
             </div>
           ) : (
             <div className="mb-5">
