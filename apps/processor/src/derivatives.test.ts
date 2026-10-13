@@ -114,7 +114,8 @@ function runCli(
   extraArgs: string[] = [],
   stubMode = '',
   extraEnv: Record<string, string> = {},
-  typed: string[] = []
+  typed: string[] = [],
+  keepStdinOpen = false
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -154,7 +155,7 @@ function runCli(
       const seen = out.match(/password for \S+: /g)?.length ?? 0;
       for (; prompts < seen && prompts < typed.length; prompts++) {
         child.stdin.write(`${typed[prompts]}\n`);
-        if (prompts === typed.length - 1) child.stdin.end();
+        if (prompts === typed.length - 1 && !keepStdinOpen) child.stdin.end();
       }
     };
     if (typed.length === 0) child.stdin.end('pw\n');
@@ -281,6 +282,15 @@ describe('the decrypt tool (EPOCH-489)', () => {
     assert.equal(readDecryptMarker(decrypted()), null, 'no marker vouches for it');
     await runCli(['--only', 'BK1']);
     assert.ok(readDecryptMarker(decrypted()), 'a clean re-run restores it');
+  });
+
+  it('exits when its work is done while stdin stays open, as the app keeps it (EPOCH-489)', async () => {
+    // The app writes each password to stdin and never closes it. Before the
+    // fix the processor finished, wrote its summary, and then never exited.
+    const started = Date.now();
+    const out = await runCli(['--force-decrypt', '--only', 'BK1'], '', {}, ['pw'], true);
+    assert.match(out, /summary written to/);
+    assert.ok(Date.now() - started < 30_000, 'the processor exited instead of waiting on its open stdin');
   });
 
   it('a new decrypt tool version keeps the decrypt it made', async () => {
