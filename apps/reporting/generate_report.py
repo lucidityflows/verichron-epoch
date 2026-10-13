@@ -302,6 +302,12 @@ def fetch_ileapp_summary(conn, evidence_id: str) -> list[dict]:
         return cur.fetchall()
 
 
+def _table_cell(text: str) -> str:
+    """Text from tool output, made safe for a Markdown table cell: a `|` or a
+    line break would otherwise split the row."""
+    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+
 def _utc(value) -> str:
     return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
@@ -315,7 +321,7 @@ def render_ileapp_section(rows: list[dict]) -> list[str]:
         "| :--- | ---: | ---: | :--- | :--- |",
     ]
     for r in rows:
-        artifact = r["artifact"] or "(no artifact name)"
+        artifact = _table_cell(r["artifact"]) if r["artifact"] else "(no artifact name)"
         if r["timed"] == 0:
             span = "no timeline position | "
         else:

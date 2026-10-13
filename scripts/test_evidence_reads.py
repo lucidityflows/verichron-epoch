@@ -427,6 +427,25 @@ def test_the_report_summarizes_ileapp_records_by_artifact(db, tmp_path):
     assert "ROW-CONTENT" not in report, "the report summarizes iLEAPP records and never lists their rows"
 
 
+def test_an_artifact_name_with_a_pipe_or_line_break_keeps_its_table_row_whole(db, tmp_path):
+    """iLEAPP controls artifact names; a `|` or a line break must not split
+    the report's table row (CodeRabbit on PR #78)."""
+    if not isinstance(db, PgReal):
+        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
+    from reporting.generate_report import generate_report
+
+    table = tmp_path / "odd.tsv"
+    table.write_text("odd")
+    with ingest(db, ctx(RUN_A), table, source_type="ileapp_record", payload_kind="full") as unit:
+        unit.write([NormalizedRecord(source_type=SourceType.ILEAPP_RECORD, fields={"source_artifact": "Calls | FaceTime\nlog"})])
+
+    out = tmp_path / "report.md"
+    generate_report(db._conn, RUN_A, EVIDENCE, str(out))
+    section = out.read_text().split("## iLEAPP Records by Artifact", 1)[1].split("\n---\n", 1)[0]
+    rows = [line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| Artifact", "| :"))]
+    assert rows == ["| Calls \\| FaceTime log | 1 | 0 | no timeline position |  |"]
+
+
 def test_a_report_without_ileapp_facts_has_no_ileapp_section(db, tmp_path):
     """EPOCH-434: no iLEAPP facts, no section; the stage table and Coverage
     already say what ran and what the evidence holds."""
