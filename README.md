@@ -1,9 +1,11 @@
 # Verichron Epoch
 
 Verichron Epoch is a forensic workbench for iOS devices. It takes an encrypted
-iTunes/Finder backup, decrypts and verifies it, runs extractors and indicator
-(IOC) matching over it, and produces a report an examiner can defend: every fact
-is traceable to the exact evidence, tool version and IOC set that produced it.
+iTunes/Finder backup, decrypts and verifies it, runs extractors over it, and
+produces a report an examiner can defend: every fact is traceable to the exact
+evidence and tool versions that produced it. Indicator (IOC) checks are not
+available until the project's own matching on extracted facts returns
+(EPOCH-490 to 493); until then the report names them as not examined.
 
 It behaves like a careful lab technician, not a scanner: it never loses,
 misattributes or over-claims evidence, and it always says what it did not do.
@@ -17,7 +19,7 @@ misattributes or over-claims evidence, and it always says what it did not do.
 ```
 device / backup ──► processor ──► orchestrator ──► stages ──► PostgreSQL ──► report, desktop app
                     hash, decrypt,   register evidence,  extract,
-                    repair, IOC scan run stages in order  write facts
+                    repair, iLEAPP   run stages in order  write facts
 ```
 
 Read [docs/architecture.md](docs/architecture.md) for the full picture.

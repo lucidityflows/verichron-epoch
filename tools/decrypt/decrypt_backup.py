@@ -52,6 +52,11 @@ def fail(code: int, message: str) -> NoReturn:
     sys.exit(code)
 
 
+def root_plists(src: str) -> list[str]:
+    """The .plist files at the backup's root (Info, Manifest, Status)."""
+    return sorted(name for name in os.listdir(src) if name.endswith(".plist"))
+
+
 def main() -> None:
     if sys.argv[1:] == ["--version"]:
         print(f"{LIBRARY} {importlib.metadata.version(LIBRARY)}")
@@ -65,6 +70,13 @@ def main() -> None:
     for name in ("Manifest.db", "Manifest.plist"):
         if not os.path.isfile(os.path.join(src, name)):
             fail(EXIT_USAGE, f"no {name} in {src}; not an iTunes-format backup")
+    # The root plists are copied into the decrypt as they are, so each must be
+    # a regular file of the backup itself: a link could bring in content from
+    # outside it, and a directory would fail only after the files were written.
+    for name in root_plists(src):
+        path = os.path.join(src, name)
+        if os.path.islink(path) or not os.path.isfile(path):
+            fail(EXIT_USAGE, f"{path} is not a regular file in the backup")
     if os.path.exists(dest) and os.listdir(dest):
         fail(EXIT_USAGE, f"{dest} is not empty")
     os.makedirs(dest, exist_ok=True)
@@ -146,9 +158,8 @@ def write_files(backup, utils, src: str, dest: str, started: float) -> None:
             last = time.monotonic()
             say(f"{n} of {total} files")
 
-    for name in sorted(os.listdir(src)):
-        if name.endswith(".plist"):
-            shutil.copy2(os.path.join(src, name), dest)
+    for name in root_plists(src):
+        shutil.copy2(os.path.join(src, name), dest)
 
     elapsed = time.monotonic() - started
     if missing or failed:

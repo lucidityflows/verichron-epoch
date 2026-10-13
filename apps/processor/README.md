@@ -32,6 +32,7 @@ times.
 | `--workspace <dir>` | Output workspace (default `~/verichron-workspace`) |
 | `--decrypt-python <path>` | The decrypt's interpreter (default `tools/decrypt/.venv/bin/python`, the pinned environment `mise run setup` creates; never searched for elsewhere) |
 | `--decrypt-script <path>` | The decrypt script (default `tools/decrypt/decrypt_backup.py`) |
+| `--decrypt-stall-timeout <dur>` | Stop the decrypt, and everything it started, when it writes nothing for this long (default `30m`). A long decrypt that keeps writing is never stopped |
 | `--sqlite-bin <path>` | `sqlite3` for the repair pass |
 | `--ileapp-dir <dir>` | The iLEAPP checkout to run (default `tools/ileapp/iLEAPP`, the submodule) |
 | `--ileapp-python <path>` | iLEAPP's interpreter (default `tools/ileapp/.venv/bin/python`, the pinned environment `mise run setup` creates) |

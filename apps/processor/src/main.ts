@@ -191,8 +191,12 @@ async function runBackups(
         }
 
         try {
-          await withDecryptProgress(decDir, backupBytes, () =>
-            decryptBackup({ tool: decryptTool, env: decryptEnv(), src, dest: decDir, password: pw })
+          await withDecryptProgress(
+            decDir,
+            backupBytes,
+            (signal) =>
+              decryptBackup({ tool: decryptTool, env: decryptEnv(), src, dest: decDir, password: pw, signal }),
+            { stallMs: cfg.decryptStallTimeoutMs }
           );
           decrypted = true;
         } catch (err) {

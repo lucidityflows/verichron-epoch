@@ -60,6 +60,7 @@ before(() => {
   // STUB_DECRYPT=wrong-once: exit 3 (wrong password) unless the password is "right".
   // STUB_DECRYPT=mutate: decrypt, then change the source, as if it changed mid-decrypt.
   // STUB_DECRYPT=unplug: decrypt BK1, then remove its source, as if the drive disconnected.
+  // STUB_DECRYPT=hang: write nothing and never finish, from a child process, as a stalled decrypt.
   stub = path.join(tmp, 'decrypt-python-stub');
   writeFileSync(
     stub,
@@ -70,6 +71,7 @@ if [ "$STUB_DECRYPT" = wrong-once ] && [ "$BACKUP_PASSWORD" != right ]; then
   echo "  decrypt-backup: the password is wrong" >&2; exit 3
 fi
 [ -z "$(ls -A "$4" 2>/dev/null)" ] || { echo "  decrypt-backup: $4 is not empty" >&2; exit 2; }
+if [ "$STUB_DECRYPT" = hang ]; then sleep 60 & wait; exit 0; fi
 mkdir -p "$4" && touch "$4/from-$(cat "$3/version.txt").txt" "$4/Manifest.db"
 if [ "$STUB_DECRYPT" = fail ]; then echo "  decrypt-backup: incomplete: 1 of 2 files written" >&2; exit 1; fi
 if [ "$STUB_DECRYPT" = mutate ]; then echo "mutated" > "$3/version.txt"; fi
@@ -269,6 +271,16 @@ describe('the decrypt tool (EPOCH-489)', () => {
     assert.match(out, /incorrect password for BK1 -- try again \(2\/3\)/);
     assert.match(out, /\[decrypt\] done/);
     assert.equal(readFileSync(passwordLog, 'utf8').trim().split('\n').length, 2, 'one decrypt per password');
+  });
+
+  it('stops a decrypt that writes nothing for the stall limit, with everything it started', async () => {
+    const started = Date.now();
+    const out = await runCli(['--force-decrypt', '--only', 'BK1', '--decrypt-stall-timeout', '1s'], 'hang');
+    assert.ok(Date.now() - started < 30_000, 'the stalled decrypt and its child were stopped');
+    assert.match(out, /\[decrypt\] error: the decrypt failed: the decrypt wrote nothing for 1 s, so it was stopped/);
+    assert.equal(readDecryptMarker(decrypted()), null, 'no marker vouches for it');
+    await runCli(['--only', 'BK1']);
+    assert.ok(readDecryptMarker(decrypted()), 'a clean re-run restores it');
   });
 
   it('a new decrypt tool version keeps the decrypt it made', async () => {
