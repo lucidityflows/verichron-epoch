@@ -115,7 +115,8 @@ function runCli(
   stubMode = '',
   extraEnv: Record<string, string> = {},
   typed: string[] = [],
-  keepStdinOpen = false
+  keepStdinOpen = false,
+  timeoutMs?: number
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -169,7 +170,19 @@ function runCli(
     });
     child.on('error', reject);
     child.stdin.on('error', () => undefined);
-    child.on('close', () => resolve(out));
+    // A bound for tests that guard against the processor not exiting: past
+    // it, the processor is killed and the test fails rather than hangs.
+    const timer =
+      timeoutMs === undefined
+        ? undefined
+        : setTimeout(() => {
+            child.kill('SIGKILL');
+            reject(new Error(`the processor was still running after ${timeoutMs} ms:\n${out}`));
+          }, timeoutMs);
+    child.on('close', () => {
+      clearTimeout(timer);
+      resolve(out);
+    });
   });
 }
 
@@ -287,10 +300,8 @@ describe('the decrypt tool (EPOCH-489)', () => {
   it('exits when its work is done while stdin stays open, as the app keeps it (EPOCH-489)', async () => {
     // The app writes each password to stdin and never closes it. Before the
     // fix the processor finished, wrote its summary, and then never exited.
-    const started = Date.now();
-    const out = await runCli(['--force-decrypt', '--only', 'BK1'], '', {}, ['pw'], true);
+    const out = await runCli(['--force-decrypt', '--only', 'BK1'], '', {}, ['pw'], true, 30_000);
     assert.match(out, /summary written to/);
-    assert.ok(Date.now() - started < 30_000, 'the processor exited instead of waiting on its open stdin');
   });
 
   it('a new decrypt tool version keeps the decrypt it made', async () => {
