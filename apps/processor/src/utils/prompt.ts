@@ -1,3 +1,10 @@
+/**
+ * Asks for a password on stdin. Without a terminal (the app relays the prompt
+ * and writes the answer to stdin, which it keeps open for any later prompt),
+ * stdin is held only while a prompt waits: once the line is read it is paused
+ * and released, so the processor can exit when its work is done instead of
+ * waiting on an input that never closes (EPOCH-489).
+ */
 export function promptPassword(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     process.stdout.write(prompt);
@@ -7,11 +14,19 @@ export function promptPassword(prompt: string): Promise<string> {
 
     if (!stdin.isTTY) {
       const chunks: Buffer[] = [];
+      // A socket or pipe has ref()/unref(); a file redirected to stdin doesn't need them.
+      const handle = stdin as NodeJS.ReadStream & { ref?: () => void; unref?: () => void };
+      handle.ref?.();
+      // After an earlier prompt paused it, a new 'data' listener alone would
+      // not start it flowing again.
+      stdin.resume();
       stdin.on('data', function onData(chunk: Buffer) {
         const idx = chunk.indexOf(0x0a);
         if (idx !== -1) {
           chunks.push(chunk.subarray(0, idx));
           stdin.removeListener('data', onData);
+          stdin.pause();
+          handle.unref?.();
           const line = Buffer.concat(chunks).toString('utf8').replace(/\r$/, '');
           process.stdout.write('\n');
           resolve(line);
