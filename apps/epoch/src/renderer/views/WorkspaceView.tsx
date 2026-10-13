@@ -56,7 +56,6 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const [showOptions, setShowOptions] = useState(false);
   const [workspace, setWorkspace] = useState('');
   const [forceDecrypt, setForceDecrypt] = useState(false);
-  const [refreshIOCs, setRefreshIOCs] = useState(false);
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -184,7 +183,6 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       const options: StartPipelineOptions = {
         workspace: workspace.trim() || undefined,
         forceDecrypt,
-        refreshIOCs,
         only: selected,
       };
       // The run's progress and result arrive through the prepare state.
@@ -437,16 +435,6 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       Process backups again, even if they were previously imported
                     </span>
                   </label>
-                  <label className="flex items-center gap-3 text-data cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={refreshIOCs}
-                      onChange={(e) => setRefreshIOCs(e.target.checked)}
-                      disabled={busy}
-                      className="accent-accent w-4 h-4 rounded"
-                    />
-                    <span className="text-foreground/90">Update threat indicators before analysis</span>
-                  </label>
                 </div>
               )}
             </div>
@@ -499,9 +487,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
               <Microscope size="1.25rem" />
             </div>
             <div>
-              <h2 className="font-display text-heading text-foreground">Run Forensic Analysis</h2>
+              <h2 className="font-display text-heading text-foreground">Analyze the Prepared Evidence</h2>
               <p className="text-data text-muted-foreground">
-                Examine prepared data for threat indicators and timeline anomalies.
+                Creates the investigation: its facts and its report appear under Investigations.
               </p>
             </div>
           </div>
@@ -509,8 +497,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
           {!analysisRunning && !analysisResult && (
             <div className="mt-4">
               <p className="text-data text-foreground/80 mb-4">
-                Run forensic analysis on the {doneCount} prepared backup{doneCount === 1 ? '' : 's'} to find indicators
-                and timeline anomalies.
+                Analyze reads the {doneCount} prepared backup{doneCount === 1 ? '' : 's'}: crash logs and iLEAPP&apos;s
+                records become facts, then the investigation report is written. Indicator checks and AI-assisted
+                analysis are not available yet; the report lists them as not examined.
               </p>
               <Button onClick={handleStartAnalysis}>
                 <Microscope size="1rem" />
