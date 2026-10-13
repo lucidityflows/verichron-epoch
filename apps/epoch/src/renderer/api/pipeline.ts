@@ -9,6 +9,7 @@ import type {
 export const pipelineApi = {
   selectBackupDirectory: () => window.epoch.selectBackupDirectory(),
   discoverBackups: (source: string) => window.epoch.discoverBackups(source),
+  getPreparedBackups: (workspace?: string) => window.epoch.getPreparedBackups(workspace),
   startPipeline: (source: string, options?: StartPipelineOptions) => window.epoch.startPipeline(source, options),
   retryRun: (backupSource: string) => window.epoch.retryRun(backupSource),
   submitBackupPassword: (password: string) => window.epoch.submitBackupPassword(password),

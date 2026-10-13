@@ -22,8 +22,10 @@ import pg from 'pg';
 import {
   MAX_RECORDS_PAGE as MAX_PAGE,
   getForensicRecords,
+  getPipelineRuns,
   getRunEvidence,
   getRunReportLocation,
+  getStageStatus,
   type ForensicRecordQuery,
   type ForensicRecordRow,
   type RecordSortKey,
@@ -351,5 +353,46 @@ describe('getRunReportLocation', live, () => {
   it('is null for a run without registered evidence, and for an unknown run', async () => {
     assert.equal(await getRunReportLocation(db, UNREGISTERED_RUN), null);
     assert.equal(await getRunReportLocation(db, '66666666-6666-6666-6666-666666666666'), null);
+  });
+});
+
+describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', live, () => {
+  before(async () => {
+    await db.query(
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id, parser_version, started_at, finished_at)
+       VALUES ($1, 'crash', 'succeeded', $2, 1, now() - interval '2 minutes', now() - interval '1 minute'),
+              ($1, 'ileapp_bridge', 'failed', $2, 3, now() - interval '1 minute', now()),
+              ($1, 'llm', 'skipped', NULL, NULL, NULL, NULL)`,
+      [RUN, EVIDENCE]
+    );
+    // Two complete units this run labelled for the decrypt, one incomplete
+    // unit, and one complete unit only another run labelled.
+    await db.query(
+      `INSERT INTO ingested_files
+         (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
+          payload_kind, raw_payload, ingest_complete, record_count, completed_at, produced_by_runs)
+       VALUES ($1, $1, repeat('1', 64), 'crash_report', 1, '/a', 'a', 'none', '{}', TRUE, 3, now(), ARRAY[$2]::uuid[]),
+              ($1, $1, repeat('2', 64), 'crash_report', 1, '/b', 'b', 'none', '{}', TRUE, 4, now(), ARRAY[$2]::uuid[]),
+              ($1, $1, repeat('3', 64), 'crash_report', 1, '/c', 'c', 'none', '{}', FALSE, NULL, NULL, ARRAY[$2]::uuid[]),
+              ($1, $1, repeat('4', 64), 'crash_report', 1, '/d', 'd', 'none', '{}', TRUE, 9, now(), ARRAY[$3]::uuid[])`,
+      [EVIDENCE, RUN, UNREGISTERED_RUN]
+    );
+  });
+
+  it("gives each run its device's name and its stage counts", async () => {
+    const run = (await getPipelineRuns(db)).find((r) => r.run_id === RUN)!;
+    assert.equal(run.device_label, 'test device');
+    assert.deepEqual([run.stages_total, run.stages_succeeded, run.stages_failed, run.stages_skipped], [3, 1, 1, 1]);
+  });
+
+  it('gives each stage what it read and the complete units this run labelled for it', async () => {
+    const stages = await getStageStatus(db, RUN);
+    const crash = stages.find((s) => s.stage_name === 'crash')!;
+    assert.equal(crash.parser_version, 1);
+    assert.equal(crash.derivative_kind, 'decrypted');
+    assert.deepEqual(crash.derivative_tool, { name: 'test', version: '0' });
+    assert.deepEqual([crash.units, crash.records], [2, 7], 'incomplete units and other runs are not counted');
+    const skipped = stages.find((s) => s.stage_name === 'llm')!;
+    assert.deepEqual([skipped.derivative_kind, skipped.units, skipped.records], [null, 0, 0]);
   });
 });

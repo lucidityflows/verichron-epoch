@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Smartphone, Circle, Loader2, CheckCircle2, XCircle, KeyRound } from 'lucide-react';
 import type { Backup } from '@verichron/contracts';
 import { STAGE_ORDER, STAGE_LABELS, type BackupProgress, type StageName } from '../../../shared/prepareProgress';
+import type { PreparedBackup } from '../../../shared/types/window';
 
 interface BackupRowProps {
   backup: Backup;
@@ -17,6 +18,8 @@ interface BackupRowProps {
   // user adjust selection for the next run) without losing what happened
   // last time.
   lastResult?: 'done' | 'failed';
+  /** What the workspace records for this backup (EPOCH-497); undefined when not prepared. */
+  prepared?: PreparedBackup;
 }
 
 export function BackupRow({
@@ -27,6 +30,7 @@ export function BackupRow({
   liveProgress,
   awaitingPassword,
   lastResult,
+  prepared,
 }: BackupRowProps) {
   if (liveProgress) {
     return <LiveBackupRow backup={backup} progress={liveProgress} awaitingPassword={awaitingPassword} />;
@@ -49,9 +53,27 @@ export function BackupRow({
       <span className="font-mono text-foreground truncate flex-1 font-medium" title={backup.path}>
         {backup.label}
       </span>
-      {lastResult === 'done' && <CheckCircle2 size="1.125rem" className="text-success shrink-0" />}
+      <PreparedState prepared={prepared} />
       {lastResult === 'failed' && <XCircle size="1.125rem" className="text-danger shrink-0" />}
     </label>
+  );
+}
+
+/** The backup's state in the workspace, in its role colour (DESIGN.md §9). */
+function PreparedState({ prepared }: { prepared?: PreparedBackup }) {
+  if (!prepared) return <span className="text-label text-muted-foreground shrink-0">Not prepared</span>;
+  const when = new Date(prepared.preparedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  if (prepared.state === 'partial') {
+    return (
+      <span className="text-label text-flag shrink-0" title={`Decrypted ${when}; iLEAPP's output is missing`}>
+        Partly prepared · prepare again
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-label text-success shrink-0">
+      <CheckCircle2 size="1rem" /> Prepared · {when}
+    </span>
   );
 }
 

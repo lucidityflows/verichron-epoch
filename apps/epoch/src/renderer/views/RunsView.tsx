@@ -9,6 +9,7 @@ import { useAnalysisState } from '../hooks/usePipelineState';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
+import { formatDuration, StageCard } from '../features/investigations/StageCard';
 
 /** Labels for run_completeness states. The state itself comes from the
  * database (EPOCH-404); this view never derives it from stage rows. */
@@ -18,18 +19,17 @@ const RUN_STATE_LABEL: Record<PipelineRunRow['state'], string> = {
   complete: 'complete',
 };
 
-function stageDurationMs(stage: StageStatusRow): number | null {
-  if (!stage.started_at || !stage.finished_at) return null;
-  return new Date(stage.finished_at).getTime() - new Date(stage.started_at).getTime();
+/** "3 of 3 succeeded", plus any failed or skipped (EPOCH-430). */
+function stageSummary(run: PipelineRunRow): string {
+  if (run.stages_total === 0) return 'No stages';
+  const parts = [`${run.stages_succeeded} of ${run.stages_total} succeeded`];
+  if (run.stages_failed > 0) parts.push(`${run.stages_failed} failed`);
+  if (run.stages_skipped > 0) parts.push(`${run.stages_skipped} skipped`);
+  return parts.join(', ');
 }
 
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.round(seconds % 60);
-  return `${minutes}m ${remainingSeconds}s`;
+function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString();
 }
 
 interface RunsViewProps {
@@ -123,20 +123,26 @@ export function RunsView({
 
   const columns: DataTableColumn<PipelineRunRow>[] = [
     {
+      // "Investigation", not "run": one term per concept (DESIGN.md §7).
       accessorKey: 'run_id',
-      header: 'Run ID',
-      meta: { width: 'minmax(8rem, 0.5fr)' },
-      cell: ({ row }) => <span className="font-mono text-muted-foreground">{row.original.run_id.slice(0, 8)}</span>,
+      header: 'Investigation',
+      meta: { width: 'minmax(7rem, 0.4fr)' },
+      cell: ({ row }) => (
+        <span className="font-mono text-muted-foreground" title={row.original.run_id}>
+          {row.original.run_id.slice(0, 8)}
+        </span>
+      ),
     },
     {
       accessorKey: 'backup_source',
-      header: 'Evidence Source',
+      header: 'Evidence',
       meta: { width: 'minmax(14rem, 1fr)' },
       cell: ({ row }) => {
         const backupName = row.original.backup_source.split('/').pop() ?? row.original.backup_source;
         return (
-          <span className="block truncate font-mono" title={row.original.backup_source}>
-            {backupName}
+          <span className="block truncate" title={row.original.backup_source}>
+            {row.original.device_label && <span className="text-foreground">{row.original.device_label} · </span>}
+            <span className="font-mono text-muted-foreground">{backupName}</span>
           </span>
         );
       },
@@ -163,15 +169,50 @@ export function RunsView({
     {
       accessorKey: 'started_at',
       header: 'Started',
-      meta: { width: 'minmax(12rem, 0.8fr)' },
+      meta: { width: 'minmax(11rem, 0.7fr)' },
       cell: ({ row }) => (
         <span
           className="font-mono tabular-nums tracking-tight text-muted-foreground"
           title={new Date(row.original.started_at).toISOString()}
         >
-          {new Date(row.original.started_at).toLocaleString()}
+          {formatTimestamp(row.original.started_at)}
         </span>
       ),
+    },
+    {
+      id: 'finished',
+      header: 'Finished',
+      meta: { width: 'minmax(11rem, 0.7fr)' },
+      cell: ({ row }) =>
+        row.original.finished_at ? (
+          <span
+            className="font-mono tabular-nums tracking-tight text-muted-foreground"
+            title={new Date(row.original.finished_at).toISOString()}
+          >
+            {formatTimestamp(row.original.finished_at)}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      id: 'duration',
+      header: 'Duration',
+      meta: { width: 'minmax(6rem, 0.4fr)' },
+      cell: ({ row }) => {
+        const { started_at, finished_at } = row.original;
+        return (
+          <span className="font-mono tabular-nums text-muted-foreground">
+            {finished_at ? formatDuration(new Date(finished_at).getTime() - new Date(started_at).getTime()) : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'stages',
+      header: 'Stages',
+      meta: { width: 'minmax(10rem, 0.6fr)' },
+      cell: ({ row }) => <span className="text-muted-foreground">{stageSummary(row.original)}</span>,
     },
   ];
 
@@ -209,45 +250,9 @@ export function RunsView({
           <EmptyState icon={Layers} title="No stages initialized for this run" />
         ) : (
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(18rem, 1fr))' }}>
-            {stages.map((stage) => {
-              const durationMs = stageDurationMs(stage);
-              const statusColor =
-                stage.status === 'succeeded'
-                  ? 'var(--accent)'
-                  : stage.status === 'failed' || stage.status === 'running'
-                    ? 'var(--flag)'
-                    : 'var(--muted-foreground)';
-
-              return (
-                <div
-                  key={`${stage.run_id}-${stage.stage_name}`}
-                  className="group relative overflow-hidden bg-surface-raised backdrop-blur-sm rounded-lg p-5 border-l-2 shadow-elevation-1 transition-all hover:shadow-elevation-2"
-                  style={{
-                    borderLeftColor: `hsl(${statusColor} / ${stage.status === 'pending' || stage.status === 'skipped' ? '0.5' : '1'})`,
-                  }}
-                >
-                  <div
-                    className="absolute -inset-1 opacity-0 group-hover:opacity-5 blur-xl transition-opacity pointer-events-none"
-                    style={{ backgroundColor: `hsl(${statusColor})` }}
-                  />
-                  <div className="relative z-10">
-                    <h4 className="font-display text-label mb-3">{stage.stage_name}</h4>
-                    <div className="text-data text-muted-foreground font-mono mb-2 flex items-center gap-1.5">
-                      Status: <Badge variant={stage.status}>{stage.status}</Badge>
-                    </div>
-                    {stage.error_message && (
-                      <p className="text-data text-flag font-mono mb-2 break-words">Error: {stage.error_message}</p>
-                    )}
-                    <p className="text-data text-muted-foreground font-mono">
-                      Duration:{' '}
-                      <strong className="text-foreground">
-                        {durationMs !== null ? formatDuration(durationMs) : '—'}
-                      </strong>
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
+            {stages.map((stage) => (
+              <StageCard key={`${stage.run_id}-${stage.stage_name}`} stage={stage} />
+            ))}
           </div>
         )}
       </div>

@@ -46,6 +46,7 @@ const dbApi = {
   selectDeviceBackupDestination: (): Promise<string | null> =>
     ipcRenderer.invoke('epoch:selectDeviceBackupDestination'),
   discoverBackups: (source: string): Promise<Backup[]> => ipcRenderer.invoke('epoch:discoverBackups', source),
+  getPreparedBackups: (workspace?: string) => ipcRenderer.invoke('epoch:getPreparedBackups', workspace),
   startPipeline: (source: string, options?: StartPipelineOptions): Promise<{ started: boolean; workspace: string }> =>
     ipcRenderer.invoke('epoch:startPipeline', source, options),
   submitBackupPassword: (password: string) => ipcRenderer.invoke('epoch:submitBackupPassword', password),

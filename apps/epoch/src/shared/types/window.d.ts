@@ -29,6 +29,15 @@ export type ReportResult =
   | { status: 'not-found'; path: string }
   | { status: 'no-report-path' };
 
+/** A backup the workspace records as prepared (EPOCH-497), from its markers. */
+export interface PreparedBackup {
+  label: string;
+  /** `prepared`: decrypt and iLEAPP output both complete; `partial`: only the decrypt. */
+  state: 'prepared' | 'partial';
+  /** When the newest of those steps completed (ISO 8601). */
+  preparedAt: string;
+}
+
 export interface StartPipelineOptions {
   workspace?: string;
   forceDecrypt?: boolean;
@@ -117,6 +126,7 @@ declare global {
       selectBackupDirectory: () => Promise<string | null>;
       selectDeviceBackupDestination: () => Promise<string | null>;
       discoverBackups: (source: string) => Promise<Backup[]>;
+      getPreparedBackups: (workspace?: string) => Promise<{ workspace: string; backups: PreparedBackup[] }>;
       startPipeline: (
         source: string,
         options?: StartPipelineOptions

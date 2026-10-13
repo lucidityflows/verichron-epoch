@@ -13,13 +13,15 @@ import {
   Pencil,
   Microscope,
   ArrowRight,
+  RotateCcw,
 } from 'lucide-react';
 import { BackupRow } from '../features/devicePullPanel/BackupRow';
 import { TerminalLog } from '../components/layout/TerminalLog';
 import { DevicePullPanel } from '../features/devicePullPanel/DevicePullPanel';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
-import type { PipelineFinishedResult, StartPipelineOptions } from '../../shared/types/window';
+import type { PipelineFinishedResult, PreparedBackup, StartPipelineOptions } from '../../shared/types/window';
+import { StepList, type Step } from '../components/ui/StepList';
 import type { Backup } from '@verichron/contracts';
 import { pipelineApi } from '../api/pipeline';
 import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
@@ -87,7 +89,29 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const finishResult = showsRun && prepare.status === 'finished' ? prepare.result : null;
   const pendingPasswordFor = prepare?.passwordFor ?? null;
   const lastRunWorkspace = showsRun && prepare.status === 'finished' ? prepare.workspace : null;
-  const analysisForRun = analysis?.kind === 'workspace' && analysis.target === lastRunWorkspace;
+
+  // What the workspace records as prepared (EPOCH-497), read from its markers
+  // when the page opens and after each run, so a restart still offers
+  // Analyze. Analyze uses the workspace the last run used, else this one.
+  const [preparedInfo, setPreparedInfo] = useState<{ workspace: string; backups: PreparedBackup[] } | null>(null);
+  const prepareStatus = prepare?.status;
+  const analysisStatus = analysis?.status;
+  useEffect(() => {
+    let active = true;
+    pipelineApi
+      .getPreparedBackups(workspace.trim() || undefined)
+      .then((info) => {
+        if (active) setPreparedInfo(info);
+      })
+      .catch((err) => console.error('Failed to read prepared backups:', err));
+    return () => {
+      active = false;
+    };
+  }, [workspace, prepareStatus, analysisStatus]);
+  const preparedByLabel = new Map((preparedInfo?.backups ?? []).map((b) => [b.label, b]));
+  const preparedCount = (preparedInfo?.backups ?? []).filter((b) => b.state === 'prepared').length;
+  const analysisWorkspace = lastRunWorkspace ?? preparedInfo?.workspace ?? null;
+  const analysisForRun = analysis?.kind === 'workspace' && analysis.target === analysisWorkspace;
   const analysisRunning = analysisForRun && analysis?.status === 'running';
   const analysisLog = analysisForRun ? analysisLogAll : [];
   const analysisResult: PipelineFinishedResult | null = analysisRunning
@@ -171,7 +195,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const selectAllBackups = () => setSelectedLabels(new Set(backups.map((b) => b.label)));
   const selectNoBackups = () => setSelectedLabels(new Set());
 
-  const handleStartPipeline = async () => {
+  // Prepare Again redoes the selected backups from the start; Prepare
+  // Evidence uses the Advanced setting.
+  const handleStartPipeline = async (again = false) => {
     if (!selectedPath || selectedLabels.size === 0) return;
     setIsStarting(true);
     setStartError(null);
@@ -182,7 +208,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     try {
       const options: StartPipelineOptions = {
         workspace: workspace.trim() || undefined,
-        forceDecrypt,
+        forceDecrypt: again || forceDecrypt,
         only: selected,
       };
       // The run's progress and result arrive through the prepare state.
@@ -207,7 +233,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   };
 
   const handleStartAnalysis = async () => {
-    if (!lastRunWorkspace) return;
+    if (!analysisWorkspace) return;
     // EPOCH-305 retry actionability: clear every piece of state a stale
     // run could have left behind before dispatching a new one, so "Try
     // again" after a crash/cancel/timeout starts from the same clean slate
@@ -217,7 +243,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     setAnalysisStartError(null);
     setAnalysisInterrupted(false);
     try {
-      await pipelineApi.startAnalysis(lastRunWorkspace);
+      await pipelineApi.startAnalysis(analysisWorkspace);
     } catch (err) {
       setAnalysisStartError(err instanceof Error ? err.message : 'Unknown error');
     }
@@ -247,11 +273,11 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   // run (with a Try again path) is what keeps a re-entered view honest
   // instead of either looking falsely fresh or spinning on nothing.
   useEffect(() => {
-    if (!lastRunWorkspace) return;
+    if (!analysisWorkspace) return;
     let cancelled = false;
 
     pipelineApi
-      .getAnalysisRunStatus(lastRunWorkspace)
+      .getAnalysisRunStatus(analysisWorkspace)
       .then((status) => {
         if (cancelled) return;
         // A run still going here is shown by the analysis state (EPOCH-487).
@@ -264,7 +290,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [lastRunWorkspace]);
+  }, [analysisWorkspace]);
 
   const busy = isStarting || isRunning;
 
@@ -278,6 +304,25 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     (runProgress ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'failed').length : 0);
   const analysisFailedCount = analysisResult?.analysis?.filter((result) => result.status === 'failed').length ?? 0;
 
+  // The page's steps (DESIGN.md §10, EPOCH-497): what is done, what is
+  // current, what comes next.
+  const selected = Array.from(selectedLabels);
+  const selectedAllPrepared =
+    selected.length > 0 && selected.every((label) => preparedByLabel.get(label)?.state === 'prepared');
+  const analyzed = !!analysisResult?.success && analysisFailedCount === 0;
+  const showAnalyze = !!selectedPath && !busy && (preparedCount > 0 || analysisForRun);
+  const steps: Step[] = [
+    { label: 'Choose Evidence', state: selectedPath ? 'done' : 'current' },
+    {
+      label: 'Prepare Evidence',
+      state: !selectedPath ? 'pending' : !busy && selectedAllPrepared ? 'done' : 'current',
+    },
+    {
+      label: 'Analyze',
+      state: analyzed ? 'done' : selectedPath && !busy && selectedAllPrepared ? 'current' : 'pending',
+    },
+  ];
+
   return (
     <ViewLayout
       section="workspace"
@@ -286,6 +331,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       width="readable"
       className="gap-7"
     >
+      <StepList steps={steps} label="New Investigation steps" className="" />
       {!selectedPath && importSource === 'device' ? (
         <DevicePullPanel onBackupPulled={handleBackupPulled} onChangeSource={() => setImportSource(null)} />
       ) : !selectedPath ? (
@@ -352,18 +398,32 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                     </button>
                   </div>
                 )}
-                <Button
-                  onClick={handleStartPipeline}
-                  disabled={discoveringBackups || selectedLabels.size === 0}
-                  loading={busy}
-                  loadingText={isStarting ? 'Starting…' : 'Running…'}
-                  className="shrink-0"
-                >
-                  <Play size="1rem" fill="currentColor" />
-                  Prepare Evidence{selectedLabels.size > 0 ? ` (${selectedLabels.size})` : ''}
-                </Button>
+                {selectedAllPrepared && !busy ? (
+                  // Done already: preparing again is a secondary choice, and
+                  // Analyze is the next step (EPOCH-497).
+                  <Button variant="outline" onClick={() => handleStartPipeline(true)} className="shrink-0">
+                    <RotateCcw size="1rem" />
+                    Prepare Again{selectedLabels.size > 1 ? ` (${selectedLabels.size})` : ''}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => handleStartPipeline()}
+                    disabled={discoveringBackups || selectedLabels.size === 0}
+                    loading={busy}
+                    loadingText={isStarting ? 'Starting…' : 'Running…'}
+                    className="shrink-0"
+                  >
+                    <Play size="1rem" fill="currentColor" />
+                    Prepare Evidence{selectedLabels.size > 0 ? ` (${selectedLabels.size})` : ''}
+                  </Button>
+                )}
               </div>
             </div>
+            <p className="text-data text-muted-foreground mb-4">
+              {selectedAllPrepared && !busy
+                ? 'The selected backups are prepared. Analyze them next; Prepare Again decrypts and reads them again from the start.'
+                : 'Hashes, decrypts and repairs each backup, then reads it with iLEAPP. A large backup takes a while; you can leave this page and come back.'}
+            </p>
 
             {discoveringBackups && (
               <p className="text-data text-muted-foreground">Looking for compatible iPhone backups…</p>
@@ -397,6 +457,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       liveProgress={isLive ? progress : undefined}
                       awaitingPassword={isLive && pendingPasswordFor === b.label}
                       lastResult={lastResult}
+                      prepared={preparedByLabel.get(b.label)}
                     />
                   );
                 })}
@@ -480,14 +541,14 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
       {(isRunning || logLines.length > 0) && <TerminalLog lines={logLines} live={isRunning} />}
 
-      {finishResult && runProgress && doneCount > 0 && lastRunWorkspace && (
+      {showAnalyze && (
         <div className="bg-surface shadow-elevation-1 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-md bg-accent/10 text-accent">
               <Microscope size="1.25rem" />
             </div>
             <div>
-              <h2 className="font-display text-heading text-foreground">Analyze the Prepared Evidence</h2>
+              <h2 className="font-display text-heading text-foreground">Analyze</h2>
               <p className="text-data text-muted-foreground">
                 Creates the investigation: its facts and its report appear under Investigations.
               </p>
@@ -497,13 +558,13 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
           {!analysisRunning && !analysisResult && (
             <div className="mt-4">
               <p className="text-data text-foreground/80 mb-4">
-                Analyze reads the {doneCount} prepared backup{doneCount === 1 ? '' : 's'}: crash logs and iLEAPP&apos;s
-                records become facts, then the investigation report is written. Indicator checks and AI-assisted
-                analysis are not available yet; the report lists them as not examined.
+                Analyze reads the {preparedCount} prepared backup{preparedCount === 1 ? '' : 's'} in the workspace:
+                crash logs and iLEAPP&apos;s records become facts, then the investigation report is written. Indicator
+                checks and AI-assisted analysis are not available yet; the report lists them as not examined.
               </p>
               <Button onClick={handleStartAnalysis}>
                 <Microscope size="1rem" />
-                Analyze {doneCount} Backup{doneCount === 1 ? '' : 's'}
+                Analyze and Create Investigation
               </Button>
               {analysisStartError && (
                 <div className="flex items-center gap-1.5 text-data text-danger mt-3">
@@ -542,7 +603,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
               {analysisResult.success && analysisFailedCount === 0 ? (
                 <div>
                   <p className="text-data text-success flex items-center gap-1.5 mb-3">
-                    <CheckCircle2 size="1rem" /> Analysis complete.
+                    <CheckCircle2 size="1rem" /> Investigation created.
                   </p>
                   {analysisResult.analysis && (
                     <p className="text-data text-muted-foreground mb-3">
@@ -584,11 +645,10 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       need attention.
                     </p>
                   )}
-                  {/* "Try again" reads as an inline link (accent color, underline-on-hover),
-                      not a restatement of `ghost` -- deferred per Button.tsx's header note. */}
-                  <button onClick={handleStartAnalysis} className="text-label text-accent hover:underline mt-2">
+                  <Button variant="outline" size="sm" onClick={handleStartAnalysis} className="mt-3">
+                    <RotateCcw size="0.875rem" />
                     Try Again
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
