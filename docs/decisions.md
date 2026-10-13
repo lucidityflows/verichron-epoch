@@ -95,6 +95,7 @@ never silently deleted.
 | Numeric timestamps need a declared epoch, or must fall between 2007-06-29 and now + 1 day; otherwise null. An unparseable time column gives null, never another column's value. *Amended 2026-10-08:* for iLEAPP this no longer applies, because its plugins declare time columns (EPOCH-461); whether the window remains as a reported check on iLEAPP's values is decided there | A plausible but wrong date is worse than none | EPOCH-419, 461 |
 | mvt's indicator types are kept verbatim as explicit fields, not mapped to our own enum *Changed 2026-10-13 (EPOCH-489): mvt's matches are removed; indicator types are designed afresh in EPOCH-490 and 491.* | An enum with an "unknown" fallback loses information | EPOCH-446 |
 | The report states which fact types it doesn't show, with counts | "Not shown" must not read as "not found" | EPOCH-448 |
+| The report's Run Completeness table leaves out the report's own stage, and says instead which run generated the report and when | The report is written while its own stage is still running, so that row always read "running" in a finished document (the user chose this over labelling the row "this report") | EPOCH-499 |
 | The report summarizes iLEAPP output per artifact (counts and time range) and doesn't list rows | Output can reach 100k+ rows; rows belong in the app | EPOCH-434 |
 
 ## Configuration, secrets and tooling
