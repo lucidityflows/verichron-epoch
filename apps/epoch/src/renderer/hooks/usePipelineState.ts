@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { pipelineApi } from '../api/pipeline';
-import type { AnalysisState, MvtLogEntry, PrepareState } from '../../shared/types/window';
+import type { AnalysisState, PipelineLogEntry, PrepareState } from '../../shared/types/window';
 
 /** The most log lines a page keeps; the main process keeps the same number. */
 const MAX_LINES = 2000;
 
 /** A state change without its log, which the change events never carry. */
-function withoutLog<S extends { log: MvtLogEntry[] }>(state: S): Omit<S, 'log'> {
+function withoutLog<S extends { log: PipelineLogEntry[] }>(state: S): Omit<S, 'log'> {
   const copy: Partial<S> = { ...state };
   delete copy.log;
   return copy as Omit<S, 'log'>;
 }
 
-function trim(lines: MvtLogEntry[]): MvtLogEntry[] {
+function trim(lines: PipelineLogEntry[]): PipelineLogEntry[] {
   return lines.length > MAX_LINES ? lines.slice(lines.length - MAX_LINES) : lines;
 }
 
@@ -22,21 +22,21 @@ function trim(lines: MvtLogEntry[]): MvtLogEntry[] {
  * Lines are numbered, so one that arrives while the state is being read is
  * neither lost nor shown twice. A new run (a new start time) starts a new log.
  */
-function useRunState<S extends { startedAt: number | null; log: MvtLogEntry[] }>(
+function useRunState<S extends { startedAt: number | null; log: PipelineLogEntry[] }>(
   read: () => Promise<S>,
   onState: (callback: (state: S) => void) => () => void,
-  onLog: (callback: (entry: MvtLogEntry) => void) => () => void
-): { state: Omit<S, 'log'> | null; log: MvtLogEntry[] } {
+  onLog: (callback: (entry: PipelineLogEntry) => void) => () => void
+): { state: Omit<S, 'log'> | null; log: PipelineLogEntry[] } {
   const [state, setState] = useState<Omit<S, 'log'> | null>(null);
-  const [log, setLog] = useState<MvtLogEntry[]>([]);
+  const [log, setLog] = useState<PipelineLogEntry[]>([]);
 
   useEffect(() => {
     let active = true;
     let loaded = false;
     let lastSeq = 0;
     let startedAt: number | null = null;
-    let early: MvtLogEntry[] = [];
-    let batch: MvtLogEntry[] = [];
+    let early: PipelineLogEntry[] = [];
+    let batch: PipelineLogEntry[] = [];
     let frame: number | null = null;
 
     const flush = () => {
@@ -94,7 +94,7 @@ function useRunState<S extends { startedAt: number | null; log: MvtLogEntry[] }>
 
 /** Prepare Evidence: progress, a password the processor is waiting for, and the result. */
 export function usePrepareState() {
-  return useRunState<PrepareState>(pipelineApi.getPrepareState, pipelineApi.onPrepareState, pipelineApi.onMvtLog);
+  return useRunState<PrepareState>(pipelineApi.getPrepareState, pipelineApi.onPrepareState, pipelineApi.onPrepareLog);
 }
 
 /** Analyze, for a workspace or for one backup retried from Investigations. */

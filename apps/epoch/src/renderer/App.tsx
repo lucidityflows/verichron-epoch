@@ -11,8 +11,6 @@ import { TooltipProvider } from './components/ui/Tooltip';
 import { useEpochStore } from './store/useEpochStore';
 import { runsApi } from './api/runs';
 
-const IOC_SOURCE_TYPES = ['mvt_ioc_detection', 'timestamp_anomaly'] as const;
-
 export const App: React.FC = () => {
   const {
     section,
@@ -125,16 +123,13 @@ export const App: React.FC = () => {
 
   const handleSectionSelect = (next: Section) => {
     setSection(next);
-    if ((next === 'records' || next === 'iocs') && selectedRun && !recordsLoaded) {
+    if (next === 'records' && selectedRun && !recordsLoaded) {
       loadRecords(selectedRun);
     }
   };
 
-  const nonIocRecords = records.filter((r) => !(IOC_SOURCE_TYPES as readonly string[]).includes(r.source_type));
-  const availableSourceTypes = Array.from(new Set(nonIocRecords.map((r) => r.source_type))).sort();
-  const visibleRecords = sourceTypeFilter
-    ? nonIocRecords.filter((r) => r.source_type === sourceTypeFilter)
-    : nonIocRecords;
+  const availableSourceTypes = Array.from(new Set(records.map((r) => r.source_type))).sort();
+  const visibleRecords = sourceTypeFilter ? records.filter((r) => r.source_type === sourceTypeFilter) : records;
 
   return (
     <TooltipProvider>
@@ -181,7 +176,7 @@ export const App: React.FC = () => {
               />
             )}
 
-            {section === 'iocs' && <IocsView selectedRun={selectedRun} />}
+            {section === 'iocs' && <IocsView />}
 
             {section === 'reports' && <ReportsView selectedRun={selectedRun} />}
           </div>

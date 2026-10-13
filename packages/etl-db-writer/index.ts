@@ -6,8 +6,8 @@
  * queries, which is the correct boundary for that table pair (simple
  * upserts, no cross-file dedup, no partial-write hazard). This package
  * exists for ingested_files/forensic_records, and specifically for a
- * TypeScript extractor that writes to them -- none exists yet; all three
- * current extractors (crash, ileapp_bridge, mvt_iocs) are Python and use
+ * TypeScript extractor that writes to them -- none exists yet; the current
+ * extractors (crash, ileapp_bridge) are Python and use
  * db_writer.py. When a TypeScript extractor is added, it should depend on
  * this package rather than issuing its own forensic_records inserts, for
  * the same reason db_writer.py is mandatory on the Python side: the

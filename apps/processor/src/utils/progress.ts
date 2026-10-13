@@ -18,8 +18,8 @@ export function throttled(intervalMs: number): (report: () => void) => void {
 
 /**
  * Reports, every few seconds while `decrypt` runs, how many bytes this
- * decrypt has written against the backup's size (EPOCH-487). mvt prints
- * nothing per file, so the decrypt folder is measured instead; only files
+ * decrypt has written against the backup's size (EPOCH-487). The decrypt
+ * folder is measured, rather than the tool's own lines read; only files
  * written since the decrypt started count, so an earlier copy being
  * replaced doesn't read as progress.
  */

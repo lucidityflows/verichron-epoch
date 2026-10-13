@@ -2,24 +2,18 @@
 import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
-import * as os from 'node:os';
-import { spawn } from 'node:child_process';
 import {
   discoverBackups,
   BACKUP_SEARCH_MAX_DEPTH,
-  CHECK_MARKER,
   DECRYPT_MARKER,
   ILEAPP_MARKER,
   deriveEvidencePath,
   EvidenceSidecar,
-  readCheckMarker,
   readDecryptMarker,
   readIleappMarker,
-  renderCheckMarker,
   renderDecryptMarker,
   renderIleappMarker,
   type Backup,
-  type CheckParams,
   type RepairProvenance,
   type ToolVersion,
 } from '@verichron/contracts';
@@ -28,20 +22,20 @@ import { parseFlags, type Config } from './utils/cli.js';
 import { pathExists, writeFileAtomic, writeMarker } from './utils/fs.js';
 import { PROGRESS_INTERVAL_MS, throttled, withDecryptProgress } from './utils/progress.js';
 import { ileappInputType, ileappToolVersion, runIleapp } from './utils/ileapp.js';
-import { checkBackup, decryptBackup, isWrongPasswordError, MVT_COLUMNS } from './utils/mvt.js';
+import { decryptBackup, decryptToolVersion, isWrongPasswordError, type DecryptTool } from './utils/decrypt.js';
 import { hashTree } from './utils/manifest.js';
 import { repairDecrypted } from './utils/repair.js';
 import { promptPassword } from './utils/prompt.js';
 import { writeSummary } from './utils/summary.js';
 
-// How many times we'll re-prompt for a password before giving up on a
-// backup. Only wrong-password failures consume an attempt -- any other
-// decrypt failure (disk full, mvt-ios crash, etc.) fails immediately on
-// the first try, since retrying those wouldn't help and would just mask
-// a different problem behind a password-retry loop.
 /** Recorded in each evidence sidecar. ../package.json resolves from both src/ (tsx) and dist/. */
 const TOOL_VERSION: string = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
+// How many times we'll re-prompt for a password before giving up on a
+// backup. Only wrong-password failures consume an attempt -- any other
+// decrypt failure (disk full, a missing file, etc.) fails immediately on
+// the first try, since retrying those wouldn't help and would just mask
+// a different problem behind a password-retry loop.
 const MAX_PASSWORD_ATTEMPTS = 3;
 
 async function main() {
@@ -55,18 +49,17 @@ async function main() {
 }
 
 async function run(cfg: Config): Promise<void> {
-  if (!(await pathExists(cfg.mvtBin))) {
+  const decryptTool: DecryptTool = { python: cfg.decryptPython, script: cfg.decryptScript };
+  if (!(await pathExists(cfg.decryptPython))) {
     throw new Error(
-      `mvt-ios not found at ${cfg.mvtBin}. Run \`mise run setup\` to create the pinned tools/mvt environment, or pass --mvt-bin`
+      `the decrypt tool's interpreter was not found at ${cfg.decryptPython}. Run \`mise run setup\` to create the pinned tools/decrypt environment, or pass --decrypt-python`
     );
   }
-
-  // mvt-ios runs only against the IOC folder this runner manages, so the IOC
-  // set recorded with each result set is exactly what check-backup loaded
-  // (EPOCH-406).
-  assertNoForeignIocs(cfg);
-  const mvtTool = await mvtToolVersion(cfg);
-  console.log(`[processor] mvt-ios ${mvtTool.version}; IOC folder ${indicatorsDir(cfg)}`);
+  if (!(await pathExists(cfg.decryptScript))) {
+    throw new Error(`the decrypt script was not found at ${cfg.decryptScript}; pass --decrypt-script`);
+  }
+  const decryptToolV = await decryptToolVersion(decryptTool);
+  console.log(`[processor] decrypt: ${decryptToolV.name} ${decryptToolV.version}`);
 
   if (!(await pathExists(cfg.ileappPython))) {
     throw new Error(
@@ -81,34 +74,19 @@ async function run(cfg: Config): Promise<void> {
   const ileappTool = await ileappToolVersion(cfg.ileappDir);
   console.log(`[processor] iLEAPP ${ileappTool.version.slice(0, 12)} (${cfg.ileappDir})`);
 
-  const dirs = ['hashes', 'decrypted', 'results', 'ileapp', 'logs'];
+  const dirs = ['decrypted', 'ileapp', 'logs'];
   for (const d of dirs) {
     await fsp.mkdir(path.join(cfg.workspace, d), { recursive: true });
   }
 
-  let iocs: IocSnapshot;
-  try {
-    await ensureIOCs(cfg);
-    iocs = await snapshotIocs(cfg);
-  } catch (err) {
-    throw new Error(`iocs: ${err instanceof Error ? err.message : err}`);
-  }
-  console.log(`[processor] IOC set ${iocs.params.ioc_set_hash.slice(0, 12)} (${iocs.params.ioc_file_count} file(s))`);
-  try {
-    await runBackups(cfg, { mvt: mvtTool, ileapp: ileappTool }, iocs);
-  } finally {
-    await fsp.rm(iocs.dataFolder, { recursive: true, force: true });
-  }
+  await runBackups(cfg, decryptTool, { decrypt: decryptToolV, ileapp: ileappTool });
 }
 
 async function runBackups(
   cfg: Config,
-  tools: { mvt: ToolVersion; ileapp: ToolVersion },
-  iocs: IocSnapshot
+  decryptTool: DecryptTool,
+  tools: { decrypt: ToolVersion; ileapp: ToolVersion }
 ): Promise<void> {
-  const mvtTool = tools.mvt;
-  const iocSet = iocs.params;
-
   let backups: Backup[];
   try {
     backups = await discoverBackups(cfg.source, cfg.only);
@@ -149,7 +127,6 @@ async function runBackups(
 
     const decDir = path.join(cfg.workspace, 'decrypted', name);
     const decMarker = path.join(decDir, DECRYPT_MARKER);
-    const resDir = path.join(cfg.workspace, 'results', name);
     const ileDir = path.join(cfg.workspace, 'ileapp', name);
     let decryptRan = false;
     // The decrypt is reusable only if it was made from the backup as it is
@@ -164,10 +141,9 @@ async function runBackups(
         // of this backup, or with no provenance: remove it all so no stale
         // file can survive into the new decrypt.
         console.log(
-          '  [decrypt] the backup changed since its last decrypt; clearing the stale decrypt, results and iLEAPP output'
+          '  [decrypt] the backup changed since its last decrypt; clearing the stale decrypt and iLEAPP output'
         );
         await fsp.rm(decDir, { recursive: true, force: true });
-        await fsp.rm(resDir, { recursive: true, force: true });
         await fsp.rm(ileDir, { recursive: true, force: true });
       }
       // Withdraw every marker that vouches for this decrypt BEFORE touching
@@ -175,8 +151,10 @@ async function runBackups(
       // existing copy) must not leave a valid marker in front of half-written
       // files; only a decrypt that completes recreates them below.
       await fsp.rm(decMarker, { force: true });
-      await fsp.rm(path.join(resDir, CHECK_MARKER), { force: true });
       await fsp.rm(path.join(ileDir, ILEAPP_MARKER), { force: true });
+      // The decrypt tool writes only into an empty folder, so a decrypt that
+      // runs again starts from nothing; no file of an earlier one survives.
+      await fsp.rm(decDir, { recursive: true, force: true });
       // Bounded retry loop: a wrong password re-prompts up to
       // MAX_PASSWORD_ATTEMPTS times before this backup is given up on and
       // recorded as failed. Any non-password decrypt failure breaks out
@@ -214,7 +192,7 @@ async function runBackups(
 
         try {
           await withDecryptProgress(decDir, backupBytes, () =>
-            decryptBackup({ mvtBin: cfg.mvtBin, env: mvtEnv(cfg), src, dest: decDir, password: pw })
+            decryptBackup({ tool: decryptTool, env: decryptEnv(), src, dest: decDir, password: pw })
           );
           decrypted = true;
         } catch (err) {
@@ -241,7 +219,7 @@ async function runBackups(
       if (!decrypted) continue; // move to the next backup; this one is recorded in failedBackups
 
       // The marker attributes this decrypt to `contentRoot`, hashed before
-      // decrypt-backup read the source. Confirm the source still hashes to it
+      // the decrypt read the source. Confirm the source still hashes to it
       // (cheap: unchanged files hit the stat cache); if the backup changed
       // in between, the decrypt may be of a different version, so it gets no
       // marker and registration will refuse it.
@@ -249,7 +227,7 @@ async function runBackups(
       try {
         recheck = await hashTree(src, { cachePath: deriveEvidencePath(cfg.workspace, name).fingerprints });
       } catch (err) {
-        // e.g. the source drive disconnected after decrypt-backup finished.
+        // e.g. the source drive disconnected after the decrypt finished.
         // The decrypt can't be attributed to a root, so it gets no marker;
         // this backup is failed and the rest still run, as with the first hash.
         console.error(
@@ -303,47 +281,7 @@ async function runBackups(
         }
         repairFailuresByBackup.set(name, repair.failed_files);
       }
-      await writeFileAtomic(decMarker, renderDecryptMarker(contentRoot, mvtTool, { repair }));
-    }
-
-    const resMarker = path.join(resDir, CHECK_MARKER);
-    // Results are current only if made from this backup, by this mvt-ios,
-    // against this IOC set; otherwise check-backup runs again and registration
-    // files the new results as a new derivative (EPOCH-406).
-    const previousCheck = readCheckMarker(resDir);
-    const staleBecause = !previousCheck
-      ? null
-      : previousCheck.content_root !== contentRoot
-        ? 'the backup changed'
-        : previousCheck.params.ioc_set_hash !== iocSet.ioc_set_hash
-          ? 'the IOC set changed'
-          : previousCheck.tool.version !== mvtTool.version
-            ? `mvt-ios changed (${previousCheck.tool.version} -> ${mvtTool.version})`
-            : null;
-    const forceCheck = cfg.force || decryptRan || !previousCheck || staleBecause !== null;
-    if (!forceCheck) {
-      console.log('  [check]   already done, skipping');
-    } else {
-      if (staleBecause && !decryptRan) console.log(`  [check]   re-checking: ${staleBecause} since the last check`);
-      const logPath = path.join(cfg.workspace, 'logs', `${name}.log`);
-      // Same rule as the decrypt: no marker vouches for results while
-      // check-backup is rewriting them.
-      await fsp.rm(resMarker, { force: true });
-      try {
-        await checkBackup({
-          mvtBin: cfg.mvtBin,
-          env: mvtEnv(cfg, iocs.dataFolder),
-          decryptedDir: decDir,
-          resultsDir: resDir,
-          logPath,
-        });
-        await writeFileAtomic(resMarker, renderCheckMarker(contentRoot, mvtTool, iocSet));
-        console.log('  [check]   done ->', resDir);
-      } catch (err) {
-        // iLEAPP reads the decrypt, not these results, so it still runs.
-        console.error(`  [check] error: ${err instanceof Error ? err.message : err}`);
-        failedBackups.add(name);
-      }
+      await writeFileAtomic(decMarker, renderDecryptMarker(contentRoot, tools.decrypt, { repair }));
     }
 
     // iLEAPP's output is current only if made from this backup's decrypt by
@@ -391,7 +329,7 @@ async function runBackups(
     console.log();
   }
 
-  const summaryPath = await writeSummary(cfg, backups, repairFailuresByBackup);
+  const summaryPath = await writeSummary(cfg, backups, failedBackups, repairFailuresByBackup);
   const backupResults = await Promise.all(
     backups.map(async (backup) => ({
       label: backup.label,
@@ -407,121 +345,14 @@ async function runBackups(
   }
 }
 
-/** Where mvt-ios keeps its data and settings when this runner invokes it. */
-function indicatorsDir(cfg: Config): string {
-  return path.join(cfg.mvtHome, 'data', 'indicators');
-}
-
 /**
- * The environment for every mvt-ios call: its data and config folders point
- * at the runner-managed home, and MVT_STIX2 is never passed through, so the
- * indicators check-backup loads are exactly the hashed folder.
+ * The decrypt's environment: this process's, without a BACKUP_PASSWORD it may
+ * have inherited. decryptBackup adds the password for its own call only.
  */
-function mvtEnv(cfg: Config, dataFolder: string = path.join(cfg.mvtHome, 'data')): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    MVT_DATA_FOLDER: dataFolder,
-    MVT_CONFIG_FOLDER: path.join(cfg.mvtHome, 'config'),
-    // One message per line: rich wraps at 80 columns in a pipe (utils/mvt.ts).
-    COLUMNS: MVT_COLUMNS,
-  };
-  delete env.MVT_STIX2;
-  // The password reaches decrypt-backup only through its own call (utils/mvt.ts).
-  delete env.MVT_IOS_BACKUP_PASSWORD;
+function decryptEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  delete env.BACKUP_PASSWORD;
   return env;
-}
-
-/**
- * Indicators from anywhere but the managed folder would make the recorded
- * IOC set a lie, so they are refused rather than silently dropped.
- */
-function assertNoForeignIocs(cfg: Config): void {
-  if (process.env.MVT_STIX2) {
-    throw new Error(
-      `MVT_STIX2 is set, but the processor records and uses only the IOC set in ${indicatorsDir(cfg)}; ` +
-        'copy those .stix2 files there and unset MVT_STIX2'
-    );
-  }
-  const configFile = path.join(cfg.mvtHome, 'config', 'config.yaml');
-  if (fs.existsSync(configFile) && /^\s*STIX2\s*:/m.test(fs.readFileSync(configFile, 'utf8'))) {
-    throw new Error(
-      `${configFile} sets STIX2, but the processor records and uses only the IOC set in ${indicatorsDir(cfg)}; ` +
-        'move those .stix2 files there and remove the setting'
-    );
-  }
-}
-
-/** mvt-ios's version, from the "Version: X" line of `mvt-ios version`. */
-async function mvtToolVersion(cfg: Config): Promise<ToolVersion> {
-  const output = await new Promise<string>((resolve, reject) => {
-    let out = '';
-    const child = spawn(cfg.mvtBin, ['version'], { stdio: ['ignore', 'pipe', 'pipe'], env: mvtEnv(cfg) });
-    child.stdout.on('data', (chunk) => (out += chunk));
-    child.stderr.on('data', (chunk) => (out += chunk));
-    child.on('error', reject);
-    child.on('close', (code) =>
-      code === 0 ? resolve(out) : reject(new Error(`${cfg.mvtBin} version exited with code ${code}`))
-    );
-  });
-  const version = /^\s*Version:\s*v?(\S+)/m.exec(output)?.[1];
-  if (!version) {
-    throw new Error(`could not read the mvt-ios version from \`${cfg.mvtBin} version\`; every derivative records it`);
-  }
-  return { name: 'mvt-ios', version };
-}
-
-/** A private, fixed copy of the IOC set, and its identity. */
-interface IocSnapshot {
-  /** Used as MVT_DATA_FOLDER for check-backup; holds indicators/. Removed when the run ends. */
-  dataFolder: string;
-  params: CheckParams;
-}
-
-/**
- * Copies the managed indicators into a folder only this run uses, and
- * identifies the copy the same way evidence is identified (the content root
- * of a canonical manifest). check-backup reads the copy, never the shared
- * folder, so a refresh by another runner mid-run can't make this run check
- * against files other than the ones it hashed and records.
- */
-async function snapshotIocs(cfg: Config): Promise<IocSnapshot> {
-  const dataFolder = await fsp.mkdtemp(path.join(os.tmpdir(), 'verichron-iocs-'));
-  try {
-    await fsp.cp(indicatorsDir(cfg), path.join(dataFolder, 'indicators'), { recursive: true });
-    const result = await hashTree(path.join(dataFolder, 'indicators'));
-    if (result.fileCount === 0) throw new Error(`no IOC files in ${indicatorsDir(cfg)}`);
-    return { dataFolder, params: { ioc_set_hash: result.contentRoot, ioc_file_count: result.fileCount } };
-  } catch (err) {
-    await fsp.rm(dataFolder, { recursive: true, force: true });
-    throw err;
-  }
-}
-
-async function ensureIOCs(cfg: Config): Promise<void> {
-  const dir = indicatorsDir(cfg);
-
-  let needsRefresh = cfg.refreshIOCs;
-  if (!needsRefresh) {
-    try {
-      const info = await fsp.stat(dir);
-      if (Date.now() - info.mtimeMs > cfg.iocMaxAgeMs) {
-        needsRefresh = true;
-      } else {
-        const entries = await fsp.readdir(dir).catch(() => []);
-        if (entries.length === 0) needsRefresh = true;
-      }
-    } catch {
-      needsRefresh = true;
-    }
-  }
-
-  if (!needsRefresh) {
-    console.log('IOC indicators are fresh, skipping download');
-    return;
-  }
-
-  console.log('downloading/refreshing IOC indicators...');
-  await runInherited(cfg.mvtBin, ['download-iocs'], mvtEnv(cfg));
 }
 
 /**
@@ -567,24 +398,13 @@ async function hashBackup(
   });
   await writeFileAtomic(paths.sidecar, JSON.stringify(sidecar, null, 2) + '\n');
 
-  // Must start with "done": apps/epoch's mvtLogParser only completes a stage
+  // Must start with "done": apps/epoch's prepareProgress only completes a step
   // on a "[stage] done..." (or skip) line.
   console.log(
     `  [hash]    done -> ${paths.sidecar}` +
       ` (${result.fileCount} files, ${result.hashed} hashed, ${result.reused} cached, root ${result.contentRoot})`
   );
   return { contentRoot: result.contentRoot, totalBytes: result.totalBytes };
-}
-
-function runInherited(bin: string, args: string[], env: NodeJS.ProcessEnv): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { stdio: 'inherit', env });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`${bin} exited with code ${code}`));
-    });
-  });
 }
 
 main();

@@ -26,8 +26,8 @@
     },
     "reads": {
       "type": "string",
-      "enum": ["decrypted", "mvt_results", "ileapp_output"],
-      "description": "The derivative this stage reads (EPOCH-416): the decrypted backup, mvt-ios's check-backup results, or iLEAPP's output, each produced by the processor. The orchestrator passes its id as --derivative-id and its directory as --derivative-path, and fails the stage before spawning it if that derivative isn't registered for the backup. Its facts are filed under that derivative (R7)."
+      "enum": ["decrypted", "ileapp_output"],
+      "description": "The derivative this stage reads (EPOCH-416): the decrypted backup or iLEAPP's output, each produced by the processor. The orchestrator passes its id as --derivative-id and its directory as --derivative-path, and fails the stage before spawning it if that derivative isn't registered for the backup. Its facts are filed under that derivative (R7)."
     },
     "parserVersion": {
       "type": "integer",

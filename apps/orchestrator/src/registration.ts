@@ -15,7 +15,7 @@
  *      HMAC-SHA256(UDID, per-install secret). The raw UDID is never stored.
  *   5. In one transaction: upsert the device, the evidence item (by
  *      content_root), the location and the derivatives (the decrypt, and the
- *      mvt results and iLEAPP output made from it, when complete), appending
+ *      iLEAPP output made from it, when complete), appending
  *      an evidence_events row for each thing that is new.
  */
 
@@ -30,7 +30,6 @@ import {
   deriveEvidencePath,
   EvidenceSidecar,
   provenanceKey,
-  readCheckMarker,
   readDecryptMarker,
   readIleappMarker,
   type DerivativeKind,
@@ -52,22 +51,16 @@ export interface Registration {
   deviceId: string;
   /** The decrypted backup this run reads. */
   decryptedDerivativeId: string;
-  /** mvt-ios's results for that decrypt, when complete. */
-  resultsDerivativeId: string | null;
   /** iLEAPP's output for that decrypt, when complete (EPOCH-416). */
   ileappDerivativeId: string | null;
 }
 
-export type RegisteredDerivatives = Pick<
-  Registration,
-  'decryptedDerivativeId' | 'resultsDerivativeId' | 'ileappDerivativeId'
->;
+export type RegisteredDerivatives = Pick<Registration, 'decryptedDerivativeId' | 'ileappDerivativeId'>;
 
 /** The derivative a stage reads, as its stage.json declares; null when that one isn't registered. */
 export function derivativeFor(stage: StageDefinition, registration: RegisteredDerivatives): string | null {
   const byKind: Record<DerivativeKind, string | null> = {
     decrypted: registration.decryptedDerivativeId,
-    mvt_results: registration.resultsDerivativeId,
     ileapp_output: registration.ileappDerivativeId,
   };
   return byKind[stage.manifest.reads];
@@ -82,8 +75,6 @@ interface Provenance {
 export interface RegistrationInput {
   /** <workspace>/decrypted/<label>, as the orchestrator receives it. */
   backupPath: string;
-  /** <workspace>/results/<label>, if derivable. */
-  resultsPath?: string;
   /** <workspace>/ileapp/<label>, if derivable. */
   ileappPath?: string;
   /** Recorded on locations and events; defaults to this machine's hostname. */
@@ -263,20 +254,19 @@ function verifySidecar(workspace: string, label: string): VerifiedSidecar {
 
 /**
  * Each derivative must have been made from THIS evidence: its completion
- * marker records the content_root it came from. A decrypt or results set
+ * marker records the content_root it came from. A decrypt or iLEAPP output
  * left over from an earlier version of the backup under the same label is
  * refused, so its facts can't be filed under the new evidence.
  *
- * Returns each derivative's provenance from its marker, and the results and
- * iLEAPP directories to register, or null for one that isn't complete
+ * Returns each derivative's provenance from its marker, and the iLEAPP
+ * directory to register, or null if it isn't complete
  * (stages that read it then fail clearly before they start).
  */
 function verifyDerivatives(
   decryptedPath: string,
-  resultsPath: string | undefined,
   ileappPath: string | undefined,
   contentRoot: string
-): { decrypt: Provenance; results: MadeFromDecrypt | null; ileapp: MadeFromDecrypt | null } {
+): { decrypt: Provenance; ileapp: MadeFromDecrypt | null } {
   const decrypt = readDecryptMarker(decryptedPath);
   if (decrypt?.content_root !== contentRoot) {
     throw new RegistrationError(
@@ -290,7 +280,6 @@ function verifyDerivatives(
 
   return {
     decrypt: { tool: decrypt.tool, params: decrypt.params },
-    results: madeFromDecrypt('the mvt results', resultsPath, readCheckMarker, contentRoot),
     ileapp: madeFromDecrypt("iLEAPP's output", ileappPath, readIleappMarker, contentRoot),
   };
 }
@@ -319,7 +308,7 @@ function madeFromDecrypt(
   if (!marker) return null;
   if (marker.content_root !== contentRoot) {
     throw new RegistrationError(
-      `${what} at ${dir} were made from content root ${marker.content_root.slice(0, 12)}…, ` +
+      `${what} at ${dir} was made from content root ${marker.content_root.slice(0, 12)}…, ` +
         `but the evidence sidecar names ${contentRoot.slice(0, 12)}…; re-run the processor`
     );
   }
@@ -348,7 +337,7 @@ async function appendEvent(
 /**
  * A derivative's identity is (evidence, kind, parent, provenance), not its
  * path (migration 0007). A pass made by a different tool version, with a
- * different repair outcome or against a different IOC set is a new
+ * different repair outcome or with a different iLEAPP input type is a new
  * derivative; a row's tool and params are never rewritten. The path is its
  * last-known location and is the one thing updated here, so a moved
  * workspace keeps its derivative (and its completed runs).
@@ -394,7 +383,7 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
   const device = readDevice([path.resolve(input.backupPath), sidecar.sourcePath]);
   const key = deviceKey(device.udid, loadDeviceSecret(input.secretPath));
   const decryptedPath = path.resolve(input.backupPath);
-  const derivatives = verifyDerivatives(decryptedPath, input.resultsPath, input.ileappPath, sidecar.contentRoot);
+  const derivatives = verifyDerivatives(decryptedPath, input.ileappPath, sidecar.contentRoot);
 
   await client.query('BEGIN');
   try {
@@ -463,17 +452,6 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
       host,
       derivatives.decrypt
     );
-    const resultsDerivativeId = derivatives.results
-      ? await upsertDerivative(
-          client,
-          evidenceId,
-          'mvt_results',
-          derivatives.results.path,
-          decryptedDerivativeId,
-          host,
-          derivatives.results.provenance
-        )
-      : null;
     const ileappDerivativeId = derivatives.ileapp
       ? await upsertDerivative(
           client,
@@ -487,7 +465,7 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
       : null;
 
     await client.query('COMMIT');
-    return { evidenceId, deviceId, decryptedDerivativeId, resultsDerivativeId, ileappDerivativeId };
+    return { evidenceId, deviceId, decryptedDerivativeId, ileappDerivativeId };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;

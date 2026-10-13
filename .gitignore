@@ -134,7 +134,7 @@ desktop.ini
 # Generated forensic output and stray files
 # ==========================================
 # Never committed: backups,
-# processor workspaces, iLEAPP and mvt output, and generated reports and
+# processor workspaces, iLEAPP output, and generated reports and
 # summaries. EPOCH-460 adds a pre-commit and CI guard behind these rules.
 /backups/
 /ileapp_raw_output/

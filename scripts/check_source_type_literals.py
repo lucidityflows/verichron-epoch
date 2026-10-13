@@ -13,7 +13,6 @@ from pathlib import Path
 LITERAL_VALUES = [
     "crash_report",
     "ileapp_record",
-    "mvt_ioc_detection",
     "safari_history",
     "sms_message",
     "call_history",

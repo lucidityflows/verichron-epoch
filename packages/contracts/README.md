@@ -9,7 +9,7 @@ and Python mirror the JSON schemas, and CI checks that the mirrors match.
 | `stage-manifest.schema.json` | `stage.json` |
 | `evidence-sidecar.schema.json` | `evidence/<label>/sidecar.json` |
 | [`EXTRACTOR_CONTRACT.md`](EXTRACTOR_CONTRACT.md) | What every pipeline stage must do |
-| `ts/` | Zod mirrors and TS helpers: `normalizedRecord`, `sourceType`, `evidenceSidecar`, `derivativeMarker` (completion markers and provenance key), `deriveEvidencePath`, `deriveResultsPath`, `discoverBackups`, `contractVersion`, `env` |
+| `ts/` | Zod mirrors and TS helpers: `normalizedRecord`, `sourceType`, `evidenceSidecar`, `derivativeMarker` (completion markers and provenance key), `deriveEvidencePath`, `deriveWorkspacePaths` (report and iLEAPP locations), `discoverBackups`, `contractVersion`, `env` |
 | `python/` | Pydantic mirror (`normalized_record`, `source_type`), the schema `adapter`, and `test_contract_sync.py` |
 
 ## Changing a contract

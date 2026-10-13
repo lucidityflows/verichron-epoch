@@ -38,9 +38,9 @@ none of its records existed, and every later run skipped it — reporting
 success — forever. In a chain-of-custody tool, evidence disappeared and
 nothing said so.
  
-That was not a rare interruption case. All three extractors hit it on their
+That was not a rare interruption case. Every extractor hit it on its
 ordinary error paths: crash/main.py `continue`s when parse_ips_file fails,
-mvt_iocs `return`s when alerts.json won't parse, ileapp_bridge `return`s when
+ileapp_bridge `return`s when
 every record in an artifact fails to normalize — each after ingest_file() had
 already committed the ledger row.
  
@@ -197,8 +197,8 @@ class IngestUnit:
     def set_raw_payload(self, payload: dict[str, Any]) -> None:
         """Attach the parsed payload to the ledger row.
 
-        Extractors that can only build the payload after parsing (crash,
-        mvt_iocs) used to insert `{}`, commit, parse, then UPDATE and commit
+        Extractors that can only build the payload after parsing (crash)
+        used to insert `{}`, commit, parse, then UPDATE and commit
         again — a second window in which the ledger was wrong. Inside a unit
         this is just part of the same transaction.
         """

@@ -19,7 +19,7 @@ import { TerminalLog } from '../components/layout/TerminalLog';
 import { DevicePullPanel } from '../features/devicePullPanel/DevicePullPanel';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
-import type { MvtFinishedResult, StartPipelineOptions } from '../../shared/types/window';
+import type { PipelineFinishedResult, StartPipelineOptions } from '../../shared/types/window';
 import type { Backup } from '@verichron/contracts';
 import { pipelineApi } from '../api/pipeline';
 import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
@@ -91,7 +91,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const analysisForRun = analysis?.kind === 'workspace' && analysis.target === lastRunWorkspace;
   const analysisRunning = analysisForRun && analysis?.status === 'running';
   const analysisLog = analysisForRun ? analysisLogAll : [];
-  const analysisResult: MvtFinishedResult | null = analysisRunning
+  const analysisResult: PipelineFinishedResult | null = analysisRunning
     ? null
     : analysisForRun && analysis?.status === 'finished'
       ? analysis.result
@@ -199,7 +199,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const handleSubmitPassword = async () => {
     setSubmittingPassword(true);
     try {
-      await pipelineApi.submitMvtPassword(passwordInput);
+      await pipelineApi.submitBackupPassword(passwordInput);
       setPasswordInput('');
     } catch (err) {
       console.error('Failed to submit password:', err);

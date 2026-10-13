@@ -13,7 +13,7 @@
 // Shared (EPOCH-487): the main process keeps a run's progress, so leaving and
 // returning to New Investigation shows it; the renderer only displays it.
 
-export type StageName = 'hash' | 'decrypt' | 'repair' | 'check' | 'ileapp';
+export type StageName = 'hash' | 'decrypt' | 'repair' | 'ileapp';
 export type StageState = 'pending' | 'running' | 'done' | 'skipped' | 'error';
 export type BackupOverallState = 'queued' | 'running' | 'done' | 'failed';
 
@@ -32,24 +32,23 @@ export interface BackupProgress {
   ileappModule?: { index: number; total: number; name: string; startedAt: number };
 }
 
-export interface MvtRunProgress {
+export interface PrepareRunProgress {
   order: string[];
   byLabel: Record<string, BackupProgress>;
   currentLabel: string | null;
 }
 
-export const STAGE_ORDER: StageName[] = ['hash', 'decrypt', 'repair', 'check', 'ileapp'];
+export const STAGE_ORDER: StageName[] = ['hash', 'decrypt', 'repair', 'ileapp'];
 
 export const STAGE_LABELS: Record<StageName, string> = {
   hash: 'Checking backup files',
   decrypt: 'Decrypting',
   repair: 'Repairing damaged files',
-  check: 'Scanning for indicators',
   ileapp: 'Reading device activity',
 };
 
 function emptyStages(): Record<StageName, StageState> {
-  return { hash: 'pending', decrypt: 'pending', repair: 'pending', check: 'pending', ileapp: 'pending' };
+  return { hash: 'pending', decrypt: 'pending', repair: 'pending', ileapp: 'pending' };
 }
 
 // Seeds progress for a fresh run from the labels the user actually
@@ -57,7 +56,7 @@ function emptyStages(): Record<StageName, StageState> {
 // That text duplicates data the UI already has authoritatively (the exact
 // same selection just sent via --only), and parsing it would just be one
 // more place a log-format change could silently break the UI.
-export function initMvtRunProgress(labels: string[]): MvtRunProgress {
+export function initPrepareProgress(labels: string[]): PrepareRunProgress {
   const byLabel: Record<string, BackupProgress> = {};
   for (const label of labels) {
     byLabel[label] = { label, overall: 'queued', stages: emptyStages(), stageStartedAt: {} };
@@ -66,13 +65,17 @@ export function initMvtRunProgress(labels: string[]): MvtRunProgress {
 }
 
 const BACKUP_START_RE = /^=== (.+) ===$/;
-const STAGE_LINE_RE = /^\s*\[(hash|decrypt|repair|check|ileapp)\]\s*(.*)$/;
-const STAGE_ERROR_RE = /^\s*\[(hash|decrypt|repair|check|ileapp)\]\s*error\b:?\s*(.*)$/i;
+const STAGE_LINE_RE = /^\s*\[(hash|decrypt|repair|ileapp)\]\s*(.*)$/;
+const STAGE_ERROR_RE = /^\s*\[(hash|decrypt|repair|ileapp)\]\s*error\b:?\s*(.*)$/i;
 const HASH_PROGRESS_RE = /^\s*\[hash\]\s+progress (\d+) bytes, (\d+) files$/;
 const DECRYPT_PROGRESS_RE = /^\s*\[decrypt\]\s+progress (\d+) of (\d+) bytes$/;
 const ILEAPP_MODULE_RE = /^\s*\[ileapp\]\s+module (\d+) of (\d+): (.+)$/;
 
-export function applyMvtLogLine(state: MvtRunProgress, rawLine: string, now: number = Date.now()): MvtRunProgress {
+export function applyPrepareLogLine(
+  state: PrepareRunProgress,
+  rawLine: string,
+  now: number = Date.now()
+): PrepareRunProgress {
   const line = rawLine.replace(/\s+$/, '');
 
   const startMatch = BACKUP_START_RE.exec(line);
@@ -100,7 +103,7 @@ export function applyMvtLogLine(state: MvtRunProgress, rawLine: string, now: num
   const current = state.byLabel[state.currentLabel];
   if (!current) return state;
 
-  const update = (patch: Partial<BackupProgress>): MvtRunProgress => ({
+  const update = (patch: Partial<BackupProgress>): PrepareRunProgress => ({
     ...state,
     byLabel: { ...state.byLabel, [state.currentLabel as string]: { ...current, ...patch } },
   });
@@ -163,7 +166,7 @@ export function applyMvtLogLine(state: MvtRunProgress, rawLine: string, now: num
           ...current,
           stages,
           stageStartedAt,
-          // A failed check doesn't stop iLEAPP, but the backup still failed.
+          // An earlier step's error leaves the backup failed even when iLEAPP finishes.
           overall: isLastStage && current.overall !== 'failed' ? 'done' : current.overall,
         },
       },

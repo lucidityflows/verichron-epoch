@@ -44,10 +44,10 @@ Each package has a short README covering only what is specific to it.
 | Path | What it is | Language |
 |---|---|---|
 | `apps/epoch` | Electron desktop app | TypeScript |
-| `apps/processor` | Processes evidence: hashes and verifies backups, then produces derivatives (decrypt, repair, IOC scan with `mvt-ios`) | TypeScript |
+| `apps/processor` | Prepares evidence: hashes and verifies backups, then produces derivatives (decrypt, repair, iLEAPP) | TypeScript |
 | `apps/orchestrator` | Registers evidence and runs the pipeline stages | TypeScript |
-| `apps/extractors/*` | Stages that turn tool output into facts (`crash`, `ileapp_bridge`, `mvt_iocs`) | Python |
-| `apps/analysis` | LLM stage that proposes leads | Python |
+| `apps/extractors/*` | Stages that turn tool output into facts (`crash`, `ileapp_bridge`) | Python |
+| `apps/analysis` | LLM stage that proposes leads; out of the pipeline until EPOCH-442 | Python |
 | `apps/reporting` | Generates the investigation report | Python |
 | `packages/contracts` | Shared schemas and types (TS and Python) | both |
 | `packages/etl-db-writer` | The fact writer, migrations and `migrate.py` | Python |

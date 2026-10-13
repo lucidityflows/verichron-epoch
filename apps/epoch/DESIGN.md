@@ -224,7 +224,7 @@ Decided 2026-10-09 (EPOCH-464), following the common desktop convention
   encryption password (required)").
 - **A page's title is its sidebar label**, word for word, so the user always
   knows where they are.
-- **Product names keep their own casing:** iPhone, iOS, iLEAPP, mvt-ios.
+- **Product names keep their own casing:** iPhone, iOS, iLEAPP.
 - **Ellipsis:** the single character `…`, never three periods, for
   in-progress states ("Checking for the required tool…").
 - **One term per concept:** the user-facing unit of work is an

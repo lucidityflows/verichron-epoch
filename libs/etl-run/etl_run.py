@@ -11,9 +11,9 @@ produce a complete written record or contribute nothing. One bad item is
 isolated and logged, not silently swallowed and not allowed to abort the
 rest of the run.
 
-Extractors with more than one independently-failable input (e.g.
-extractors/mvt_iocs/ processing alerts.json and timeline.csv separately,
-per EXTRACTOR_CONTRACT.md #5's multi-input rule) build one ETLRunResult
+Extractors with more than one independently-failable input (two files
+processed separately, per EXTRACTOR_CONTRACT.md #5's multi-input rule)
+build one ETLRunResult
 per input and combine them with merge() before deciding the stage's exit
 code — one missing/malformed input still doesn't block the other.
 
@@ -34,8 +34,8 @@ class ETLRunResult:
     """Accumulates per-item outcomes across one extractor stage run.
 
     `succeeded`/`failed` count whatever unit the extractor treats as its
-    natural item of partial failure — files for crash, records for
-    mvt_iocs/ileapp_bridge. An extractor that writes many rows per item
+    natural item of partial failure — files for crash, artifact tables for
+    ileapp_bridge. An extractor that writes many rows per item
     should call ok() once per item, not once per row, so the printed
     summary answers "how many things did I process" rather than "how many
     rows exist," which is what a reader actually wants after a run.
@@ -77,8 +77,8 @@ class ETLRunResult:
 
     def note(self, message: str) -> "ETLRunResult":
         """Record an informational message that should be surfaced but
-        must NOT affect exit_code — e.g. an optional input file (like
-        mvt_iocs's alerts.json) simply wasn't present for this backup.
+        must NOT affect exit_code — e.g. an optional input file simply
+        wasn't present for this backup.
         Distinct from fail(): a note is expected-and-handled, not a
         partial failure of the stage."""
         self.notes.append(message)
@@ -123,7 +123,7 @@ class ETLRunResult:
         detail behind it.
 
         `tag` is the extractor's bracketed log prefix (e.g. "crash",
-        "mvt_iocs").
+        "ileapp_bridge").
 
         By default the one-line summary goes to stdout and everything
         else (notes, itemized failures) goes to stderr.

@@ -1,6 +1,5 @@
 /**
- * Process groups the processor started with `detached: true` (mvt-ios
- * check-backup, iLEAPP), so a timeout or a failed log can stop a tool and
+ * Process groups the processor started with `detached: true` (iLEAPP), so a timeout or a failed log can stop a tool and
  * everything it started. Being its own group, such a tool no longer receives
  * a SIGINT or SIGTERM sent to the processor (Ctrl-C in a terminal, or a stop
  * from its parent), and would keep writing its output after the processor

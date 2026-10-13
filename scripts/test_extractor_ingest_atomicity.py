@@ -8,8 +8,8 @@ reached the bad state on their *ordinary* error paths, no interruption required.
 
   crash/main.py            committed the ledger row, then `continue`d when
                            parse_ips_file() returned an error
-  mvt_iocs.process_alerts  committed the ledger row, then `return`ed when
-                           alerts.json would not parse
+  mvt_iocs.process_alerts  the same when alerts.json would not parse (the
+                           extractor was removed with mvt-ios, EPOCH-489)
   ileapp_bridge
     .process_artifact_file committed the ledger row, then `return`ed when every
                            record in the artifact failed to normalize
@@ -32,7 +32,6 @@ import pytest
 
 import crash.main as crash_main
 from db_writer import IngestContext
-import mvt_iocs.main as mvt_main
 from testing.pg_real import BACKENDS, open_db
 
 RUN_ID = "aaaaaaaa-0000-0000-0000-000000000000"
@@ -146,82 +145,22 @@ def _valid_ips() -> str:
     return json.dumps(header) + "\n" + json.dumps(payload) + "\n"
 
 
-# ==========================================================================
-# mvt_iocs extractor
-# ==========================================================================
-
-
-def test_unparseable_alerts_json_is_reported_failed_and_left_retryable(db, tmp_path):
-    (tmp_path / "alerts.json").write_text("{ not valid json")
-
-    result = mvt_main.process_alerts(db, ctx(RUN_ID), tmp_path)
-
-    assert result.succeeded == 0
-    assert result.failed == 1
-    assert result.failures
-    assert db.ledger() == [], (
-        "a malformed alerts.json left a ledger row, so the MVT detections for "
-        "this backup would never be ingested by any later run"
-    )
-
-
-def test_repaired_alerts_json_is_ingested_on_retry(db, tmp_path):
-    alerts = tmp_path / "alerts.json"
-    alerts.write_text("{ not valid json")
-    mvt_main.process_alerts(db, ctx(RUN_ID), tmp_path)
-
-    alerts.write_text(json.dumps([]))
-    result = mvt_main.process_alerts(db, ctx(RETRY_RUN_ID), tmp_path)
-
-    assert result.failed == 0
-    assert db.ledger(), "the retried file should now be recorded"
-    assert db.ledger()[0]["ingest_complete"] == 1
-
-
-def test_empty_alerts_json_completes_rather_than_retrying_forever(db, tmp_path):
-    """A clean backup legitimately has zero detections. That is a completed
-    ingest with record_count = 0, not an unfinished one."""
-    (tmp_path / "alerts.json").write_text(json.dumps([]))
-
-    result = mvt_main.process_alerts(db, ctx(RUN_ID), tmp_path)
-    assert result.failed == 0
-
-    row = db.ledger()[0]
-    assert row["ingest_complete"] == 1
-    assert row["record_count"] == 0
-
-    # Second run must treat it as done.
-    retry = mvt_main.process_alerts(db, ctx(RETRY_RUN_ID), tmp_path)
-    assert retry.failed == 0
-    assert retry.succeeded == 0
-    assert len(db.ledger()) == 1
-
-
-def test_identical_empty_alerts_json_in_two_backups_is_ingested_for_both(db, tmp_path):
-    """EPOCH-402's regression: a default empty alerts.json is byte-identical
-    across clean backups. Under the old global file-hash dedup the second
-    backup's ingest was silently skipped. Each evidence item gets its own unit."""
+def test_an_identical_file_in_two_backups_is_ingested_for_both(db, tmp_path):
+    """EPOCH-402's regression: a file can be byte-identical across backups.
+    Under the old global file-hash dedup the second backup's ingest was
+    silently skipped. Each evidence item gets its own unit."""
     for name in ("backup_a", "backup_b"):
         (tmp_path / name).mkdir()
-        (tmp_path / name / "alerts.json").write_text("[]")
+        (tmp_path / name / "same.ips").write_text(_valid_ips())
 
-    first = mvt_main.process_alerts(db, ctx(RUN_ID, EVIDENCE_ID), tmp_path / "backup_a")
-    second = mvt_main.process_alerts(db, ctx(RUN_ID, OTHER_EVIDENCE_ID), tmp_path / "backup_b")
+    first = crash_main.run(db, ctx(RUN_ID, EVIDENCE_ID), str(tmp_path / "backup_a"))
+    second = crash_main.run(db, ctx(RUN_ID, OTHER_EVIDENCE_ID), str(tmp_path / "backup_b"))
 
     assert first.failed == second.failed == 0
     ledger = db.ledger()
     assert len(ledger) == 2
     assert {row["evidence_id"] for row in ledger} == {EVIDENCE_ID, OTHER_EVIDENCE_ID}
     assert all(row["ingest_complete"] for row in ledger)
-
-
-def test_missing_alerts_json_is_not_a_failure(db, tmp_path):
-    """No alerts.json at all means mvt did not produce one; that is a skip, and
-    it must not create a ledger row for a file that does not exist."""
-    result = mvt_main.process_alerts(db, ctx(RUN_ID), tmp_path)
-
-    assert (result.succeeded, result.failed) == (0, 0)
-    assert db.ledger() == []
 
 
 # ==========================================================================

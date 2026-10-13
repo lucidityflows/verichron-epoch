@@ -44,7 +44,7 @@
  * apps/reporting/generate_report.py can't disagree about them (R27).
  */
 
-import { deriveResultsPath } from '@verichron/contracts';
+import { deriveReportPath } from '@verichron/contracts';
 import type { Client, Pool, PoolClient } from 'pg';
 
 type Db = Client | PoolClient | Pool;
@@ -130,39 +130,11 @@ export async function getRunEvidence(client: Db, runId: string): Promise<string 
 }
 
 /**
- * Where the mvt results a run's stages read are now: the current path of that
- * `mvt_results` derivative, or null if they read none (e.g. check-backup
- * failed, so no results were registered). A results derivative is specific to
- * one results set (IOC set and mvt version), so this is the most precise
- * location of a run's outputs; registration updates it when its workspace
- * moves.
- */
-async function runResultsDerivativePath(client: Db, runId: string): Promise<string | null> {
-  const result = await client.query<{ path: string }>(
-    `SELECT DISTINCT d.path
-       FROM pipeline_stage_status s
-       JOIN evidence_derivatives d ON d.derivative_id = s.derivative_id
-      WHERE s.run_id = $1 AND d.kind = 'mvt_results'`,
-    [runId]
-  );
-  if (result.rows.length > 1) {
-    throw new Error(`run ${runId} read more than one mvt results derivative`);
-  }
-  return result.rows[0]?.path ?? null;
-}
-
-/**
  * Where the decrypted backup a run processed is now: the current path of the
  * run's decrypted derivative, or null if the run has no registered evidence
  * (it predates EPOCH-404) or doesn't exist. Registration updates a
  * derivative's path when its workspace moves, so this follows a moved
  * workspace; the run's `backup_source` keeps the path it started from.
- *
- * The orchestrator derives a run's results path, where it writes the report,
- * from this path (`deriveResultsPath`), whether or not mvt results were
- * registered; prefer the run's results derivative and fall back to this. A decrypt
- * can be shared by several results sets in different workspaces, and its one
- * path is wherever it was last registered.
  */
 async function runDecryptedPath(client: Db, runId: string): Promise<string | null> {
   const result = await client.query<{ path: string }>(
@@ -176,27 +148,16 @@ async function runDecryptedPath(client: Db, runId: string): Promise<string | nul
 }
 
 /**
- * Where a run's results are now: the directory the orchestrator pointed every
- * stage at as `--results-path`, and where the reporting stage wrote the run's
- * report. Null if the run has no registered evidence or no derivable results
- * location.
- *
- * - The `mvt_results` derivative the run read comes first. It is specific to
- *   the run's results set (IOC set and mvt version).
- * - Otherwise (check-backup failed, so no results were registered) the path is
- *   derived from the run's decrypt with `deriveResultsPath`, as the
- *   orchestrator derived it. A decrypt can be shared by results sets in several
- *   workspaces and points wherever it was last registered, so it is only the
- *   fallback.
- *
- * Both come from the database, where registration keeps a derivative's path
- * current when its workspace moves; the run's `backup_source` goes stale.
+ * Where a run's report is now: the folder the orchestrator passed every stage
+ * as `--report-path`, derived from the run's decrypt with `deriveReportPath`
+ * (<workspace>/reports/<label>/, EPOCH-489). Null if the run has no
+ * registered evidence or its decrypt is not in a workspace. The decrypt's
+ * path comes from the database, where registration keeps it current when the
+ * workspace moves; the run's `backup_source` goes stale.
  */
-export async function getRunResultsLocation(client: Db, runId: string): Promise<string | null> {
-  const results = await runResultsDerivativePath(client, runId);
-  if (results) return results;
+export async function getRunReportLocation(client: Db, runId: string): Promise<string | null> {
   const decrypted = await runDecryptedPath(client, runId);
-  return decrypted ? (deriveResultsPath(decrypted) ?? null) : null;
+  return decrypted ? (deriveReportPath(decrypted) ?? null) : null;
 }
 
 /**
@@ -421,83 +382,4 @@ export async function getForensicRecords(
   const nextCursor = fetched.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
   const rows = pageRows.map(({ total: _total, sort_value: _cursorOnly, ...row }) => row as ForensicRecordRow);
   return { rows, total, nextCursor };
-}
-
-/**
- * Correlation pivots + context, mirroring apps/reporting/generate_report.py's
- * fetch_correlation_pivots / fetch_correlated_context exactly -- same source
- * types, same window, same query shape. Two functions, not one, matching the
- * Python file's own split: pivots is cheap (one query, all of them, since a
- * run's mvt_ioc_detection + timestamp_anomaly count is small), context is
- * per-pivot and only worth fetching when a caller actually wants to expand
- * one -- fetching context for every pivot up front doesn't scale the same
- * way pivots does.
- */
-
-export interface CorrelationPivotRow {
-  id: string;
-  source_type: string;
-  event_time: string | null;
-  fields: Record<string, unknown>;
-}
-
-export interface CorrelatedContextRow {
-  id: string;
-  source_type: string;
-  event_time: string | null;
-  process_name: string | null;
-  bundle_id: string | null;
-  fields: Record<string, unknown>;
-}
-
-/** Minutes on either side of a pivot's event_time to pull as context. Matches
- * generate_report.py's CORRELATION_WINDOW (a fixed default, not yet a CLI
- * flag there either -- see that file's own comment on why a sensible fixed
- * default shipped first). */
-export const CORRELATION_WINDOW_MINUTES = 15;
-
-/**
- * Every mvt_ioc_detection / timestamp_anomaly row for an evidence item -- the pivot
- * points a correlation view builds a window around. Rows with a null
- * event_time (e.g. an untimed alert) come back too; there's nothing to
- * correlate them against, so a caller should render those separately rather
- * than pass them to getCorrelatedContext.
- */
-export async function getCorrelationPivots(client: Db, evidenceId: string): Promise<CorrelationPivotRow[]> {
-  const result = await client.query<CorrelationPivotRow>(
-    `SELECT id, source_type, event_time, fields
-       FROM current_forensic_records
-      WHERE evidence_id = $1 AND source_type IN ('mvt_ioc_detection', 'timestamp_anomaly')
-      ORDER BY event_time ASC NULLS LAST, id ASC`,
-    [evidenceId]
-  );
-  return result.rows;
-}
-
-/**
- * Everything else known about this evidence within the correlation
- * window of one pivot's event_time, across every source_type -- the entire
- * point per generate_report.py's own comment: crash today, every other
- * domain automatically once its extractor lands, no change needed here when
- * that happens. `excludeId` keeps the pivot itself out of its own context.
- */
-export async function getCorrelatedContext(
-  client: Db,
-  evidenceId: string,
-  eventTime: string,
-  excludeId: string,
-  windowMinutes: number = CORRELATION_WINDOW_MINUTES
-): Promise<CorrelatedContextRow[]> {
-  const center = new Date(eventTime);
-  const lo = new Date(center.getTime() - windowMinutes * 60_000).toISOString();
-  const hi = new Date(center.getTime() + windowMinutes * 60_000).toISOString();
-
-  const result = await client.query<CorrelatedContextRow>(
-    `SELECT id, source_type, event_time, process_name, bundle_id, fields
-       FROM current_forensic_records
-      WHERE evidence_id = $1 AND event_time BETWEEN $2 AND $3 AND id != $4
-      ORDER BY event_time ASC, id ASC`,
-    [evidenceId, lo, hi, excludeId]
-  );
-  return result.rows;
 }

@@ -21,11 +21,9 @@ import pg from 'pg';
 
 import {
   MAX_RECORDS_PAGE as MAX_PAGE,
-  getCorrelatedContext,
-  getCorrelationPivots,
   getForensicRecords,
   getRunEvidence,
-  getRunResultsLocation,
+  getRunReportLocation,
   type ForensicRecordQuery,
   type ForensicRecordRow,
   type RecordSortKey,
@@ -38,12 +36,9 @@ const MIGRATIONS = path.resolve(__dirname, '../etl-db-writer/migrations');
 const EVIDENCE = '11111111-1111-1111-1111-111111111111';
 const OTHER = '22222222-2222-2222-2222-222222222222';
 const RUN = '33333333-3333-3333-3333-333333333333';
-const FAILED_CHECK_RUN = '44444444-4444-4444-4444-444444444444';
+const REPORT_RUN = '44444444-4444-4444-4444-444444444444';
 const DECRYPT = '55555555-5555-5555-5555-555555555555';
 const UNREGISTERED_RUN = '77777777-7777-7777-7777-777777777777';
-const SHARED_DECRYPT = '88888888-8888-8888-8888-888888888888';
-const RESULTS_A = '99999999-0000-0000-0000-00000000000a';
-const RUN_A = '99999999-0000-0000-0000-0000000000aa';
 
 /** 23 records for EVIDENCE: more than several pages at limit 4. Includes NULL
  * times and names, exact ties (decided by id), and two times that differ only
@@ -54,9 +49,9 @@ const ROWS: Array<[string | null, string, string | null, string | null]> = [
   ['2024-01-15 10:30:00.000200+00', 'crash_report', 'SpringBoard', 'com.apple.springboard'],
   ['2024-01-15 10:30:00+00', 'crash_report', 'backboardd', null],
   ['2024-01-15 10:30:00+00', 'crash_report', 'backboardd', null],
-  ['2024-01-15 10:31:00+00', 'mvt_ioc_detection', 'Pegasus_100%', 'com.evil_app'],
-  ['2024-01-15 10:32:00+00', 'timestamp_anomaly', null, null],
-  [null, 'mvt_ioc_detection', 'untimed', null],
+  ['2024-01-15 10:31:00+00', 'ileapp_record', 'Pegasus_100%', 'com.evil_app'],
+  ['2024-01-15 10:32:00+00', 'safari_history', null, null],
+  [null, 'ileapp_record', 'untimed', null],
   [null, 'crash_report', null, null],
   [null, 'crash_report', 'zzz', 'org.example'],
   ...Array.from({ length: 14 }, (_, i): [string, string, string, string] => [
@@ -127,7 +122,7 @@ before(async () => {
   await insertRecord(stranded, EVIDENCE, 'crash_report', '2024-03-01 00:00:00+00', 'stranded', null);
   // Another evidence item's facts must never leak in.
   const other = await insertUnit(OTHER, 'f'.repeat(64), 1, true);
-  await insertRecord(other, OTHER, 'mvt_ioc_detection', '2024-01-15 10:31:00+00', 'other_evidence', null);
+  await insertRecord(other, OTHER, 'ileapp_record', '2024-01-15 10:31:00+00', 'other_evidence', null);
 });
 
 after(async () => {
@@ -320,65 +315,21 @@ describe('evidence-scoped helpers', live, () => {
     assert.equal(await getRunEvidence(db, RUN), EVIDENCE);
     assert.equal(await getRunEvidence(db, '44444444-4444-4444-4444-444444444444'), null);
   });
-
-  it('pivots and context come from one evidence item only', async () => {
-    const pivots = await getCorrelationPivots(db, EVIDENCE);
-    assert.ok(pivots.length >= 3);
-    assert.ok(pivots.every((p) => ['mvt_ioc_detection', 'timestamp_anomaly'].includes(p.source_type)));
-
-    const timed = pivots.find((p) => p.event_time !== null)!;
-    const context = await getCorrelatedContext(db, EVIDENCE, new Date(timed.event_time!).toISOString(), timed.id);
-    assert.ok(context.length > 0);
-    assert.ok(context.every((c) => c.id !== timed.id && c.process_name !== 'other_evidence'));
-  });
 });
 
-describe('getRunResultsLocation', live, () => {
+describe('getRunReportLocation', live, () => {
   before(async () => {
-    // A run whose check-backup failed: no mvt results were registered and no
-    // stage read any, but the run has its decrypt.
     await db.query(
       `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
-       VALUES ($1, $2, 'decrypted', '/old/ws/decrypted/a', '{"name": "mvt-ios", "version": "0"}',
+       VALUES ($1, $2, 'decrypted', '/old/ws/decrypted/a', '{"name": "iphone_backup_decrypt", "version": "0.10.0"}',
                '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('2', 64))`,
       [DECRYPT, EVIDENCE]
     );
     await db.query(
       `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
        VALUES ($1, '/old/ws/decrypted/a', 'test', '{}', $2, $3)`,
-      [FAILED_CHECK_RUN, EVIDENCE, DECRYPT]
+      [REPORT_RUN, EVIDENCE, DECRYPT]
     );
-    await db.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id)
-       VALUES ($1, 'crash', 'succeeded', $2), ($1, 'reporting', 'succeeded', $2)`,
-      [FAILED_CHECK_RUN, DECRYPT]
-    );
-
-    // Run A in workspace A read results made with IOC set A. The same backup,
-    // decrypted identically, was then registered from workspace B with another
-    // IOC set: the shared decrypt now points at B, run A's results still at A.
-    await db.query(
-      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
-       VALUES ($1, $2, 'decrypted', '/ws-b/decrypted/a', '{"name": "mvt-ios", "version": "0"}',
-               '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('3', 64))`,
-      [SHARED_DECRYPT, EVIDENCE]
-    );
-    await db.query(
-      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, parent_derivative_id, tool, params, provenance_key)
-       VALUES ($1, $2, 'mvt_results', '/ws-a/results/a', $3, '{"name": "mvt-ios", "version": "0"}', '{}', repeat('4', 64))`,
-      [RESULTS_A, EVIDENCE, SHARED_DECRYPT]
-    );
-    await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-       VALUES ($1, '/ws-a/decrypted/a', 'test', '{}', $2, $3)`,
-      [RUN_A, EVIDENCE, SHARED_DECRYPT]
-    );
-    await db.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id)
-       VALUES ($1, 'crash', 'succeeded', $2), ($1, 'mvt_iocs', 'succeeded', $3), ($1, 'reporting', 'succeeded', $2)`,
-      [RUN_A, SHARED_DECRYPT, RESULTS_A]
-    );
-
     // A run from before evidence registration (EPOCH-404).
     await db.query(
       `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions)
@@ -387,24 +338,18 @@ describe('getRunResultsLocation', live, () => {
     );
   });
 
-  it("uses the mvt results the run read, not the shared decrypt's latest workspace", async () => {
-    assert.equal(await getRunResultsLocation(db, RUN_A), '/ws-a/results/a');
-  });
-
-  it('derives the location from the decrypt when check-backup failed and no results were registered', async () => {
-    assert.equal(await getRunResultsLocation(db, FAILED_CHECK_RUN), '/old/ws/results/a');
+  it("derives the report folder from the run's decrypt", async () => {
+    assert.equal(await getRunReportLocation(db, REPORT_RUN), '/old/ws/reports/a');
   });
 
   it('follows a moved workspace, not the run backup_source', async () => {
     // What registration does when the same decrypt is found at a new location.
     await db.query(`UPDATE evidence_derivatives SET path = '/new/ws/decrypted/a' WHERE derivative_id = $1`, [DECRYPT]);
-    assert.equal(await getRunResultsLocation(db, FAILED_CHECK_RUN), '/new/ws/results/a');
-    await db.query(`UPDATE evidence_derivatives SET path = '/moved/results/a' WHERE derivative_id = $1`, [RESULTS_A]);
-    assert.equal(await getRunResultsLocation(db, RUN_A), '/moved/results/a');
+    assert.equal(await getRunReportLocation(db, REPORT_RUN), '/new/ws/reports/a');
   });
 
   it('is null for a run without registered evidence, and for an unknown run', async () => {
-    assert.equal(await getRunResultsLocation(db, UNREGISTERED_RUN), null);
-    assert.equal(await getRunResultsLocation(db, '66666666-6666-6666-6666-666666666666'), null);
+    assert.equal(await getRunReportLocation(db, UNREGISTERED_RUN), null);
+    assert.equal(await getRunReportLocation(db, '66666666-6666-6666-6666-666666666666'), null);
   });
 });

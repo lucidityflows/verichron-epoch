@@ -2,19 +2,19 @@ import { ipcMain, shell } from 'electron';
 import path from 'path';
 import fs from 'fs/promises';
 import type { Pool } from 'pg';
-import { getRunResultsLocation } from '@verichron/etl-db-reader';
+import { getRunReportLocation } from '@verichron/etl-db-reader';
 
-/** A run's report is in its results location (see getRunResultsLocation). */
+/** A run's report is in its report folder (see getRunReportLocation). */
 async function reportPathFor(dbPool: Pool, runId: string): Promise<string | undefined> {
-  const resultsPath = await getRunResultsLocation(dbPool, runId);
-  return resultsPath ? path.join(resultsPath, 'investigation_report.md') : undefined;
+  const reportFolder = await getRunReportLocation(dbPool, runId);
+  return reportFolder ? path.join(reportFolder, 'investigation_report.md') : undefined;
 }
 
 export function registerReportHandlers(dbPool: Pool) {
   ipcMain.handle('epoch:getReport', async (_event, runId: string) => {
     const reportPath = await reportPathFor(dbPool, runId);
     if (!reportPath) {
-      return { status: 'no-results-path' as const };
+      return { status: 'no-report-path' as const };
     }
     try {
       const content = await fs.readFile(reportPath, 'utf-8');

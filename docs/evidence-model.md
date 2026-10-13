@@ -35,8 +35,8 @@ UDID, and is refused.
 ## Derivatives
 
 A *derivative* is something produced from evidence: the **decrypted** backup,
-and two made from it, whose parent is the decrypt: the **mvt results** checked
-from it, and **iLEAPP's output** (`ileapp_output`). Facts are filed under the
+and, made from it with the decrypt as its parent, **iLEAPP's output**
+(`ileapp_output`). Facts are filed under the
 derivative they were read from, so iLEAPP records belong to iLEAPP's output, not
 to the decrypt (R7).
 
@@ -44,29 +44,29 @@ A derivative's identity is **(evidence, kind, parent, provenance)**:
 
 - **provenance** is the tool that made it and the parameters that shaped it, for
   example:
-  - a decrypt records the mvt-ios version and the SQLite repair outcome (sqlite3
+  - a decrypt records the decrypt library and its version
+    (`iphone_backup_decrypt`, EPOCH-489) and the SQLite repair outcome (sqlite3
     version, databases repaired, files not fully recovered, originals kept as
     `.corrupt-<timestamp>`);
-  - a results set records the mvt-ios version and the hash of the IOC set it
-    was checked against;
   - iLEAPP's output records the iLEAPP commit (the submodule's, because
     iLEAPP's self-reported version does not match its release tag) and how
     iLEAPP read the decrypt (`itunes` or `fs`);
 - `provenance_key` is the sha256 of that provenance in canonical form;
-- a different tool version, repair outcome, IOC set or iLEAPP commit is
+- a different tool version, repair outcome or iLEAPP commit is
   therefore a **new derivative**. A derivative's provenance is never rewritten; only its path, its
   last-known location, is updated.
 
-**Completion markers.** The processor writes `.mvt_decrypted_ok`, `.mvt_check_ok`
-and `.ileapp_ok` only once a derivative is finished. Each records the evidence `content_root` it
+**Completion markers.** The processor writes `.decrypted_ok` and `.ileapp_ok`
+only once a derivative is finished. A decrypt is finished only when every file
+the backup's `Manifest.db` lists was written. Each records the evidence `content_root` it
 was made from and its provenance. Registration refuses a derivative whose marker
 is missing, malformed, or names different evidence. That's how a backup that
 changed under the same label can never have its old decrypt filed under the new
 evidence.
 
-**IOC sets.** The processor runs mvt-ios only against IOC files it manages. Each run
-checks against a private copy of them, and the hash of that copy is what the
-results record, so a refresh during a run can't change what was recorded.
+**Indicator sets.** No derivative records an indicator set at the moment:
+indicator checks were removed with their tool (EPOCH-489). Indicator sets return
+as versioned, hashed data the project's own matching reads (EPOCH-490, 491).
 
 ## Runs
 

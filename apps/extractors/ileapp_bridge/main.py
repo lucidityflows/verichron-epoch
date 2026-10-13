@@ -156,7 +156,7 @@ def main() -> int:
     add_context_args(parser)
     parser.add_argument("--backup-path", required=True, help="the decrypted backup the output was made from")
     parser.add_argument("--db-url", required=True, help="Postgres connection string")
-    parser.add_argument("--results-path", default=None, help="unused; passed to every stage")
+    parser.add_argument("--report-path", default=None, help="unused; passed to every stage")
     args = parser.parse_args()
 
     try:

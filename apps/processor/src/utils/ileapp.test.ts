@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 
-import { IleappProgress, ileappInputType, runIleapp, type IleappRun } from './ileapp.js';
+import { IleappProgress, ileappInputType, runIleapp, UNIFIEDLOG_ITERATOR_DISABLED, type IleappRun } from './ileapp.js';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'ileapp-input-'));
 after(() => rmSync(tmp, { recursive: true, force: true }));
@@ -122,7 +122,7 @@ describe('per-module limit (EPOCH-487)', () => {
   writeFileSync(
     python,
     `#!/bin/sh
-echo "$PYTHONUNBUFFERED" > "${envFile}"
+echo "$PYTHONUNBUFFERED|$ILEAPP_UNIFIEDLOG_ITERATOR" > "${envFile}"
 mkdir -p "$7/$9"
 for m in 1 2 3; do
   echo "[$m/3] Module $m [mod$m] artifact started"
@@ -172,7 +172,9 @@ echo "Report generation Completed."
     // Three modules of 0.4 s against a 1 s limit: the run takes about 1.2 s.
     const { outcome, printed, timings } = await runWith('slow-but-moving', { STUB_STEP: '0.4' }, 1000);
     assert.equal(outcome, null);
-    assert.equal(readFileSync(envFile, 'utf8').trim(), '1', 'iLEAPP runs unbuffered');
+    const [unbuffered, iterator] = readFileSync(envFile, 'utf8').trim().split('|');
+    assert.equal(unbuffered, '1', 'iLEAPP runs unbuffered');
+    assert.equal(iterator, UNIFIEDLOG_ITERATOR_DISABLED, 'iLEAPP never finds unifiedlog_iterator (EPOCH-489)');
     assert.match(printed, /\[ileapp\]  module 2 of 3: Module 2/);
     assert.equal(timings.stopped, null);
     assert.deepEqual(

@@ -25,7 +25,8 @@ export interface StageSet {
 
 export interface RunConfig {
   backupPath: string;
-  resultsPath?: string;
+  /** <workspace>/reports/<label>: where the report stage writes (EPOCH-489). */
+  reportPath?: string;
   ileappPath?: string;
   dbUrl: string;
   pythonBin: string;

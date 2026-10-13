@@ -1,0 +1,24 @@
+# The backup decrypt, in its own pinned environment (EPOCH-489).
+#
+# The processor runs tools/decrypt/decrypt_backup.py with
+# tools/decrypt/.venv/bin/python; no workspace code imports it. It decrypts an
+# encrypted iTunes-format backup into the same layout (Manifest.db and
+# XX/<fileID>), which iLEAPP reads with `-t itunes`.
+#
+# iphone_backup_decrypt is pinned exactly: decrypt_backup.py uses two of its
+# internal functions (the keybag and the chunked file decrypt), because its
+# public calls look files up by path and cannot copy entries that have no
+# encryption key. Check those internals before moving the pin. The library
+# version is recorded with every decrypt (EPOCH-406).
+[project]
+name = "verichron-tool-decrypt"
+version = "0"
+requires-python = "==3.14.*"
+dependencies = [
+    "iphone-backup-decrypt==0.10.0",
+]
+
+[tool.uv]
+package = false
+python-preference = "only-managed"
+required-version = ">=0.12.23,<0.13"

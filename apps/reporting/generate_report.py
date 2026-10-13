@@ -7,39 +7,25 @@ Markdown artifact. This replaces the report-generation half of the original
 deep_ips_report.py — that file's PARSING logic moves to /extractors/crash,
 its RENDERING logic (and rendering for every other domain) lives here.
 
-Three things this file must always do, per the "fix, don't punish" principle
-and the correlation design in Extractor Requirements.md §7:
+Three things this file must always do, per the "fix, don't punish" principle:
   1. Query pipeline_stage_status FIRST and render an honest preface —
      which domains are present, which failed, which were never run.
-  2. Render the cross-domain correlation section SECOND, before any
-     single-domain table — it's a synthesis across everything mvt_iocs
-     flagged, not a seventh parallel section, and it's the highest-signal
-     content in the report when present.
+  2. Say what was NOT examined, before any findings: today, indicator
+     checks and AI-assisted analysis, which have had no producer since
+     EPOCH-489 and return with EPOCH-490 to 493 and EPOCH-442.
   3. Never let a missing/failed domain silently disappear from the report.
      A failed stage gets a visible "not available" note, not omission.
 """
 
 import argparse
-import csv
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 from runtime_env import fatal_if_missing_venv
 
 import psycopg2
 import psycopg2.extras
-
-# Named constant per Extractor Requirements.md §7 ("worth a --correlation-window
-# CLI flag eventually, but a sensible fixed default is fine to ship first").
-CORRELATION_WINDOW = timedelta(minutes=15)
-
-# Mirrors extractors/mvt_iocs/main.py's LOW_SIGNAL equivalent for the
-# timeline.csv *supplement* below — backup-internal bookkeeping churn that's
-# real but not semantically interesting in a correlation table, counted
-# rather than dumped line-by-line.
-LOW_SIGNAL_PLUGINS = {"Manifest"}
-
 
 def fetch_stage_status(conn, run_id: str) -> list[dict]:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -144,11 +130,8 @@ def describe_derivative(d: dict) -> list[str]:
     tool = d["tool"]
     params = d["params"]
     produced = f"produced by {tool['name']} {tool['version']}"
-    if d["kind"] == "mvt_results":
-        return [
-            f"- **mvt results** (`{d['path']}`): {produced}, "
-            f"IOC set `{params['ioc_set_hash'][:12]}` ({params['ioc_file_count']} file(s))"
-        ]
+    if d["kind"] == "ileapp_output":
+        return [f"- **iLEAPP output** (`{d['path']}`): produced by iLEAPP {tool['version'][:12]}, read as `{params['input_type']}`"]
     repair = params["repair"]
     if repair["status"] == "skipped":
         repair_note = f"repair skipped ({repair['reason']})"
@@ -171,8 +154,8 @@ def render_provenance_section(inputs: list[dict], fact_sources: list[dict] | Non
     """What this run read, and, separately, what produced the facts shown.
 
     The two differ whenever a fact was filed by an earlier pass: e.g. after an
-    IOC-set change, an unchanged alerts.json keeps its first ingest, so its
-    detections come from the older results set, not the one this run read.
+    iLEAPP update, an unchanged artifact table keeps its first ingest, so its
+    records come from the older iLEAPP output, not the one this run read.
     `fact_sources` is None when no evidence is registered (no facts are read).
     """
     lines = ["## Provenance", "", "### Inputs this run read", ""]
@@ -200,168 +183,24 @@ def render_provenance_section(inputs: list[dict], fact_sources: list[dict] | Non
     return lines
 
 
-# --- correlation section (Extractor Requirements.md §7) ------------------
+# --- what was not examined (EPOCH-489) ------------------------------------
 
 
-def fetch_correlation_pivots(conn, evidence_id: str) -> list[dict]:
-    """Every mvt_ioc_detection / timestamp_anomaly row for this evidence — these
-    are the pivot points the correlation section builds a window around.
-    Rows with a null event_time (e.g. an untimed alert) come back too;
-    they're rendered separately since there's nothing to correlate them
-    against."""
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT id, source_type, event_time, fields
-            FROM current_forensic_records
-            WHERE evidence_id = %s AND source_type IN ('mvt_ioc_detection', 'timestamp_anomaly')
-            ORDER BY event_time NULLS LAST, id
-            """,
-            (evidence_id,),
-        )
-        return cur.fetchall()
-
-
-def fetch_correlated_context(conn, evidence_id: str, event_time, exclude_id: int) -> list[dict]:
-    """Everything else known about this evidence within the
-    correlation window — across every source_type, which is the entire
-    point (crash today; safari/sms/network automatically once they land,
-    with no change needed here)."""
-    lo = event_time - CORRELATION_WINDOW
-    hi = event_time + CORRELATION_WINDOW
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT id, source_type, event_time, process_name, bundle_id, fields
-            FROM current_forensic_records
-            WHERE evidence_id = %s AND event_time BETWEEN %s AND %s AND id != %s
-            ORDER BY event_time, id
-            """,
-            (evidence_id, lo, hi, exclude_id),
-        )
-        return cur.fetchall()
-
-
-def summarize_row(row: dict) -> str:
-    st = row["source_type"]
-    fields = row.get("fields") or {}
-    if st == "safari_history":
-        return f"Safari visit: {fields.get('url', '?')}"
-    if st == "sms_attachment":
-        return f"SMS/attachment from {fields.get('sender_handle', '?')}"
-    if st == "network_usage":
-        return f"Network usage: {row.get('bundle_id') or fields.get('process_name', '?')}"
-    if st == "crash_report":
-        return f"Crash: {row.get('process_name') or 'unknown process'} ({fields.get('filename', '?')})"
-    return f"{st}: {str(fields)[:100]}"
-
-
-def parse_ts(s):
-    if not isinstance(s, str) or not s.strip():
-        return None
-    for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
-        try:
-            return datetime.strptime(s.strip(), fmt).replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-    return None
-
-
-def load_timeline_supplement(results_path: Path | None, center, window=CORRELATION_WINDOW):
-    """Supplementary, UNVALIDATED context for modules that don't have their
-    own extractor yet (today: everything except crash and mvt_iocs itself —
-    SMS, Datausage, InteractionC, etc. all still only exist in mvt's own
-    timeline.csv, not in forensic_records). Clearly separated from the
-    validated forensic_records table above — see extractors/mvt_iocs/README.md
-    'Known limitation'. Returns [] if no --results-path was given or the
-    file isn't there; this is a nice-to-have, not a requirement."""
-    if results_path is None:
-        return []
-    tpath = results_path / "timeline.csv"
-    if not tpath.exists():
-        return []
-    lo, hi = center - window, center + window
-    rows = []
-    with tpath.open(newline="", encoding="utf-8", errors="replace") as f:
-        reader = csv.reader(f)
-        next(reader, None)
-        for row in reader:
-            if len(row) < 4:
-                continue
-            ts = parse_ts(row[0])
-            if ts is None or not (lo <= ts <= hi):
-                continue
-            rows.append((ts, row[1], row[2], row[3]))
-    rows.sort(key=lambda r: r[0])
-    return rows
-
-
-def render_correlation_section(conn, evidence_id: str, results_path: Path | None) -> list[str]:
-    pivots = fetch_correlation_pivots(conn, evidence_id)
-    if not pivots:
-        return []  # nothing flagged this run — omit the section entirely, don't render an empty shell
-
-    lines = ["## ⚠ IOC Detections & Correlated Activity", ""]
-    lines.append(
-        f"Every `mvt_ioc_detection` / `timestamp_anomaly` finding for this evidence, "
-        f"with everything else in `forensic_records` within ±{int(CORRELATION_WINDOW.total_seconds() // 60)} "
-        f"minutes of it. This is what mvt-ios's own report can't show you — it flags an event in isolation; "
-        f"this section shows what else was happening around it.\n"
-    )
-
-    timed = [p for p in pivots if p["event_time"] is not None]
-    untimed = [p for p in pivots if p["event_time"] is None]
-
-    for p in timed:
-        f = p["fields"] or {}
-        ts = p["event_time"]
-        if p["source_type"] == "mvt_ioc_detection":
-            title = f"{f.get('level', '?')} — {f.get('source_module', '?')}"
-            detail = f.get("message", "")
-        else:
-            title = f"timestamp anomaly — {f.get('plugin', '?')}"
-            years = (f.get("delta_from_backup_seconds") or 0) / (365.25 * 24 * 3600)
-            detail = f"{f.get('description', '')} (+{years:.1f} yr after backup)"
-
-        lines.append(f"### `{ts.isoformat()}` — {title}")
-        lines.append(f"> {detail}\n")
-
-        context = fetch_correlated_context(conn, evidence_id, ts, p["id"])
-        supplement = load_timeline_supplement(results_path, ts)
-        supplement_lines, churn = [], {}
-        for sts, plugin, event, desc in supplement:
-            if plugin in LOW_SIGNAL_PLUGINS:
-                churn[plugin] = churn.get(plugin, 0) + 1
-                continue
-            supplement_lines.append((sts, plugin, event, desc))
-
-        if context or supplement_lines:
-            lines.append(f"**Correlated activity ({len(context)} validated, {len(supplement_lines)} supplementary):**\n")
-            lines.append("| Time | Source | Summary |")
-            lines.append("| :--- | :--- | :--- |")
-            for row in context:
-                lines.append(f"| {row['event_time'].strftime('%H:%M:%S')} | `forensic_records`/{row['source_type']} | {summarize_row(row)} |")
-            for sts, plugin, event, desc in supplement_lines:
-                d = desc.strip()
-                d = d if len(d) <= 120 else d[:119] + "…"
-                lines.append(f"| {sts.strftime('%H:%M:%S')} | timeline.csv/{plugin} (unvalidated) | {d} |")
-            if churn:
-                omitted = ", ".join(f"{v} {k}" for k, v in churn.items())
-                lines.append("")
-                lines.append(f"_(+{sum(churn.values())} low-signal event(s) omitted from timeline.csv supplement: {omitted})_")
-        else:
-            lines.append("_No correlated activity found (no --results-path given, or nothing nearby)._")
-        lines.append("")
-
-    if untimed:
-        lines.append("**Findings with no timestamp (not correlatable):**\n")
-        for p in untimed:
-            f = p["fields"] or {}
-            lines.append(f"- {f.get('level', '?')} / {f.get('source_module', '?')}: {f.get('message', '')}")
-        lines.append("")
-
-    lines.append("---\n")
-    return lines
+def render_not_examined_section() -> list[str]:
+    """Checks this report cannot speak to, stated so their absence is never
+    read as a clean result."""
+    return [
+        "## Not Examined",
+        "",
+        "- **Indicators of compromise:** no indicator check was run. Indicator matching is being "
+        "rebuilt on the project's own facts and is not available yet. No match is reported "
+        "because nothing was checked, not because the device was found clean.",
+        "- **AI-assisted analysis:** not run. It returns as a separate, labelled section of leads "
+        "for the examiner to confirm or dismiss.",
+        "",
+        "---",
+        "",
+    ]
 
 
 # TODO: one render_<source_type>_section() per domain as extractors land.
@@ -419,10 +258,6 @@ RENDERERS = {
     "crash_report": render_crash_section,
     # "safari_history": render_safari_section,
     # ...
-    # mvt_ioc_detection / timestamp_anomaly are intentionally NOT here —
-    # they render via render_correlation_section() above, as a synthesis
-    # section rather than a parallel per-domain table (Extractor
-    # Requirements.md §7).
 }
 
 
@@ -434,9 +269,7 @@ def fetch_run_evidence(conn, run_id: str) -> str | None:
     return str(row[0]) if row and row[0] is not None else None
 
 
-def generate_report(
-    conn, run_id: str, evidence_id: str | None, output_path: str, results_path: str | None
-) -> None:
+def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str) -> None:
     """Stage status is this run's own (a run's outcome is about the run);
     every fact is the evidence's, whichever run produced it (R7).
 
@@ -480,7 +313,7 @@ def generate_report(
         print(f"[reporting] wrote {output_path} (no evidence registered for run {run_id})")
         return
 
-    lines += render_correlation_section(conn, evidence_id, Path(results_path) if results_path else None)
+    lines += render_not_examined_section()
 
     for source_type, renderer in RENDERERS.items():
         records = fetch_records_by_source_type(conn, evidence_id, source_type)
@@ -496,34 +329,20 @@ def generate_report(
     print(f"[reporting] wrote {output_path}")
 
 
-def resolve_output_path(output: str | None, results_path: str | None) -> str:
+def resolve_output_path(output: str | None, report_path: str | None) -> str:
     """
-    A bare 'investigation_report.md' default with no run/backup identity in
-    the name meant every run silently overwrote the same file, wherever the
-    orchestrator process's cwd happened to be -- there was no reliable,
-    discoverable per-run report on disk at all.
-
-    The orchestrator already derives --results-path from --backup-path for
-    every stage that can use it (see @verichron/contracts's
-    deriveResultsPath, and mvt_iocs's own resolve_results_path fallback of
-    the same logic) -- reusing that gives the report a real per-run home
-    alongside that backup's own mvt output, with no new CLI surface needed.
-
-    An explicit --output always wins, for manual/ad hoc invocation.
+    <report-path>/investigation_report.md: the orchestrator passes
+    --report-path (<workspace>/reports/<label>/, @verichron/contracts's
+    deriveReportPath) to every stage, which gives each backup's report a
+    stable home the app reads it from (EPOCH-489). An explicit --output
+    wins, for a manual run. With neither, the report is refused rather than
+    written somewhere the next run would overwrite.
     """
     if output is not None:
         return output
-    if results_path:
-        return str(Path(results_path) / "investigation_report.md")
-    print(
-        "[reporting] no --output and no --results-path given -- falling back "
-        "to 'investigation_report.md' in the current working directory. "
-        "This will be silently overwritten by the next run invoked the same "
-        "way -- pass --backup-path (so --results-path can be derived) or "
-        "--output explicitly to get a stable per-run path.",
-        file=sys.stderr,
-    )
-    return "investigation_report.md"
+    if report_path:
+        return str(Path(report_path) / "investigation_report.md")
+    raise SystemExit("[reporting] no --report-path or --output given; nowhere stable to write the report")
 
 
 def main():
@@ -540,12 +359,12 @@ def main():
     parser.add_argument("--derivative-id", required=False)
     parser.add_argument("--derivative-path", required=False)
     parser.add_argument("--backup-path", required=False)  # unused here, present for contract consistency
-    parser.add_argument("--results-path", required=False, help="enables the timeline.csv correlation supplement (see render_correlation_section), and is also where the report itself is written by default -- see resolve_output_path")
+    parser.add_argument("--report-path", required=False, help="the folder the report is written to (see resolve_output_path)")
     parser.add_argument("--db-url", required=True)
-    parser.add_argument("--output", default=None, help="defaults to <results-path>/investigation_report.md when --results-path is given; see resolve_output_path")
+    parser.add_argument("--output", default=None, help="write the report here instead of <report-path>/investigation_report.md")
     args = parser.parse_args()
 
-    output_path = resolve_output_path(args.output, args.results_path)
+    output_path = resolve_output_path(args.output, args.report_path)
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -555,7 +374,7 @@ def main():
         sys.exit(1)
 
     try:
-        generate_report(conn, args.run_id, args.evidence_id, output_path, args.results_path)
+        generate_report(conn, args.run_id, args.evidence_id, output_path)
     except Exception as e:
         print(f"[reporting] failed: {e}", file=sys.stderr)
         sys.exit(1)

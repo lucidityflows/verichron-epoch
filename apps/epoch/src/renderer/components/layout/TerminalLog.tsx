@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, ArrowDown, TerminalSquare } from 'lucide-react';
-import type { MvtLogEntry } from '../../../shared/types/window';
+import type { PipelineLogEntry } from '../../../shared/types/window';
 import { Loader } from '../ui/Loader';
 
 interface TerminalLogProps {
-  lines: Array<Pick<MvtLogEntry, 'stream' | 'line'>>;
+  lines: Array<Pick<PipelineLogEntry, 'stream' | 'line'>>;
   live: boolean;
   defaultOpen?: boolean;
   label?: string;

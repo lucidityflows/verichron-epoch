@@ -10,7 +10,6 @@ const __dirname = path.dirname(__filename);
 export const REPO_ROOT = path.resolve(__dirname, '../../..');
 const EXTRACTORS_DIR = path.join(REPO_ROOT, 'apps', 'extractors');
 const REPORTING_DIR = path.join(REPO_ROOT, 'apps', 'reporting');
-const ANALYSIS_DIR = path.join(REPO_ROOT, 'apps', 'analysis');
 
 /** Every key stage-manifest.schema.json allows; it sets additionalProperties: false. */
 const MANIFEST_KEYS = new Set(['$schema', 'entrypoint', 'runtime', 'order', 'reads', 'parserVersion', 'enabled']);
@@ -74,7 +73,8 @@ export async function discoverStages(): Promise<StageSet> {
   const candidateDirs = extractorEntries
     .filter((e) => e.isDirectory())
     .map((e) => ({ dir: path.join(EXTRACTORS_DIR, e.name), name: e.name }));
-  candidateDirs.push({ dir: ANALYSIS_DIR, name: path.basename(ANALYSIS_DIR) });
+  // apps/analysis (the AI stage) is not a stage until EPOCH-442 re-points it
+  // at the project's own facts; its only input was removed (EPOCH-489).
   candidateDirs.push({ dir: REPORTING_DIR, name: path.basename(REPORTING_DIR) });
 
   const loaded = await Promise.all(candidateDirs.map((c) => loadStageFromDir(c.dir, c.name)));

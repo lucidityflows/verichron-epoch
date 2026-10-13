@@ -4,7 +4,7 @@ import path from 'path';
 // A discovered backup: `label` is the friendly top-level directory name
 // under `source` (used for workspace organization), `path` is the actual
 // directory containing Manifest.db / Info.plist (what gets passed to
-// mvt-ios). These are the same directory in the simple case, but idevice-
+// the decrypt). These are the same directory in the simple case, but idevice-
 // backup2 output is commonly one level deeper: <source>/<label>/<UDID>/Manifest.db
 //
 // Shared between apps/processor (CLI --only filtering) and apps/epoch

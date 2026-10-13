@@ -5,7 +5,7 @@ import { pipeline } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 import { walkFiles, pathExists } from './fs.js';
 import { lineReader } from './lines.js';
-import type { RepairProvenance } from '@verichron/contracts';
+import { DECRYPT_MARKER, type RepairProvenance } from '@verichron/contracts';
 import { sqliteVersion } from './resolver.js';
 import type { Config } from './cli.js';
 
@@ -35,7 +35,7 @@ export async function repairDecrypted(cfg: Config, decDir: string): Promise<Repa
   const preserved: string[] = [];
 
   for await (const p of walkFiles(decDir)) {
-    if (path.basename(p).startsWith('.mvt_')) continue;
+    if (path.basename(p) === DECRYPT_MARKER) continue;
     if (p.endsWith('-wal') || p.endsWith('-shm') || p.includes('.corrupt-')) continue;
 
     if (!(await looksLikeSqlite(p))) continue;

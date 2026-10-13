@@ -1,10 +1,10 @@
 /**
- * The processor's derivatives: a decrypt, mvt results and iLEAPP output are
- * each reusable only if made from the backup as it is now, by the tools as
- * they are now (EPOCH-404, EPOCH-406, EPOCH-416). Runs the real CLI against a
- * stub mvt-ios whose decrypt-backup writes a file named after the source's
- * version, so a stale decrypt surviving a source change is directly visible,
- * and a stub iLEAPP in a git checkout of its own.
+ * The processor's derivatives: a decrypt and iLEAPP output are each reusable
+ * only if made from the backup as it is now, by the tools as they are now
+ * (EPOCH-404, EPOCH-406, EPOCH-416). Runs the real CLI against a stub decrypt
+ * tool (EPOCH-489) that writes a file named after the source's version, so a
+ * stale decrypt surviving a source change is directly visible, and a stub
+ * iLEAPP in a git checkout of its own.
  */
 
 import assert from 'node:assert/strict';
@@ -23,13 +23,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { readCheckMarker, readDecryptMarker, readIleappMarker } from '@verichron/contracts';
+import { readDecryptMarker, readIleappMarker } from '@verichron/contracts';
 
 let tmp: string;
 let source: string;
 let workspace: string;
 let stub: string;
-let mvtHome: string;
+let passwordLog: string;
 let ileappDir: string;
 let ileappPython: string;
 
@@ -43,7 +43,7 @@ before(() => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'decrypt-provenance-'));
   source = path.join(tmp, 'source');
   workspace = path.join(tmp, 'workspace');
-  mvtHome = path.join(tmp, 'mvt-home');
+  passwordLog = path.join(tmp, 'passwords');
   mkdirSync(path.join(source, 'BK1'), { recursive: true });
   writeFileSync(path.join(source, 'BK1', 'Manifest.db'), 'db');
   writeFileSync(path.join(source, 'BK1', 'version.txt'), 'v1');
@@ -52,33 +52,34 @@ before(() => {
   writeFileSync(path.join(source, 'BK2', 'Manifest.db'), 'db2');
   writeFileSync(path.join(source, 'BK2', 'version.txt'), 'w1');
 
-  // version                          -> "Version: $STUB_MVT_VERSION" (default 9.9.0)
-  // download-iocs                    -> $MVT_DATA_FOLDER/indicators/feed.stix2
-  // decrypt-backup -d DEST SRC      -> DEST/from-<version>.txt (the password arrives in MVT_IOS_BACKUP_PASSWORD)
-  // check-backup --output OUT DIR     -> OUT/, plus OUT/mvt-env recording the IOC folder it was given
+  // The stub stands in for the decrypt tool's interpreter, so it is called as
+  //   <python> -I decrypt_backup.py --version   -> "iphone_backup_decrypt $STUB_DECRYPT_VERSION" (default 0.10.0)
+  //   <python> -I decrypt_backup.py SRC DEST    -> DEST/from-<version>.txt and DEST/Manifest.db
+  // Each decrypt appends its arguments and BACKUP_PASSWORD to $STUB_PASSWORDS.
   // STUB_DECRYPT=fail: write part of the decrypt, then fail (not a password error).
+  // STUB_DECRYPT=wrong-once: exit 3 (wrong password) unless the password is "right".
   // STUB_DECRYPT=mutate: decrypt, then change the source, as if it changed mid-decrypt.
   // STUB_DECRYPT=unplug: decrypt BK1, then remove its source, as if the drive disconnected.
-  // STUB_DECRYPT=refresh: decrypt, then add an IOC file to $STUB_SHARED_IOCS, as if another runner refreshed it.
-  stub = path.join(tmp, 'mvt-stub');
+  stub = path.join(tmp, 'decrypt-python-stub');
   writeFileSync(
     stub,
     `#!/bin/sh
-case "$1" in
-  version) printf '\n\tMVT - Mobile Verification Toolkit\n\thttps://mvt.re\n\tVersion: %s\n' "\${STUB_MVT_VERSION:-9.9.0}" ;;
-  download-iocs) mkdir -p "$MVT_DATA_FOLDER/indicators" && echo ioc-v1 > "$MVT_DATA_FOLDER/indicators/feed.stix2" ;;
-  decrypt-backup)
-    mkdir -p "$3" && touch "$3/from-$(cat "$4/version.txt").txt" "$3/Manifest.db"
-    if [ "$STUB_DECRYPT" = fail ]; then echo "disk error mid-decrypt" >&2; exit 2; fi
-    if [ "$STUB_DECRYPT" = mutate ]; then echo "mutated" > "$4/version.txt"; fi
-    if [ "$STUB_DECRYPT" = refresh ]; then echo late > "$STUB_SHARED_IOCS/late.stix2"; fi
-    if [ "$STUB_DECRYPT" = unplug ] && [ "$(basename "$4")" = BK1 ]; then rm -rf "$4"; fi ;;
-  check-backup) mkdir -p "$3" && echo "$MVT_DATA_FOLDER|\${MVT_STIX2:-}" > "$3/mvt-env" && ls "$MVT_DATA_FOLDER/indicators" > "$3/iocs-seen" ;;
-esac
+if [ "$3" = --version ]; then echo "iphone_backup_decrypt \${STUB_DECRYPT_VERSION-0.10.0}"; exit 0; fi
+echo "$* | $BACKUP_PASSWORD" >> "$STUB_PASSWORDS"
+if [ "$STUB_DECRYPT" = wrong-once ] && [ "$BACKUP_PASSWORD" != right ]; then
+  echo "  decrypt-backup: the password is wrong" >&2; exit 3
+fi
+[ -z "$(ls -A "$4" 2>/dev/null)" ] || { echo "  decrypt-backup: $4 is not empty" >&2; exit 2; }
+mkdir -p "$4" && touch "$4/from-$(cat "$3/version.txt").txt" "$4/Manifest.db"
+if [ "$STUB_DECRYPT" = fail ]; then echo "  decrypt-backup: incomplete: 1 of 2 files written" >&2; exit 1; fi
+if [ "$STUB_DECRYPT" = mutate ]; then echo "mutated" > "$3/version.txt"; fi
+if [ "$STUB_DECRYPT" = unplug ] && [ "$(basename "$3")" = BK1 ]; then rm -rf "$3"; fi
 exit 0
 `
   );
   chmodSync(stub, 0o755);
+  // The processor checks the script exists; the stub interpreter never reads it.
+  writeFileSync(path.join(tmp, 'decrypt_backup.py'), '# stub\n');
 
   // The stub stands in for iLEAPP's interpreter, so it is called as
   //   <python> ileapp.py -t TYPE -i INPUT -o PARENT --custom_output_folder NAME
@@ -107,7 +108,12 @@ mkdir "$7/$9" && echo "$3" > "$7/$9/input-type"
 
 after(() => rmSync(tmp, { recursive: true, force: true }));
 
-function runCli(extraArgs: string[] = [], stubMode = '', extraEnv: Record<string, string> = {}): Promise<string> {
+function runCli(
+  extraArgs: string[] = [],
+  stubMode = '',
+  extraEnv: Record<string, string> = {},
+  typed: string[] = []
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
@@ -119,39 +125,60 @@ function runCli(extraArgs: string[] = [], stubMode = '', extraEnv: Record<string
         source,
         '--workspace',
         workspace,
-        '--mvt-bin',
+        '--decrypt-python',
         stub,
+        '--decrypt-script',
+        path.join(tmp, 'decrypt_backup.py'),
         '--sqlite-bin',
         '/nonexistent/sqlite3',
-        '--mvt-home',
-        mvtHome,
         '--ileapp-dir',
         ileappDir,
         '--ileapp-python',
         ileappPython,
         ...extraArgs,
       ],
-      { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, STUB_DECRYPT: stubMode, STUB_ILEAPP: '', ...extraEnv } }
+      {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, STUB_DECRYPT: stubMode, STUB_ILEAPP: '', STUB_PASSWORDS: passwordLog, ...extraEnv },
+      }
     );
+    // With `typed`, one answer per password prompt, typed when the prompt
+    // appears, as the app does; stdin closes after the last. Without, a
+    // single "pw" for every backup (the processor reuses it).
     let out = '';
-    child.stdout.on('data', (c) => (out += c));
-    child.stderr.on('data', (c) => (out += c));
-    child.stdin.end('pw\n');
+    let prompts = 0;
+    const answer = () => {
+      if (typed.length === 0) return;
+      const seen = out.match(/password for \S+: /g)?.length ?? 0;
+      for (; prompts < seen && prompts < typed.length; prompts++) {
+        child.stdin.write(`${typed[prompts]}\n`);
+        if (prompts === typed.length - 1) child.stdin.end();
+      }
+    };
+    if (typed.length === 0) child.stdin.end('pw\n');
+    child.stdout.on('data', (c) => {
+      out += c;
+      answer();
+    });
+    child.stderr.on('data', (c) => {
+      out += c;
+      answer();
+    });
     child.on('error', reject);
+    child.stdin.on('error', () => undefined);
     child.on('close', () => resolve(out));
   });
 }
 
 const decrypted = () => path.join(workspace, 'decrypted', 'BK1');
-const results = () => path.join(workspace, 'results', 'BK1');
 const ileapp = () => path.join(workspace, 'ileapp', 'BK1');
 
 describe('decrypt provenance', () => {
-  it('records the content root a decrypt and its results came from', async () => {
+  it('records the content root a decrypt and its iLEAPP output came from', async () => {
     await runCli();
     const decrypt = readDecryptMarker(decrypted());
     assert.ok(decrypt, 'decrypt marker written');
-    assert.equal(readCheckMarker(results())?.content_root, decrypt.content_root);
+    assert.equal(readIleappMarker(ileapp())?.content_root, decrypt.content_root);
     assert.ok(existsSync(path.join(decrypted(), 'from-v1.txt')));
   });
 
@@ -172,7 +199,6 @@ describe('decrypt provenance', () => {
     assert.notEqual(after.content_root, before.content_root);
     assert.ok(readdirSync(decrypted()).includes('from-v2.txt'));
     assert.ok(!readdirSync(decrypted()).includes('from-v1.txt'), 'the stale decrypt was removed, not merged into');
-    assert.equal(readCheckMarker(results())?.content_root, after.content_root, 'results redone too');
     assert.equal(readIleappMarker(ileapp())?.content_root, after.content_root, 'iLEAPP output redone too');
   });
 
@@ -180,9 +206,9 @@ describe('decrypt provenance', () => {
     assert.ok(readDecryptMarker(decrypted()), 'precondition: a valid decrypt exists');
     const out = await runCli(['--force-decrypt'], 'fail');
     assert.match(out, /\[decrypt\] error/);
+    assert.match(out, /\[decrypt\] error: the decrypt failed: incomplete: 1 of 2 files written/);
     assert.equal(readDecryptMarker(decrypted()), null, 'registration will refuse this copy');
-    assert.equal(readCheckMarker(results()), null, 'results built on it are withdrawn too');
-    assert.equal(readIleappMarker(ileapp()), null, 'so is iLEAPP output');
+    assert.equal(readIleappMarker(ileapp()), null, 'iLEAPP output built on it is withdrawn too');
 
     await runCli();
     assert.ok(readDecryptMarker(decrypted()), 'a clean re-run restores it');
@@ -204,9 +230,7 @@ describe('decrypt provenance', () => {
   });
 });
 
-describe('derivative provenance (EPOCH-406)', () => {
-  const iocDir = () => path.join(mvtHome, 'data', 'indicators');
-
+describe('the decrypt tool (EPOCH-489)', () => {
   before(() => {
     // The previous suite ends by unplugging BK1's source; put it back.
     mkdirSync(path.join(source, 'BK1'), { recursive: true });
@@ -214,69 +238,49 @@ describe('derivative provenance (EPOCH-406)', () => {
     writeFileSync(path.join(source, 'BK1', 'version.txt'), 'v3');
   });
 
-  it('records the mvt-ios version, repair outcome and IOC set in the markers', async () => {
+  it('records the decrypt library, its version and the repair outcome in the marker', async () => {
     await runCli();
     const decrypt = readDecryptMarker(decrypted())!;
-    assert.deepEqual(decrypt.tool, { name: 'mvt-ios', version: '9.9.0' });
+    assert.deepEqual(decrypt.tool, { name: 'iphone_backup_decrypt', version: '0.10.0' });
     assert.equal(
       decrypt.params.repair.status,
       'skipped',
       'no sqlite3: recorded as skipped, not as "nothing to repair"'
     );
-    const check = readCheckMarker(results())!;
-    assert.deepEqual(check.tool, { name: 'mvt-ios', version: '9.9.0' });
-    assert.match(check.params.ioc_set_hash, /^[0-9a-f]{64}$/);
-    assert.equal(check.params.ioc_file_count, 1);
   });
 
-  it('checks against a private copy of the IOC set, removed when the run ends', async () => {
-    const [dataFolder, stix2] = readFileSync(path.join(results(), 'mvt-env'), 'utf8').trim().split('|');
-    assert.equal(stix2, '', 'MVT_STIX2 is not passed');
-    assert.notEqual(dataFolder, path.join(mvtHome, 'data'), 'not the shared folder');
-    assert.ok(path.basename(dataFolder).startsWith('verichron-iocs-'));
-    assert.equal(existsSync(dataFolder), false, 'the copy is cleaned up');
-    assert.deepEqual(readFileSync(path.join(results(), 'iocs-seen'), 'utf8').trim().split('\n'), ['feed.stix2']);
+  it('passes the password only in BACKUP_PASSWORD, never on the command line', async () => {
+    rmSync(passwordLog, { force: true });
+    await runCli(['--force-decrypt', '--only', 'BK1'], '', {}, ['correct horse']);
+    const [args, password] = readFileSync(passwordLog, 'utf8').trim().split(' | ');
+    assert.equal(password, 'correct horse');
+    assert.doesNotMatch(args, /correct horse/);
   });
 
-  it('a changed IOC set re-checks, and the new results carry the new hash', async () => {
-    const before = readCheckMarker(results())!;
-    const unchanged = await runCli();
-    assert.match(unchanged, /\[check\]   already done, skipping/);
-
-    writeFileSync(path.join(iocDir(), 'extra.stix2'), 'ioc-extra');
-    const out = await runCli();
-    assert.match(out, /re-checking: the IOC set changed/);
-    const after = readCheckMarker(results())!;
-    assert.notEqual(after.params.ioc_set_hash, before.params.ioc_set_hash);
-    assert.equal(after.params.ioc_file_count, 2);
-    assert.deepEqual(readDecryptMarker(decrypted())!.tool, before.tool, 'the decrypt itself is reused');
+  it('never passes on a BACKUP_PASSWORD the processor itself inherited', async () => {
+    rmSync(passwordLog, { force: true });
+    await runCli(['--force-decrypt', '--only', 'BK1'], '', { BACKUP_PASSWORD: 'inherited' }, ['typed']);
+    assert.match(readFileSync(passwordLog, 'utf8'), /\| typed$/m);
   });
 
-  it('a different mvt-ios version re-checks but keeps the decrypt it made', async () => {
-    const decryptBefore = readDecryptMarker(decrypted())!;
-    const out = await runCli([], '', { STUB_MVT_VERSION: '10.0.0' });
-    assert.match(out, /re-checking: mvt-ios changed \(9\.9\.0 -> 10\.0\.0\)/);
-    assert.equal(readCheckMarker(results())!.tool.version, '10.0.0');
-    assert.deepEqual(readDecryptMarker(decrypted()), decryptBefore, 'a decrypt records the version that made it');
+  it('asks again after a wrong password, recognised by the exit code', async () => {
+    rmSync(passwordLog, { force: true });
+    const out = await runCli(['--force-decrypt', '--only', 'BK1'], 'wrong-once', {}, ['wrong', 'right']);
+    assert.match(out, /incorrect password for BK1 -- try again \(2\/3\)/);
+    assert.match(out, /\[decrypt\] done/);
+    assert.equal(readFileSync(passwordLog, 'utf8').trim().split('\n').length, 2, 'one decrypt per password');
   });
 
-  it('an IOC refresh by another runner mid-run does not change what this run checks or records', async () => {
-    const out = await runCli(['--force-decrypt'], 'refresh', { STUB_SHARED_IOCS: iocDir() });
-    assert.match(out, /\[check\]   done/);
-    assert.ok(existsSync(path.join(iocDir(), 'late.stix2')), 'precondition: the shared folder changed mid-run');
-    const seen = readFileSync(path.join(results(), 'iocs-seen'), 'utf8').trim().split('\n');
-    assert.ok(!seen.includes('late.stix2'), 'check-backup read the snapshot, not the refreshed folder');
-    assert.equal(readCheckMarker(results())!.params.ioc_file_count, seen.length, 'the recorded set is the set checked');
+  it('a new decrypt tool version keeps the decrypt it made', async () => {
+    const before = readDecryptMarker(decrypted())!;
+    const out = await runCli([], '', { STUB_DECRYPT_VERSION: '0.11.0' });
+    assert.match(out, /\[decrypt\] already done, skipping/);
+    assert.deepEqual(readDecryptMarker(decrypted()), before, 'a decrypt records the version that made it');
   });
 
-  it('refuses to run with indicators from MVT_STIX2, which the recorded IOC set would not cover', async () => {
-    const out = await runCli([], '', { MVT_STIX2: '/somewhere/else' });
-    assert.match(out, /MVT_STIX2 is set/);
-  });
-
-  it('refuses an mvt-ios whose version it cannot read', async () => {
-    const out = await runCli([], '', { STUB_MVT_VERSION: ' ' });
-    assert.match(out, /could not read the mvt-ios version/);
+  it('refuses a decrypt tool whose version it cannot read', async () => {
+    const out = await runCli([], '', { STUB_DECRYPT_VERSION: '' });
+    assert.match(out, /could not read the decrypt tool's version/);
   });
 });
 
@@ -323,13 +327,13 @@ describe('iLEAPP output (EPOCH-416)', () => {
     }
   });
 
-  it('stops an iLEAPP run past its timeout; no marker vouches for it, and the check results stand', async () => {
+  it('stops an iLEAPP run past its timeout, and no marker vouches for it', async () => {
     const started = Date.now();
     const out = await runCli(['--force', '--ileapp-module-timeout', '1s'], '', { STUB_ILEAPP: 'hang' });
     assert.ok(Date.now() - started < 30_000, 'the hung iLEAPP and its children were killed');
     assert.match(out, /\[ileapp\] error: iLEAPP's setup ran past the 1 s limit and was stopped before any module ran/);
     assert.equal(readIleappMarker(ileapp()), null);
-    assert.ok(readCheckMarker(results()), 'mvt results are unaffected');
+    assert.ok(readDecryptMarker(decrypted()), 'the decrypt is unaffected');
     assert.match(out, /backup\(s\) that need attention/);
   });
 

@@ -1,14 +1,16 @@
 """The external tools' pinned environments stay in step with what they need (EPOCH-458).
 
-mvt and iLEAPP each run from their own uv project under tools/, not from the
-workspace venv, because their exact dependency pins conflict. These tests catch
-the drift that arrangement allows:
+The backup decrypt and iLEAPP each run from their own uv project under tools/,
+not from the workspace venv, so each tool's exact pins stay its own (EPOCH-489
+replaced mvt with tools/decrypt). These tests catch the drift that arrangement
+allows:
 
 * tools/ileapp must declare exactly the requirements, version constraints
   included, that the iLEAPP submodule's requirements.txt applies on our Python
   and platforms, so moving the submodule pin cannot silently drop or loosen one;
-* tools/mvt must pin mvt exactly, because its version is recorded with every
-  derivative (EPOCH-406);
+* tools/decrypt must pin iphone-backup-decrypt exactly, because its version is
+  recorded with every decrypt (EPOCH-406) and decrypt_backup.py uses two of its
+  internals;
 * neither tool may leak back into the workspace's dependencies.
 """
 
@@ -89,17 +91,17 @@ def test_ileapp_environment_matches_submodule_requirements(environment):
     )
 
 
-def test_mvt_environment_pins_mvt_exactly():
-    deps = _dependencies(REPO_ROOT / "tools" / "mvt" / "pyproject.toml")
-    mvt = [Requirement(d) for d in deps if canonicalize_name(Requirement(d).name) == "mvt"]
-    assert len(mvt) == 1 and re.fullmatch(r"==[0-9][0-9.]*", str(mvt[0].specifier)), (
-        f"tools/mvt must pin mvt with ==, found {[str(r) for r in mvt]}"
+def test_decrypt_environment_pins_its_library_exactly():
+    deps = _dependencies(REPO_ROOT / "tools" / "decrypt" / "pyproject.toml")
+    lib = [Requirement(d) for d in deps if canonicalize_name(Requirement(d).name) == "iphone-backup-decrypt"]
+    assert len(lib) == 1 and re.fullmatch(r"==[0-9][0-9.]*", str(lib[0].specifier)), (
+        f"tools/decrypt must pin iphone-backup-decrypt with ==, found {[str(r) for r in lib]}"
     )
 
 
 def test_tools_are_not_workspace_dependencies():
     lock = (REPO_ROOT / "uv.lock").read_text()
-    for name in ("mvt", "pyliblzfse", "astc-decomp-faster"):
+    for name in ("mvt", "iphone-backup-decrypt", "pyliblzfse", "astc-decomp-faster"):
         assert f'\nname = "{name}"\n' not in lock, (
             f"{name} is in the workspace lockfile; it belongs in its tools/ environment"
         )

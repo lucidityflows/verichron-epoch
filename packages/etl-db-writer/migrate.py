@@ -97,6 +97,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _constraint("evidence_derivatives_kind_known"),
         _constraint("evidence_derivatives_kind_known"),
     ),
+    "0009_remove_mvt_results.sql": (
+        _constraint("evidence_derivatives_kind_current"),
+        _constraint("evidence_derivatives_kind_current"),
+    ),
 }
 
 
