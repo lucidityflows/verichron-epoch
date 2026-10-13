@@ -37,7 +37,6 @@ import type {
 interface StartPipelineOptions {
   workspace?: string;
   forceDecrypt?: boolean;
-  refreshIOCs?: boolean;
   only?: string[];
 }
 

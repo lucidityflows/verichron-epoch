@@ -11,7 +11,6 @@ import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSession
 interface StartPipelineOptions {
   workspace?: string;
   forceDecrypt?: boolean;
-  refreshIOCs?: boolean;
   only?: string[];
 }
 
@@ -310,7 +309,6 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     const args = ['--filter', '@verichron/processor', 'dev', '--', '--source', source];
     args.push('--workspace', workspacePath);
     if (options?.forceDecrypt) args.push('--force-decrypt');
-    if (options?.refreshIOCs) args.push('--refresh-iocs');
     if (options?.only && options.only.length > 0) args.push('--only', options.only.join(','));
 
     const child = spawn('pnpm', args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] });

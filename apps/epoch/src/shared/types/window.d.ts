@@ -32,7 +32,6 @@ export type ReportResult =
 export interface StartPipelineOptions {
   workspace?: string;
   forceDecrypt?: boolean;
-  refreshIOCs?: boolean;
   only?: string[];
 }
 
