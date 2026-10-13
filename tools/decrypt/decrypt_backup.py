@@ -77,6 +77,11 @@ def main() -> None:
         path = os.path.join(src, name)
         if os.path.islink(path) or not os.path.isfile(path):
             fail(EXIT_USAGE, f"{path} is not a regular file in the backup")
+    # The decrypt must never write into the backup it reads (R7), nor read a
+    # backup inside its own output.
+    real_src, real_dest = os.path.realpath(src), os.path.realpath(dest)
+    if os.path.commonpath((real_src, real_dest)) in (real_src, real_dest):
+        fail(EXIT_USAGE, f"{dest} and {src} overlap; the decrypt must be written outside the backup")
     if os.path.exists(dest) and os.listdir(dest):
         fail(EXIT_USAGE, f"{dest} is not empty")
     os.makedirs(dest, exist_ok=True)
