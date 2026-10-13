@@ -15,8 +15,9 @@ flowchart LR
   W --> C[orchestrator]
   C -->|register evidence| D[(PostgreSQL)]
   C -->|spawn in order| S[stages]
-  S -->|facts via ingest(); report to reports/| D
-  D --> R[report]
+  S -->|facts via ingest()| D
+  D --> R[report stage]
+  R -->|reports/ investigation report| W
   D --> E[desktop app]
 ```
 
