@@ -10,9 +10,11 @@ its RENDERING logic (and rendering for every other domain) lives here.
 Three things this file must always do, per the "fix, don't punish" principle:
   1. Query pipeline_stage_status FIRST and render an honest preface —
      which domains are present, which failed, which were never run.
-  2. Say what was NOT examined, before any findings: today, indicator
-     checks and AI-assisted analysis, which have had no producer since
-     EPOCH-489 and return with EPOCH-490 to 493 and EPOCH-442.
+  2. Before any findings, say what the report shows of the evidence's facts
+     and what it leaves out (the Coverage section, EPOCH-448), then what was
+     NOT examined: today, indicator checks and AI-assisted analysis, which
+     have had no producer since EPOCH-489 and return with EPOCH-490 to 493
+     and EPOCH-442.
   3. Never let a missing/failed domain silently disappear from the report.
      A failed stage gets a visible "not available" note, not omission.
 """
@@ -226,7 +228,7 @@ def render_not_examined_section() -> list[str]:
 # fields to render crash_report's section, matching the extractor contract's
 # ownership boundaries.
 def render_crash_section(records: list[dict]) -> list[str]:
-    lines = ["## Crash Reports", "", "| Incident | Process | PID | Bug Type | Event Time |", "| :--- | :--- | :--- | :--- | :--- |"]
+    lines = ["| Incident | Process | PID | Bug Type | Event Time |", "| :--- | :--- | :--- | :--- | :--- |"]
     for r in records:
         lines.append(
             f"| `{r['incident_id'] or 'N/A'}` | {r['process_name'] or 'Unknown'} "
@@ -271,11 +273,55 @@ def render_crash_section(records: list[dict]) -> list[str]:
     return lines
 
 
+# Each fact type the report shows: its section's heading and its renderer.
+# The coverage table reads the same mapping, so a type is listed as shown
+# exactly when a section exists for it (EPOCH-448).
 RENDERERS = {
-    "crash_report": render_crash_section,
-    # "safari_history": render_safari_section,
+    "crash_report": ("Crash Reports", render_crash_section),
+    # "safari_history": ("Safari History", render_safari_section),
     # ...
 }
+
+
+# --- coverage (EPOCH-448) --------------------------------------------------
+
+
+def fetch_fact_counts(conn, evidence_id: str) -> list[dict]:
+    """Every fact type recorded for this evidence, with its record count."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT source_type, count(*) AS records
+            FROM current_forensic_records
+            WHERE evidence_id = %s
+            GROUP BY source_type
+            ORDER BY source_type
+            """,
+            (evidence_id,),
+        )
+        return cur.fetchall()
+
+
+def render_coverage_section(counts: list[dict]) -> list[str]:
+    """What the report shows of the evidence's facts, and what it doesn't, so
+    "not shown" can never read as "not found"."""
+    lines = [
+        "## Coverage",
+        "",
+        "Every type of fact recorded for this evidence, how many records it has, and where this "
+        "report shows it.",
+        "",
+    ]
+    if not counts:
+        return lines + ["No facts are recorded for this evidence.", "", "---", ""]
+    lines += ["| Fact type | Records | Shown in |", "| :--- | ---: | :--- |"]
+    for row in counts:
+        section = RENDERERS.get(row["source_type"])
+        shown = f"{section[0]} section" if section else "**not shown in this report**; view them in Forensic Records"
+        lines.append(f"| `{row['source_type']}` | {row['records']} | {shown} |")
+    lines.append(f"| **All facts** | {sum(row['records'] for row in counts)} | |")
+    lines += ["", "---", ""]
+    return lines
 
 
 def fetch_run_evidence(conn, run_id: str) -> str | None:
@@ -330,12 +376,14 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
         print(f"[reporting] wrote {output_path} (no evidence registered for run {run_id})")
         return
 
+    lines += render_coverage_section(fetch_fact_counts(conn, evidence_id))
     lines += render_not_examined_section()
 
-    for source_type, renderer in RENDERERS.items():
+    for source_type, (title, renderer) in RENDERERS.items():
         records = fetch_records_by_source_type(conn, evidence_id, source_type)
         if not records:
             continue
+        lines += [f"## {title}", ""]
         lines += renderer(records)
         lines.append("---")
         lines.append("")
