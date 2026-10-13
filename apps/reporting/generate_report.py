@@ -65,6 +65,10 @@ def fetch_records_by_source_type(conn, evidence_id: str, source_type: str) -> li
         return cur.fetchall()
 
 
+def fetch_crash_records(conn, evidence_id: str) -> list[dict]:
+    return fetch_records_by_source_type(conn, evidence_id, "crash_report")
+
+
 # The orchestrator names a stage after its directory (discovery.ts), so this
 # is the report stage's own name in pipeline_stage_status.
 REPORT_STAGE = Path(__file__).resolve().parent.name
@@ -273,13 +277,62 @@ def render_crash_section(records: list[dict]) -> list[str]:
     return lines
 
 
-# Each fact type the report shows: its section's heading and its renderer.
-# The coverage table reads the same mapping, so a type is listed as shown
-# exactly when a section exists for it (EPOCH-448).
+# --- iLEAPP records: a per-artifact summary (EPOCH-434) ---------------------
+
+
+def fetch_ileapp_summary(conn, evidence_id: str) -> list[dict]:
+    """One row per iLEAPP artifact: its record count and its time span. iLEAPP
+    output runs to 100k+ rows with different columns per artifact, so the
+    report summarizes them and never lists rows."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT fields->>'source_artifact' AS artifact,
+                   count(*) AS records,
+                   count(event_time) AS timed,
+                   min(event_time) AS earliest,
+                   max(event_time) AS latest
+            FROM current_forensic_records
+            WHERE evidence_id = %s AND source_type = 'ileapp_record'
+            GROUP BY fields->>'source_artifact'
+            ORDER BY count(*) DESC, fields->>'source_artifact'
+            """,
+            (evidence_id,),
+        )
+        return cur.fetchall()
+
+
+def _utc(value) -> str:
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def render_ileapp_section(rows: list[dict]) -> list[str]:
+    lines = [
+        f"{sum(r['records'] for r in rows)} record(s) from {len(rows)} iLEAPP artifact(s), most records first. "
+        "The rows themselves are in Forensic Records, filtered to `ileapp_record` and the artifact.",
+        "",
+        "| Artifact | Records | With event time | Earliest | Latest |",
+        "| :--- | ---: | ---: | :--- | :--- |",
+    ]
+    for r in rows:
+        artifact = r["artifact"] or "(no artifact name)"
+        if r["timed"] == 0:
+            span = "no timeline position | "
+        else:
+            span = f"{_utc(r['earliest'])} | {_utc(r['latest'])}"
+        lines.append(f"| {artifact} | {r['records']} | {r['timed']} | {span} |")
+    lines.append("")
+    return lines
+
+
+# Each fact type the report shows: its section's heading, how to read its
+# facts, and how to render them. The coverage table reads the same mapping,
+# so a type is listed as shown exactly when a section exists for it
+# (EPOCH-448).
 RENDERERS = {
-    "crash_report": ("Crash Reports", render_crash_section),
-    # "safari_history": ("Safari History", render_safari_section),
-    # ...
+    "crash_report": ("Crash Reports", fetch_crash_records, render_crash_section),
+    "ileapp_record": ("iLEAPP Records by Artifact", fetch_ileapp_summary, render_ileapp_section),
+    # "safari_history": ("Safari History", fetch_..., render_...),
 }
 
 
@@ -379,12 +432,12 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     lines += render_coverage_section(fetch_fact_counts(conn, evidence_id))
     lines += render_not_examined_section()
 
-    for source_type, (title, renderer) in RENDERERS.items():
-        records = fetch_records_by_source_type(conn, evidence_id, source_type)
-        if not records:
+    for source_type, (title, fetch, render) in RENDERERS.items():
+        rows = fetch(conn, evidence_id)
+        if not rows:
             continue
         lines += [f"## {title}", ""]
-        lines += renderer(records)
+        lines += render(rows)
         lines.append("---")
         lines.append("")
 

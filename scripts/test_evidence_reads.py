@@ -380,6 +380,65 @@ def test_the_report_states_its_coverage_against_the_golden_file(db, tmp_path):
     assert f"| **All facts** | {total} | |" in report, "the coverage counts add up to every current fact"
 
 
+def test_the_report_summarizes_ileapp_records_by_artifact(db, tmp_path):
+    """EPOCH-434: one row per artifact with its counts and time span, most
+    records first; an artifact without event times is marked as having no
+    timeline position. Rows are never listed."""
+    if not isinstance(db, PgReal):
+        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
+    from datetime import datetime, timezone
+
+    from reporting.generate_report import generate_report
+
+    def at(day: int) -> datetime:
+        return datetime(2026, 10, day, 12, 0, 0, tzinfo=timezone.utc)
+
+    artifacts = {
+        "Safari History": [at(1), at(3), at(2)],
+        "Location Data": [at(5), None],
+        "Installed Apps": [None, None, None, None],
+    }
+    for name, times in artifacts.items():
+        table = tmp_path / f"{name}.tsv"
+        table.write_text(name)
+        with ingest(db, ctx(RUN_A), table, source_type="ileapp_record", payload_kind="full") as unit:
+            unit.write(
+                [
+                    NormalizedRecord(
+                        source_type=SourceType.ILEAPP_RECORD,
+                        event_time=when,
+                        fields={"source_artifact": name, "secret_row_value": "ROW-CONTENT"},
+                    )
+                    for when in times
+                ]
+            )
+
+    out = tmp_path / "report.md"
+    generate_report(db._conn, RUN_A, EVIDENCE, str(out))
+    report = out.read_text()
+    section = report.split("## iLEAPP Records by Artifact", 1)[1].split("\n---\n", 1)[0]
+    rows = [line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| Artifact", "| :"))]
+    assert rows == [
+        "| Installed Apps | 4 | 0 | no timeline position |  |",
+        "| Safari History | 3 | 3 | 2026-10-01 12:00:00 UTC | 2026-10-03 12:00:00 UTC |",
+        "| Location Data | 2 | 1 | 2026-10-05 12:00:00 UTC | 2026-10-05 12:00:00 UTC |",
+    ]
+    assert "9 record(s) from 3 iLEAPP artifact(s)" in section
+    assert "ROW-CONTENT" not in report, "the report summarizes iLEAPP records and never lists their rows"
+
+
+def test_a_report_without_ileapp_facts_has_no_ileapp_section(db, tmp_path):
+    """EPOCH-434: no iLEAPP facts, no section; the stage table and Coverage
+    already say what ran and what the evidence holds."""
+    if not isinstance(db, PgReal):
+        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
+    from reporting.generate_report import generate_report
+
+    out = tmp_path / "report.md"
+    generate_report(db._conn, RUN_A, EVIDENCE, str(out))
+    assert "## iLEAPP Records by Artifact" not in out.read_text()
+
+
 def test_a_run_without_evidence_gets_a_report_that_says_so(db, tmp_path):
     """No evidence read must not look like nothing found."""
     if not isinstance(db, PgReal):
