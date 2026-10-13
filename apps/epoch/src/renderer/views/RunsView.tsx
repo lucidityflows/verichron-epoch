@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Inbox, Layers, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Inbox, Layers, Loader2, MinusCircle, RefreshCw, XCircle } from 'lucide-react';
 import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
-import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { TerminalLog } from '../components/layout/TerminalLog';
 import { pipelineApi } from '../api/pipeline';
@@ -9,17 +8,40 @@ import { useAnalysisState } from '../hooks/usePipelineState';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/Tooltip';
 import { formatDuration, StageCard } from '../features/investigations/StageCard';
 
 /** Labels for run_completeness states. The state itself comes from the
  * database (EPOCH-404); this view never derives it from stage rows. */
 const RUN_STATE_LABEL: Record<PipelineRunRow['state'], string> = {
-  running: 'in progress',
-  incomplete: 'incomplete',
-  complete: 'complete',
+  running: 'In progress',
+  incomplete: 'Incomplete: a stage failed or did not finish',
+  complete: 'Complete',
 };
 
-/** "3 of 3 succeeded", plus any failed or skipped (EPOCH-430). */
+/** An icon in a table cell, named by its tooltip and for screen readers, so
+ * a state takes a column's width of one glyph (EPOCH-430). */
+function IconCell({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span role="img" aria-label={label} className="inline-flex items-center gap-2 cursor-default">
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** The run's state as one icon in its role colour (DESIGN.md §9). */
+function StateIcon({ state }: { state: PipelineRunRow['state'] }) {
+  if (state === 'complete') return <CheckCircle2 size="1.125rem" className="text-success" />;
+  if (state === 'running') return <Loader2 size="1.125rem" className="text-accent animate-spin" />;
+  return <AlertCircle size="1.125rem" className="text-flag" />;
+}
+
+/** "3 of 3 succeeded", plus any failed or skipped (EPOCH-430): the tooltip. */
 function stageSummary(run: PipelineRunRow): string {
   if (run.stages_total === 0) return 'No stages';
   const parts = [`${run.stages_succeeded} of ${run.stages_total} succeeded`];
@@ -150,21 +172,12 @@ export function RunsView({
     {
       id: 'status',
       header: 'Status',
-      meta: { width: 'minmax(10rem, 0.6fr)' },
-      cell: ({ row }) => {
-        const { state } = row.original;
-        return (
-          <div className="flex items-center gap-1.5">
-            {state === 'running' && (
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
-              </span>
-            )}
-            <Badge variant={state}>{RUN_STATE_LABEL[state]}</Badge>
-          </div>
-        );
-      },
+      meta: { width: 'minmax(4rem, 0.25fr)' },
+      cell: ({ row }) => (
+        <IconCell label={RUN_STATE_LABEL[row.original.state]}>
+          <StateIcon state={row.original.state} />
+        </IconCell>
+      ),
     },
     {
       accessorKey: 'started_at',
@@ -211,8 +224,30 @@ export function RunsView({
     {
       id: 'stages',
       header: 'Stages',
-      meta: { width: 'minmax(10rem, 0.6fr)' },
-      cell: ({ row }) => <span className="text-muted-foreground">{stageSummary(row.original)}</span>,
+      meta: { width: 'minmax(7rem, 0.4fr)' },
+      cell: ({ row }) => {
+        const run = row.original;
+        return (
+          <IconCell label={stageSummary(run)}>
+            <span className="inline-flex items-center gap-1 text-success">
+              <CheckCircle2 size="1rem" />
+              <span className="font-mono tabular-nums">{run.stages_succeeded}</span>
+            </span>
+            {run.stages_failed > 0 && (
+              <span className="inline-flex items-center gap-1 text-danger">
+                <XCircle size="1rem" />
+                <span className="font-mono tabular-nums">{run.stages_failed}</span>
+              </span>
+            )}
+            {run.stages_skipped > 0 && (
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                <MinusCircle size="1rem" />
+                <span className="font-mono tabular-nums">{run.stages_skipped}</span>
+              </span>
+            )}
+          </IconCell>
+        );
+      },
     },
   ];
 
