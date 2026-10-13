@@ -2,10 +2,11 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import type { Pool } from 'pg';
 import { discoverBackups, type Backup } from '@verichron/contracts';
-import type { MvtFinishedResult, AnalysisRunStatus } from '../../shared/types/window';
+import type { MvtFinishedResult, AnalysisRunStatus, MvtLogEntry } from '../../shared/types/window';
+import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
 
 interface StartPipelineOptions {
   workspace?: string;
@@ -109,53 +110,52 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }
   }
 
-  function makeStreamBuffer(stream: 'stdout' | 'stderr', child: ChildProcessWithoutNullStreams) {
-    let pending = '';
-    return (chunk: Buffer) => {
-      pending += chunk.toString('utf-8');
-      const lines = pending.split('\n');
-      pending = lines.pop() ?? '';
+  // EPOCH-487: each run's state outlives New Investigation, which unmounts
+  // when another view is opened.
+  const prepareSession = new PrepareSession((state) => sendToRenderer('epoch:prepareState', state));
+  const analysisSession = new AnalysisSession((state) => sendToRenderer('epoch:analysisState', state));
 
-      for (const line of lines) {
-        sendToRenderer('epoch:mvtLog', { stream, line });
-      }
-
+  /** Relays the processor's output line by line, and its password prompt (which ends without a newline). */
+  function makeStreamBuffer(stream: MvtLogEntry['stream'], child: ChildProcessWithoutNullStreams) {
+    const splitter = new LineSplitter();
+    const emit = (line: string) => sendToRenderer('epoch:mvtLog', prepareSession.line(stream, line));
+    const onChunk = (chunk: Buffer) => {
+      splitter.push(chunk).forEach(emit);
       if (stream === 'stdout') {
-        const match = PASSWORD_PROMPT_RE.exec(pending);
+        const match = PASSWORD_PROMPT_RE.exec(splitter.pending());
         if (match) {
-          sendToRenderer('epoch:mvtLog', { stream, line: pending });
+          emit(splitter.takePending());
           pendingPasswordResolve = (password: string) => {
             child.stdin.write(password + '\n');
           };
-          sendToRenderer('epoch:mvtPasswordRequired', match[1]);
-          pending = '';
+          prepareSession.passwordRequested(match[1]);
         }
       }
     };
+    const end = () => {
+      const rest = splitter.end();
+      if (rest) emit(rest);
+    };
+    return { onChunk, end };
   }
 
-  function makeOrchestratorStreamBuffer(stream: 'stdout' | 'stderr') {
-    let pending = '';
+  function makeOrchestratorStreamBuffer(stream: MvtLogEntry['stream']) {
+    const splitter = new LineSplitter();
+    const emit = (line: string) => sendToRenderer('epoch:orchestratorLog', analysisSession.line(stream, line));
+    const onChunk = (chunk: Buffer) => splitter.push(chunk).forEach(emit);
     const emitPending = () => {
-      if (pending) {
-        sendToRenderer('epoch:orchestratorLog', { stream, line: pending });
-        pending = '';
-      }
-    };
-    const onChunk = (chunk: Buffer) => {
-      pending += chunk.toString('utf-8');
-      const lines = pending.split('\n');
-      pending = lines.pop() ?? '';
-      for (const line of lines) {
-        sendToRenderer('epoch:orchestratorLog', { stream, line });
-      }
+      const rest = splitter.end();
+      if (rest) emit(rest);
     };
     return { onChunk, emitPending };
   }
 
-  async function readPreparationSummary(workspace: string) {
+  /** The processor's summary.json, if this run wrote it: one left by an earlier run is ignored. */
+  async function readPreparationSummary(workspace: string, runStartedAt: number) {
     try {
-      const raw = await readFile(path.join(workspace, 'summary.json'), 'utf8');
+      const file = path.join(workspace, 'summary.json');
+      if ((await stat(file)).mtimeMs < runStartedAt) return undefined;
+      const raw = await readFile(file, 'utf8');
       const parsed: unknown = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { backups?: unknown }).backups)) {
         return undefined;
@@ -316,26 +316,27 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     const child = spawn('pnpm', args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] });
     runningMvtProcess = child;
     pendingPasswordResolve = null;
+    const startedAt = Date.now();
+    prepareSession.start(source, workspacePath, options?.only ?? [], startedAt);
 
-    child.stdout.on('data', makeStreamBuffer('stdout', child));
-    child.stderr.on('data', makeStreamBuffer('stderr', child));
+    const stdoutBuffer = makeStreamBuffer('stdout', child);
+    const stderrBuffer = makeStreamBuffer('stderr', child);
+    child.stdout.on('data', stdoutBuffer.onChunk);
+    child.stderr.on('data', stderrBuffer.onChunk);
 
     child.on('error', (err) => {
       runningMvtProcess = null;
       pendingPasswordResolve = null;
-      sendToRenderer('epoch:mvtFinished', { success: false, error: err.message });
+      prepareSession.finish({ success: false, error: err.message, workspace: workspacePath });
     });
 
     child.on('close', (code) => {
       runningMvtProcess = null;
       pendingPasswordResolve = null;
-      void readPreparationSummary(workspacePath).then((backups) => {
-        sendToRenderer('epoch:mvtFinished', {
-          success: code === 0,
-          exitCode: code,
-          workspace: workspacePath,
-          backups,
-        });
+      stdoutBuffer.end();
+      stderrBuffer.end();
+      void readPreparationSummary(workspacePath, startedAt).then((backups) => {
+        prepareSession.finish({ success: code === 0, exitCode: code, workspace: workspacePath, backups });
       });
     });
 
@@ -349,7 +350,11 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     const resolve = pendingPasswordResolve;
     pendingPasswordResolve = null;
     resolve(password);
+    prepareSession.passwordSubmitted();
   });
+
+  ipcMain.handle('epoch:getPrepareState', () => prepareSession.snapshot());
+  ipcMain.handle('epoch:getAnalysisState', () => analysisSession.snapshot());
 
   ipcMain.handle('epoch:startAnalysis', async (_event, workspace: string) => {
     if (runningOrchestratorProcess) {
@@ -368,6 +373,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     runningOrchestratorProcess = child;
     runningOrchestratorWorkspace = trimmedWorkspace;
     orchestratorTerminationReason = null;
+    analysisSession.start('workspace', trimmedWorkspace);
 
     // EPOCH-305 timeout guardrail: a hung orchestrator (e.g. blocked on a
     // stalled DB connection) never fires 'error' or 'close' on its own --
@@ -392,7 +398,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       if (workspaceAtFailure) {
         void markWorkspaceRunsAborted(workspaceAtFailure, `orchestrator process error: ${err.message}`);
       }
-      sendToRenderer('epoch:orchestratorFinished', {
+      analysisSession.finish({
         success: false,
         error: err.message,
         cancelled: reason === 'cancelled',
@@ -427,7 +433,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
         void markWorkspaceRunsAborted(workspaceAtClose, closeReason)
           .then(() => readAnalysisSummary(workspaceAtClose))
           .then((analysis) => {
-            sendToRenderer('epoch:orchestratorFinished', {
+            analysisSession.finish({
               success: false,
               exitCode: code,
               analysis,
@@ -444,7 +450,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       }
 
       void readAnalysisSummary(workspaceAtClose).then((analysis) => {
-        sendToRenderer('epoch:orchestratorFinished', { success: true, exitCode: code, analysis });
+        analysisSession.finish({ success: true, exitCode: code, analysis });
       });
     });
 
@@ -476,6 +482,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     runningOrchestratorProcess = child;
     runningOrchestratorBackupSource = trimmedBackupSource;
     orchestratorTerminationReason = null;
+    analysisSession.start('retry', trimmedBackupSource);
 
     orchestratorTimeoutHandle = setTimeout(() => {
       killOrchestrator('timeout');
@@ -496,7 +503,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       if (scopedBackupSource) {
         void markSingleRunAborted(scopedBackupSource, `orchestrator process error: ${err.message}`);
       }
-      sendToRenderer('epoch:orchestratorFinished', {
+      analysisSession.finish({
         success: false,
         error: err.message,
         cancelled: reason === 'cancelled',
@@ -525,7 +532,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
             : `orchestrator process exited unexpectedly (code ${code})`;
 
         void markSingleRunAborted(scopedBackupSource, closeReason).then(() => {
-          sendToRenderer('epoch:orchestratorFinished', {
+          analysisSession.finish({
             success: false,
             exitCode: code,
             cancelled,
@@ -540,7 +547,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
         return;
       }
 
-      sendToRenderer('epoch:orchestratorFinished', { success: true, exitCode: code });
+      analysisSession.finish({ success: true, exitCode: code });
     });
 
     return { started: true };

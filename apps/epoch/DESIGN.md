@@ -342,6 +342,13 @@ button; it becomes an outline button once the step is done.
 numbered rail: pending (muted), current (accent ring), done (success check),
 blocked (flag). The iPhone pull uses it (`PullSteps`).
 
+**Long steps show what they have done** (EPOCH-487). A step that runs for
+minutes or hours says how far it has got and how long it has taken, never
+only its name: bytes read, bytes written against a known size (with an
+accent bar on an `inset` track, held below 100% until the step finishes), or
+the item it is on ("module 212 of 540: <name>"). Prepare Evidence's backup
+rows follow this rule.
+
 **Applied so far:** the New Investigation page (`WorkspaceView`,
 `DevicePullPanel`, `BackupProgressCard`, `BackupRow`, `ToolSetup`), and
 app-wide the tokens, the sidebar, `ViewLayout`, `EmptyState` and `Badge`

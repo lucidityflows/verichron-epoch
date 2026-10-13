@@ -50,7 +50,7 @@ export function isWrongPasswordError(err: unknown): boolean {
 /**
  * Decrypts `src` into `dest` with mvt-ios. The password goes only in
  * MVT_IOS_BACKUP_PASSWORD, never on the command line (R30), and mvt's stdin is
- * closed so it can't wait for a typed one. Output streams to the console as it
+ * closed so it can't wait for a typed one. Output streams to the console line by line as it
  * arrives. Fails on a non-zero exit, and on any file mvt reports it couldn't
  * decrypt: mvt skips such a file and exits 0, which would otherwise make an
  * incomplete decrypt look complete.
@@ -80,15 +80,20 @@ export async function decryptBackup(opts: {
       }
       if (failed || WRONG_PASSWORD_PATTERNS.some((re) => re.test(line))) kept.push(line);
     };
-    const readers = [lineReader(onLine), lineReader(onLine)];
-    child.stdout.on('data', (chunk: Buffer) => {
-      process.stdout.write(chunk);
-      readers[0].push(chunk);
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      process.stderr.write(chunk);
-      readers[1].push(chunk);
-    });
+    // Passed on whole lines at a time, so the processor's own progress lines
+    // never land inside one of mvt's (EPOCH-487).
+    const readers = [
+      lineReader((line) => {
+        process.stdout.write(line + '\n');
+        onLine(line);
+      }),
+      lineReader((line) => {
+        process.stderr.write(line + '\n');
+        onLine(line);
+      }),
+    ];
+    child.stdout.on('data', (chunk: Buffer) => readers[0].push(chunk));
+    child.stderr.on('data', (chunk: Buffer) => readers[1].push(chunk));
     child.on('error', reject);
     child.on('close', (code) => {
       readers.forEach((r) => r.end());

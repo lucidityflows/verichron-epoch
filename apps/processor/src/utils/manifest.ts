@@ -142,6 +142,8 @@ export interface HashTreeOptions {
   cachePath?: string;
   /** Ignore the cache and re-hash every file (the cache is still rewritten). */
   verify?: boolean;
+  /** Called after each file with the bytes and files covered so far, hashed or reused (EPOCH-487). */
+  onProgress?: (bytes: number, files: number) => void;
 }
 
 export interface HashTreeResult {
@@ -188,6 +190,7 @@ export async function hashTree(root: string, opts: HashTreeOptions = {}): Promis
     nextCache.set(rel, { ...fp, sha256 });
     entries.push({ path: rel, sha256, size: Number(st.size) });
     totalBytes += Number(st.size);
+    opts.onProgress?.(totalBytes, entries.length);
   }
 
   const manifest = renderManifest(entries);

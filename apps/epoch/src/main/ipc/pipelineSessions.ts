@@ -1,0 +1,190 @@
+import { StringDecoder } from 'node:string_decoder';
+
+import { applyMvtLogLine, initMvtRunProgress } from '../../shared/prepareProgress';
+import type { AnalysisState, MvtFinishedResult, MvtLogEntry, PrepareState } from '../../shared/types/window';
+
+/**
+ * The state of Prepare Evidence and Analyze, kept in the main process
+ * (EPOCH-487). New Investigation unmounts when another view is opened, so a
+ * run's progress, a password the processor is waiting for, and its result
+ * live here, and the page reads them back when it mounts again.
+ */
+
+/** How many log lines a run keeps for a page that mounts mid-run. */
+export const KEPT_LOG_LINES = 2000;
+/** The most often a change is sent to the renderer while lines stream in. */
+const NOTIFY_INTERVAL_MS = 250;
+
+/** Sends at most one change per interval while lines stream in, and the latest one last. */
+class Notifier<T> {
+  private timer: NodeJS.Timeout | null = null;
+  private lastSent = 0;
+
+  constructor(
+    private readonly send: (state: T) => void,
+    private readonly read: () => T
+  ) {}
+
+  soon(): void {
+    if (this.timer) return;
+    const wait = Math.max(0, this.lastSent + NOTIFY_INTERVAL_MS - Date.now());
+    this.timer = setTimeout(() => this.now(), wait);
+  }
+
+  now(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.lastSent = Date.now();
+    this.send(this.read());
+  }
+}
+
+class LogBuffer {
+  private lines: MvtLogEntry[] = [];
+  private seq = 0;
+
+  add(stream: MvtLogEntry['stream'], line: string): MvtLogEntry {
+    const entry = { stream, line, seq: ++this.seq };
+    this.lines.push(entry);
+    if (this.lines.length > KEPT_LOG_LINES) this.lines.splice(0, this.lines.length - KEPT_LOG_LINES);
+    return entry;
+  }
+
+  clear(): void {
+    this.lines = [];
+  }
+
+  all(): MvtLogEntry[] {
+    return [...this.lines];
+  }
+}
+
+export class PrepareSession {
+  private state: Omit<PrepareState, 'log'> = {
+    status: 'idle',
+    source: null,
+    workspace: null,
+    labels: [],
+    startedAt: null,
+    progress: null,
+    passwordFor: null,
+    result: null,
+  };
+  private readonly log = new LogBuffer();
+  private readonly notifier: Notifier<PrepareState>;
+
+  /** `send` delivers a change (without the log) to the renderer. */
+  constructor(send: (state: PrepareState) => void) {
+    this.notifier = new Notifier<PrepareState>(send, () => ({ ...this.state, log: [] }));
+  }
+
+  start(source: string, workspace: string, labels: string[], now = Date.now()): void {
+    this.log.clear();
+    this.state = {
+      status: 'running',
+      source,
+      workspace,
+      labels,
+      startedAt: now,
+      progress: initMvtRunProgress(labels),
+      passwordFor: null,
+      result: null,
+    };
+    this.notifier.now();
+  }
+
+  /** Records one of the processor's lines and returns it, numbered, for the live log. */
+  line(stream: MvtLogEntry['stream'], text: string, now = Date.now()): MvtLogEntry {
+    const entry = this.log.add(stream, text);
+    if (this.state.progress) this.state.progress = applyMvtLogLine(this.state.progress, text, now);
+    this.notifier.soon();
+    return entry;
+  }
+
+  passwordRequested(backup: string): void {
+    this.state.passwordFor = backup;
+    this.notifier.now();
+  }
+
+  passwordSubmitted(): void {
+    this.state.passwordFor = null;
+    this.notifier.now();
+  }
+
+  finish(result: MvtFinishedResult): void {
+    this.state = { ...this.state, status: 'finished', passwordFor: null, result };
+    this.notifier.now();
+  }
+
+  snapshot(): PrepareState {
+    return { ...this.state, log: this.log.all() };
+  }
+}
+
+export class AnalysisSession {
+  private state: Omit<AnalysisState, 'log'> = {
+    status: 'idle',
+    kind: null,
+    target: null,
+    startedAt: null,
+    result: null,
+  };
+  private readonly log = new LogBuffer();
+  private readonly notifier: Notifier<AnalysisState>;
+
+  constructor(send: (state: AnalysisState) => void) {
+    this.notifier = new Notifier<AnalysisState>(send, () => ({ ...this.state, log: [] }));
+  }
+
+  start(kind: 'workspace' | 'retry', target: string, now = Date.now()): void {
+    this.log.clear();
+    this.state = { status: 'running', kind, target, startedAt: now, result: null };
+    this.notifier.now();
+  }
+
+  line(stream: MvtLogEntry['stream'], text: string): MvtLogEntry {
+    return this.log.add(stream, text);
+  }
+
+  finish(result: MvtFinishedResult): void {
+    this.state = { ...this.state, status: 'finished', result };
+    this.notifier.now();
+  }
+
+  snapshot(): AnalysisState {
+    return { ...this.state, log: this.log.all() };
+  }
+}
+
+/**
+ * Splits a child's output into lines, decoding the stream as one so a
+ * character split across chunks stays whole. `pending()` is the text after
+ * the last line break, which is how a password prompt with no newline is seen.
+ */
+export class LineSplitter {
+  private readonly decoder = new StringDecoder('utf8');
+  private carry = '';
+
+  push(chunk: Buffer): string[] {
+    const parts = (this.carry + this.decoder.write(chunk)).split('\n');
+    this.carry = parts.pop() ?? '';
+    return parts;
+  }
+
+  pending(): string {
+    return this.carry;
+  }
+
+  /** Takes the text after the last line break, e.g. once a prompt has been handled. */
+  takePending(): string {
+    const rest = this.carry;
+    this.carry = '';
+    return rest;
+  }
+
+  end(): string {
+    const rest = this.carry + this.decoder.end();
+    this.carry = '';
+    return rest;
+  }
+}

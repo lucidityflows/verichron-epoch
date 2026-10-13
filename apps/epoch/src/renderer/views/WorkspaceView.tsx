@@ -19,10 +19,10 @@ import { TerminalLog } from '../components/layout/TerminalLog';
 import { DevicePullPanel } from '../features/devicePullPanel/DevicePullPanel';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
-import type { MvtLogEntry, MvtFinishedResult, StartPipelineOptions } from '../../shared/types/window';
+import type { MvtFinishedResult, StartPipelineOptions } from '../../shared/types/window';
 import type { Backup } from '@verichron/contracts';
-import { applyMvtLogLine, initMvtRunProgress, type MvtRunProgress } from '../libs/mvtLogParser';
 import { pipelineApi } from '../api/pipeline';
+import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
 import { devicesApi } from '../api/devices';
 import { ViewLayout } from '../components/layout/ViewLayout';
 
@@ -59,106 +59,60 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const [refreshIOCs, setRefreshIOCs] = useState(false);
 
   const [isStarting, setIsStarting] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
-  const [logLines, setLogLines] = useState<MvtLogEntry[]>([]);
-  const [finishResult, setFinishResult] = useState<MvtFinishedResult | null>(null);
 
-  const [runProgress, setRunProgress] = useState<MvtRunProgress | null>(null);
-
-  const [pendingPasswordFor, setPendingPasswordFor] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [submittingPassword, setSubmittingPassword] = useState(false);
 
-  const [lastRunWorkspace, setLastRunWorkspace] = useState<string | null>(null);
-  const [analysisRunning, setAnalysisRunning] = useState(false);
-  const [analysisLog, setAnalysisLog] = useState<MvtLogEntry[]>([]);
-  const [analysisResult, setAnalysisResult] = useState<MvtFinishedResult | null>(null);
   const [analysisStartError, setAnalysisStartError] = useState<string | null>(null);
   // EPOCH-305: true while a cancel request is in flight -- distinct from
   // analysisRunning flipping false, which only happens once the main
-  // process actually confirms the subprocess is gone (via
-  // onOrchestratorFinished). Prevents double-clicking Cancel from firing a
-  // second IPC call while the first kill is still working its way through
-  // the SIGTERM -> grace period -> SIGKILL escalation.
+  // process confirms the subprocess is gone (through the analysis state).
+  // Prevents double-clicking Cancel from firing a second IPC call while the
+  // first kill is still working its way through the SIGTERM -> grace period
+  // -> SIGKILL escalation.
   const [analysisCancelling, setAnalysisCancelling] = useState(false);
+  // A past analysis of this workspace that never closed out (EPOCH-305).
+  const [analysisInterrupted, setAnalysisInterrupted] = useState(false);
 
-  useEffect(() => {
-    let mvtBuffer: MvtLogEntry[] = [];
-    let mvtRafId: number | null = null;
+  // Both runs live in the main process (EPOCH-487), so leaving this page and
+  // coming back shows a run still going, a password the processor is
+  // waiting for, or a finished result.
+  const { state: prepare, log: prepareLog } = usePrepareState();
+  const { state: analysis, log: analysisLogAll } = useAnalysisState();
+  const isRunning = prepare?.status === 'running';
+  // The run belongs to the folder it was started on; another folder shows none.
+  const showsRun = !!prepare && prepare.status !== 'idle' && prepare.source === selectedPath;
+  const runProgress = showsRun ? prepare.progress : null;
+  const logLines = showsRun ? prepareLog : [];
+  const finishResult = showsRun && prepare.status === 'finished' ? prepare.result : null;
+  const pendingPasswordFor = prepare?.passwordFor ?? null;
+  const lastRunWorkspace = showsRun && prepare.status === 'finished' ? prepare.workspace : null;
+  const analysisForRun = analysis?.kind === 'workspace' && analysis.target === lastRunWorkspace;
+  const analysisRunning = analysisForRun && analysis?.status === 'running';
+  const analysisLog = analysisForRun ? analysisLogAll : [];
+  const analysisResult: MvtFinishedResult | null = analysisRunning
+    ? null
+    : analysisForRun && analysis?.status === 'finished'
+      ? analysis.result
+      : analysisInterrupted
+        ? { success: false, error: 'A previous analysis run for this workspace was interrupted and never finished.' }
+        : null;
 
-    const flushMvtBuffer = () => {
-      if (mvtBuffer.length > 0) {
-        const batch = [...mvtBuffer];
-        mvtBuffer = [];
-        setLogLines((prev) => [...prev, ...batch]);
-        setRunProgress((prev) => {
-          if (!prev) return prev;
-          let current = prev;
-          for (const item of batch) {
-            current = applyMvtLogLine(current, item.line);
-          }
-          return current;
-        });
-      }
-      mvtRafId = null;
-    };
+  // Opening the page while a run exists shows that run's folder: once, when
+  // the run's state first arrives (adjusted during render, not in an effect).
+  const [restoredRun, setRestoredRun] = useState(false);
+  if (!restoredRun && prepare) {
+    setRestoredRun(true);
+    if (prepare.status !== 'idle' && prepare.source && selectedPath === null) setSelectedPath(prepare.source);
+  }
 
-    let orchBuffer: MvtLogEntry[] = [];
-    let orchRafId: number | null = null;
-
-    const flushOrchBuffer = () => {
-      if (orchBuffer.length > 0) {
-        const batch = [...orchBuffer];
-        orchBuffer = [];
-        setAnalysisLog((prev) => [...prev, ...batch]);
-      }
-      orchRafId = null;
-    };
-
-    const unsubLog = pipelineApi.onMvtLog((entry) => {
-      mvtBuffer.push(entry);
-      if (mvtRafId === null) {
-        mvtRafId = requestAnimationFrame(flushMvtBuffer);
-      }
-    });
-    const unsubPassword = pipelineApi.onMvtPasswordRequired((backupName) => {
-      setPendingPasswordFor(backupName);
-      setPasswordInput('');
-    });
-    const unsubFinished = pipelineApi.onMvtFinished((result) => {
-      if (mvtRafId !== null) {
-        cancelAnimationFrame(mvtRafId);
-        flushMvtBuffer();
-      }
-      setIsRunning(false);
-      setFinishResult(result);
-    });
-    const unsubOrchestratorLog = pipelineApi.onOrchestratorLog((entry) => {
-      orchBuffer.push(entry);
-      if (orchRafId === null) {
-        orchRafId = requestAnimationFrame(flushOrchBuffer);
-      }
-    });
-    const unsubOrchestratorFinished = pipelineApi.onOrchestratorFinished((result) => {
-      if (orchRafId !== null) {
-        cancelAnimationFrame(orchRafId);
-        flushOrchBuffer();
-      }
-      setAnalysisRunning(false);
-      setAnalysisCancelling(false);
-      setAnalysisResult(result);
-    });
-    return () => {
-      if (mvtRafId !== null) cancelAnimationFrame(mvtRafId);
-      if (orchRafId !== null) cancelAnimationFrame(orchRafId);
-      unsubLog();
-      unsubPassword();
-      unsubFinished();
-      unsubOrchestratorLog();
-      unsubOrchestratorFinished();
-    };
-  }, []);
+  // A new password request starts with an empty field.
+  const [promptFor, setPromptFor] = useState<string | null>(null);
+  if (pendingPasswordFor !== promptFor) {
+    setPromptFor(pendingPasswordFor);
+    setPasswordInput('');
+  }
 
   const handleSelectDirectory = async () => {
     const dir = await pipelineApi.selectBackupDirectory();
@@ -222,14 +176,10 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     if (!selectedPath || selectedLabels.size === 0) return;
     setIsStarting(true);
     setStartError(null);
-    setLogLines([]);
-    setFinishResult(null);
-    setAnalysisResult(null);
-    setAnalysisLog([]);
     setAnalysisStartError(null);
     setAnalysisCancelling(false);
+    setAnalysisInterrupted(false);
     const selected = Array.from(selectedLabels);
-    setRunProgress(initMvtRunProgress(selected));
     try {
       const options: StartPipelineOptions = {
         workspace: workspace.trim() || undefined,
@@ -237,12 +187,10 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         refreshIOCs,
         only: selected,
       };
-      const result = await pipelineApi.startPipeline(selectedPath, options);
-      setLastRunWorkspace(result.workspace);
-      setIsRunning(true);
+      // The run's progress and result arrive through the prepare state.
+      await pipelineApi.startPipeline(selectedPath, options);
     } catch (err) {
       setStartError(err instanceof Error ? err.message : 'Unknown error');
-      setRunProgress(null);
     } finally {
       setIsStarting(false);
     }
@@ -252,7 +200,6 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     setSubmittingPassword(true);
     try {
       await pipelineApi.submitMvtPassword(passwordInput);
-      setPendingPasswordFor(null);
       setPasswordInput('');
     } catch (err) {
       console.error('Failed to submit password:', err);
@@ -268,16 +215,13 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     // again" after a crash/cancel/timeout starts from the same clean slate
     // as a first run rather than carrying forward old logs or a stuck
     // cancelling flag.
-    setAnalysisRunning(true);
     setAnalysisCancelling(false);
     setAnalysisStartError(null);
-    setAnalysisLog([]);
-    setAnalysisResult(null);
+    setAnalysisInterrupted(false);
     try {
       await pipelineApi.startAnalysis(lastRunWorkspace);
     } catch (err) {
       setAnalysisStartError(err instanceof Error ? err.message : 'Unknown error');
-      setAnalysisRunning(false);
     }
   };
 
@@ -286,11 +230,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     setAnalysisCancelling(true);
     try {
       await pipelineApi.cancelAnalysis();
-      // Deliberately not setting analysisRunning(false) here -- the actual
-      // transition out of 'running' happens when onOrchestratorFinished
-      // fires for the kill, same as any other termination path. Flipping
-      // it here too would let the UI show "done" a moment before the
-      // subprocess is actually confirmed gone.
+      // Deliberately not ending the run here -- the transition out of
+      // 'running' arrives with the analysis state once the main process has
+      // seen the subprocess exit, the same as any other termination path.
     } catch (err) {
       setAnalysisCancelling(false);
       setAnalysisStartError(err instanceof Error ? err.message : 'Failed to cancel the running analysis.');
@@ -314,19 +256,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       .getAnalysisRunStatus(lastRunWorkspace)
       .then((status) => {
         if (cancelled) return;
-        if (status.status === 'interrupted') {
-          setAnalysisRunning(false);
-          setAnalysisResult({
-            success: false,
-            error: 'A previous analysis run for this workspace was interrupted and never finished.',
-          });
-        } else if (status.status === 'running') {
-          // The view (re)mounted while the main process still has this
-          // workspace's orchestrator tracked as in flight -- reflect that
-          // rather than showing the "start analysis" button over a run
-          // that's genuinely still going.
-          setAnalysisRunning(true);
-        }
+        // A run still going here is shown by the analysis state (EPOCH-487).
+        setAnalysisInterrupted(status.status === 'interrupted');
       })
       .catch((err) => {
         console.error('Failed to check analysis run status:', err);
@@ -547,10 +478,10 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
           <div className="text-data">
             <p className={failedCount === 0 ? 'text-success' : 'text-danger'}>
               {failedCount === 0
-                ? `Analysis completed for all ${doneCount} backup${doneCount === 1 ? '' : 's'}.`
+                ? `Evidence prepared for ${doneCount === 1 ? 'the backup' : `all ${doneCount} backups`}. Analyze it next.`
                 : `${doneCount} of ${runProgress.order.length} backup${
                     runProgress.order.length === 1 ? '' : 's'
-                  } finished; ${failedCount} couldn't be completed.`}
+                  } prepared; ${failedCount} couldn't be prepared.`}
             </p>
             {!finishResult.success && finishResult.error && (
               <p className="text-muted-foreground mt-1">{finishResult.error}</p>

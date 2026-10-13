@@ -325,9 +325,9 @@ describe('iLEAPP output (EPOCH-416)', () => {
 
   it('stops an iLEAPP run past its timeout; no marker vouches for it, and the check results stand', async () => {
     const started = Date.now();
-    const out = await runCli(['--force', '--ileapp-timeout', '1s'], '', { STUB_ILEAPP: 'hang' });
+    const out = await runCli(['--force', '--ileapp-module-timeout', '1s'], '', { STUB_ILEAPP: 'hang' });
     assert.ok(Date.now() - started < 30_000, 'the hung iLEAPP and its children were killed');
-    assert.match(out, /\[ileapp\] error: iLEAPP did not finish within 1s/);
+    assert.match(out, /\[ileapp\] error: iLEAPP's setup ran past the 1 s limit and was stopped before any module ran/);
     assert.equal(readIleappMarker(ileapp()), null);
     assert.ok(readCheckMarker(results()), 'mvt results are unaffected');
     assert.match(out, /backup\(s\) that need attention/);

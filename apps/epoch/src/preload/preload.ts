@@ -1,7 +1,7 @@
 import type { ForensicRecordQuery } from '@verichron/etl-db-reader';
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Backup } from '@verichron/contracts';
-import type { AnalysisRunStatus, ReportResult } from '../shared/types/window';
+import type { AnalysisRunStatus, AnalysisState, MvtLogEntry, PrepareState, ReportResult } from '../shared/types/window';
 import type {
   BackupProgress,
   DeviceInfo,
@@ -44,24 +44,18 @@ const dbApi = {
   startPipeline: (source: string, options?: StartPipelineOptions): Promise<{ started: boolean; workspace: string }> =>
     ipcRenderer.invoke('epoch:startPipeline', source, options),
   submitMvtPassword: (password: string) => ipcRenderer.invoke('epoch:submitMvtPassword', password),
-  onMvtLog: (callback: (entry: { stream: 'stdout' | 'stderr'; line: string }) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, entry: { stream: 'stdout' | 'stderr'; line: string }) =>
-      callback(entry);
+  onMvtLog: (callback: (entry: MvtLogEntry) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, entry: MvtLogEntry) => callback(entry);
     ipcRenderer.on('epoch:mvtLog', listener);
     return () => ipcRenderer.removeListener('epoch:mvtLog', listener);
   },
-  onMvtPasswordRequired: (callback: (backupName: string) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, backupName: string) => callback(backupName);
-    ipcRenderer.on('epoch:mvtPasswordRequired', listener);
-    return () => ipcRenderer.removeListener('epoch:mvtPasswordRequired', listener);
-  },
-  onMvtFinished: (callback: (result: { success: boolean; exitCode?: number | null; error?: string }) => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      result: { success: boolean; exitCode?: number | null; error?: string }
-    ) => callback(result);
-    ipcRenderer.on('epoch:mvtFinished', listener);
-    return () => ipcRenderer.removeListener('epoch:mvtFinished', listener);
+  // EPOCH-487: Prepare Evidence's state lives in the main process, so a
+  // remounted New Investigation reads it here and follows its changes.
+  getPrepareState: (): Promise<PrepareState> => ipcRenderer.invoke('epoch:getPrepareState'),
+  onPrepareState: (callback: (state: PrepareState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: PrepareState) => callback(state);
+    ipcRenderer.on('epoch:prepareState', listener);
+    return () => ipcRenderer.removeListener('epoch:prepareState', listener);
   },
   getPipelineRuns: () => ipcRenderer.invoke('epoch:getPipelineRuns'),
   getStageStatus: (runId: string) => ipcRenderer.invoke('epoch:getStageStatus', runId),
@@ -95,21 +89,17 @@ const dbApi = {
   // guessing from nothing.
   getAnalysisRunStatus: (workspace: string): Promise<AnalysisRunStatus> =>
     ipcRenderer.invoke('epoch:getAnalysisRunStatus', workspace),
-  onOrchestratorLog: (callback: (entry: { stream: 'stdout' | 'stderr'; line: string }) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, entry: { stream: 'stdout' | 'stderr'; line: string }) =>
-      callback(entry);
+  onOrchestratorLog: (callback: (entry: MvtLogEntry) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, entry: MvtLogEntry) => callback(entry);
     ipcRenderer.on('epoch:orchestratorLog', listener);
     return () => ipcRenderer.removeListener('epoch:orchestratorLog', listener);
   },
-  onOrchestratorFinished: (
-    callback: (result: { success: boolean; exitCode?: number | null; error?: string }) => void
-  ) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      result: { success: boolean; exitCode?: number | null; error?: string }
-    ) => callback(result);
-    ipcRenderer.on('epoch:orchestratorFinished', listener);
-    return () => ipcRenderer.removeListener('epoch:orchestratorFinished', listener);
+  // EPOCH-487: Analyze's state, kept in the main process like Prepare Evidence's.
+  getAnalysisState: (): Promise<AnalysisState> => ipcRenderer.invoke('epoch:getAnalysisState'),
+  onAnalysisState: (callback: (state: AnalysisState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: AnalysisState) => callback(state);
+    ipcRenderer.on('epoch:analysisState', listener);
+    return () => ipcRenderer.removeListener('epoch:analysisState', listener);
   },
 
   // Device backup acquisition -- see apps/epoch/src/tools/device-backup.

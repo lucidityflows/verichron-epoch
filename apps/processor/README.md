@@ -33,7 +33,7 @@ to its UI.
 | `--sqlite-bin <path>` | `sqlite3` for the repair pass |
 | `--ileapp-dir <dir>` | The iLEAPP checkout to run (default `tools/ileapp/iLEAPP`, the submodule) |
 | `--ileapp-python <path>` | iLEAPP's interpreter (default `tools/ileapp/.venv/bin/python`, the pinned environment `mise run setup` creates) |
-| `--ileapp-timeout <dur>` | Stop iLEAPP, and everything it started, after this long (default `30m`) |
+| `--ileapp-module-timeout <dur>` | Stop iLEAPP, and everything it started, when one module, its setup or its report runs longer than this (default `60m`). A long run that keeps moving is never stopped. Each module's timing is written to `logs/<backup>.ileapp-modules.json` |
 | `--force` | Re-run `check-backup` and iLEAPP even if current |
 | `--force-decrypt` | Re-decrypt, then repair, check and run iLEAPP again |
 | `--verify` | Re-read every byte when hashing, ignoring the stat cache |
@@ -54,7 +54,11 @@ that ran.
 | File | Responsibility |
 |---|---|
 | `src/main.ts` | The per-backup loop: hash → decrypt → repair → check → iLEAPP, plus markers and summary |
-| `src/utils/ileapp.ts` | iLEAPP's commit, its input type, and running it with a timeout |
+| `src/utils/ileapp.ts` | iLEAPP's commit, its input type, and running it with a limit per module |
+| `src/utils/mvt.ts` | Running `decrypt-backup` and `check-backup` |
+| `src/utils/progress.ts` | The decrypt's progress, measured from the decrypt folder |
+| `src/utils/processGroup.ts` | Forwarding a stop signal to the tools' process groups |
+| `src/utils/lines.ts` | Reading a tool's output line by line |
 | `src/utils/manifest.ts` | Canonical manifest, `content_root`, stat cache |
 | `src/utils/repair.ts` | SQLite quick-check and `.recover`, returning repair provenance |
 | `src/utils/resolver.ts` | Reading the `sqlite3` version |
@@ -70,6 +74,13 @@ pnpm --filter @verichron/processor test
 The tests drive the real CLI against stub `mvt-ios`, `sqlite3` and iLEAPP
 executables.
 
-**Known issues:** the backup password is passed to `mvt-ios` on the command line
-(EPOCH-423). The app reads this tool's progress by parsing its log lines
-(EPOCH-445).
+**Known issue:** the app reads this tool's progress by parsing its log lines
+(EPOCH-445). The lines it reads are:
+
+| Line | Meaning |
+|---|---|
+| `=== <backup> ===` | A backup starts |
+| `[<step>] done …`, `[<step>] already done, skipping`, `[<step>] error: …` | A step ends |
+| `[hash] progress <bytes> bytes, <files> files` | Hashing, every few seconds |
+| `[decrypt] progress <bytes> of <total> bytes` | Decrypting, every few seconds |
+| `[ileapp] module <n> of <total>: <name>` | An iLEAPP module starts |

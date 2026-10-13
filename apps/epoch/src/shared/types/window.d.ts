@@ -24,6 +24,7 @@ import type {
   ToolSetupStatus,
   ToolAvailabilityStatus,
 } from './tools';
+import type { MvtRunProgress } from '../prepareProgress';
 
 export type ReportResult =
   | { status: 'ok'; content: string; path: string }
@@ -40,6 +41,8 @@ export interface StartPipelineOptions {
 export interface MvtLogEntry {
   stream: 'stdout' | 'stderr';
   line: string;
+  /** Increases with each line of a run, so a line already shown is never shown twice (EPOCH-487). */
+  seq: number;
 }
 
 /**
@@ -79,6 +82,37 @@ export interface MvtFinishedResult {
   timedOut?: boolean;
 }
 
+/**
+ * Prepare Evidence as the main process sees it (EPOCH-487). It outlives the
+ * page, so New Investigation shows a run that is still going, a password the
+ * processor is waiting for, or a finished result when it is opened again.
+ */
+export interface PrepareState {
+  status: 'idle' | 'running' | 'finished';
+  source: string | null;
+  workspace: string | null;
+  labels: string[];
+  startedAt: number | null;
+  progress: MvtRunProgress | null;
+  /** The backup whose password the processor is waiting for. */
+  passwordFor: string | null;
+  result: MvtFinishedResult | null;
+  /** The run's recent log lines, oldest first; empty in the change events, which carry state only. */
+  log: MvtLogEntry[];
+}
+
+/** Analyze (the orchestrator) as the main process sees it (EPOCH-487). */
+export interface AnalysisState {
+  status: 'idle' | 'running' | 'finished';
+  /** A whole workspace from New Investigation, or one backup retried from Investigations. */
+  kind: 'workspace' | 'retry' | null;
+  /** The workspace, or the retried backup's source. */
+  target: string | null;
+  startedAt: number | null;
+  result: MvtFinishedResult | null;
+  log: MvtLogEntry[];
+}
+
 declare global {
   interface Window {
     epoch: {
@@ -92,8 +126,8 @@ declare global {
       ) => Promise<{ started: boolean; workspace: string }>;
       submitMvtPassword: (password: string) => Promise<void>;
       onMvtLog: (callback: (entry: MvtLogEntry) => void) => () => void;
-      onMvtPasswordRequired: (callback: (backupName: string) => void) => () => void;
-      onMvtFinished: (callback: (result: MvtFinishedResult) => void) => () => void;
+      getPrepareState: () => Promise<PrepareState>;
+      onPrepareState: (callback: (state: PrepareState) => void) => () => void;
       getPipelineRuns: () => Promise<PipelineRunRow[]>;
       getStageStatus: (runId: string) => Promise<StageStatusRow[]>;
       getForensicRecords: (runId: string, query?: ForensicRecordQuery) => Promise<ForensicRecordPage>;
@@ -116,7 +150,8 @@ declare global {
       cancelAnalysis: () => Promise<{ cancelled: boolean }>;
       getAnalysisRunStatus: (workspace: string) => Promise<AnalysisRunStatus>;
       onOrchestratorLog: (callback: (entry: MvtLogEntry) => void) => () => void;
-      onOrchestratorFinished: (callback: (result: MvtFinishedResult) => void) => () => void;
+      getAnalysisState: () => Promise<AnalysisState>;
+      onAnalysisState: (callback: (state: AnalysisState) => void) => () => void;
       listDeviceBackupSources: () => Promise<Array<{ id: string; label: string }>>;
       checkDeviceBackupToolAvailable: (sourceId: string) => Promise<ToolAvailabilityStatus>;
       listConnectedDevices: (sourceId: string) => Promise<DeviceInfo[]>;
