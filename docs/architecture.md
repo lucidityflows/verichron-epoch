@@ -11,11 +11,11 @@ through it. Identity and provenance are explained in
 flowchart LR
   A[Encrypted backup] --> B[processor]
   B -->|evidence/ sidecar + manifest| W[(Workspace)]
-  B -->|decrypted/ + results/ + ileapp/ with markers| W
+  B -->|decrypted/ + ileapp/ with markers| W
   W --> C[orchestrator]
   C -->|register evidence| D[(PostgreSQL)]
   C -->|spawn in order| S[stages]
-  S -->|facts via ingest()| D
+  S -->|facts via ingest(); report to reports/| D
   D --> R[report]
   D --> E[desktop app]
 ```
@@ -102,7 +102,7 @@ Each concern has exactly one owner (R2).
 
 | Component | Owns | Does not |
 |---|---|---|
-| `apps/epoch` | Device pull, starting runs, showing runs, records, indicator results and reports | Decide run state or write facts |
+| `apps/epoch` | Device pull, starting runs, showing runs, records and reports, and saying that indicator checks are not available yet | Decide run state or write facts |
 | `apps/processor` | Hashing evidence, decrypt, repair, iLEAPP invocation, completion markers | Touch the database |
 | `apps/orchestrator` | Evidence registration, run creation, stage order, run and stage state | Parse evidence |
 | Stages (`apps/extractors/*`, `apps/analysis`, `apps/reporting`) | Turning one derivative's files into facts, or rendering the report | Choose their own identity (R16) or commit transactions (R15) |

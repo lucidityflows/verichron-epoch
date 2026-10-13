@@ -33,12 +33,11 @@ from typing import IO
 class ETLRunResult:
     """Accumulates per-item outcomes across one extractor stage run.
 
-    `succeeded`/`failed` count whatever unit the extractor treats as its
-    natural item of partial failure — files for crash, artifact tables for
-    ileapp_bridge. An extractor that writes many rows per item
-    should call ok() once per item, not once per row, so the printed
-    summary answers "how many things did I process" rather than "how many
-    rows exist," which is what a reader actually wants after a run.
+    `failed` counts failed items: files for crash, artifact tables for
+    ileapp_bridge. `succeeded` follows EXTRACTOR_CONTRACT.md §5, where
+    `ok(n)` counts what this run wrote: crash calls ok() once per file, and
+    ileapp_bridge calls ok(n) with the records a newly ingested artifact
+    table wrote (an empty table adds zero).
 
     `failures` stores structured `(item_label, reason)` pairs rather than
     pre-joined strings. `fail()` renders `BaseException` arguments as

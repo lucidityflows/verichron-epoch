@@ -23,6 +23,8 @@ export interface Config {
   workspace: string;
   decryptPython: string;
   decryptScript: string;
+  /** How long the decrypt may write nothing before it is stopped. */
+  decryptStallTimeoutMs: number;
   sqliteBin: string;
   ileappDir: string;
   ileappPython: string;
@@ -48,6 +50,7 @@ export function parseFlags(): Config {
       workspace: { type: 'string', default: path.join(home, 'verichron-workspace') },
       'decrypt-python': { type: 'string', default: DEFAULT_DECRYPT_PYTHON },
       'decrypt-script': { type: 'string', default: DEFAULT_DECRYPT_SCRIPT },
+      'decrypt-stall-timeout': { type: 'string', default: '30m' },
       'sqlite-bin': { type: 'string', default: 'sqlite3' },
       'ileapp-dir': { type: 'string', default: DEFAULT_ILEAPP_DIR },
       'ileapp-python': { type: 'string', default: DEFAULT_ILEAPP_PYTHON },
@@ -73,12 +76,16 @@ export function parseFlags(): Config {
   }
 
   const ileappModuleTimeoutMs = durationFlag('ileapp-module-timeout', values['ileapp-module-timeout'] as string);
+  const decryptStallTimeoutMs = durationFlag('decrypt-stall-timeout', values['decrypt-stall-timeout'] as string);
+  // A path is resolved, as iLEAPP's interpreter is; a bare name stays a PATH lookup.
+  const decryptPython = values['decrypt-python'] as string;
 
   return {
     source: values.source as string,
     workspace: values.workspace as string,
-    decryptPython: values['decrypt-python'] as string,
+    decryptPython: decryptPython.includes(path.sep) ? path.resolve(decryptPython) : decryptPython,
     decryptScript: path.resolve(values['decrypt-script'] as string),
+    decryptStallTimeoutMs,
     sqliteBin: values['sqlite-bin'] as string,
     ileappDir: path.resolve(values['ileapp-dir'] as string),
     ileappPython: values['ileapp-python'] as string,
@@ -100,6 +107,9 @@ Options:
   --decrypt-python <path>  interpreter for the backup decrypt (default: <repo-root>/tools/decrypt/.venv/bin/python,
                            the pinned environment "mise run setup" creates)
   --decrypt-script <path>  the backup decrypt script (default: <repo-root>/tools/decrypt/decrypt_backup.py)
+  --decrypt-stall-timeout <dur>
+                           stop the decrypt if it writes nothing for this long, e.g. "45m" (default: 30m);
+                           a long decrypt that keeps writing is never stopped
   --sqlite-bin <path>      path to sqlite3 binary used for repairing malformed DBs (default: "sqlite3" on PATH)
   --ileapp-dir <dir>       the iLEAPP checkout to run (default: <repo-root>/tools/ileapp/iLEAPP, the submodule)
   --ileapp-python <path>   interpreter for iLEAPP (default: <repo-root>/tools/ileapp/.venv/bin/python,

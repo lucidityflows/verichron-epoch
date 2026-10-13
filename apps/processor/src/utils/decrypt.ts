@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import type { ToolVersion } from '@verichron/contracts';
 
 import { lineReader } from './lines.js';
+import { killProcessGroup, trackProcessGroup } from './processGroup.js';
 
 /**
  * Running the backup decrypt, tools/decrypt/decrypt_backup.py, from its own
@@ -39,6 +40,9 @@ export interface DecryptTool {
  * on the command line (R30), and the tool's stdin is closed so it can't wait
  * for a typed one. Its output streams to the console a line at a time, so the
  * processor's own progress lines never land inside one of its lines.
+ *
+ * The tool runs in its own process group, tracked so a stop sent to the
+ * processor reaches it, and `signal` (the stall limit) stops it the same way.
  */
 export async function decryptBackup(opts: {
   tool: DecryptTool;
@@ -46,13 +50,27 @@ export async function decryptBackup(opts: {
   src: string;
   dest: string;
   password: string;
+  signal?: AbortSignal;
 }): Promise<void> {
   await fsp.mkdir(opts.dest, { recursive: true });
   await new Promise<void>((resolve, reject) => {
     const child = spawn(opts.tool.python, ['-I', opts.tool.script, opts.src, opts.dest], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...opts.env, BACKUP_PASSWORD: opts.password },
+      detached: true,
     });
+    const untrack = trackProcessGroup(child.pid);
+    let stopReason: Error | null = null;
+    const stop = () => {
+      stopReason = opts.signal?.reason instanceof Error ? opts.signal.reason : new Error('the decrypt was stopped');
+      killProcessGroup(child.pid);
+    };
+    if (opts.signal?.aborted) stop();
+    else opts.signal?.addEventListener('abort', stop, { once: true });
+    const finish = () => {
+      untrack();
+      opts.signal?.removeEventListener('abort', stop);
+    };
     // The tool's last line on stderr says why it failed.
     let lastError = '';
     const readers = [
@@ -64,9 +82,14 @@ export async function decryptBackup(opts: {
     ];
     child.stdout.on('data', (chunk: Buffer) => readers[0].push(chunk));
     child.stderr.on('data', (chunk: Buffer) => readers[1].push(chunk));
-    child.on('error', reject);
+    child.on('error', (err) => {
+      finish();
+      reject(err);
+    });
     child.on('close', (code, signal) => {
+      finish();
       readers.forEach((r) => r.end());
+      if (stopReason) return reject(new DecryptError(`the decrypt failed: ${stopReason.message}`, false));
       if (code === 0) return resolve();
       const why =
         lastError.replace(/^decrypt-backup:\s*/, '') || (signal ? `stopped by ${signal}` : `exit code ${code}`);
