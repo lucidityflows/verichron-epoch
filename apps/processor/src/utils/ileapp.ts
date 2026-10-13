@@ -142,7 +142,8 @@ export class IleappProgress {
     const completed = MODULE_COMPLETED.exec(text);
     if (completed && this.phase.kind === 'module' && this.phase.record.module === completed[2]) {
       this.finish(this.phase.record, nowMs, 'completed');
-      return false;
+      // The wait for the next module is timed too.
+      return true;
     }
     if (MODULES_DONE.test(text)) {
       this.endPhase(nowMs, 'completed');
@@ -151,7 +152,9 @@ export class IleappProgress {
     }
     if (REPORT_DONE.test(text) && this.phase.kind === 'report') {
       this.endPhase(nowMs, 'completed');
+      // The wait for iLEAPP to exit is timed too.
       this.startPhase({ kind: 'done' }, nowMs);
+      return true;
     }
     return false;
   }
@@ -167,16 +170,24 @@ export class IleappProgress {
     const phase = this.phase;
     let message: string;
     if (phase.kind === 'module') {
-      const { index, total, name, module } = phase.record;
+      const { index, total, name, module, status } = phase.record;
       const rest =
         index === total
           ? 'it was the last module'
           : index + 1 === total
             ? `module ${total} did not run`
             : `modules ${index + 1} to ${total} did not run`;
-      message = `iLEAPP module ${index} of ${total}, ${name} [${module}], ran past the ${limit} limit and was stopped; ${rest}`;
+      message =
+        status === 'completed'
+          ? `iLEAPP stopped responding after module ${index} of ${total}, ${name} [${module}], completed: ` +
+            `nothing followed within the ${limit} limit, so it was stopped; ${rest}`
+          : `iLEAPP module ${index} of ${total}, ${name} [${module}], ran past the ${limit} limit and was stopped; ${rest}`;
     } else if (phase.kind === 'report') {
       message = `iLEAPP's report generation ran past the ${limit} limit and was stopped; every module had run`;
+    } else if (phase.kind === 'done') {
+      message =
+        `iLEAPP wrote its report but did not exit within the ${limit} limit, so it was stopped; ` +
+        'every module had run';
     } else {
       message = `iLEAPP's setup ran past the ${limit} limit and was stopped before any module ran`;
     }

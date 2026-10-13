@@ -163,8 +163,15 @@ function LiveBackupRow({
           {detail && <span className="text-muted-foreground"> · {detail}</span>}
         </div>
         {decryptPercent !== null && (
-          <div className="mt-2 flex items-center gap-2" aria-label={`Decrypted ${decryptPercent}%`}>
-            <div className="h-1.5 flex-1 rounded-full bg-inset overflow-hidden">
+          <div className="mt-2 flex items-center gap-2">
+            <div
+              role="progressbar"
+              aria-label="Decrypted"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={decryptPercent}
+              className="h-1.5 flex-1 rounded-full bg-inset overflow-hidden"
+            >
               <div
                 className="h-full rounded-full bg-accent transition-[width]"
                 style={{ width: `${decryptPercent}%` }}

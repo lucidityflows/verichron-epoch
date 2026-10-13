@@ -76,7 +76,7 @@ export function parseFlags(): Config {
   }
 
   const iocMaxAgeMs = durationFlag('ioc-max-age', values['ioc-max-age'] as string);
-  const ileappModuleTimeoutMs = durationFlag('ileapp-module-timeout', values['ileapp-module-timeout'] as string);
+  const ileappModuleTimeoutMs = durationFlag('ileapp-module-timeout', values['ileapp-module-timeout'] as string, true);
 
   return {
     source: values.source as string,
@@ -135,9 +135,24 @@ Options:
   --help                   show this help`);
 }
 
-function durationFlag(name: string, value: string): number {
+/** Node's longest timer delay; a larger one fires after 1 ms instead (with a TimeoutOverflowWarning). */
+export const MAX_TIMER_MS = 2_147_483_647;
+
+/**
+ * A duration used as a timer (EPOCH-487): more than zero, which would stop
+ * the tool at once, and no more than Node's longest timer.
+ */
+export function timerDuration(value: string): number {
+  const ms = parseDuration(value);
+  if (ms <= 0 || ms > MAX_TIMER_MS) {
+    throw new Error(`"${value}" must be more than 0 and at most 24 days, the longest timer Node supports`);
+  }
+  return ms;
+}
+
+function durationFlag(name: string, value: string, timer = false): number {
   try {
-    return parseDuration(value);
+    return timer ? timerDuration(value) : parseDuration(value);
   } catch (err) {
     console.error(`error: invalid --${name}: ${err instanceof Error ? err.message : err}`);
     process.exit(2);

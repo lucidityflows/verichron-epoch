@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 
-import { ileappInputType, runIleapp, type IleappRun } from './ileapp.js';
+import { IleappProgress, ileappInputType, runIleapp, type IleappRun } from './ileapp.js';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'ileapp-input-'));
 after(() => rmSync(tmp, { recursive: true, force: true }));
@@ -202,5 +202,30 @@ echo "Report generation Completed."
         ['mod2', 'stopped'],
       ]
     );
+  });
+});
+
+describe('IleappProgress stop messages (EPOCH-487)', () => {
+  it('names the gap after a completed module, without calling that module stopped', () => {
+    const progress = new IleappProgress(0);
+    assert.equal(progress.line('[1/2] Module 1 [mod1] artifact started', 10), true);
+    assert.equal(
+      progress.line('Module 1 [mod1] artifact completed', 20),
+      true,
+      'the wait for the next module is timed'
+    );
+    const message = progress.stop(5000, 1000);
+    assert.match(message, /^iLEAPP stopped responding after module 1 of 2, Module 1 \[mod1\], completed: /);
+    assert.match(message, /module 2 did not run$/);
+    assert.equal(progress.modules[0].status, 'completed');
+  });
+
+  it('says the report was written when iLEAPP then fails to exit', () => {
+    const progress = new IleappProgress(0);
+    progress.line('[1/1] Module 1 [mod1] artifact started', 10);
+    progress.line('Module 1 [mod1] artifact completed', 20);
+    progress.line('Processes completed.', 30);
+    assert.equal(progress.line('Report generation Completed.', 40), true, 'the wait for iLEAPP to exit is timed');
+    assert.match(progress.stop(5000, 1000), /^iLEAPP wrote its report but did not exit within the 1 s limit/);
   });
 });
