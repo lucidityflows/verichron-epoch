@@ -1,7 +1,13 @@
 import type { ForensicRecordQuery } from '@verichron/etl-db-reader';
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Backup } from '@verichron/contracts';
-import type { AnalysisRunStatus, AnalysisState, MvtLogEntry, PrepareState, ReportResult } from '../shared/types/window';
+import type {
+  AnalysisRunStatus,
+  AnalysisState,
+  PipelineLogEntry,
+  PrepareState,
+  ReportResult,
+} from '../shared/types/window';
 import type {
   BackupProgress,
   DeviceInfo,
@@ -43,11 +49,11 @@ const dbApi = {
   discoverBackups: (source: string): Promise<Backup[]> => ipcRenderer.invoke('epoch:discoverBackups', source),
   startPipeline: (source: string, options?: StartPipelineOptions): Promise<{ started: boolean; workspace: string }> =>
     ipcRenderer.invoke('epoch:startPipeline', source, options),
-  submitMvtPassword: (password: string) => ipcRenderer.invoke('epoch:submitMvtPassword', password),
-  onMvtLog: (callback: (entry: MvtLogEntry) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, entry: MvtLogEntry) => callback(entry);
-    ipcRenderer.on('epoch:mvtLog', listener);
-    return () => ipcRenderer.removeListener('epoch:mvtLog', listener);
+  submitBackupPassword: (password: string) => ipcRenderer.invoke('epoch:submitBackupPassword', password),
+  onPrepareLog: (callback: (entry: PipelineLogEntry) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, entry: PipelineLogEntry) => callback(entry);
+    ipcRenderer.on('epoch:prepareLog', listener);
+    return () => ipcRenderer.removeListener('epoch:prepareLog', listener);
   },
   // EPOCH-487: Prepare Evidence's state lives in the main process, so a
   // remounted New Investigation reads it here and follows its changes.
@@ -61,9 +67,6 @@ const dbApi = {
   getStageStatus: (runId: string) => ipcRenderer.invoke('epoch:getStageStatus', runId),
   getForensicRecords: (runId: string, query?: ForensicRecordQuery) =>
     ipcRenderer.invoke('epoch:getForensicRecords', runId, query),
-  getCorrelationPivots: (runId: string) => ipcRenderer.invoke('epoch:getCorrelationPivots', runId),
-  getCorrelatedContext: (runId: string, eventTime: string, excludeId: string, windowMinutes?: number) =>
-    ipcRenderer.invoke('epoch:getCorrelatedContext', runId, eventTime, excludeId, windowMinutes),
   getReport: (runId: string): Promise<ReportResult> => ipcRenderer.invoke('epoch:getReport', runId),
   openReport: (runId: string): Promise<boolean> => ipcRenderer.invoke('epoch:openReport', runId),
 
@@ -89,8 +92,8 @@ const dbApi = {
   // guessing from nothing.
   getAnalysisRunStatus: (workspace: string): Promise<AnalysisRunStatus> =>
     ipcRenderer.invoke('epoch:getAnalysisRunStatus', workspace),
-  onOrchestratorLog: (callback: (entry: MvtLogEntry) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, entry: MvtLogEntry) => callback(entry);
+  onOrchestratorLog: (callback: (entry: PipelineLogEntry) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, entry: PipelineLogEntry) => callback(entry);
     ipcRenderer.on('epoch:orchestratorLog', listener);
     return () => ipcRenderer.removeListener('epoch:orchestratorLog', listener);
   },

@@ -26,7 +26,7 @@ Each version is declared once, in the file the enforcing tool reads:
 | uv | 0.12.23 | `mise.toml` (`required-version` in `pyproject.toml` guards it) |
 | Python | 3.14.8, a uv-managed CPython; system interpreters are never used | `.python-version` |
 | Electron | 44.7.0 | `apps/epoch/package.json` |
-| mvt | 2026.10.5 | `tools/mvt/pyproject.toml` |
+| iphone_backup_decrypt | 0.10.0 (exact; the decrypt uses two of its internals) | `tools/decrypt/pyproject.toml` |
 | iLEAPP | v2026.3.1 (submodule) | `.gitmodules` pin; its dependencies in `tools/ileapp/pyproject.toml` |
 | Prettier | 3.9.6 | `devDependencies` in `package.json` |
 
@@ -38,13 +38,13 @@ the iLEAPP submodule. `mise.toml` and `.python-version` are updated by hand.
 | Environment | Holds | Used by |
 |---|---|---|
 | `.venv/` | The uv workspace: our Python stages, writer, report and tests | the orchestrator's stages, `uv run` |
-| `tools/mvt/.venv/` | mvt, pinned | The processor runs `tools/mvt/.venv/bin/mvt-ios` (or `--mvt-bin`) |
+| `tools/decrypt/.venv/` | The backup decrypt's library, pinned | The processor runs `tools/decrypt/decrypt_backup.py` with this interpreter (or `--decrypt-python`) |
 | `tools/ileapp/.venv/` | iLEAPP's runtime dependencies, pinned | the processor runs the submodule, `tools/ileapp/iLEAPP/ileapp.py`, with this interpreter |
 | `node_modules/` | The pnpm workspace | the app, the processor, the orchestrator |
 
-mvt and iLEAPP each have their own uv project and lockfile because their exact
-dependency pins conflict (for example, `packaging`). No workspace code imports
-either tool; both run as subprocesses.
+The backup decrypt and iLEAPP each have their own uv project and lockfile, so
+each tool's exact pins stay its own. No workspace code imports either tool;
+both run as subprocesses.
 
 ## First-time setup
 
@@ -79,7 +79,7 @@ docker compose -f infra/docker-compose.yml down -v && docker compose -f infra/do
 ## Running the pipeline
 
 ```bash
-# 1. Prepare backups: hash, decrypt (prompts for the password), repair, IOC scan
+# 1. Prepare backups: hash, decrypt (prompts for the password), repair, iLEAPP
 pnpm --filter @verichron/processor dev -- --source /path/to/backups --workspace ~/verichron-workspace
 
 # 2. Register the evidence and run every stage, for every decrypted backup in the workspace
@@ -90,14 +90,15 @@ pnpm --filter @verichron/epoch dev
 ```
 
 The orchestrator reads `DATABASE_URL` or `DB_*` from `.env`. The report is
-written by the `reporting` stage to `results/<label>/investigation_report.md`.
+written by the `reporting` stage to `reports/<label>/investigation_report.md`.
+A database created before EPOCH-489 that still holds mvt results is refused by
+migration 0009; recreate it with the command above.
 
 Useful tools:
 
 | Command | What it does |
 |---|---|
 | `uv run python scripts/db_peek.py` | Shows the latest run's stages and records |
-| `pnpm gen:fake-stix` | Builds a fake STIX2 IOC set from generated indicators |
 | `uv run python scripts/inspect_ileapp_output.py <dir>` | Shows what the iLEAPP bridge will read from one report, and what would fail |
 
 ## Testing
@@ -122,8 +123,9 @@ pnpm check:contracts                                 # schema ↔ TS ↔ Python 
 
 `mise run test` runs both suites (`mise run test:py`, `mise run test:ts`).
 
-External tools are tested through stub executables and servers (a stub
-`mvt-ios`, `sqlite3`, Ollama), so tests exercise the real process boundary.
+External tools are tested through stub executables and servers (a stub decrypt
+interpreter, `sqlite3`, iLEAPP, Ollama), so tests exercise the real process
+boundary.
 
 ### Real-device checks for iPhone pulls
 

@@ -33,8 +33,6 @@ class SourceType(StrEnum):
     NETWORK_USAGE       = "network_usage"
     GCLOUD_LOG          = "gcloud_log"
     SYSLOG_LINE         = "syslog_line"
-    MVT_IOC_DETECTION   = "mvt_ioc_detection"
-    TIMESTAMP_ANOMALY   = "timestamp_anomaly"
     ILEAPP_RECORD       = "ileapp_record"
     LLM_FLAGGED_ANOMALY = "llm_flagged_anomaly"
     # END SOURCE_TYPE

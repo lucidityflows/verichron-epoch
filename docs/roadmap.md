@@ -47,7 +47,7 @@ public:
 3. It names no unfixed security weakness. A weakness is described once it is
    fixed, or in general terms ("Hardened secrets handling").
 4. It makes no promise of a date or a version.
-5. It may name third-party tools the product uses (iLEAPP, mvt, PostgreSQL),
+5. It may name third-party tools the product uses (iLEAPP, PostgreSQL),
    but never implies their authors endorse the project.
 6. It is in sentence case, at most 90 characters, with no trailing full stop.
 

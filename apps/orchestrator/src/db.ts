@@ -12,8 +12,7 @@ export type RunState = 'running' | 'incomplete' | 'complete';
  * re-derived here) AND in which every stage enabled now succeeded at the
  * parserVersion its stage.json declares now, reading the derivative it would
  * read now. A parserVersion bump (R8), a newly enabled stage, or a new
- * results set or iLEAPP output (e.g. a new IOC set, EPOCH-406, or a new
- * iLEAPP commit, EPOCH-416) therefore gets a new run
+ * iLEAPP output (e.g. a new iLEAPP commit, EPOCH-416) therefore gets a new run
  * instead of being skipped as done; unchanged stages dedup in the ledger, so
  * re-running them writes nothing new.
  */

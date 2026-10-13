@@ -5,7 +5,7 @@ import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
 import type { Pool } from 'pg';
 import { discoverBackups, type Backup } from '@verichron/contracts';
-import type { MvtFinishedResult, AnalysisRunStatus, MvtLogEntry } from '../../shared/types/window';
+import type { PipelineFinishedResult, AnalysisRunStatus, PipelineLogEntry } from '../../shared/types/window';
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
 
 interface StartPipelineOptions {
@@ -82,7 +82,7 @@ export async function reconcileStaleRunsOnStartup(dbPool: Pool): Promise<void> {
 }
 
 export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | null, repoRoot: string, dbPool: Pool) {
-  let runningMvtProcess: ChildProcessWithoutNullStreams | null = null;
+  let runningProcessor: ChildProcessWithoutNullStreams | null = null;
   let runningOrchestratorProcess: ChildProcessWithoutNullStreams | null = null;
   // Which workspace the currently-tracked orchestrator invocation is for --
   // lets epoch:getAnalysisRunStatus tell "still actually running" apart from
@@ -116,9 +116,9 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   const analysisSession = new AnalysisSession((state) => sendToRenderer('epoch:analysisState', state));
 
   /** Relays the processor's output line by line, and its password prompt (which ends without a newline). */
-  function makeStreamBuffer(stream: MvtLogEntry['stream'], child: ChildProcessWithoutNullStreams) {
+  function makeStreamBuffer(stream: PipelineLogEntry['stream'], child: ChildProcessWithoutNullStreams) {
     const splitter = new LineSplitter();
-    const emit = (line: string) => sendToRenderer('epoch:mvtLog', prepareSession.line(stream, line));
+    const emit = (line: string) => sendToRenderer('epoch:prepareLog', prepareSession.line(stream, line));
     const onChunk = (chunk: Buffer) => {
       splitter.push(chunk).forEach(emit);
       if (stream === 'stdout') {
@@ -139,7 +139,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     return { onChunk, end };
   }
 
-  function makeOrchestratorStreamBuffer(stream: MvtLogEntry['stream']) {
+  function makeOrchestratorStreamBuffer(stream: PipelineLogEntry['stream']) {
     const splitter = new LineSplitter();
     const emit = (line: string) => sendToRenderer('epoch:orchestratorLog', analysisSession.line(stream, line));
     const onChunk = (chunk: Buffer) => splitter.push(chunk).forEach(emit);
@@ -173,7 +173,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { results?: unknown }).results)) {
         return undefined;
       }
-      return (parsed as { results: MvtFinishedResult['analysis'] }).results;
+      return (parsed as { results: PipelineFinishedResult['analysis'] }).results;
     } catch {
       return undefined;
     }
@@ -299,7 +299,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   });
 
   ipcMain.handle('epoch:startPipeline', async (_event, source: string, options?: StartPipelineOptions) => {
-    if (runningMvtProcess) {
+    if (runningProcessor) {
       throw new Error('The processor is already running -- wait for it to finish before starting another.');
     }
     if (!source || !source.trim()) {
@@ -314,7 +314,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     if (options?.only && options.only.length > 0) args.push('--only', options.only.join(','));
 
     const child = spawn('pnpm', args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] });
-    runningMvtProcess = child;
+    runningProcessor = child;
     pendingPasswordResolve = null;
     const startedAt = Date.now();
     prepareSession.start(source, workspacePath, options?.only ?? [], startedAt);
@@ -325,13 +325,13 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     child.stderr.on('data', stderrBuffer.onChunk);
 
     child.on('error', (err) => {
-      runningMvtProcess = null;
+      runningProcessor = null;
       pendingPasswordResolve = null;
       prepareSession.finish({ success: false, error: err.message, workspace: workspacePath });
     });
 
     child.on('close', (code) => {
-      runningMvtProcess = null;
+      runningProcessor = null;
       pendingPasswordResolve = null;
       stdoutBuffer.end();
       stderrBuffer.end();
@@ -343,8 +343,8 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     return { started: true, workspace: workspacePath };
   });
 
-  ipcMain.handle('epoch:submitMvtPassword', async (_event, password: string) => {
-    if (!runningMvtProcess || !pendingPasswordResolve) {
+  ipcMain.handle('epoch:submitBackupPassword', async (_event, password: string) => {
+    if (!runningProcessor || !pendingPasswordResolve) {
       throw new Error('No password prompt is currently pending.');
     }
     const resolve = pendingPasswordResolve;

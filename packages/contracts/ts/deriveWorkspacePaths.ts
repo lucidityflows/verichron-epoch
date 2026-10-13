@@ -13,9 +13,9 @@ function siblingOfDecrypted(backupSource: string, dir: string): string | undefin
   return path.join(path.dirname(parent), dir, label);
 }
 
-/** Where the processor writes mvt-ios's check-backup results for a decrypt. */
-export function deriveResultsPath(backupSource: string): string | undefined {
-  return siblingOfDecrypted(backupSource, 'results');
+/** Where the report stage writes the investigation report for a decrypt (EPOCH-489). */
+export function deriveReportPath(backupSource: string): string | undefined {
+  return siblingOfDecrypted(backupSource, 'reports');
 }
 
 /** Where the processor writes iLEAPP's output for a decrypt (EPOCH-416). */

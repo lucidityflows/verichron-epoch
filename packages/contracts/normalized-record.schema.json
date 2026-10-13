@@ -23,8 +23,6 @@
         "network_usage",
         "gcloud_log",
         "syslog_line",
-        "mvt_ioc_detection",
-        "timestamp_anomaly",
         "ileapp_record",
         "llm_flagged_anomaly"
       ]

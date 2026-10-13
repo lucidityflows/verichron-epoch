@@ -8,7 +8,7 @@
   "include": [
     "./*.ts", 
     "ts/sourceType.ts", 
-    "ts/deriveResultsPath.ts", 
+    "ts/deriveWorkspacePaths.ts", 
     "ts/deriveEvidencePath.ts",
     "ts/evidenceSidecar.ts",
     "ts/contractVersion.ts",

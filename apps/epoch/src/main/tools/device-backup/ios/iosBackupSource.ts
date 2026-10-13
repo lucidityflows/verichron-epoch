@@ -32,7 +32,7 @@ import { appendPullRecord, type PullRecord } from './pullRecord';
 /**
  * NOTE (EPOCH-103 review): the password captured here (used as
  * BACKUP_PASSWORD for idevicebackup2) and the password the processor later
- * prompts for during `mvt-ios decrypt-backup` are deliberately NOT threaded
+ * prompts for during its decrypt step are deliberately NOT threaded
  * together, even though they happen to be the same secret in the normal
  * flow. This process (Electron main, device-pull IPC) and the processor
  * (a separately spawned CLI subprocess) have no shared credential channel,

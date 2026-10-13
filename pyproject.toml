@@ -13,7 +13,6 @@ dependencies = [
     "verichron-runtime-env",
     "verichron-etl-run",
     "verichron-testing",
-    "verichron-mvt-iocs",
     "verichron-crash",
     "verichron-ileapp-bridge",
     "verichron-analysis",
@@ -21,10 +20,8 @@ dependencies = [
     "pytest>=8.0",
     "jsonschema>=4.0",
     "requests>=2.31",
-    "stix2>=3.0",
-    "faker>=20.0",
-    # mvt and iLEAPP are not workspace dependencies: each runs from its own
-    # pinned environment under tools/ (EPOCH-458).
+    # The backup decrypt and iLEAPP are not workspace dependencies: each runs
+    # from its own pinned environment under tools/ (EPOCH-458, EPOCH-489).
 ]
 
 [tool.setuptools]
@@ -52,8 +49,8 @@ members = [
 exclude = [
     "packages/etl-db-reader",
 ]
-# tools/mvt and tools/ileapp are separate uv projects with their own lockfiles,
-# not workspace members: their pinned dependencies conflict with each other.
+# tools/decrypt and tools/ileapp are separate uv projects with their own
+# lockfiles, not workspace members, so each tool's pins stay its own.
 
 [tool.uv.sources]
 verichron-contracts = { workspace = true }
@@ -61,7 +58,6 @@ verichron-etl-db-writer = { workspace = true }
 verichron-runtime-env = { workspace = true }
 verichron-etl-run = { workspace = true }
 verichron-testing = { workspace = true }
-verichron-mvt-iocs = { workspace = true }
 verichron-crash = { workspace = true }
 verichron-ileapp-bridge = { workspace = true }
 verichron-analysis = { workspace = true }

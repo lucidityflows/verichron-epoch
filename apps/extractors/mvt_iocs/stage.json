@@ -1,9 +1,0 @@
-{
-  "$schema": "../../../packages/contracts/stage-manifest.schema.json",
-  "entrypoint": "main.py",
-  "runtime": "python",
-  "order": 70,
-  "reads": "mvt_results",
-  "parserVersion": 1,
-  "enabled": true
-}

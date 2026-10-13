@@ -1,7 +1,7 @@
 import { StringDecoder } from 'node:string_decoder';
 
-import { applyMvtLogLine, initMvtRunProgress } from '../../shared/prepareProgress';
-import type { AnalysisState, MvtFinishedResult, MvtLogEntry, PrepareState } from '../../shared/types/window';
+import { applyPrepareLogLine, initPrepareProgress } from '../../shared/prepareProgress';
+import type { AnalysisState, PipelineFinishedResult, PipelineLogEntry, PrepareState } from '../../shared/types/window';
 
 /**
  * The state of Prepare Evidence and Analyze, kept in the main process
@@ -40,10 +40,10 @@ class Notifier<T> {
 }
 
 class LogBuffer {
-  private lines: MvtLogEntry[] = [];
+  private lines: PipelineLogEntry[] = [];
   private seq = 0;
 
-  add(stream: MvtLogEntry['stream'], line: string): MvtLogEntry {
+  add(stream: PipelineLogEntry['stream'], line: string): PipelineLogEntry {
     const entry = { stream, line, seq: ++this.seq };
     this.lines.push(entry);
     if (this.lines.length > KEPT_LOG_LINES) this.lines.splice(0, this.lines.length - KEPT_LOG_LINES);
@@ -54,7 +54,7 @@ class LogBuffer {
     this.lines = [];
   }
 
-  all(): MvtLogEntry[] {
+  all(): PipelineLogEntry[] {
     return [...this.lines];
   }
 }
@@ -86,7 +86,7 @@ export class PrepareSession {
       workspace,
       labels,
       startedAt: now,
-      progress: initMvtRunProgress(labels),
+      progress: initPrepareProgress(labels),
       passwordFor: null,
       result: null,
     };
@@ -94,9 +94,9 @@ export class PrepareSession {
   }
 
   /** Records one of the processor's lines and returns it, numbered, for the live log. */
-  line(stream: MvtLogEntry['stream'], text: string, now = Date.now()): MvtLogEntry {
+  line(stream: PipelineLogEntry['stream'], text: string, now = Date.now()): PipelineLogEntry {
     const entry = this.log.add(stream, text);
-    if (this.state.progress) this.state.progress = applyMvtLogLine(this.state.progress, text, now);
+    if (this.state.progress) this.state.progress = applyPrepareLogLine(this.state.progress, text, now);
     this.notifier.soon();
     return entry;
   }
@@ -111,7 +111,7 @@ export class PrepareSession {
     this.notifier.now();
   }
 
-  finish(result: MvtFinishedResult): void {
+  finish(result: PipelineFinishedResult): void {
     this.state = { ...this.state, status: 'finished', passwordFor: null, result };
     this.notifier.now();
   }
@@ -142,11 +142,11 @@ export class AnalysisSession {
     this.notifier.now();
   }
 
-  line(stream: MvtLogEntry['stream'], text: string): MvtLogEntry {
+  line(stream: PipelineLogEntry['stream'], text: string): PipelineLogEntry {
     return this.log.add(stream, text);
   }
 
-  finish(result: MvtFinishedResult): void {
+  finish(result: PipelineFinishedResult): void {
     this.state = { ...this.state, status: 'finished', result };
     this.notifier.now();
   }

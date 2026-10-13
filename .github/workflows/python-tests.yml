@@ -52,8 +52,8 @@ jobs:
       - name: Sync workspace
         run: uv sync --locked --all-extras
 
-      - name: Check the mvt lockfile
-        run: uv lock --check --project tools/mvt
+      - name: Build the decrypt tool's environment
+        run: uv sync --locked --project tools/decrypt
 
       # The iLEAPP end-to-end test runs the real iLEAPP from this environment
       # (VER-16). Building it compiles two native packages; the runner has a
@@ -69,12 +69,6 @@ jobs:
 
       - name: Run pytest
         run: uv run pytest -q
-
-      # EPOCH-403: EXPLAIN output for the evidence-scoped correlation reads on
-      # a ~260k-record fixture, kept in the log for review. The pytest above
-      # already fails the build if either read stops using an index.
-      - name: Explain evidence reads
-        run: uv run python scripts/explain_evidence_reads.py
         # testpaths / norecursedirs already scoped correctly in root
         # pyproject.toml ([tool.pytest.ini_options]): packages, scripts,
         # apps; iLEAPP/node_modules/.venv/dist/.git/infra excluded. The

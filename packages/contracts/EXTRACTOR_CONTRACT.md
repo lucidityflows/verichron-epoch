@@ -17,7 +17,7 @@ The stage's name is its directory name.
 | `entrypoint` | File to run, relative to the stage directory |
 | `runtime` | `python` (run with the repo's `.venv` interpreter) or `node` |
 | `order` | Run position; unique among enabled stages |
-| `reads` | The derivative the stage reads: `decrypted` (the decrypted backup), `mvt_results` (mvt-ios's check-backup results) or `ileapp_output` (iLEAPP's report). Each is produced by the processor |
+| `reads` | The derivative the stage reads: `decrypted` (the decrypted backup) or `ileapp_output` (iLEAPP's report). Each is produced by the processor |
 | `parserVersion` | Integer, bumped whenever what the stage writes changes; omit if it writes no facts |
 | `enabled` | `false` records the stage as `skipped` instead of running it. Disabling a stage is a team decision, never a shortcut |
 
@@ -33,12 +33,13 @@ The orchestrator registers the evidence before the run and passes every stage:
 | `--run-id`, `--evidence-id` | This run and the evidence it processes |
 | `--derivative-id`, `--derivative-path` | The derivative this stage reads (`reads` in `stage.json`): its id, and the directory to read. A stage whose derivative isn't registered for the backup fails before it is spawned |
 | `--parser-version` | From `stage.json`, when declared |
-| `--backup-path`, `--results-path` | Where the decrypted backup and the mvt results are |
+| `--backup-path` | Where the decrypted backup is |
+| `--report-path` | The folder the report stage writes the investigation report to (`<workspace>/reports/<label>/`). Passed to every stage; only the report stage uses it |
 | `--db-url` | The database. *Moving to the environment (EPOCH-423).* |
 
 Python stages register the identity arguments and `--derivative-path` with
 `db_writer.add_context_args` and build one `IngestContext` with
-`context_from_args`. Add `--backup-path`, `--results-path` and `--db-url`
+`context_from_args`. Add `--backup-path`, `--report-path` and `--db-url`
 separately. **Never invent, default or
 edit these values (R16).** A stage reads only the derivative it was given.
 

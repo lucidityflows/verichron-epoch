@@ -258,14 +258,10 @@ def main():
     add_context_args(parser)
     parser.add_argument("--backup-path", required=True)
     parser.add_argument("--db-url", required=True)
-    # Unused here — crash parses .ips files straight out of the decrypted
-    # backup (--backup-path), it never needs mvt-ios's own check-backup
-    # output. The orchestrator passes --results-path best-effort to every
-    # stage (see EXTRACTOR_CONTRACT.md #1), so this extractor must accept
-    # and ignore it rather than reject it, or every run fails on
-    # "unrecognized arguments" the moment a results/ dir is derivable.
-    parser.add_argument("--results-path", dest="results_path", default=None,
-                         help="Unused compatibility flag for the shared extractor contract")
+    # Unused here: only the report stage writes to the report folder. The
+    # orchestrator passes --report-path to every stage (EXTRACTOR_CONTRACT.md
+    # section 2), so this extractor accepts and ignores it.
+    parser.add_argument("--report-path", default=None, help="unused; passed to every stage")
     args = parser.parse_args()
 
     try:

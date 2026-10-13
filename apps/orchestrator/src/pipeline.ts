@@ -6,7 +6,7 @@ import { Client } from 'pg';
 import type { StageDefinition, StageSet, RunConfig } from './types.js';
 import { createRun, hasCompleteRunFor, markStage, markRunFailed, type RunProvenance } from './db.js';
 import { derivativeFor, registerEvidence, RegistrationError, type Registration } from './registration.js';
-import { contractVersion, deriveIleappPath, deriveResultsPath, type DerivativeKind } from '@verichron/contracts';
+import { contractVersion, deriveIleappPath, deriveReportPath, type DerivativeKind } from '@verichron/contracts';
 
 async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!backupPath || backupPath.startsWith('-')) {
@@ -34,7 +34,6 @@ async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { 
 /** What each derivative kind is, for a stage whose input is missing. */
 const DERIVATIVE_NAMES: Record<DerivativeKind, string> = {
   decrypted: 'the decrypted backup',
-  mvt_results: 'mvt-ios results',
   ileapp_output: 'iLEAPP output',
 };
 
@@ -51,7 +50,6 @@ function runStage(
 ): Promise<{ success: boolean; stderr: string }> {
   const paths: Record<DerivativeKind, string | undefined> = {
     decrypted: config.backupPath,
-    mvt_results: config.resultsPath,
     ileapp_output: config.ileappPath,
   };
   // Identity comes from here, never from the stage (R16): the evidence, the
@@ -84,7 +82,7 @@ function runStage(
     ];
     if (stage.manifest.parserVersion !== undefined)
       extraArgs.push('--parser-version', String(stage.manifest.parserVersion));
-    if (config.resultsPath) extraArgs.push('--results-path', config.resultsPath);
+    if (config.reportPath) extraArgs.push('--report-path', config.reportPath);
 
     const entrypointPath = path.join(stage.dir, stage.manifest.entrypoint);
     const bin = stage.manifest.runtime === 'python' ? config.pythonBin : process.execPath;
@@ -108,7 +106,7 @@ const ORCHESTRATOR_VERSION: string = JSON.parse(
 
 /**
  * Provenance recorded on every run (R35). Tool versions here are the
- * run-level ones; per-derivative tool versions (mvt-ios, iLEAPP) belong to
+ * run-level ones; per-derivative tool versions (the decrypt, iLEAPP) belong to
  * EPOCH-406.
  */
 export function collectProvenance(pythonBin: string): RunProvenance {
@@ -158,13 +156,12 @@ export async function runPipelineForBackup(
     return { success: false, error: validation.reason };
   }
 
-  const resultsPath = deriveResultsPath(backupPath);
+  const reportPath = deriveReportPath(backupPath);
   const ileappPath = deriveIleappPath(backupPath);
   let registration: Registration;
   try {
     registration = await registerEvidence(client, {
       backupPath,
-      resultsPath,
       ileappPath,
       secretPath: options.secretPath,
     });
@@ -189,7 +186,7 @@ export async function runPipelineForBackup(
       await markStage(client, runId, stage.name, 'running');
       const { success, stderr } = await runStage(
         stage,
-        { backupPath, resultsPath, ileappPath, dbUrl, pythonBin },
+        { backupPath, reportPath, ileappPath, dbUrl, pythonBin },
         runId,
         registration
       );

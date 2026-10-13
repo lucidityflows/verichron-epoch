@@ -189,7 +189,7 @@ def test_the_report_shows_the_same_facts_under_either_run(db, tmp_path):
     reports = {}
     for run in (RUN_A, RUN_B):
         out = tmp_path / f"report-{run[:4]}.md"
-        generate_report(db._conn, run, EVIDENCE, str(out), None)
+        generate_report(db._conn, run, EVIDENCE, str(out))
         reports[run] = out.read_text()
 
     section_a, section_b = _crash_section(reports[RUN_A]), _crash_section(reports[RUN_B])
@@ -217,21 +217,22 @@ def test_the_report_takes_its_evidence_from_the_run_when_not_given(db, tmp_path)
     db.commit()
 
     out = tmp_path / "report.md"
-    generate_report(db._conn, RUN_A, None, str(out), None)
+    generate_report(db._conn, RUN_A, None, str(out))
     report = out.read_text()
     assert f"`{EVIDENCE}`" in report
     assert "INCIDENT-FROM-RUN" in _crash_section(report)
 
 
 def test_the_report_says_what_produced_each_derivative_the_run_read(db, tmp_path):
-    """EPOCH-406: "produced by mvt-ios X.Y, IOC set abc123, N files repaired"."""
+    """EPOCH-406: "produced by iphone_backup_decrypt X.Y; N files repaired",
+    and iLEAPP output by its commit, including output from an earlier pass."""
     if not isinstance(db, PgReal):
         pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
     import json
 
     from reporting.generate_report import generate_report
 
-    results = "aaaa0000-0000-0000-0000-0000000000eb"
+    output = "aaaa0000-0000-0000-0000-0000000000eb"
     repair = {
         "status": "ran",
         "tool": {"name": "sqlite3", "version": "3.45.1"},
@@ -240,17 +241,18 @@ def test_the_report_says_what_produced_each_derivative_the_run_read(db, tmp_path
         "failed_files": ["HomeDomain/Library/SMS/sms.db"],
         "preserved_originals": ["a.db.corrupt-1", "HomeDomain/Library/SMS/sms.db.corrupt-1"],
     }
-    mvt = json.dumps({"name": "mvt-ios", "version": "2.6.1"})
+    decrypt = json.dumps({"name": "iphone_backup_decrypt", "version": "0.10.0"})
+    ileapp = json.dumps({"name": "iLEAPP", "version": "c" * 40})
     with db.cursor() as cur:
         cur.execute(
             "UPDATE evidence_derivatives SET tool = %s, params = %s WHERE derivative_id = %s",
-            (mvt, json.dumps({"repair": repair}), DERIVATIVE),
+            (decrypt, json.dumps({"repair": repair}), DERIVATIVE),
         )
         cur.execute(
             "INSERT INTO evidence_derivatives "
             "(derivative_id, evidence_id, parent_derivative_id, kind, path, tool, params, provenance_key) "
-            "VALUES (%s, %s, %s, 'mvt_results', '/pytest/results', %s, %s, repeat('1', 64))",
-            (results, EVIDENCE, DERIVATIVE, mvt, json.dumps({"ioc_set_hash": "abc123" + "0" * 58, "ioc_file_count": 14})),
+            "VALUES (%s, %s, %s, 'ileapp_output', '/pytest/ileapp', %s, %s, repeat('1', 64))",
+            (output, EVIDENCE, DERIVATIVE, ileapp, json.dumps({"input_type": "itunes"})),
         )
         cur.execute(
             "UPDATE pipeline_runs SET evidence_id = %s, derivative_id = %s WHERE run_id = %s",
@@ -258,42 +260,57 @@ def test_the_report_says_what_produced_each_derivative_the_run_read(db, tmp_path
         )
         cur.execute(
             "INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id) "
-            "VALUES (%s, 'mvt_iocs', 'succeeded', %s)",
-            (RUN_A, results),
+            "VALUES (%s, 'ileapp_bridge', 'succeeded', %s)",
+            (RUN_A, output),
         )
     db.commit()
 
-    # A detection filed by an earlier results set (an older IOC set): its
-    # alerts.json was ingested then, and that ingest still stands.
+    # A record filed from an earlier iLEAPP output (an older iLEAPP commit):
+    # its artifact table was ingested then, and that ingest still stands.
     older = "aaaa0000-0000-0000-0000-0000000000ea"
     with db.cursor() as cur:
         cur.execute(
             "INSERT INTO evidence_derivatives "
             "(derivative_id, evidence_id, parent_derivative_id, kind, path, tool, params, provenance_key) "
-            "VALUES (%s, %s, %s, 'mvt_results', '/pytest/results-old', %s, %s, repeat('2', 64))",
-            (older, EVIDENCE, DERIVATIVE, mvt, json.dumps({"ioc_set_hash": "0ff0" + "0" * 60, "ioc_file_count": 9})),
+            "VALUES (%s, %s, %s, 'ileapp_output', '/pytest/ileapp-old', %s, %s, repeat('2', 64))",
+            (older, EVIDENCE, DERIVATIVE, json.dumps({"name": "iLEAPP", "version": "d" * 40}), json.dumps({"input_type": "itunes"})),
         )
     db.commit()
-    alerts = tmp_path / "alerts.json"
-    alerts.write_text("[]")
+    table = tmp_path / "artifact.tsv"
+    table.write_text("x")
     old_pass = IngestContext(evidence_id=EVIDENCE, derivative_id=older, run_id=RUN_B, parser_version=1)
-    with ingest(db, old_pass, alerts, source_type="mvt_ioc_detection", payload_kind="full") as unit:
-        unit.write([NormalizedRecord(source_type=SourceType.MVT_IOC_DETECTION, fields={})])
+    with ingest(db, old_pass, table, source_type="ileapp_record", payload_kind="full") as unit:
+        unit.write([NormalizedRecord(source_type=SourceType.ILEAPP_RECORD, fields={})])
 
     out = tmp_path / "report.md"
-    generate_report(db._conn, RUN_A, None, str(out), None)
+    generate_report(db._conn, RUN_A, None, str(out))
     report = out.read_text()
     section = report.split("## Provenance", 1)[1].split("---", 1)[0]
     inputs, sources = section.split("### Where the facts in this report come from", 1)
-    assert "produced by mvt-ios 2.6.1; repair by sqlite3 3.45.1: 12 database(s) checked, 2 repaired" in inputs
+    assert "produced by iphone_backup_decrypt 0.10.0; repair by sqlite3 3.45.1: 12 database(s) checked, 2 repaired" in inputs
     assert "1 could not be fully recovered, 2 original(s) preserved" in inputs
     assert "not fully recovered: `HomeDomain/Library/SMS/sms.db`" in inputs
-    assert "**mvt results** (`/pytest/results`): produced by mvt-ios 2.6.1, IOC set `abc123000000` (14 file(s))" in inputs
-    assert "/pytest/results-old" not in inputs, "this run did not read the older results set"
+    assert "**iLEAPP output** (`/pytest/ileapp`): produced by iLEAPP cccccccccccc, read as `itunes`" in inputs
+    assert "/pytest/ileapp-old" not in inputs, "this run did not read the older output"
     assert (
-        "**mvt results** (`/pytest/results-old`): produced by mvt-ios 2.6.1, IOC set `0ff000000000` (9 file(s))"
+        "**iLEAPP output** (`/pytest/ileapp-old`): produced by iLEAPP dddddddddddd, read as `itunes`"
         " — 1 record(s); **from an earlier pass, not an input of this run**"
     ) in sources
+
+
+def test_the_report_says_indicator_checks_and_ai_analysis_were_not_run(db, tmp_path):
+    """EPOCH-489: until indicator matching returns, nothing checks indicators; the
+    report says so, so no reader takes "no match" for a clean device."""
+    if not isinstance(db, PgReal):
+        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
+    from reporting.generate_report import generate_report
+
+    out = tmp_path / "report.md"
+    generate_report(db._conn, RUN_A, EVIDENCE, str(out))
+    section = out.read_text().split("## Not Examined", 1)[1].split("---", 1)[0]
+    assert "**Indicators of compromise:** no indicator check was run" in section
+    assert "not because the device was found clean" in section
+    assert "**AI-assisted analysis:** not run" in section
 
 
 def test_a_run_without_evidence_gets_a_report_that_says_so(db, tmp_path):
@@ -303,7 +320,7 @@ def test_a_run_without_evidence_gets_a_report_that_says_so(db, tmp_path):
     from reporting.generate_report import generate_report
 
     out = tmp_path / "report.md"
-    generate_report(db._conn, RUN_B, None, str(out), None)
+    generate_report(db._conn, RUN_B, None, str(out))
     report = out.read_text()
     assert "## No evidence registered" in report
     assert "not the same as finding nothing" in report
@@ -333,27 +350,3 @@ def test_no_reader_filters_facts_by_run(path):
         sql = next(g for g in groups if g) if any(groups) else ""
         if FACT_SOURCES.search(sql):
             assert not re.search(r"\brun_id\b", sql), f"{path.name} filters facts by run_id:\n{sql}"
-
-
-# ==========================================================================
-# Index use at real-timeline size (EPOCH-403 DoD; Postgres)
-# ==========================================================================
-
-
-def test_correlation_reads_use_indexes_at_timeline_size():
-    """~260k records: neither correlation read may fall back to a sequential
-    scan of forensic_records. The plans themselves are printed by the
-    `explain_evidence_reads.py` CI step for the PR."""
-    import os
-
-    dsn = os.environ.get("TEST_DATABASE_URL")
-    if not dsn:
-        if os.environ.get("CI"):
-            pytest.fail("TEST_DATABASE_URL must be set in CI")
-        pytest.skip("TEST_DATABASE_URL not set; needs real Postgres")
-
-    import explain_evidence_reads
-
-    plans, problems, count = explain_evidence_reads.check(dsn)
-    assert count >= 250_000, f"fixture too small to be meaningful: {count}"
-    assert problems == [], "\n\n".join(plans.values())

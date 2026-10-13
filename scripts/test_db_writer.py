@@ -382,11 +382,11 @@ def postgres_only(db) -> None:
 
 def test_same_content_under_two_evidence_items_is_two_units(db, tmp_path):
     """The global-dedup bug: byte-identical files from unrelated backups (an
-    empty alerts.json is the common case) used to collide, so the second
+    empty artifact table is the common case) used to collide, so the second
     evidence item silently got nothing. Identity is per evidence (R6)."""
-    empty = tmp_path / "alerts.json"
-    empty.write_text("[]")
-    unit_shape = {"source_type": "mvt_ioc_detection", "payload_kind": "full"}
+    empty = tmp_path / "artifact.tsv"
+    empty.write_text("")
+    unit_shape = {"source_type": "ileapp_record", "payload_kind": "full"}
 
     with ingest(db, ctx(RUN_ID, EVIDENCE_A), empty, **unit_shape) as unit:
         unit.write([])

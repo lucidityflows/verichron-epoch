@@ -3,7 +3,7 @@ import * as path from 'node:path';
 /**
  * Where the processor writes, and the orchestrator reads, a backup's evidence
  * artifacts inside a workspace. One helper so the two never disagree about
- * the layout -- the same reason deriveResultsPath exists.
+ * the layout -- the same reason deriveWorkspacePaths exists.
  *
  * Everything lives under one directory per backup, `evidence/<name>/`, with
  * fixed short file names inside. The label is used as a whole path component

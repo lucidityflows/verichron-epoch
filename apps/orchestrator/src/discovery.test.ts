@@ -20,13 +20,14 @@ const VALID = {
 
 describe('stage manifests', () => {
   it('accepts each derivative kind as what a stage reads', () => {
-    for (const reads of ['decrypted', 'mvt_results', 'ileapp_output']) {
+    for (const reads of ['decrypted', 'ileapp_output']) {
       assert.equal(isStageManifest({ ...VALID, reads }), true, reads);
     }
   });
 
   it('refuses an unknown derivative kind, a missing one, and keys the schema does not allow', () => {
     assert.equal(isStageManifest({ ...VALID, reads: 'results' }), false);
+    assert.equal(isStageManifest({ ...VALID, reads: 'mvt_results' }), false, 'mvt-ios is removed (EPOCH-489)');
     const { reads: _, ...missing } = VALID;
     assert.equal(isStageManifest(missing), false);
     assert.equal(isStageManifest({ ...VALID, requiresResultsPath: true }), false, 'the replaced key is refused');
@@ -36,7 +37,11 @@ describe('stage manifests', () => {
     const { enabled } = await discoverStages();
     const reads = Object.fromEntries(enabled.map((s) => [s.name, s.manifest.reads]));
     assert.equal(reads.ileapp_bridge, 'ileapp_output');
-    assert.equal(reads.mvt_iocs, 'mvt_results');
     assert.equal(reads.crash, 'decrypted');
+    assert.deepEqual(
+      enabled.map((s) => s.name).sort(),
+      ['crash', 'ileapp_bridge', 'reporting'],
+      'the AI analysis stage is out of the pipeline until EPOCH-442'
+    );
   });
 });

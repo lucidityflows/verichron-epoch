@@ -7,22 +7,22 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { deriveIleappPath, deriveResultsPath } from '@verichron/contracts';
+import { deriveIleappPath, deriveReportPath } from '@verichron/contracts';
 
 describe('derivative paths beside a decrypt', () => {
   it("replace the decrypt's own parent", () => {
-    assert.equal(deriveResultsPath('/ws/decrypted/BK1'), '/ws/results/BK1');
+    assert.equal(deriveReportPath('/ws/decrypted/BK1'), '/ws/reports/BK1');
     assert.equal(deriveIleappPath('/ws/decrypted/BK1'), '/ws/ileapp/BK1');
     assert.equal(deriveIleappPath('/ws/decrypted/BK1/'), '/ws/ileapp/BK1');
   });
 
   it('ignore a decrypted directory higher up the path', () => {
     assert.equal(deriveIleappPath('/mnt/decrypted/case/decrypted/BK1'), '/mnt/decrypted/case/ileapp/BK1');
-    assert.equal(deriveResultsPath('/mnt/decrypted/case/decrypted/BK1'), '/mnt/decrypted/case/results/BK1');
+    assert.equal(deriveReportPath('/mnt/decrypted/case/decrypted/BK1'), '/mnt/decrypted/case/reports/BK1');
   });
 
   it('are undefined when the backup is not directly under decrypted/', () => {
     assert.equal(deriveIleappPath('/mnt/decrypted/BK1/nested'), undefined);
-    assert.equal(deriveResultsPath('/backups/BK1'), undefined);
+    assert.equal(deriveReportPath('/backups/BK1'), undefined);
   });
 });

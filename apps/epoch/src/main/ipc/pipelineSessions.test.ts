@@ -5,14 +5,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { applyMvtLogLine, initMvtRunProgress } from '../../shared/prepareProgress';
+import { applyPrepareLogLine, initPrepareProgress } from '../../shared/prepareProgress';
 import type { PrepareState } from '../../shared/types/window';
 import { AnalysisSession, KEPT_LOG_LINES, LineSplitter, PrepareSession } from './pipelineSessions';
 
 describe('prepare progress lines', () => {
   const lines = (...text: string[]) => {
-    let state = initMvtRunProgress(['BK']);
-    text.forEach((line, i) => (state = applyMvtLogLine(state, line, 1000 * (i + 1))));
+    let state = initPrepareProgress(['BK']);
+    text.forEach((line, i) => (state = applyPrepareLogLine(state, line, 1000 * (i + 1))));
     return state.byLabel.BK;
   };
 

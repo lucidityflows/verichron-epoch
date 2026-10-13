@@ -8,7 +8,6 @@ the [stage contract](../../packages/contracts/EXTRACTOR_CONTRACT.md).
 |---|---|---|
 | [`crash`](crash/) | decrypted backup | `crash_report` |
 | [`ileapp_bridge`](ileapp_bridge/) | iLEAPP output | `ileapp_record` |
-| [`mvt_iocs`](mvt_iocs/) | mvt results | `mvt_ioc_detection`, `timestamp_anomaly` |
 
 To add an extractor:
 

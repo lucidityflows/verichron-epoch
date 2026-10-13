@@ -59,7 +59,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
         </div>
       ) : reportLoading || !report ? (
         <EmptyState loading title="Loading the report…" />
-      ) : report.status === 'no-results-path' ? (
+      ) : report.status === 'no-report-path' ? (
         <EmptyState
           icon={FileQuestion}
           title="Report location unknown"

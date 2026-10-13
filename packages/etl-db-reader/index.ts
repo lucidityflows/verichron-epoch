@@ -20,8 +20,6 @@ export type {
   StageStatusRow,
   ForensicRecordRow,
   StageStatus,
-  CorrelationPivotRow,
-  CorrelatedContextRow,
   ForensicRecordQuery,
   ForensicRecordPage,
   RecordSortKey,
@@ -29,12 +27,9 @@ export type {
 export {
   getPipelineRuns,
   getRunEvidence,
-  getRunResultsLocation,
+  getRunReportLocation,
   getStageStatus,
   getForensicRecords,
-  getCorrelationPivots,
-  getCorrelatedContext,
   CANONICAL_STAGE_ORDER,
-  CORRELATION_WINDOW_MINUTES,
   MAX_RECORDS_PAGE,
 } from './dbReader.js';

@@ -9,7 +9,7 @@ import { z } from 'zod';
  *
  * Each marker records the content_root of the evidence the derivative was
  * produced FROM. Without it, a backup that changed under the same label would
- * be re-hashed (new content_root) while its old decrypt and results stayed in
+ * be re-hashed (new content_root) while its old decrypt and iLEAPP output stayed in
  * place behind their "done" markers, and registration would file the old
  * backup's facts under the new evidence. With it, a stale derivative is
  * detectable: the processor redoes it, and registration refuses it.
@@ -18,14 +18,13 @@ import { z } from 'zod';
  * that produced it and the parameters that shaped it. Registration copies
  * these into evidence_derivatives.tool / .params, and they are part of the
  * derivative's identity (provenanceKey), so a different tool version, repair
- * outcome or IOC set is a different derivative, never an update in place.
+ * outcome or input type is a different derivative, never an update in place.
  */
-export const DECRYPT_MARKER = '.mvt_decrypted_ok';
-export const CHECK_MARKER = '.mvt_check_ok';
+export const DECRYPT_MARKER = '.decrypted_ok';
 export const ILEAPP_MARKER = '.ileapp_ok';
 
-/** The derivative kinds evidence_derivatives.kind allows (migration 0008). */
-export const DerivativeKind = z.enum(['decrypted', 'mvt_results', 'ileapp_output']);
+/** The derivative kinds evidence_derivatives.kind allows (migration 0009). */
+export const DerivativeKind = z.enum(['decrypted', 'ileapp_output']);
 export type DerivativeKind = z.infer<typeof DerivativeKind>;
 
 const ContentRoot = z.string().regex(/^[0-9a-f]{64}$/);
@@ -64,15 +63,6 @@ export type RepairProvenance = z.infer<typeof RepairProvenance>;
 export const DecryptParams = z.object({ repair: RepairProvenance }).strict();
 export type DecryptParams = z.infer<typeof DecryptParams>;
 
-export const CheckParams = z
-  .object({
-    /** Content root (same canonical manifest as evidence) of the IOC folder check-backup loaded. */
-    ioc_set_hash: ContentRoot,
-    ioc_file_count: Count,
-  })
-  .strict();
-export type CheckParams = z.infer<typeof CheckParams>;
-
 export const IleappParams = z
   .object({
     /** How iLEAPP walked the decrypt (its -t): 'itunes' with a Manifest.db, else 'fs'. */
@@ -93,8 +83,6 @@ const markerOf = <P extends z.ZodTypeAny>(params: P) =>
 
 export const DecryptMarker = markerOf(DecryptParams);
 export type DecryptMarker = z.infer<typeof DecryptMarker>;
-export const CheckMarker = markerOf(CheckParams);
-export type CheckMarker = z.infer<typeof CheckMarker>;
 export const IleappMarker = markerOf(IleappParams);
 export type IleappMarker = z.infer<typeof IleappMarker>;
 
@@ -112,18 +100,11 @@ function readMarker<S extends z.ZodTypeAny>(schema: S, dir: string, marker: stri
 /** The decrypt's provenance, or null if the marker is missing or not in this format. */
 export const readDecryptMarker = (dir: string): DecryptMarker | null => readMarker(DecryptMarker, dir, DECRYPT_MARKER);
 
-/** The results' provenance, or null if the marker is missing or not in this format. */
-export const readCheckMarker = (dir: string): CheckMarker | null => readMarker(CheckMarker, dir, CHECK_MARKER);
-
 /** iLEAPP's output's provenance, or null if the marker is missing or not in this format. */
 export const readIleappMarker = (dir: string): IleappMarker | null => readMarker(IleappMarker, dir, ILEAPP_MARKER);
 
 export function renderDecryptMarker(contentRoot: string, tool: ToolVersion, params: DecryptParams): string {
   return render(DecryptMarker, contentRoot, tool, params);
-}
-
-export function renderCheckMarker(contentRoot: string, tool: ToolVersion, params: CheckParams): string {
-  return render(CheckMarker, contentRoot, tool, params);
 }
 
 export function renderIleappMarker(contentRoot: string, tool: ToolVersion, params: IleappParams): string {
@@ -150,7 +131,7 @@ export function canonicalJson(value: unknown): string {
 /**
  * Part of a derivative's identity: sha256 over the canonical JSON of
  * {tool, params}. Two passes that differ in tool version, repair outcome or
- * IOC set get different keys, so they are different derivatives.
+ * input type get different keys, so they are different derivatives.
  */
 export function provenanceKey(tool: ToolVersion, params: unknown): string {
   return createHash('sha256').update(canonicalJson({ tool, params })).digest('hex');

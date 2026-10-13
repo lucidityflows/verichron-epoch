@@ -244,6 +244,18 @@ export class IleappProgress {
  * runs unbuffered, so each line arrives as it is printed. Each module's
  * timing is written to `modulesPath` either way.
  */
+/**
+ * iLEAPP's environment. Its output arrives a line at a time (EPOCH-487), and
+ * its logarchive module never runs unifiedlog_iterator (EPOCH-489): iLEAPP
+ * uses ILEAPP_UNIFIEDLOG_ITERATOR before any other location, and a value that
+ * is not an executable file makes it log that and carry on without one.
+ */
+export const UNIFIEDLOG_ITERATOR_DISABLED = 'disabled-by-verichron';
+
+export function ileappEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, PYTHONUNBUFFERED: '1', ILEAPP_UNIFIEDLOG_ITERATOR: UNIFIEDLOG_ITERATOR_DISABLED };
+}
+
 export async function runIleapp(opts: IleappRun): Promise<void> {
   // iLEAPP runs from its checkout (cwd), so every path it is given must be
   // absolute; a relative one would resolve against the checkout instead. A
@@ -279,7 +291,7 @@ export async function runIleapp(opts: IleappRun): Promise<void> {
         cwd: ileappDir,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: true,
-        env: { ...process.env, PYTHONUNBUFFERED: '1' },
+        env: ileappEnv(),
       });
       const untrack = trackProcessGroup(child.pid);
       const stop = (reason: Error) => {

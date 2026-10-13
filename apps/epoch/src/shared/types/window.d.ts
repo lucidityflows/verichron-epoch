@@ -4,8 +4,6 @@ import type {
   ForensicRecordRow,
   ForensicRecordPage,
   ForensicRecordQuery,
-  CorrelationPivotRow,
-  CorrelatedContextRow,
 } from '@verichron/db-reader';
 import type { Backup } from '@verichron/contracts';
 import type {
@@ -24,12 +22,12 @@ import type {
   ToolSetupStatus,
   ToolAvailabilityStatus,
 } from './tools';
-import type { MvtRunProgress } from '../prepareProgress';
+import type { PrepareRunProgress } from '../prepareProgress';
 
 export type ReportResult =
   | { status: 'ok'; content: string; path: string }
   | { status: 'not-found'; path: string }
-  | { status: 'no-results-path' };
+  | { status: 'no-report-path' };
 
 export interface StartPipelineOptions {
   workspace?: string;
@@ -38,7 +36,7 @@ export interface StartPipelineOptions {
   only?: string[];
 }
 
-export interface MvtLogEntry {
+export interface PipelineLogEntry {
   stream: 'stdout' | 'stderr';
   line: string;
   /** Increases with each line of a run, so a line already shown is never shown twice (EPOCH-487). */
@@ -61,7 +59,7 @@ export interface AnalysisRunStatus {
   status: 'idle' | 'running' | 'interrupted';
 }
 
-export interface MvtFinishedResult {
+export interface PipelineFinishedResult {
   success: boolean;
   exitCode?: number | null;
   error?: string;
@@ -93,12 +91,12 @@ export interface PrepareState {
   workspace: string | null;
   labels: string[];
   startedAt: number | null;
-  progress: MvtRunProgress | null;
+  progress: PrepareRunProgress | null;
   /** The backup whose password the processor is waiting for. */
   passwordFor: string | null;
-  result: MvtFinishedResult | null;
+  result: PipelineFinishedResult | null;
   /** The run's recent log lines, oldest first; empty in the change events, which carry state only. */
-  log: MvtLogEntry[];
+  log: PipelineLogEntry[];
 }
 
 /** Analyze (the orchestrator) as the main process sees it (EPOCH-487). */
@@ -109,8 +107,8 @@ export interface AnalysisState {
   /** The workspace, or the retried backup's source. */
   target: string | null;
   startedAt: number | null;
-  result: MvtFinishedResult | null;
-  log: MvtLogEntry[];
+  result: PipelineFinishedResult | null;
+  log: PipelineLogEntry[];
 }
 
 declare global {
@@ -124,24 +122,17 @@ declare global {
         source: string,
         options?: StartPipelineOptions
       ) => Promise<{ started: boolean; workspace: string }>;
-      submitMvtPassword: (password: string) => Promise<void>;
-      onMvtLog: (callback: (entry: MvtLogEntry) => void) => () => void;
+      submitBackupPassword: (password: string) => Promise<void>;
+      onPrepareLog: (callback: (entry: PipelineLogEntry) => void) => () => void;
       getPrepareState: () => Promise<PrepareState>;
       onPrepareState: (callback: (state: PrepareState) => void) => () => void;
       getPipelineRuns: () => Promise<PipelineRunRow[]>;
       getStageStatus: (runId: string) => Promise<StageStatusRow[]>;
       getForensicRecords: (runId: string, query?: ForensicRecordQuery) => Promise<ForensicRecordPage>;
-      getCorrelationPivots: (runId: string) => Promise<CorrelationPivotRow[]>;
-      getCorrelatedContext: (
-        runId: string,
-        eventTime: string,
-        excludeId: string,
-        windowMinutes?: number
-      ) => Promise<CorrelatedContextRow[]>;
       getReport: (runId: string) => Promise<ReportResult>;
       openReport: (runId: string) => Promise<boolean>;
       // Stage 3 (orchestrator) -- see main.ts's epoch:startAnalysis handler.
-      // Reuses MvtLogEntry/MvtFinishedResult since the shape is identical;
+      // Reuses PipelineLogEntry/PipelineFinishedResult since the shape is identical;
       // no need for a second pair of structurally-equal types.
       startAnalysis: (workspace: string) => Promise<{ started: boolean }>;
       // EPOCH-308
@@ -149,7 +140,7 @@ declare global {
       // EPOCH-305
       cancelAnalysis: () => Promise<{ cancelled: boolean }>;
       getAnalysisRunStatus: (workspace: string) => Promise<AnalysisRunStatus>;
-      onOrchestratorLog: (callback: (entry: MvtLogEntry) => void) => () => void;
+      onOrchestratorLog: (callback: (entry: PipelineLogEntry) => void) => () => void;
       getAnalysisState: () => Promise<AnalysisState>;
       onAnalysisState: (callback: (state: AnalysisState) => void) => () => void;
       listDeviceBackupSources: () => Promise<Array<{ id: string; label: string }>>;

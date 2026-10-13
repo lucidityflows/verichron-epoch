@@ -16,28 +16,23 @@
 export { NormalizedRecord } from './ts/normalizedRecord.js';
 export { discoverBackups, BACKUP_SEARCH_MAX_DEPTH } from './ts/discoverBackups.js';
 export type { Backup } from './ts/discoverBackups.js';
-export { deriveResultsPath, deriveIleappPath } from './ts/deriveResultsPath.js';
+export { deriveReportPath, deriveIleappPath } from './ts/deriveWorkspacePaths.js';
 export { deriveEvidencePath } from './ts/deriveEvidencePath.js';
 export { EvidenceSidecar } from './ts/evidenceSidecar.js';
 export { contractVersion, CONTRACT_SCHEMAS } from './ts/contractVersion.js';
 export {
   DECRYPT_MARKER,
-  CHECK_MARKER,
   ILEAPP_MARKER,
   DerivativeKind,
   ToolVersion,
   RepairProvenance,
   DecryptParams,
-  CheckParams,
   IleappParams,
   DecryptMarker,
-  CheckMarker,
   IleappMarker,
   readDecryptMarker,
-  readCheckMarker,
   readIleappMarker,
   renderDecryptMarker,
-  renderCheckMarker,
   renderIleappMarker,
   canonicalJson,
   provenanceKey,

@@ -5,8 +5,6 @@ import {
   getRunEvidence,
   getStageStatus,
   getForensicRecords,
-  getCorrelationPivots,
-  getCorrelatedContext,
   type ForensicRecordPage,
   type ForensicRecordQuery,
 } from '@verichron/etl-db-reader';
@@ -47,29 +45,4 @@ export function registerDbHandlers(dbPool: Pool) {
       throw err;
     }
   });
-
-  ipcMain.handle('epoch:getCorrelationPivots', async (_event, runId: string) => {
-    try {
-      const evidenceId = await getRunEvidence(dbPool, runId);
-      if (!evidenceId) return [];
-      return await getCorrelationPivots(dbPool, evidenceId);
-    } catch (err) {
-      console.error('DB error:', err);
-      throw err;
-    }
-  });
-
-  ipcMain.handle(
-    'epoch:getCorrelatedContext',
-    async (_event, runId: string, eventTime: string, excludeId: string, windowMinutes?: number) => {
-      try {
-        const evidenceId = await getRunEvidence(dbPool, runId);
-        if (!evidenceId) return [];
-        return await getCorrelatedContext(dbPool, evidenceId, eventTime, excludeId, windowMinutes);
-      } catch (err) {
-        console.error('DB error:', err);
-        throw err;
-      }
-    }
-  );
 }
