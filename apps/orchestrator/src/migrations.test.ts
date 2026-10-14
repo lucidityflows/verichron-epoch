@@ -71,20 +71,26 @@ async function setLedger(filenames: string[]): Promise<void> {
   for (const name of filenames) await db.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [name]);
 }
 
-/** Runs the orchestrator on one backup path; returns its exit code and summary. */
-async function investigate(): Promise<{ code: number; error?: string }> {
+/** Runs the orchestrator on one backup path that doesn't exist; returns its
+ * exit code and summary. Its config folder is the test's own, so nothing is
+ * written outside the temp dir. */
+async function investigate(): Promise<{
+  code: number;
+  error?: string;
+  results: Array<{ status: string; error?: string }>;
+}> {
   const workspace = mkdtempSync(path.join(tmp, 'ws-'));
   const backup = path.join(workspace, 'decrypted', 'backup');
   const main = path.resolve(import.meta.dirname, 'main.ts');
   const code = await promisify(execFile)(process.execPath, ['--import', 'tsx', main, backup], {
     cwd: import.meta.dirname,
-    env: { ...process.env, DATABASE_URL: dbUrl },
+    env: { ...process.env, DATABASE_URL: dbUrl, XDG_CONFIG_HOME: path.join(tmp, 'config') },
   }).then(
     () => 0,
     (err: { code?: number }) => err.code ?? -1
   );
   const summary = JSON.parse(readFileSync(path.join(workspace, 'analysis-summary.json'), 'utf8'));
-  return { code, error: summary.error };
+  return { code, error: summary.error, results: summary.results };
 }
 
 async function registeredRows(): Promise<number> {
@@ -122,5 +128,13 @@ describe('pending migrations (EPOCH-498)', live, () => {
     const status = await readMigrationStatus(db);
     assert.deepEqual(status, { ledger: true, pending: [] });
     assert.equal(migrationRefusal(status), null);
+
+    // Past the gate, the backup itself is checked: it doesn't exist, so that
+    // backup fails on its own, and nothing refuses the run as a whole.
+    const { error, results } = await investigate();
+    assert.equal(error, undefined);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].status, 'failed');
+    assert.doesNotMatch(results[0].error ?? '', /migrations/);
   });
 });

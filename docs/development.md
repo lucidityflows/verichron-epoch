@@ -164,12 +164,11 @@ New device behaviour seen during these checks is added to the verified list in
 | Workflow | Runs |
 |---|---|
 | `.github/workflows/python-tests.yml` | Migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
-| `.github/workflows/ts-tests.yml` | The formatting check, then typecheck and tests for the processor, the writer, the reader and the orchestrator, with real PostgreSQL |
+| `.github/workflows/ts-tests.yml` | The formatting check, then typecheck and tests for the processor, the writer, the reader and the orchestrator, with real PostgreSQL, and the desktop app's typecheck, Vite build and tests |
 
 Both workflows install the toolchain from `mise.toml` and Python from
 `.python-version`, the same files a development machine uses. All Actions are
-pinned to full commit SHAs. The desktop app isn't built or
-tested in CI yet (EPOCH-454).
+pinned to full commit SHAs.
 
 ## Conventions
 
