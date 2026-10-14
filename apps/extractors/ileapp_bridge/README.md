@@ -61,8 +61,9 @@ chosen or parsed by name.
   keeps iLEAPP's value
   under its header, `event_time` takes the corrected value, and `fields.corrections`
   lists each correction (defect, column, original, corrected, resolution).
-  A registered column the artifact lacks fails that artifact. The defects
-  applied are part of the unit's identity.
+  A registered column the artifact lacks fails that artifact. Corrections are
+  not part of the unit's identity: an entry ships with a bump of this stage's
+  `parserVersion` (`applied_from`), which supersedes the uncorrected facts.
 - The first entry, `ILEAPP-0001` (EPOCH-510): the `uberClient` plugin divides
   Uber's Unix seconds by 1,000 once too often in Uber - Place Search Hits and
   Uber - Cached Locations. iLEAPP keeps whole seconds after dividing, so the

@@ -275,8 +275,10 @@ def read_artifact(
         "columns": [[c, artifact.column_map[c]] for c in columns],
         "object_columns": [[c, t] for c, t in artifact.object_columns.items()],
         "event_time_column": artifact.event_time_column,
-        # A new or changed correction is new content, not a dedup hit.
-        **({"corrections": [[d.id, h, d.correction.model_dump()] for d, _, h in fixes]} if fixes else {}),
+        # Corrections are not part of the identity: the unit is iLEAPP's
+        # content, so a corrected re-ingest at a newer parser version
+        # supersedes the uncorrected facts (R8). A registry change reaches
+        # stored facts through that bump (`applied_from`, R36).
     }))
     rows: list[dict[str, Any]] = []
     event_times: list[datetime | None] = []

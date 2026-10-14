@@ -48,6 +48,16 @@ class ScaleCorrection(_Strict):
         return value * self.factor
 
 
+class AppliedFrom(_Strict):
+    """The stage that applies a correction and its first parser version that
+    does. A registry change only reaches stored facts through a newer parser
+    version, which supersedes the earlier facts of the same unit (R8); a test
+    holds each stage's parserVersion at or above its entries'."""
+
+    stage: str
+    parser_version: int = Field(ge=1)
+
+
 class Upstream(_Strict):
     status: Literal["not reported", "reported", "fixed"]
     #: The issue or pull request at the tool's project, once there is one.
@@ -65,6 +75,7 @@ class ToolDefect(_Strict):
     defect: str
     evidence: str
     correction: ScaleCorrection
+    applied_from: AppliedFrom
     upstream: Upstream
 
     def column_for(self, artifact: str, module: str) -> str | None:

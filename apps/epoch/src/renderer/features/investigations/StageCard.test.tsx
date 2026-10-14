@@ -19,6 +19,7 @@ function stage(overrides: Partial<StageStatusRow>): StageStatusRow {
     stage_name: 'crash',
     status: 'succeeded',
     error_message: null,
+    warnings: null,
     started_at: '2026-10-13T20:00:00.000Z',
     finished_at: '2026-10-13T20:01:00.000Z',
     parser_version: 1,
@@ -74,6 +75,23 @@ describe('StageCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show full output' }));
     assert.ok(screen.getByText(/line 8/));
     assert.ok(screen.getByRole('button', { name: 'Hide full output' }));
+  });
+
+  it('shows a succeeded stage’s warnings as warnings, never as an error (EPOCH-420)', () => {
+    const warnings = '[ileapp]   Calendar Events: 57 time(s) in Last Modification Time fall before 2007-06-29';
+    render(<StageCard stage={stage({ warnings })} />);
+    assert.ok(screen.getByText(/with warnings/), 'said on the closed card');
+    fireEvent.click(card());
+    assert.ok(screen.getByText('Warnings'));
+    assert.ok(screen.getByText(/57 time\(s\) in Last Modification Time/));
+    assert.equal(screen.queryByText('Error'), null);
+  });
+
+  it('says nothing about warnings when a succeeded stage printed none', () => {
+    render(<StageCard stage={stage({})} />);
+    assert.equal(screen.queryByText(/with warnings/), null);
+    fireEvent.click(card());
+    assert.equal(screen.queryByText('Warnings'), null);
   });
 
   it('opens and closes from the keyboard, and says so', () => {

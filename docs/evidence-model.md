@@ -85,7 +85,9 @@ an audit event; facts belong to evidence, not to runs (R7).**
 
 - Every rerun creates a new run; finished runs are never reopened.
 - Each stage's row records its status, times, the parser version it ran at and
-  the derivative it read.
+  the derivative it read. A failed stage's stderr is its `error_message`; a
+  succeeded stage's stderr is its `warnings` (EPOCH-420), which never change
+  the run's state.
 - **Completeness has one definition (R23):** the `run_completeness` view. A run
   is `running` until it finishes; `incomplete` if any stage failed or was left
   pending or running; otherwise `complete`. A `skipped` (disabled) stage never
@@ -154,9 +156,11 @@ The stage applies a correction only from the registry. The record keeps the
 tool's value under the tool's own column header, takes the corrected value
 where our model holds it (`event_time` for a time), and lists each correction
 in `fields.corrections`: the defect, the column, the original and the corrected
-value. The registry entries applied are part of the unit's identity, so a new
-or changed entry produces a new unit. The report lists every correction it
-relies on, with the defect behind it.
+value. Corrections are not part of the unit's identity, which stays the tool's
+content: an entry names the stage parser version that first applies it
+(`applied_from`), a test holds the stage at or above it, and that newer version
+supersedes the uncorrected facts of the same unit (R8). The report lists every
+correction it relies on, with the defect behind it.
 
 ## What is not modelled yet
 

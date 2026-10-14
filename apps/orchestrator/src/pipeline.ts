@@ -101,8 +101,11 @@ export function runStage(
 
     let stderr = '';
     child.stdout?.pipe(process.stdout);
-    child.stderr?.on('data', (chunk) => {
-      stderr += chunk.toString();
+    // Decoded as a stream, so a UTF-8 character split across two chunks
+    // survives intact into error_message or warnings.
+    child.stderr?.setEncoding('utf8');
+    child.stderr?.on('data', (text: string) => {
+      stderr += text;
     });
     child.on('error', (err) => resolve({ success: false, stderr: err.message }));
     child.on('close', (code) => resolve({ success: code === 0, stderr: stderr.trim() }));
@@ -212,7 +215,9 @@ export async function runPipelineForBackup(
       );
 
       if (success) {
-        await markStage(client, runId, stage.name, 'succeeded');
+        // What a stage printed to stderr while succeeding is its notes:
+        // kept, not discarded (EPOCH-420).
+        await markStage(client, runId, stage.name, 'succeeded', undefined, stderr || undefined);
       } else {
         await markStage(client, runId, stage.name, 'failed', stderr || 'unknown error');
       }

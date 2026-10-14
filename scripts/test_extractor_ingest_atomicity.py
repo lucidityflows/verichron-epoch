@@ -113,17 +113,17 @@ def test_a_previously_failed_ips_file_is_retried_on_the_next_run(db, tmp_path):
 
 
 def test_a_successful_ips_file_is_deduped_not_duplicated(db, tmp_path):
-    """A resumed run still counts an already-complete file as succeeded — it is
-    successfully in the database, and reporting it as skipped would make a
-    resumed run look like it had lost files. What must not happen is a second
-    copy of the records."""
+    """A resumed run writes nothing for an already-complete file, so it counts
+    zero records (EPOCH-421), and notes the file as already ingested so it
+    doesn't read as lost. What must not happen is a second copy of the records."""
     (tmp_path / "good.ips").write_text(_valid_ips())
 
     crash_main.run(db, ctx(RUN_ID), str(tmp_path))
     retry = crash_main.run(db, ctx(RETRY_RUN_ID), str(tmp_path))
 
     assert retry.failed == 0
-    assert retry.succeeded == 1
+    assert retry.succeeded == 0, "the retry wrote no records"
+    assert retry.notes == ["good.ips: already ingested; nothing new was written"]
     assert db.record_count() == 1, "dedup must not duplicate evidence"
     assert len(db.ledger()) == 1
     assert db.ledger()[0]["produced_by_runs"] == [RUN_ID, RETRY_RUN_ID], (

@@ -359,12 +359,12 @@ describe('getRunReportLocation', live, () => {
 describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', live, () => {
   before(async () => {
     await db.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id, parser_version, started_at, finished_at)
-       VALUES ($1, 'crash', 'succeeded', $2, 1, now() - interval '2 minutes', now() - interval '1 minute'),
-              ($1, 'ileapp_bridge', 'failed', $2, 3, now() - interval '1 minute', now()),
-              ($1, 'llm', 'skipped', NULL, NULL, NULL, NULL),
-              ($1, 'reporting', 'running', NULL, NULL, now(), NULL),
-              ($1, 'later', 'pending', NULL, NULL, NULL, NULL)`,
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id, parser_version, started_at, finished_at, warnings)
+       VALUES ($1, 'crash', 'succeeded', $2, 1, now() - interval '2 minutes', now() - interval '1 minute', '[crash]   a.ips: already ingested; nothing new was written'),
+              ($1, 'ileapp_bridge', 'failed', $2, 3, now() - interval '1 minute', now(), NULL),
+              ($1, 'llm', 'skipped', NULL, NULL, NULL, NULL, NULL),
+              ($1, 'reporting', 'running', NULL, NULL, now(), NULL, NULL),
+              ($1, 'later', 'pending', NULL, NULL, NULL, NULL, NULL)`,
       [RUN, EVIDENCE]
     );
     // More stages, so each status has its own count (pending 5, running 4,
@@ -395,6 +395,7 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
     assert.equal(run.device_label, 'test device');
     assert.deepEqual(run.stage_counts, { pending: 5, running: 4, failed: 3, skipped: 2, succeeded: 1 });
     assert.equal(run.state, 'running', 'the verdict comes from run_completeness, not the counts');
+    assert.equal(run.stages_with_warnings, 1, 'EPOCH-420: the succeeded crash stage left warnings');
   });
 
   it('gives each stage what it read and the complete units this run labelled for it', async () => {
@@ -404,6 +405,12 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
     assert.equal(crash.derivative_kind, 'decrypted');
     assert.deepEqual(crash.derivative_tool, { name: 'test', version: '0' });
     assert.deepEqual([crash.units, crash.records], [2, 7], 'incomplete units and other runs are not counted');
+    assert.equal(
+      crash.warnings,
+      '[crash]   a.ips: already ingested; nothing new was written',
+      'kept on success (EPOCH-420)'
+    );
+    assert.equal(crash.error_message, null, 'warnings are never stored as an error');
     const skipped = stages.find((s) => s.stage_name === 'llm')!;
     assert.deepEqual([skipped.derivative_kind, skipped.units, skipped.records], [null, 0, 0]);
   });

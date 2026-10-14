@@ -225,13 +225,10 @@ def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
                 payload_kind="full",
             ) as unit:
                 if unit.already_ingested:
-                    # A resumed run still counts an already-complete file as
-                    # succeeded: it IS successfully in the database, and
-                    # reporting it as merely skipped would make a resumed
-                    # run look like it had lost files relative to the first
-                    # pass. What must not happen is a second copy of the
-                    # records, which `already_ingested` guarantees here.
-                    result.ok()
+                    # Already complete in the ledger: this run wrote nothing
+                    # for it (EPOCH-421), and says so rather than letting the
+                    # file look lost.
+                    result.note(f"{file_path.name}: already ingested; nothing new was written")
                     continue
 
                 parsed, err = parse_ips_file(file_path)

@@ -115,19 +115,25 @@ export async function createRun(
   return runId;
 }
 
+/**
+ * A stage's status. A failed stage's output goes in `errorMessage`; a
+ * succeeded stage's in `warnings` (EPOCH-420), so its notes aren't lost and
+ * are never read as a failure.
+ */
 export async function markStage(
   client: Client,
   runId: string,
   stageName: string,
   status: 'running' | 'succeeded' | 'failed',
-  errorMessage?: string
+  errorMessage?: string,
+  warnings?: string
 ): Promise<void> {
   const timestampCol = status === 'running' ? 'started_at' : 'finished_at';
   await client.query(
     `UPDATE pipeline_stage_status
-     SET status = $1, error_message = $2, ${timestampCol} = now()
-     WHERE run_id = $3 AND stage_name = $4`,
-    [status, errorMessage ?? null, runId, stageName]
+     SET status = $1, error_message = $2, warnings = $3, ${timestampCol} = now()
+     WHERE run_id = $4 AND stage_name = $5`,
+    [status, errorMessage ?? null, warnings ?? null, runId, stageName]
   );
 }
 
