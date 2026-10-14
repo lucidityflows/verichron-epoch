@@ -133,3 +133,15 @@ def test_redact_password_removes_it_in_either_form(url, secret):
 def test_redact_password_leaves_a_url_without_one_unchanged():
     assert runtime_env.redact_password("text", "postgresql://user@host/db") == "text"
 
+
+def test_libpq_reads_back_db_values_that_need_encoding(monkeypatch):
+    from psycopg2.extensions import parse_dsn
+
+    for key in DATABASE_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("DB_USER", "epoch user")
+    monkeypatch.setenv("DB_PASSWORD", "p@ss:w/rd?#%")
+    monkeypatch.setenv("DB_NAME", "epoch db")
+    parsed = parse_dsn(runtime_env.resolve_database_url())
+    assert (parsed["user"], parsed["password"], parsed["dbname"]) == ("epoch user", "p@ss:w/rd?#%", "epoch db")
+

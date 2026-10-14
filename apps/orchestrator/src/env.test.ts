@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import pg from 'pg';
 import { resolveDatabaseUrl } from '@verichron/contracts';
 
 type DatabaseUrlCase = {
@@ -34,6 +35,23 @@ test('database URL resolution matches the shared Python/TypeScript cases', () =>
   } finally {
     for (const key of databaseEnvKeys) {
       const value = originalEnv[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test('node-postgres reads back DB_* values that need encoding', () => {
+  const env = { DB_USER: 'epoch user', DB_PASSWORD: 'p@ss:w/rd?#%', DB_NAME: 'epoch db' };
+  const saved = Object.fromEntries(databaseEnvKeys.map((key) => [key, process.env[key]]));
+  try {
+    for (const key of databaseEnvKeys) delete process.env[key];
+    Object.assign(process.env, env);
+    const client = new pg.Client({ connectionString: resolveDatabaseUrl() });
+    assert.deepEqual([client.user, client.password, client.database], [env.DB_USER, env.DB_PASSWORD, env.DB_NAME]);
+  } finally {
+    for (const key of databaseEnvKeys) {
+      const value = saved[key];
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }

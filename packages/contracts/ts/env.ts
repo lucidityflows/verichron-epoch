@@ -41,7 +41,9 @@ export function resolveDatabaseUrl(): string {
   const port = process.env.DB_PORT || '5432';
 
   if (user && password && name) {
-    return `postgresql://${user}:${password}@${host}:${port}/${name}`;
+    // Encoded, so a password holding ?, #, @ or / still parses as itself.
+    const enc = encodeURIComponent;
+    return `postgresql://${enc(user)}:${enc(password)}@${host}:${port}/${enc(name)}`;
   }
 
   throw new Error('Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME.');

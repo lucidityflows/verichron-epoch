@@ -13,7 +13,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from os import environ, path as os_path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
  
 def repo_root() -> Path:
     # This file lives at libs/runtime-env/runtime_env.py -- two directories
@@ -80,7 +80,11 @@ def resolve_database_url() -> str:
     host = environ.get("DB_HOST") or "localhost"
     port = environ.get("DB_PORT") or "5432"
     if user and password and name:
-        return f"postgresql://{user}:{password}@{host}:{port}/{name}"
+        # Encoded, so a password holding ?, #, @ or / still parses as itself;
+        # the same encoding as encodeURIComponent for these characters.
+        def enc(value: str) -> str:
+            return quote(value, safe="!'()*-._~")
+        return f"postgresql://{enc(user)}:{enc(password)}@{host}:{port}/{enc(name)}"
     raise RuntimeError(
         "Database configuration is required: set DATABASE_URL, or all of "
         "DB_USER, DB_PASSWORD, and DB_NAME."

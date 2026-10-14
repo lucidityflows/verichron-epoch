@@ -32,6 +32,15 @@
     "expectedUrl": "postgresql://epoch-user:epoch-password@localhost:5432/epoch-db"
   },
   {
+    "name": "DB variables with URI-reserved characters are encoded",
+    "env": {
+      "DB_USER": "epoch user",
+      "DB_PASSWORD": "p@ss:w/rd?#%",
+      "DB_NAME": "epoch db"
+    },
+    "expectedUrl": "postgresql://epoch%20user:p%40ss%3Aw%2Frd%3F%23%25@localhost:5432/epoch%20db"
+  },
+  {
     "name": "missing configuration fails",
     "env": {},
     "expectedError": "Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME."
