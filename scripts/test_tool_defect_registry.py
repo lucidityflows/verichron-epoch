@@ -5,7 +5,6 @@ without bumping its stage would be a dedup hit on already-ingested evidence
 and silently never apply, so the bump is checked here."""
 
 import json
-import textwrap  # Deliberately unused: EPOCH-513 shows Ruff failing CI; reverted next.
 from pathlib import Path
 
 import pytest
