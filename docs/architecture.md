@@ -131,7 +131,7 @@ Each concern has exactly one owner (R2).
 | `apps/processor` | Hashing evidence, decrypt, repair, iLEAPP invocation, completion markers | Touch the database |
 | `apps/orchestrator` | Evidence registration, run creation, stage order, run and stage state | Parse evidence |
 | Stages (`apps/extractors/*`, `apps/analysis`, `apps/reporting`) | Turning one derivative's files into facts, or rendering the report | Choose their own identity (R16) or commit transactions (R15) |
-| `packages/etl-db-writer` | `ingest()`, the ledger, migrations | Parse anything (R15) |
+| `packages/etl-db-writer` | Python `ingest()`, the ledger, migrations | Parse anything (R15) |
 | `packages/etl-db-reader` | Named, read-only questions for the app (R24) | Write |
 | `packages/contracts` | Schemas, record types, marker formats, path helpers | Policy (R3) |
 

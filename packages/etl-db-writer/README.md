@@ -23,6 +23,5 @@ its last. Never edit a merged migration.
 `scripts/test_db_writer.py` and `scripts/test_extractor_ingest_atomicity.py`
 (PgDouble and real PostgreSQL), and `scripts/test_migrate_bootstrap.py`.
 
-**Decided, not yet done:** this package becomes Python-only. The unused
-TypeScript writer (`dbWriter.ts`, `index.ts`, `package.json`) is removed in
-EPOCH-452.
+This package is Python-only: `db_writer.py` is the sole fact writer, while
+`migrate.py` applies the SQL migrations.

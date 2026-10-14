@@ -2,7 +2,7 @@
   "name": "@verichron/etl-db-reader",
   "version": "0.1.0",
   "private": true,
-  "description": "Read-only Postgres query helpers for pipeline_runs / pipeline_stage_status / forensic_records -- the query-side counterpart to @verichron/etl-db-writer. This package never opens a transaction and never writes; it exists so that consumers (apps/epoch today, apps/orchestrator or a future API service later) share one set of query definitions instead of each hand-rolling SELECTs against the same tables. Like etl-db-writer, every function takes an already-open `Db` (pg Client | PoolClient) -- this package does not own a Pool or read DB_* env vars itself, so callers control connection lifecycle and pooling strategy.",
+  "description": "Read-only Postgres query helpers for pipeline_runs / pipeline_stage_status / forensic_records. This package never opens a transaction and never writes; it exists so that consumers (apps/epoch today, apps/orchestrator or a future API service later) share one set of query definitions instead of each hand-rolling SELECTs against the same tables. Every function takes an already-open `Db` (pg Client | PoolClient) -- this package does not own a Pool or read DB_* env vars itself, so callers control connection lifecycle and pooling strategy.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
