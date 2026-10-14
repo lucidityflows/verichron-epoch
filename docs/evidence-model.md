@@ -85,7 +85,9 @@ an audit event; facts belong to evidence, not to runs (R7).**
 
 - Every rerun creates a new run; finished runs are never reopened.
 - Each stage's row records its status, times, the parser version it ran at and
-  the derivative it read.
+  the derivative it read. A failed stage's stderr is its `error_message`; a
+  succeeded stage's stderr is its `warnings` (EPOCH-420), which never change
+  the run's state.
 - **Completeness has one definition (R23):** the `run_completeness` view. A run
   is `running` until it finishes; `incomplete` if any stage failed or was left
   pending or running; otherwise `complete`. A `skipped` (disabled) stage never

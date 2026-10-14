@@ -104,6 +104,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _constraint("evidence_derivatives_kind_current"),
         _constraint("evidence_derivatives_kind_current"),
     ),
+    "0010_stage_warnings.sql": (
+        _column("pipeline_stage_status", "warnings"),
+        _column("pipeline_stage_status", "warnings"),
+    ),
 }
 
 

@@ -48,6 +48,8 @@ export interface PipelineRunRow {
   /** How many of the run's stages are in each status, for a one-line summary
    * (EPOCH-430). `state` stays the verdict; never derive it from these. */
   stage_counts: Record<StageStatus, number>;
+  /** How many of the run's stages succeeded with warnings (EPOCH-420). */
+  stages_with_warnings: number;
 }
 
 export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
@@ -57,6 +59,8 @@ export interface StageStatusRow {
   stage_name: string;
   status: StageStatus;
   error_message: string | null;
+  /** What the stage printed while succeeding: its notes (EPOCH-420); null if nothing. */
+  warnings: string | null;
   started_at: string | null;
   finished_at: string | null;
   /** The parser version the stage declared (migration 0006); null if none. */
@@ -104,7 +108,7 @@ export async function getPipelineRuns(client: Db, limit = 100): Promise<Pipeline
   const result = await client.query<PipelineRunRow>(
     `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id,
             r.contract_version, r.tool_versions, c.state, d.label AS device_label,
-            s.stage_counts
+            s.stage_counts, s.stages_with_warnings
        FROM pipeline_runs r
        JOIN run_completeness c USING (run_id)
        LEFT JOIN evidence_items e ON e.evidence_id = r.evidence_id
@@ -116,7 +120,8 @@ export async function getPipelineRuns(client: Db, limit = 100): Promise<Pipeline
                   'succeeded', count(*) FILTER (WHERE status = 'succeeded')::int,
                   'failed', count(*) FILTER (WHERE status = 'failed')::int,
                   'skipped', count(*) FILTER (WHERE status = 'skipped')::int
-                ) AS stage_counts
+                ) AS stage_counts,
+                count(*) FILTER (WHERE warnings IS NOT NULL)::int AS stages_with_warnings
            FROM pipeline_stage_status ps
           WHERE ps.run_id = r.run_id
        ) s
@@ -194,7 +199,7 @@ export const CANONICAL_STAGE_ORDER = ['crash', 'safari', 'sms', 'network', 'gclo
  */
 export async function getStageStatus(client: Db, runId: string): Promise<StageStatusRow[]> {
   const result = await client.query<StageStatusRow>(
-    `SELECT s.run_id, s.stage_name, s.status, s.error_message, s.started_at, s.finished_at,
+    `SELECT s.run_id, s.stage_name, s.status, s.error_message, s.warnings, s.started_at, s.finished_at,
             s.parser_version, s.derivative_id, d.kind AS derivative_kind, d.tool AS derivative_tool,
             u.units, u.records
        FROM pipeline_stage_status s

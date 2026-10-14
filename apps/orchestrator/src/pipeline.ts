@@ -212,7 +212,9 @@ export async function runPipelineForBackup(
       );
 
       if (success) {
-        await markStage(client, runId, stage.name, 'succeeded');
+        // What a stage printed to stderr while succeeding is its notes:
+        // kept, not discarded (EPOCH-420).
+        await markStage(client, runId, stage.name, 'succeeded', undefined, stderr || undefined);
       } else {
         await markStage(client, runId, stage.name, 'failed', stderr || 'unknown error');
       }

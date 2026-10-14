@@ -641,6 +641,40 @@ describe('stages and the completeness predicate', live, () => {
   });
 });
 
+describe('stage warnings (EPOCH-420)', live, () => {
+  /** A stage that succeeds, printing `stderr` the way a Python stage prints its notes. */
+  function notingStage(name: string, order: number, stderr: string): StageDefinition {
+    const dir = path.join(tmp, 'stages', name);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'stage.mjs'), `process.stderr.write(${JSON.stringify(stderr)});\n`);
+    return {
+      name,
+      dir,
+      manifest: { entrypoint: 'stage.mjs', runtime: 'node', order, reads: 'decrypted', enabled: true },
+    };
+  }
+
+  it('keeps what a succeeded stage printed as its warnings, never as an error, and the run stays complete', async () => {
+    const ws = makeWorkspace('warnings', { label: 'A' });
+    const notes = '[ileapp]   Calendar Events: 57 time(s) fall before 2007-06-29\n';
+    const result = await run(ws.backupPath, {
+      enabled: [notingStage('noted', 10, notes), recordingStage('quiet', 20)],
+      disabled: [],
+    });
+    assert.equal(result.success, true);
+    const { rows } = await db.query(
+      `SELECT stage_name, status, warnings, error_message FROM pipeline_stage_status WHERE run_id = $1 ORDER BY stage_name`,
+      [result.runId]
+    );
+    assert.deepEqual(rows, [
+      { stage_name: 'noted', status: 'succeeded', warnings: notes.trim(), error_message: null },
+      { stage_name: 'quiet', status: 'succeeded', warnings: null, error_message: null },
+    ]);
+    const { rows: state } = await db.query(`SELECT state FROM run_completeness WHERE run_id = $1`, [result.runId]);
+    assert.equal(state[0].state, 'complete', 'warnings never change the verdict');
+  });
+});
+
 describe('per-run summaries (EPOCH-409)', live, () => {
   const summaryOf = (backupPath: string, runId: string) => deriveRunSummaryPath(backupPath, runId)!;
 

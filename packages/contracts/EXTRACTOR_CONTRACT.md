@@ -92,6 +92,9 @@ with ingest(conn, ctx, file_path, source_type=..., payload_kind=..., raw_payload
   ones dedup.
 - Write human-readable warnings (coverage gaps, skipped data) to stderr. A stage
   must never report "nothing found" when it didn't look; say what wasn't done.
+  When the stage succeeds, the orchestrator keeps its stderr as the stage's
+  `warnings`, which the app and the report show; a failed stage's stderr is its
+  `error_message` (EPOCH-420).
 
 ## 5. Count and summarize
 

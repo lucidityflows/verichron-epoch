@@ -9,7 +9,7 @@ import { reportsApi } from '../../api/reports';
 
 /** The report stage, named after its directory as the orchestrator names stages. */
 const REPORT_STAGE = 'reporting';
-/** How many lines of a failed stage's output show before "Show full output". */
+/** How many lines of a stage's output show before "Show full output". */
 const OUTPUT_PREVIEW_LINES = 5;
 
 export function stageDurationMs(stage: StageStatusRow): number | null {
@@ -56,6 +56,31 @@ function summary(stage: StageStatusRow): string {
     : 'No facts written';
 }
 
+/** A stage's output: the first lines, the rest behind a toggle, and a copy button. */
+function StageOutput({ label, labelClass, text }: { label: string; labelClass: string; text: string }) {
+  const lines = text.split('\n');
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between mb-1">
+        <p className={`text-data ${labelClass}`}>{label}</p>
+        <CopyButton text={text} title="Copy output" />
+      </div>
+      <pre className="bg-inset rounded-md p-3 text-label font-mono text-foreground whitespace-pre-wrap break-words">
+        {lines.slice(0, OUTPUT_PREVIEW_LINES).join('\n')}
+      </pre>
+      {lines.length > OUTPUT_PREVIEW_LINES && (
+        <div className="mt-2">
+          <Disclosure label="Show full output" openLabel="Hide full output">
+            <pre className="bg-inset rounded-md p-3 text-label font-mono text-foreground whitespace-pre-wrap break-words max-h-80 overflow-auto">
+              {text}
+            </pre>
+          </Disclosure>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The status colour (DESIGN.md §9): running is current work, not an alert. */
 function statusColour(stage: StageStatusRow): string {
   if (stage.status === 'succeeded') return 'var(--success)';
@@ -78,7 +103,8 @@ export function StageCard({ stage }: { stage: StageStatusRow }) {
   const durationMs = stageDurationMs(stage);
   const colour = statusColour(stage);
   const read = describeRead(stage);
-  const outputLines = stage.status === 'failed' && stage.error_message ? stage.error_message.split('\n') : [];
+  // A succeeded stage's notes (EPOCH-420): it still succeeded, but said something.
+  const warnings = stage.status === 'succeeded' && stage.warnings ? stage.warnings : null;
 
   const toggle = () => setOpen((v) => !v);
   const onKeyDown = (e: KeyboardEvent) => {
@@ -113,6 +139,7 @@ export function StageCard({ stage }: { stage: StageStatusRow }) {
       <p className="text-data text-muted-foreground mt-2 truncate">
         {summary(stage)}
         {durationMs !== null && ` · ${formatDuration(durationMs)}`}
+        {warnings && <span className="text-flag"> · with warnings</span>}
       </p>
 
       {open && (
@@ -150,26 +177,11 @@ export function StageCard({ stage }: { stage: StageStatusRow }) {
             <p className="text-data text-muted-foreground mt-3">Skipped: {stage.error_message}</p>
           )}
 
-          {outputLines.length > 0 && (
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-data text-danger">Error</p>
-                <CopyButton text={stage.error_message ?? ''} title="Copy output" />
-              </div>
-              <pre className="bg-inset rounded-md p-3 text-label font-mono text-foreground whitespace-pre-wrap break-words">
-                {outputLines.slice(0, OUTPUT_PREVIEW_LINES).join('\n')}
-              </pre>
-              {outputLines.length > OUTPUT_PREVIEW_LINES && (
-                <div className="mt-2">
-                  <Disclosure label="Show full output" openLabel="Hide full output">
-                    <pre className="bg-inset rounded-md p-3 text-label font-mono text-foreground whitespace-pre-wrap break-words max-h-80 overflow-auto">
-                      {stage.error_message}
-                    </pre>
-                  </Disclosure>
-                </div>
-              )}
-            </div>
+          {stage.status === 'failed' && stage.error_message && (
+            <StageOutput label="Error" labelClass="text-danger" text={stage.error_message} />
           )}
+
+          {warnings && <StageOutput label="Warnings" labelClass="text-flag" text={warnings} />}
 
           {stage.stage_name === REPORT_STAGE && stage.status === 'succeeded' && (
             <Button variant="outline" size="sm" className="mt-3" onClick={() => reportsApi.openReport(stage.run_id)}>

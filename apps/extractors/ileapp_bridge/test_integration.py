@@ -347,6 +347,24 @@ def test_identical_artifacts_are_one_unit_and_changed_ones_are_new(db, tmp_path)
     assert len(hashes) == 2 and len(set(hashes)) == 2
 
 
+def test_the_count_is_the_records_this_run_wrote(db, tmp_path):
+    """EPOCH-421: ok(n) counts records written. The first run's count equals
+    the records its units filed; a re-run writes nothing, counts zero, and
+    notes each artifact as already ingested."""
+    report = write_report(tmp_path / "BK1", SAFARI, UBER)
+    first = ingest_report(db, CTX, report)
+    cur = db.cursor()
+    cur.execute("SELECT sum(record_count) FROM ingested_files WHERE ingest_complete")
+    assert first.succeeded == cur.fetchone()[0] == 4
+
+    again = ingest_report(db, CTX, report)
+    assert (again.succeeded, again.failed) == (0, 0)
+    assert sorted(n for n in again.notes if "already ingested" in n) == [
+        "Safari Browser - History: already ingested by an earlier run",
+        "Uber - Cached Locations: already ingested by an earlier run",
+    ]
+
+
 def test_changed_metadata_or_time_declarations_are_new_content(db, tmp_path):
     """A report that renames an artifact, corrects its source path or reorders
     its declared datetime columns is new content: its records must be
@@ -427,7 +445,8 @@ def test_an_artifact_with_no_rows_is_filed_complete_with_no_records_and_skipped_
     assert stored(db) == []
 
     again = ingest_report(db, CTX, report)
-    assert again.failed == 0 and again.succeeded == 1, "the next run finds it already ingested"
+    assert again.failed == 0 and again.succeeded == 0, "the next run finds it already ingested and writes nothing"
+    assert "Safari Browser - History: already ingested by an earlier run" in again.notes
     assert len(ledger(db)) == 1
 
 
