@@ -15,16 +15,38 @@ import sys
 from itertools import batched
 from pathlib import Path
 
-from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
 from db_writer import IngestContext, add_context_args, context_from_args, incomplete_ingests, ingest
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
+from runtime_env import redact_password, require_database_url
 from tool_defects import ToolDefect, defects_for
 
 try:
-    from .lava import TOOL, Artifact, ArtifactScan, LavaOutput, check_tables, open_database, RowRead, iter_rows, read_manifest, scan_artifact
+    from .lava import (
+        TOOL,
+        Artifact,
+        ArtifactScan,
+        LavaOutput,
+        RowRead,
+        check_tables,
+        iter_rows,
+        open_database,
+        read_manifest,
+        scan_artifact,
+    )
 except ImportError:
-    from lava import TOOL, Artifact, ArtifactScan, LavaOutput, check_tables, open_database, RowRead, iter_rows, read_manifest, scan_artifact
+    from lava import (
+        TOOL,
+        Artifact,
+        ArtifactScan,
+        LavaOutput,
+        RowRead,
+        check_tables,
+        iter_rows,
+        open_database,
+        read_manifest,
+        scan_artifact,
+    )
 
 import psycopg2
 
@@ -66,7 +88,9 @@ def _summary(scan: ArtifactScan) -> dict:
         "table": artifact.tablename,
         "source_path": scan.source_path,
         "record_count": scan.row_count,
-        "event_time_column": artifact.column_map.get(artifact.event_time_column) if artifact.event_time_column else None,
+        "event_time_column": (
+            artifact.column_map.get(artifact.event_time_column) if artifact.event_time_column else None
+        ),
         "unconvertible_times": scan.unconvertible_times,
         "tool_version": scan.tool_version,
         "corrections": scan.corrected,
@@ -103,7 +127,7 @@ def ingest_artifact(
             result.note(f"{artifact.name}: already ingested; nothing new was written")
             return result
         written = 0
-        for chunk in batched((to_record(scan, read) for read in iter_rows(lava_conn, scan)), CHUNK_ROWS):
+        for chunk in batched((to_record(scan, read) for read in iter_rows(lava_conn, scan)), CHUNK_ROWS, strict=False):
             written += unit.write(list(chunk))
         result.ok(written)
     return result
@@ -128,8 +152,7 @@ def _warn_about_incomplete_ingests(conn, evidence_id: str) -> None:
         return
 
     print(
-        f"[ileapp] {len(stranded)} file(s) have an incomplete ingest ledger entry "
-        "and will be retried on the next run:",
+        f"[ileapp] {len(stranded)} file(s) have an incomplete ingest ledger entry and will be retried on the next run:",
         file=sys.stderr,
     )
     for file_hash, file_path in stranded[:20]:
@@ -191,5 +214,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    fatal_if_missing_venv()
     sys.exit(main())

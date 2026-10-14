@@ -85,15 +85,22 @@ class PgReal:
                         "INSERT INTO devices (device_key, label) VALUES (%s, %s) RETURNING device_id",
                         (_hex64(f"device:{evidence_id}"), f"pytest device {evidence_id[:8]}"),
                     )
-                    device_id = cur.fetchone()[0]
+                    device_row = cur.fetchone()
+                    if device_row is None:
+                        raise RuntimeError("Postgres INSERT did not return the newly created device")
+                    device_id = device_row[0]
                     cur.execute(
                         "INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes) "
                         "VALUES (%s, %s, %s, 0, 0)",
                         (evidence_id, _hex64(f"root:{evidence_id}"), device_id),
                     )
                     cur.execute(
-                        "INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key) "
-                        "VALUES (%s, %s, 'decrypted', %s, '{\"name\": \"pytest\", \"version\": \"0\"}', '{\"repair\": {\"status\": \"skipped\", \"reason\": \"pytest fixture\"}}', repeat('0', 64))",
+                        "INSERT INTO evidence_derivatives "
+                        "(derivative_id, evidence_id, kind, path, tool, params, provenance_key) "
+                        "VALUES (%s, %s, 'decrypted', %s, "
+                        '\'{"name": "pytest", "version": "0"}\', '
+                        '\'{"repair": {"status": "skipped", "reason": "pytest fixture"}}\', '
+                        "repeat('0', 64))",
                         (derivative_id, evidence_id, f"/pytest/decrypted/{evidence_id[:8]}"),
                     )
                 for run_id in run_ids:
@@ -150,8 +157,7 @@ class PgReal:
 
     def records(self) -> list[dict[str, Any]]:
         return self._dicts(
-            "SELECT *, fields::text AS fields, evidence_id::text AS evidence_id "
-            "FROM forensic_records ORDER BY id"
+            "SELECT *, fields::text AS fields, evidence_id::text AS evidence_id FROM forensic_records ORDER BY id"
         )
 
     def record_count(self, file_hash: str | None = None) -> int:
@@ -164,7 +170,10 @@ class PgReal:
                     "WHERE i.file_hash = %s",
                     (file_hash,),
                 )
-            return cur.fetchone()[0]
+            count_row = cur.fetchone()
+            if count_row is None:
+                raise RuntimeError("Postgres COUNT query returned no row")
+            return count_row[0]
 
 
 BACKENDS = ("pgdouble", "postgres")

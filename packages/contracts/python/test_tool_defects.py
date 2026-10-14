@@ -4,7 +4,6 @@ valid, and a correction touches only the values it was registered for."""
 from pathlib import Path
 
 import pytest
-
 import tool_defects
 from tool_defects import ScaleCorrection, defect, defects_for, load_registry
 

@@ -25,6 +25,8 @@ Each version is declared once, in the file the enforcing tool reads:
 | pnpm | 10.34.5 | `packageManager` in `package.json` |
 | uv | 0.12.23 | `mise.toml` (`required-version` in `pyproject.toml` guards it) |
 | Python | 3.14.8, a uv-managed CPython; system interpreters are never used | `.python-version` |
+| Pyright | 1.1.414 | `pyproject.toml` |
+| Ruff | 0.17.0 | `pyproject.toml` |
 | Electron | 44.7.0 | `apps/epoch/package.json` |
 | iphone_backup_decrypt | 0.10.0 (exact; the decrypt uses two of its internals) | `tools/decrypt/pyproject.toml` |
 | iLEAPP | v2026.3.1 (submodule) | `.gitmodules` pin; its dependencies in `tools/ileapp/pyproject.toml` |
@@ -121,10 +123,15 @@ There are two test tiers, and both run in CI (R33):
   database, never your dev one.
 
 ```bash
+mise run lint
 uv run pytest                                        # Python: packages/, scripts/, apps/
+uv run pyright                                       # Python type checking
 TEST_DATABASE_URL=postgresql://.../verichron_test uv run pytest
 
 pnpm --filter @verichron/processor test             # TypeScript (node:test via tsx)
+pnpm --filter @verichron/processor typecheck:tests  # Includes *.test.ts
+pnpm --filter @verichron/etl-db-reader typecheck:tests
+pnpm --filter @verichron/orchestrator typecheck:tests
 pnpm --filter @verichron/orchestrator test           # real-Postgres tests need TEST_DATABASE_URL
 pnpm --filter @verichron/etl-db-reader test
 pnpm --filter @verichron/epoch test                  # Vitest: main process in Node, renderer in jsdom
@@ -132,6 +139,7 @@ pnpm check:contracts                                 # schema ↔ TS ↔ Python 
 ```
 
 `mise run test` runs both suites (`mise run test:py`, `mise run test:ts`).
+`mise run lint` runs Ruff, Python formatting validation and Pyright on first-party code.
 
 The desktop app's tests run in Vitest: main-process and IPC handler tests in
 Node (the IPC tests against real Postgres, with a stand-in for Electron's
@@ -168,8 +176,8 @@ New device behaviour seen during these checks is added to the verified list in
 
 | Workflow | Runs |
 |---|---|
-| `.github/workflows/python-tests.yml` | Migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
-| `.github/workflows/ts-tests.yml` | The formatting check, then typecheck and tests for the processor, the writer, the reader and the orchestrator, with real PostgreSQL, and the desktop app's typecheck, Vite build and tests |
+| `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright, migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
+| `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, Vite build and tests |
 
 Both workflows install the toolchain from `mise.toml` and Python from
 `.python-version`, the same files a development machine uses. All Actions are
@@ -187,9 +195,11 @@ pinned to full commit SHAs.
   `migrate.py`. Never edit a merged migration; add a new one.
 - **Contracts:** add a `source_type` to `normalized-record.schema.json` first,
   then run `pnpm sync:contracts`.
-- **Formatting:** Prettier formats the TypeScript (`.ts`, `.tsx`, `.mts`) with
-  the settings in `.prettierrc.json`. Run `pnpm format` before committing; CI
-  runs `pnpm format:check`. Markdown, YAML and JSON aren't formatted. The
+- **Formatting:** Ruff formats first-party Python (`packages/`, `libs/`,
+  `apps/`, `scripts/`); run `mise run lint` to check lint and formatting.
+  Prettier formats TypeScript (`.ts`, `.tsx`, `.mts`) with the settings in
+  `.prettierrc.json`. Run `pnpm format` before committing; CI runs
+  `pnpm format:check`. Markdown, YAML and JSON aren't formatted. The
   one-time reformat is listed in `.git-blame-ignore-revs`; run
   `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so `git blame`
   skips it (GitHub's blame view does this already).

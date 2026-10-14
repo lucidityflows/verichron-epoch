@@ -27,6 +27,14 @@ run = "scripts/bootstrap-dev.sh --check"
 description = "Check prerequisites, then install every environment from the lockfiles"
 run = "scripts/bootstrap-dev.sh"
 
+[tasks.lint]
+description = "Lint, format-check and type-check first-party Python"
+run = [
+  "uv run ruff check packages libs apps scripts",
+  "uv run ruff format --check packages libs apps scripts",
+  "uv run pyright",
+]
+
 [tasks."test:py"]
 description = "Python test suite (TEST_DATABASE_URL enables the real-Postgres tier)"
 run = "uv run pytest -q"

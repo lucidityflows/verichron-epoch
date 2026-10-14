@@ -63,9 +63,9 @@ each correction in `fields.corrections`. The report discloses every correction
 ```python
 with ingest(conn, ctx, file_path, source_type=..., payload_kind=..., raw_payload=...) as unit:
     if unit.already_ingested:
-        ...           # this exact file, at this parser version, is already in: count ok(0) and note it
+        ...  # this exact file, at this parser version, is already in: count ok(0) and note it
     else:
-        unit.write(records)   # write() raises on an already-ingested unit
+        unit.write(records)  # write() raises on an already-ingested unit
 ```
 
 - **One unit per source file** (R13). Its ledger row, payload and records commit

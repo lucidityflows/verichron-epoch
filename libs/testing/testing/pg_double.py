@@ -202,7 +202,7 @@ class _Cursor:
     path rather than a reimplementation of it.
     """
 
-    def __init__(self, conn: sqlite3.Connection, owner: "PgDouble"):
+    def __init__(self, conn: sqlite3.Connection, owner: PgDouble):
         self._conn = conn
         self._cur = conn.cursor()
         # execute_values reads cur.connection.encoding to pick the codec for the
@@ -210,7 +210,7 @@ class _Cursor:
         # it through psycopg2.extensions.encodings to Python's 'utf-8'.
         self.connection = owner
 
-    def __enter__(self) -> "_Cursor":
+    def __enter__(self) -> _Cursor:
         return self
 
     def __exit__(self, *exc_info: object) -> None:
@@ -284,9 +284,7 @@ class PgDouble:
     def ledger(self) -> list[dict[str, Any]]:
         self._conn.row_factory = sqlite3.Row
         try:
-            rows = self._conn.execute(
-                "SELECT * FROM ingested_files ORDER BY file_hash, ingest_id"
-            ).fetchall()
+            rows = self._conn.execute("SELECT * FROM ingested_files ORDER BY file_hash, ingest_id").fetchall()
             out = [dict(row) for row in rows]
         finally:
             self._conn.row_factory = None
@@ -306,7 +304,6 @@ class PgDouble:
         if file_hash is None:
             return self._conn.execute("SELECT COUNT(*) FROM forensic_records").fetchone()[0]
         return self._conn.execute(
-            "SELECT COUNT(*) FROM forensic_records f JOIN ingested_files i USING (ingest_id) "
-            "WHERE i.file_hash = ?",
+            "SELECT COUNT(*) FROM forensic_records f JOIN ingested_files i USING (ingest_id) WHERE i.file_hash = ?",
             (file_hash,),
         ).fetchone()[0]

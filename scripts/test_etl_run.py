@@ -14,7 +14,6 @@ from __future__ import annotations
 import io
 
 import pytest
-
 from etl_run import ETLRunResult
 
 

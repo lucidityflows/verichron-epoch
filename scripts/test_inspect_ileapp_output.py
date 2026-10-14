@@ -8,8 +8,6 @@ import sqlite3
 import sys
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import inspect_ileapp_output  # noqa: E402
 from ileapp_bridge.test_integration import SAFARI, write_report  # noqa: E402
@@ -24,7 +22,14 @@ def run(report: Path, monkeypatch, capsys) -> tuple[int, str]:
 
 
 def test_a_header_the_stage_refuses_is_reported_as_failing(tmp_path, monkeypatch, capsys):
-    clash = dict(SAFARI, columns=[("visit_timestamp", "Visit Timestamp", "datetime"), ("url", "source_path", None), ("title", "Title", None)])
+    clash = dict(
+        SAFARI,
+        columns=[
+            ("visit_timestamp", "Visit Timestamp", "datetime"),
+            ("url", "source_path", None),
+            ("title", "Title", None),
+        ],
+    )
     code, out = run(write_report(tmp_path / "BK1", clash), monkeypatch, capsys)
     assert code == 1
     assert "FAIL  Safari Browser - History: header(s) source_path clash" in out

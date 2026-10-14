@@ -1,12 +1,21 @@
 {
   "venvPath": ".",
   "venv": ".venv",
-  "include": [
-    "packages",
+  "pythonVersion": "3.14",
+  "typeCheckingMode": "basic",
+  "extraPaths": [
+    "packages/etl-db-writer",
+    "libs/etl-run",
+    "libs/verichron-runtime-env",
+    "libs/testing",
+    "apps",
     "apps/extractors",
-    "apps/analysis",
-    "apps/reporting",
-    "libs",
+    "apps/extractors/ileapp_bridge"
+  ],
+  "include": [
+    "packages/*",
+    "apps/*",
+    "libs/*",
     "scripts"
   ],
   "exclude": [

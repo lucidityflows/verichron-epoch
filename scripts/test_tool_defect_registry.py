@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 import tool_defects
 
 REPO = Path(__file__).resolve().parents[1]

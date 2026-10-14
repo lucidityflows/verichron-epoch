@@ -5,6 +5,7 @@ CI guard: fails if raw source_type string literals are found outside packages/co
 Usage: python scripts/check_source_type_literals.py
 Exit code 1 if violations found.
 """
+
 import re
 import sys
 from pathlib import Path
@@ -29,9 +30,7 @@ ALLOWLIST = [
 ]
 
 # Pattern: the literal in quotes, as a value (not e.g. a URL slug or comment)
-PATTERN = re.compile(
-    r"""(['"])(%s)\1""" % "|".join(re.escape(v) for v in LITERAL_VALUES)
-)
+PATTERN = re.compile(rf"""(['"])({"|".join(re.escape(v) for v in LITERAL_VALUES)})\1""")
 
 ROOT = Path(__file__).parent.parent
 violations: list[str] = []

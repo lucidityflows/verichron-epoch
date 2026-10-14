@@ -1,39 +1,17 @@
-import * as fsp from 'node:fs/promises';
-import * as path from 'node:path';
 import { Client } from 'pg';
-import { parseCliConfig, resolvePythonBin } from './cli.js';
+import { type AnalysisResult, preflightPython, writeCallSummary } from './callSummary.js';
+import { parseCliConfig } from './cli.js';
 import { discoverStages } from './discovery.js';
 import { migrationRefusal, readMigrationStatus } from './migrations.js';
 import { runPipelineForBackup } from './pipeline.js';
 
-type AnalysisResult = {
-  backupPath: string;
-  status: 'succeeded' | 'failed' | 'skipped';
-  runId?: string;
-  stages?: { stage: string; success: boolean }[];
-  error?: string;
-};
-
-/** This call's result, at the path its caller gave (EPOCH-409): each backup's
- * outcome, and why the call stopped before any backup, if it did. */
-async function writeCallSummary(
-  summaryPath: string | undefined,
-  results: AnalysisResult[],
-  error?: string
-): Promise<void> {
-  if (!summaryPath) return;
-  await fsp.mkdir(path.dirname(summaryPath), { recursive: true });
-  // Owner-only, and created new: the caller's path is often in a shared
-  // temporary folder, and the result names backups and their errors.
-  await fsp.writeFile(summaryPath, JSON.stringify(error ? { results, error } : { results }, null, 2), {
-    mode: 0o600,
-    flag: 'wx',
-  });
-}
-
 async function main() {
   const cfg = await parseCliConfig();
-  const pythonBin = await resolvePythonBin();
+  const pythonBin = await preflightPython(cfg.summaryPath);
+  if (!pythonBin) {
+    process.exitCode = 1;
+    return;
+  }
   const stages = await discoverStages();
 
   if (stages.enabled.length === 0) {

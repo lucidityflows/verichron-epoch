@@ -35,6 +35,7 @@ from runtime_env import fatal_if_missing_venv, load_root_env, redact_password, r
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
+
 def ensure_migrations_table(conn) -> None:
     with conn.cursor() as cur:
         cur.execute(
@@ -201,9 +202,7 @@ def apply_migration(conn, path: Path) -> None:
     sql = path.read_text()
     with conn.cursor() as cur:
         cur.execute(sql)
-        cur.execute(
-            "INSERT INTO schema_migrations (filename) VALUES (%s)", (path.name,)
-        )
+        cur.execute("INSERT INTO schema_migrations (filename) VALUES (%s)", (path.name,))
     conn.commit()
 
 

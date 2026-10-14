@@ -24,17 +24,13 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-
 from typing import Any
 
-from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
+import psycopg2
 from db_writer import IngestContext, add_context_args, context_from_args, ingest
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
-
-import psycopg2
-
-
+from runtime_env import redact_password, require_database_url
 
 # --- parsing (ported from deep_ips_report.py, unchanged logic) -------------
 
@@ -45,7 +41,7 @@ def parse_ips_file(file_path: Path) -> tuple[dict | None, str | None]:
     followed by a payload block) or a single JSON block.
     """
     try:
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+        with open(file_path, encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
 
         if not lines:
@@ -153,7 +149,7 @@ def telemetry_to_record(telemetry: dict) -> NormalizedRecord:
     pid = telemetry.get("pid")
     try:
         pid = int(pid) if pid is not None else None
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         pid = None
 
     return NormalizedRecord(
@@ -232,8 +228,10 @@ def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
                     continue
 
                 parsed, err = parse_ips_file(file_path)
-                if err:
+                if err is not None:
                     raise ValueError(err)
+                if parsed is None:
+                    raise RuntimeError("parse_ips_file returned neither data nor an error")
 
                 unit.set_raw_payload(parsed)
 
@@ -250,7 +248,6 @@ def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
 
 
 def main():
-    fatal_if_missing_venv()
     db_url = require_database_url()
     parser = argparse.ArgumentParser()
     add_context_args(parser)
@@ -280,5 +277,4 @@ def main():
 
 
 if __name__ == "__main__":
-    fatal_if_missing_venv()
     main()
