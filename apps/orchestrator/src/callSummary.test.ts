@@ -35,3 +35,6 @@ test('a passing Python preflight returns the interpreter and writes nothing', as
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// Deliberate type error: EPOCH-513 shows the test-file typecheck failing CI; reverted next.
+export const deliberateTypeError: number = 'EPOCH-513';
