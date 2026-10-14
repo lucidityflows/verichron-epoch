@@ -491,6 +491,8 @@ def iter_rows(conn: sqlite3.Connection, scan: ArtifactScan) -> Iterator[RowRead]
     judged them. A table that no longer holds the rows the first pass counted
     fails its artifact, so a unit never commits rows its identity didn't cover."""
     artifact = scan.artifact
+    if not artifact.tablename:
+        raise ArtifactError(f"{artifact.name}: the manifest names no table")
     cursor = conn.execute(f"SELECT * FROM {_quote(artifact.tablename)} ORDER BY rowid")
     if [d[0] for d in cursor.description] != scan.plan.columns:
         raise ArtifactError(f"{artifact.name}: table {artifact.tablename} changed between the two passes")
