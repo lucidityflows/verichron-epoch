@@ -220,6 +220,8 @@ def test_a_row_that_fails_partway_through_its_unit_writes_nothing_for_that_artif
     def write_then_fail(unit, records):
         written = real_write(unit, records[:1])
         if unit.file_path.name.endswith("#safarihistory"):
+            assert written == 1
+            assert len(stored(db)) == 1, "the first row is in the transaction before the failure"
             raise ValueError("row 2 refused")
         return written + real_write(unit, records[1:])
 
