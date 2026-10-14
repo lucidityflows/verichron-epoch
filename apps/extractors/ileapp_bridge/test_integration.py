@@ -360,8 +360,8 @@ def test_the_count_is_the_records_this_run_wrote(db, tmp_path):
     again = ingest_report(db, CTX, report)
     assert (again.succeeded, again.failed) == (0, 0)
     assert sorted(n for n in again.notes if "already ingested" in n) == [
-        "Safari Browser - History: already ingested by an earlier run",
-        "Uber - Cached Locations: already ingested by an earlier run",
+        "Safari Browser - History: already ingested; nothing new was written",
+        "Uber - Cached Locations: already ingested; nothing new was written",
     ]
 
 
@@ -446,7 +446,7 @@ def test_an_artifact_with_no_rows_is_filed_complete_with_no_records_and_skipped_
 
     again = ingest_report(db, CTX, report)
     assert again.failed == 0 and again.succeeded == 0, "the next run finds it already ingested and writes nothing"
-    assert "Safari Browser - History: already ingested by an earlier run" in again.notes
+    assert "Safari Browser - History: already ingested; nothing new was written" in again.notes
     assert len(ledger(db)) == 1
 
 

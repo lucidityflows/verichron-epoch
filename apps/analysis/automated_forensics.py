@@ -343,7 +343,7 @@ def ingest_file_findings(
         ) as unit:
             if unit.already_ingested:
                 # A prior run already finished this file: nothing written (EPOCH-421).
-                result.note(f"{filename}: already ingested by an earlier run")
+                result.note(f"{filename}: already ingested; nothing new was written")
                 return result
             raw_rows = collect_flagged_rows(checkpoint_conn, filename)
             records = [flagged_row_to_record(row) for row in raw_rows]

@@ -65,13 +65,13 @@ function StageOutput({ label, labelClass, text }: { label: string; labelClass: s
         <p className={`text-data ${labelClass}`}>{label}</p>
         <CopyButton text={text} title="Copy output" />
       </div>
-      <pre className="bg-inset rounded-md p-3 text-label font-mono text-foreground whitespace-pre-wrap break-words">
+      <pre className="bg-inset rounded-md p-3 text-data font-mono text-foreground whitespace-pre-wrap break-words">
         {lines.slice(0, OUTPUT_PREVIEW_LINES).join('\n')}
       </pre>
       {lines.length > OUTPUT_PREVIEW_LINES && (
         <div className="mt-2">
           <Disclosure label="Show full output" openLabel="Hide full output">
-            <pre className="bg-inset rounded-md p-3 text-label font-mono text-foreground whitespace-pre-wrap break-words max-h-80 overflow-auto">
+            <pre className="bg-inset rounded-md p-3 text-data font-mono text-foreground whitespace-pre-wrap break-words max-h-80 overflow-auto">
               {text}
             </pre>
           </Disclosure>

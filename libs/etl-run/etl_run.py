@@ -37,8 +37,8 @@ class ETLRunResult:
     ileapp_bridge. `succeeded` counts the records this run wrote
     (EXTRACTOR_CONTRACT.md §5, EPOCH-421): every stage calls ok(n) with the
     records a newly ingested unit wrote, so crash's one record per file adds
-    one and an empty iLEAPP table adds zero. A unit an earlier run already
-    ingested writes nothing: it adds zero, and the stage notes it as already
+    one and an empty iLEAPP table adds zero. A unit the ledger already holds
+    complete writes nothing: it adds zero, and the stage notes it as already
     ingested, so a resumed run never reads as having lost anything.
 
     `failures` stores structured `(item_label, reason)` pairs rather than

@@ -123,7 +123,7 @@ def test_a_successful_ips_file_is_deduped_not_duplicated(db, tmp_path):
 
     assert retry.failed == 0
     assert retry.succeeded == 0, "the retry wrote no records"
-    assert retry.notes == ["good.ips: already ingested by an earlier run"]
+    assert retry.notes == ["good.ips: already ingested; nothing new was written"]
     assert db.record_count() == 1, "dedup must not duplicate evidence"
     assert len(db.ledger()) == 1
     assert db.ledger()[0]["produced_by_runs"] == [RUN_ID, RETRY_RUN_ID], (

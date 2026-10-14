@@ -225,10 +225,10 @@ def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
                 payload_kind="full",
             ) as unit:
                 if unit.already_ingested:
-                    # Already complete from an earlier run: this run wrote
-                    # nothing for it (EPOCH-421), and says so rather than
-                    # letting the file look lost.
-                    result.note(f"{file_path.name}: already ingested by an earlier run")
+                    # Already complete in the ledger: this run wrote nothing
+                    # for it (EPOCH-421), and says so rather than letting the
+                    # file look lost.
+                    result.note(f"{file_path.name}: already ingested; nothing new was written")
                     continue
 
                 parsed, err = parse_ips_file(file_path)
