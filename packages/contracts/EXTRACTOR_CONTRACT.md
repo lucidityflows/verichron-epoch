@@ -47,6 +47,17 @@ Python stages read it with `runtime_env.require_database_url()`, which exits
 `runtime_env.redact_password()`. **Never invent, default or
 edit these values (R16).** A stage reads only the derivative it was given.
 
+### Tool output is checked, not trusted (R36)
+
+A stage that reads another tool's output checks it rather than passing it
+through: plausibility per value type, and agreement between related artifacts.
+A defect confirmed against the evidence the tool read is registered in
+`packages/contracts/tool_defects/<tool>.json` (`tool_defects.py` loads and
+validates it) and corrected only from there, limited to the tool versions it
+names. The record keeps the tool's value under the tool's own name and lists
+each correction in `fields.corrections`. The report discloses every correction
+(see [evidence-model.md](../../docs/evidence-model.md#tool-defects)).
+
 ## 3. Write facts through `ingest()`, one source file per unit
 
 ```python

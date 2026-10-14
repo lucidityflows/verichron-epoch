@@ -46,6 +46,28 @@ untimed; a value that isn't Unix seconds gives `event_time = null`, keeps its
 raw value in `fields`, and is counted in the stage's notes (R11). No column is
 chosen or parsed by name.
 
+**iLEAPP's output is checked, not trusted (R36, EPOCH-511).**
+
+- Every declared time before 2007-06-29 (the first iPhone) or after the run is
+  kept as iLEAPP gives it, counted in the stage's notes per artifact and
+  column, and marked on its record in `fields.time_review` (column, time,
+  check). The report lists every marked column for review, not only
+  `event_time`.
+- A defect registered for this iLEAPP version in
+  `packages/contracts/tool_defects/iLEAPP.json` is corrected. The version is
+  the one iLEAPP records in its manifest (`parser_info.leapp_version`), so a
+  report that doesn't record it as a non-empty string fails the stage. A
+  defect applies only to the module, artifacts and columns it names. The row
+  keeps iLEAPP's value
+  under its header, `event_time` takes the corrected value, and `fields.corrections`
+  lists each correction (defect, column, original, corrected, resolution).
+  A registered column the artifact lacks fails that artifact. The defects
+  applied are part of the unit's identity.
+- The first entry, `ILEAPP-0001` (EPOCH-510): the `uberClient` plugin divides
+  Uber's Unix seconds by 1,000 once too often in Uber - Place Search Hits and
+  Uber - Cached Locations. iLEAPP keeps whole seconds after dividing, so the
+  corrected time is exact to 1,000 seconds.
+
 ## `fields`
 
 - every column of the row, under **iLEAPP's original header** (e.g. `Visit
@@ -56,9 +78,12 @@ chosen or parsed by name.
 - `engine`: always `"iLEAPP"`;
 - `source_artifact`, `module`, `category`: the artifact as the manifest names it;
 - `source_path`: the input file the artifact was read from, relative to the
-  evidence.
+  evidence;
+- `corrections`, only on a row a registered tool defect corrected, and
+  `time_review`, only on a row with a declared time outside the device era
+  (see above).
 
-A header equal to one of these five keys fails its artifact rather than being
+A header equal to one of these seven keys fails its artifact rather than being
 overwritten. The shape otherwise varies with the iLEAPP module.
 
 ## Test
@@ -72,5 +97,3 @@ uv run pytest apps/extractors/ileapp_bridge
 | Issue | Ticket |
 |---|---|
 | NUL characters and NaN values break inserts; an artifact's rows are held in memory | EPOCH-418 |
-| Whether a plausibility window is reported over iLEAPP's declared times | EPOCH-419 |
-| iLEAPP exits 0 even when it terminates early or a plugin fails, so the processor marks its output complete; it should read iLEAPP's per-module status | EPOCH-457 |

@@ -134,6 +134,30 @@ A plausible but wrong date is worse than none, so ambiguous numeric timestamps
 are rejected rather than interpreted (EPOCH-419). Records without a time are
 counted and shown, never dropped.
 
+## Tool defects
+
+A tool's output is checked, not trusted (R36). Checks run on every ingest; for
+iLEAPP, each artifact's declared times are compared with the device era
+(2007-06-29, the first iPhone) and with the time of the run. A time outside it
+is never altered: it is marked on its record in `fields.time_review` (the
+column, the time and the check), and the report lists every marked column for
+review.
+
+A defect confirmed against the evidence the tool read is registered in
+`packages/contracts/tool_defects/<tool>.json`. An entry names the tool and the
+versions it affects (as the tool reports its own version), the module, the
+artifacts and columns (a correction applies only where all of them match), the defect, the evidence, the correction, the ticket and
+the upstream status. Entries are never deleted; a fixed release simply falls
+outside an entry's versions.
+
+The stage applies a correction only from the registry. The record keeps the
+tool's value under the tool's own column header, takes the corrected value
+where our model holds it (`event_time` for a time), and lists each correction
+in `fields.corrections`: the defect, the column, the original and the corrected
+value. The registry entries applied are part of the unit's identity, so a new
+or changed entry produces a new unit. The report lists every correction it
+relies on, with the defect behind it.
+
 ## What is not modelled yet
 
 | Gap | Ticket |

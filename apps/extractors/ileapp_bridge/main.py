@@ -18,11 +18,12 @@ from runtime_env import fatal_if_missing_venv, redact_password, require_database
 from db_writer import IngestContext, add_context_args, context_from_args, incomplete_ingests, ingest
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
+from tool_defects import ToolDefect, defects_for
 
 try:
-    from .lava import Artifact, ArtifactRows, LavaOutput, check_tables, open_database, read_artifact, read_manifest
+    from .lava import TOOL, Artifact, ArtifactRows, LavaOutput, check_tables, open_database, read_artifact, read_manifest
 except ImportError:
-    from lava import Artifact, ArtifactRows, LavaOutput, check_tables, open_database, read_artifact, read_manifest
+    from lava import TOOL, Artifact, ArtifactRows, LavaOutput, check_tables, open_database, read_artifact, read_manifest
 
 import psycopg2
 
@@ -31,7 +32,9 @@ SAMPLE_ROWS = 10
 
 def build_records(read: ArtifactRows) -> list[NormalizedRecord]:
     """One record per row: the row under iLEAPP's original headers, plus where
-    it came from. event_time is the artifact's declared time, and lava.py has
+    it came from. event_time is the artifact's declared time, corrected where
+    a registered tool defect applies; `corrections` lists any correction and
+    `time_review` any declared time outside the device era (R36). lava.py has
     already refused headers that would clash with these keys."""
     artifact = read.artifact
     metadata = {
@@ -42,8 +45,17 @@ def build_records(read: ArtifactRows) -> list[NormalizedRecord]:
         "source_path": read.source_path,
     }
     return [
-        NormalizedRecord(source_type=SourceType.ILEAPP_RECORD, event_time=when, fields={**metadata, **row})
-        for row, when in zip(read.rows, read.event_times)
+        NormalizedRecord(
+            source_type=SourceType.ILEAPP_RECORD,
+            event_time=when,
+            fields={
+                **metadata,
+                **row,
+                **({"corrections": applied} if applied else {}),
+                **({"time_review": flagged} if flagged else {}),
+            },
+        )
+        for row, when, applied, flagged in zip(read.rows, read.event_times, read.corrections, read.review)
     ]
 
 
@@ -59,16 +71,20 @@ def _summary(read: ArtifactRows) -> dict:
         "record_count": len(read.rows),
         "event_time_column": artifact.column_map.get(artifact.event_time_column) if artifact.event_time_column else None,
         "unconvertible_times": read.unconvertible_times,
+        "tool_version": read.tool_version,
+        "corrections": read.corrected,
         "sample_records": read.rows[:SAMPLE_ROWS],
     }
 
 
-def ingest_artifact(conn, lava_conn, ctx: IngestContext, output: LavaOutput, artifact: Artifact) -> ETLRunResult:
+def ingest_artifact(
+    conn, lava_conn, ctx: IngestContext, output: LavaOutput, artifact: Artifact, defects: tuple[ToolDefect, ...] = ()
+) -> ETLRunResult:
     """One artifact table, one ingest unit (R13): every row commits, or none.
     An artifact with no rows is a unit too, completed with 0 records, so the
     evidence shows it was examined and later runs skip it (EPOCH-417)."""
     result = ETLRunResult()
-    read = read_artifact(lava_conn, output, artifact)
+    read = read_artifact(lava_conn, output, artifact, defects)
     for note in read.notes:
         result.note(note)
     records = build_records(read)
@@ -128,10 +144,12 @@ def ingest_report(conn, ctx: IngestContext, report_dir: str | Path) -> ETLRunRes
     lava_conn = open_database(output)
     try:
         check_tables(lava_conn, output)
+        # The tool defects registered for this iLEAPP version (R36).
+        defects = defects_for(TOOL, output.tool_version)
         result = ETLRunResult()
         for artifact in output.artifacts:
             try:
-                result = result.merge(ingest_artifact(conn, lava_conn, ctx, output, artifact))
+                result = result.merge(ingest_artifact(conn, lava_conn, ctx, output, artifact, defects))
             except Exception as exc:
                 # Per-artifact isolation (EXTRACTOR_CONTRACT.md #5); the
                 # failed artifact's unit has rolled back.

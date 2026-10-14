@@ -29,6 +29,7 @@ from ileapp_bridge.lava import (
 )
 from ileapp_bridge.main import ingest_report
 from normalized_record import NormalizedRecord, SourceType
+from tool_defects import defects_for
 from testing.pg_real import BACKENDS, open_db
 
 RUN_ID = "dddddddd-0000-0000-0000-000000000000"
@@ -36,6 +37,8 @@ EVIDENCE_ID = "dddd0000-0000-0000-0000-00000000000d"
 DERIVATIVE_ID = "dddd0000-0000-0000-0000-0000000000dd"
 CTX = IngestContext(evidence_id=EVIDENCE_ID, derivative_id=DERIVATIVE_ID, run_id=RUN_ID, parser_version=1)
 INPUT = "/ws/decrypted/BK1"
+#: The version the recorded output reports; ILEAPP-0001 is registered for it.
+TOOL_VERSION = "2026.3.0"
 
 VISIT = 1791140650  # 2026-10-04T...Z
 SAFARI = {
@@ -54,7 +57,9 @@ def db(request):
     yield from open_db(request.param, (RUN_ID,), {EVIDENCE_ID: DERIVATIVE_ID})
 
 
-def write_report(report: Path, *artifacts: dict, status: str = "Complete", extra_tables: tuple[str, ...] = ()) -> Path:
+def write_report(
+    report: Path, *artifacts: dict, status: str = "Complete", extra_tables: tuple[str, ...] = (), tool_version: str = TOOL_VERSION
+) -> Path:
     """A report as iLEAPP writes it. An artifact dict may override
     `record_count`, omit keys, or carry `listed=False` to leave it out of the
     manifest while still creating its table."""
@@ -88,6 +93,7 @@ def write_report(report: Path, *artifacts: dict, status: str = "Complete", extra
     conn.close()
     (report / "_lava_data.lava").write_text(json.dumps({
         "lava_schema_version": 2,
+        "parser_info": {"leapp_name": "iLEAPP", "leapp_version": tool_version},
         "processing_status": status,
         "lava_db_name": "_lava_artifacts.db",
         "param_input": INPUT,
@@ -462,6 +468,140 @@ def test_encoding_for_storage_keeps_existing_binary_artifacts_identity(tmp_path)
 # --------------------------------------------------------------------------
 # Contract
 # --------------------------------------------------------------------------
+
+
+# --------------------------------------------------------------------------
+# Tool checks and corrections (R36, EPOCH-511, EPOCH-419)
+# --------------------------------------------------------------------------
+
+#: iLEAPP's uberClient output as on the reference backup: Unix seconds divided
+#: by 1,000 once too often (ILEAPP-0001), beside a value the plugin got right.
+UBER = {
+    "category": "Uber", "name": "Uber - Cached Locations", "module": "uberClient", "tablename": "ubercachedlocations",
+    "columns": [("last_hit", "Last hit", "datetime"), ("name", "Name", None)],
+    "rows": [(1791009, "A"), (1791009794, "B")],
+}
+
+
+def test_a_registered_defect_is_corrected_and_the_tools_value_kept(db, tmp_path):
+    report = write_report(tmp_path / "BK1", UBER)
+    result = ingest_report(db, CTX, report)
+    assert result.failed == 0, result.failures
+
+    (wrong, wrong_time), (right, right_time) = stored(db)
+    assert wrong_time == datetime.fromtimestamp(1791009000, timezone.utc), "corrected, not 1970-01-21"
+    assert wrong["Last hit"] == 1791009, "iLEAPP's own value stays under its header"
+    assert wrong["corrections"] == [
+        {"defect": "ILEAPP-0001", "column": "Last hit", "original": 1791009, "corrected": 1791009000, "resolution": 1000}
+    ]
+    assert right_time == datetime.fromtimestamp(1791009794, timezone.utc)
+    assert "corrections" not in right, "a value the tool got right is never touched"
+    assert any("corrected for iLEAPP defect ILEAPP-0001" in n for n in result.notes)
+
+
+def test_a_version_the_defect_is_not_registered_for_is_not_corrected(tmp_path):
+    report = write_report(tmp_path / "BK1", UBER, tool_version="2026.4.0")
+    output = read_manifest(report)
+    conn = open_database(output)
+    try:
+        read = read_artifact(conn, output, output.artifacts[0], defects_for("iLEAPP", output.tool_version))
+    finally:
+        conn.close()
+    assert read.event_times[0] == datetime.fromtimestamp(1791009, timezone.utc)
+    assert read.corrections == [[], []]
+    assert any("before 2007-06-29, the first iPhone" in n for n in read.notes), "still reported for review"
+
+
+def test_a_registered_column_the_artifact_lacks_fails_that_artifact(tmp_path):
+    renamed = {**UBER, "columns": [("seen", "Seen", "datetime"), ("name", "Name", None)]}
+    output = read_manifest(write_report(tmp_path / "BK1", renamed))
+    conn = open_database(output)
+    try:
+        with pytest.raises(ArtifactError, match="ILEAPP-0001 names column 'Last hit'"):
+            read_artifact(conn, output, output.artifacts[0], defects_for("iLEAPP", output.tool_version))
+    finally:
+        conn.close()
+
+
+def test_times_outside_the_device_era_are_kept_and_reported_for_review(tmp_path):
+    calendar = {
+        "category": "Calendar", "name": "Calendar Events", "module": "calendarAll", "tablename": "calendarevents",
+        "columns": [("start", "Start Time", "datetime"), ("modified", "Last Modification Time", "datetime")],
+        "rows": [(4102444800, 197164800), (1791140650, 1791140650)],  # 2100-01-01 and 1976-04-01; then ordinary
+    }
+    read = read_one(write_report(tmp_path / "BK1", calendar), "Calendar Events")
+    assert read.event_times[0] == datetime.fromtimestamp(4102444800, timezone.utc), "kept, not nulled"
+    assert read.rows[0]["Last Modification Time"] == 197164800
+    assert any("1 time(s) in Last Modification Time fall before 2007-06-29" in n for n in read.notes)
+    assert any("1 time(s) in Start Time fall after this run" in n for n in read.notes)
+    # Marked on the record too, so the report lists every column, not only event_time.
+    assert read.review[0] == [
+        {"column": "Start Time", "time": "2100-01-01T00:00:00+00:00", "check": "after_run"},
+        {"column": "Last Modification Time", "time": "1976-04-01T00:00:00+00:00", "check": "before_device_era"},
+    ]
+    assert read.review[1] == []
+
+
+def test_time_review_markers_reach_the_stored_record(db, tmp_path):
+    calendar = {
+        "category": "Calendar", "name": "Calendar Events", "module": "calendarAll", "tablename": "calendarevents",
+        "columns": [("start", "Start Time", "datetime"), ("modified", "Last Modification Time", "datetime")],
+        "rows": [(1791140650, 197164800)],  # an ordinary start; modified 1976-04-01
+    }
+    ingest_report(db, CTX, write_report(tmp_path / "BK1", calendar))
+    [(fields, when)] = stored(db)
+    assert when == datetime.fromtimestamp(1791140650, timezone.utc)
+    assert fields["time_review"] == [
+        {"column": "Last Modification Time", "time": "1976-04-01T00:00:00+00:00", "check": "before_device_era"}
+    ]
+
+
+def test_a_same_named_artifact_from_another_module_is_not_corrected(tmp_path):
+    other = {**UBER, "module": "someOtherModule"}
+    output = read_manifest(write_report(tmp_path / "BK1", other))
+    conn = open_database(output)
+    try:
+        read = read_artifact(conn, output, output.artifacts[0], defects_for("iLEAPP", output.tool_version))
+    finally:
+        conn.close()
+    assert read.corrections == [[], []], "outside the registered scope"
+    assert read.event_times[0] == datetime.fromtimestamp(1791009, timezone.utc)
+
+
+@pytest.mark.parametrize(
+    "parser_info",
+    [
+        None,  # absent
+        "iLEAPP 2026.3.0",  # not a mapping
+        {"leapp_name": "iLEAPP"},  # no version
+        {"leapp_name": "iLEAPP", "leapp_version": 2026.3},  # a number would silently match no registered version
+        {"leapp_name": "iLEAPP", "leapp_version": "  "},
+        {"leapp_name": "ALEAPP", "leapp_version": "2026.3.0"},  # another tool
+    ],
+)
+def test_a_report_that_does_not_name_its_ileapp_version_fails_the_stage(tmp_path, parser_info):
+    report = write_report(tmp_path / "BK1", SAFARI)
+    manifest = json.loads((report / "_lava_data.lava").read_text())
+    if parser_info is None:
+        del manifest["parser_info"]
+    else:
+        manifest["parser_info"] = parser_info
+    (report / "_lava_data.lava").write_text(json.dumps(manifest))
+    with pytest.raises(LavaError, match="which iLEAPP version"):
+        read_manifest(report)
+
+
+def test_an_applied_correction_is_part_of_the_units_identity(tmp_path):
+    report = write_report(tmp_path / "BK1", UBER)
+    output = read_manifest(report)
+    conn = open_database(output)
+    try:
+        artifact = output.artifacts[0]
+        plain = read_artifact(conn, output, artifact)
+        corrected = read_artifact(conn, output, artifact, defects_for("iLEAPP", output.tool_version))
+    finally:
+        conn.close()
+    assert plain.content_hash != corrected.content_hash
 
 
 def test_ileapp_record_is_a_declared_source_type():
