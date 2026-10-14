@@ -80,6 +80,8 @@ export function useDevicePull() {
   const [pulledAt, setPulledAt] = useState<number | null>(null);
 
   const destDirRef = useRef(destDir);
+  // Advanced by every new attempt, so a superseded pull's result is never applied.
+  const attempt = useRef(0);
   useEffect(() => {
     destDirRef.current = destDir;
   }, [destDir]);
@@ -307,6 +309,7 @@ export function useDevicePull() {
   /** The previous attempt's log, error and progress: cleared whenever a new
    * destination or attempt starts, so nothing from it is read as current (EPOCH-503). */
   const clearAttempt = () => {
+    attempt.current += 1;
     setPullProgress([]);
     setPullError(null);
     setDeviceAction(null);
@@ -386,6 +389,7 @@ export function useDevicePull() {
       return 'finished';
     }
     clearAttempt();
+    const thisAttempt = attempt.current;
     setIncomplete([]);
     if (!enableEncryption) {
       try {
@@ -403,7 +407,8 @@ export function useDevicePull() {
     try {
       const pulling = devicesApi.pullDeviceBackup(sourceId, selectedDevice, destDir, { password, enableEncryption });
       onStarted?.();
-      setPulledDir(await pulling);
+      const written = await pulling;
+      if (attempt.current === thisAttempt) setPulledDir(written);
     } catch (err) {
       // The pull usually reported its error as progress already.
       setPullError((prev) => prev ?? ipcErrorMessage(err));

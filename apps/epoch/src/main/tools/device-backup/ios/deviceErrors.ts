@@ -46,7 +46,7 @@ const LOST_CONNECTION = /^ERROR: Could not receive from mobilebackup2 \(-4\)/;
  */
 export function explainFailure(reason: string | undefined, ctx: FailureContext): string | undefined {
   if (reason && LOST_CONNECTION.test(reason) && ctx.connected === false) {
-    const arrived = ctx.receivedBytes ? ` (${gb(ctx.receivedBytes)} had arrived)` : '';
+    const arrived = ctx.receivedBytes != null ? ` (${gb(ctx.receivedBytes)} had arrived)` : '';
     return (
       `${ctx.device} was disconnected during the backup${arrived}. Reconnect it and start again; ` +
       `the unfinished backup can't be resumed.`

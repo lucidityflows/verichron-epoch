@@ -385,19 +385,36 @@ export class IosBackupSource implements DeviceBackupSource {
       // folder no one can use: remove it, and say so in the record (EPOCH-505).
       if (record.outcome !== 'completed' && folderIsThisPulls) {
         await removeOwnLeftover(destDir, device).catch((err) =>
-          console.error('Failed to remove the folder a failed pull left', err)
+          console.error('Failed to record the folder a failed pull left', err)
         );
       }
     }
   }
 }
 
-/** Removes the device folder a failed pull created when it holds no backup data, and records it. */
+/**
+ * Removes the device folder a failed pull created when it holds no backup
+ * data, and records it. A folder that couldn't be checked or removed is
+ * recorded as kept, with the reason, so the record never hides it (R19).
+ */
 async function removeOwnLeftover(destDir: string, device: DeviceInfo): Promise<void> {
-  const plistutil = trustedToolPath('plistutil');
-  if (!plistutil) return;
   const backupDir = backupFolder(destDir, device);
-  const bytes = await removeFailedPullFolder(plistutil, backupDir);
+  const kept = (reason: string) =>
+    appendPullRecord(destDir, {
+      event: 'failed-pull-folder-kept',
+      udid: device.id,
+      path: backupDir,
+      reason,
+      at: new Date().toISOString(),
+    });
+  const plistutil = trustedToolPath('plistutil');
+  if (!plistutil) return kept('plistutil is not available, so the folder could not be checked');
+  let bytes: number | null;
+  try {
+    bytes = await removeFailedPullFolder(plistutil, backupDir);
+  } catch (err) {
+    return kept(err instanceof Error ? err.message : String(err));
+  }
   if (bytes === null) return;
   await appendPullRecord(destDir, {
     event: 'failed-pull-folder-removed',

@@ -226,6 +226,13 @@ describe('failureMessage', () => {
     );
   });
 
+  it('states that nothing had arrived, rather than leaving the amount out', () => {
+    assert.match(
+      failureMessage('The backup of iPhone failed.', UNPLUGGED, 255, { ...ctx, connected: false, receivedBytes: 0 }),
+      /^iPhone was disconnected during the backup \(0\.0 GB had arrived\)\./
+    );
+  });
+
   it("doesn't call it a disconnect while the device is still listed, or when that can't be told", () => {
     for (const connected of [true, null]) {
       assert.equal(

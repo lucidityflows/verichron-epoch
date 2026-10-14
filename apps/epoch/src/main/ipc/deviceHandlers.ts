@@ -133,10 +133,26 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
       // existing backup. Created without `recursive`, so it fails rather than
       // share a folder with another pull.
       const pullDir = path.join(destDir, pullFolderName(new Date()));
-      await fs.mkdir(pullDir);
-      pull.start(sourceId, device, pullDir);
+      try {
+        await fs.mkdir(pullDir);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+          throw new Error(
+            `Another pull into ${destDir} started this same second (${pullDir}). Wait a moment and try again.`,
+            { cause: err }
+          );
+        }
+        throw err;
+      }
       try {
         await addPullDestination(app.getPath('userData'), pullDir);
+      } catch (err) {
+        // Nothing has been written into it yet: it leaves no trace (R14).
+        await fs.rmdir(pullDir).catch(() => undefined);
+        throw err;
+      }
+      pull.start(sourceId, device, pullDir);
+      try {
         return await source.pullBackup(
           device,
           pullDir,

@@ -51,9 +51,18 @@ export interface FailedPullFolderRemoved {
   removed_at: string;
 }
 
+/** A failed pull couldn't check or remove the folder it created, so it was left (EPOCH-505). */
+export interface FailedPullFolderKept {
+  event: 'failed-pull-folder-kept';
+  udid: string;
+  path: string;
+  reason: string;
+  at: string;
+}
+
 export async function appendPullRecord(
   destDir: string,
-  record: PullRecord | IncompleteBackupDeleted | FailedPullFolderRemoved
+  record: PullRecord | IncompleteBackupDeleted | FailedPullFolderRemoved | FailedPullFolderKept
 ): Promise<void> {
   await fs.appendFile(path.join(destDir, PULL_RECORD_FILE), JSON.stringify(record) + '\n');
 }
