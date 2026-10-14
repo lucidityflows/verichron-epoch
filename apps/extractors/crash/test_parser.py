@@ -40,6 +40,9 @@ def test_the_time_is_the_metadata_timestamp_and_the_body_time_is_kept():
     body's captureTime, where there is one, is kept beside it."""
     _, record = record_of("crash-json-body.ips")
     assert record.event_time == METADATA_TIME
+    assert record.event_time is not None and record.event_time.tzinfo is UTC, (
+        "stored in UTC (R11), not at the report's offset"
+    )
     assert record.fields["time_source"] == "metadata timestamp"
     assert record.fields["body_time"] == "2026-01-02 03:04:05.1111 -0700"
 

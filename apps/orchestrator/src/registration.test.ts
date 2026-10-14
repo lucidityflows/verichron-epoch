@@ -494,6 +494,19 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(again.skipped, true, 'still no crash logs, so the complete run stands');
   });
 
+  it("a disabled stage's skip never stands in for an absent input: enabling it gets a new run", async () => {
+    const ws = makeWorkspace('disabled-then-no-input');
+    rmSync(path.join(ws.ileappPath, ILEAPP_MARKER)); // no iLEAPP output is registered
+    const off = recordingStage('ileapp-reader', 10, { reads: 'ileapp_output', parserVersion: 1, enabled: false });
+    const first = await run(ws.backupPath, { enabled: [], disabled: [off] });
+    assert.equal(await getRunState(db, first.runId!), 'complete');
+
+    const on = recordingStage('ileapp-reader', 10, { reads: 'ileapp_output', parserVersion: 1 });
+    const second = await run(ws.backupPath, { enabled: [on], disabled: [] });
+    assert.notEqual(second.skipped, true, 'the disabled skip must not hide the missing iLEAPP output');
+    assert.equal(second.success, false, 'the stage fails on its missing input, as it should');
+  });
+
   it('a finished run with a stage stuck pending or running is incomplete, not succeeded', async () => {
     const ws = makeWorkspace('killed');
     const result = await run(ws.backupPath, { enabled: [recordingStage('ok', 10)], disabled: [] });

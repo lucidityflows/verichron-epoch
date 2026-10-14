@@ -5,7 +5,13 @@ import * as path from 'node:path';
 import { Client } from 'pg';
 import type { StageDefinition, StageSet, RunConfig } from './types.js';
 import { createRun, findCompleteRunFor, markStage, markRunFailed, type RunProvenance } from './db.js';
-import { derivativeFor, registerEvidence, RegistrationError, type Registration } from './registration.js';
+import {
+  absentInputReason,
+  derivativeFor,
+  registerEvidence,
+  RegistrationError,
+  type Registration,
+} from './registration.js';
 import {
   contractVersion,
   deriveIleappPath,
@@ -45,25 +51,13 @@ const DERIVATIVE_NAMES: Record<DerivativeKind, string> = {
   crash_reports: "the device's crash logs",
 };
 
-/**
- * Derivatives that only some acquisitions produce, so their absence is a fact
- * about the evidence, not a step left undone: a stage reading one is recorded
- * as skipped, with this reason, and the report lists it as not examined
- * (EPOCH-447). Every other missing derivative fails the stage.
- */
-const NOT_ACQUIRED: Partial<Record<DerivativeKind, string>> = {
-  crash_reports:
-    "Crash logs were not acquired for this evidence. An iOS backup does not contain the device's crash logs; " +
-    'they are copied from the device separately.',
-};
-
 export type StageOutcome = { status: 'succeeded' | 'failed'; stderr: string } | { status: 'skipped'; reason: string };
 
 /**
  * Runs one stage against the derivative its stage.json says it reads, passing
  * that derivative's id and path. A stage whose derivative wasn't registered
  * (the processor hasn't completed it) fails before it is spawned, unless that
- * derivative is one only some acquisitions produce (NOT_ACQUIRED).
+ * derivative is one only some acquisitions produce (absentInputReason).
  */
 export function runStage(
   stage: StageDefinition,
@@ -81,7 +75,7 @@ export function runStage(
   // derivative this stage reads, and its declared parser version.
   const derivativeId = derivativeFor(stage, registration);
   const derivativePath = paths[stage.manifest.reads];
-  const notAcquired = NOT_ACQUIRED[stage.manifest.reads];
+  const notAcquired = absentInputReason(stage);
   if (!derivativeId && notAcquired) {
     return Promise.resolve({ status: 'skipped', reason: notAcquired });
   }

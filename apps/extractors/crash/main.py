@@ -25,7 +25,7 @@ import argparse
 import json
 import sys
 from collections import Counter
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -149,7 +149,8 @@ def parse_crash_time(raw: Any) -> datetime | None:
         return None
     for fmt in _CRASH_TIME_FORMATS:
         try:
-            return datetime.strptime(raw.strip(), fmt)
+            # Stored in UTC (R11); the report's own offset is in the payload.
+            return datetime.strptime(raw.strip(), fmt).astimezone(UTC)
         except ValueError:
             continue
     return None
