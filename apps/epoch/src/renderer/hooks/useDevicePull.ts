@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import type {
   BackupProgress,
   BackupStats,
-  DestinationBackup,
   DevicePullState,
   IncompleteBackup,
   DeviceInfo,
@@ -14,11 +13,23 @@ import type {
   ToolSetupStep,
 } from '../../shared/types/tools';
 import { devicesApi } from '../api/devices';
+import { useToast } from '../components/ui/Toast';
 
 /** An IPC error's own message, without Electron's "Error invoking remote method" prefix. */
 function ipcErrorMessage(err: unknown): string {
   if (!(err instanceof Error)) return 'Unknown error';
   return err.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+}
+
+/** The folder a path is in. */
+function parentFolder(dir: string): string {
+  const trimmed = dir.replace(/[\\/]+$/, '');
+  const cut = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  return cut > 0 ? trimmed.slice(0, cut) : trimmed;
+}
+
+function formatGB(bytes: number): string {
+  return `${(bytes / 1e9).toFixed(1)} GB`;
 }
 
 export type Phase = 'checking' | 'unavailable' | 'available' | 'acquiring' | 'pulling' | 'pulled';
@@ -29,6 +40,7 @@ export type Phase = 'checking' | 'unavailable' | 'available' | 'acquiring' | 'pu
  * never moves on by itself.
  */
 export function useDevicePull() {
+  const toast = useToast();
   const [sources, setSources] = useState<Array<{ id: string; label: string }>>([]);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('checking');
@@ -61,13 +73,15 @@ export function useDevicePull() {
   const [incomplete, setIncomplete] = useState<IncompleteBackup[]>([]);
   // The path being deleted, if any.
   const [deletingIncomplete, setDeletingIncomplete] = useState<string | null>(null);
-  // What the chosen destination already holds for the device (EPOCH-483); a pull there is refused.
-  const [destinationBackup, setDestinationBackup] = useState<DestinationBackup | null>(null);
+  // The folder the finished pull wrote into, inside destDir (EPOCH-504).
+  const [pulledDir, setPulledDir] = useState<string | null>(null);
 
   // When this panel saw the pull finish; null when it finished before a remount.
   const [pulledAt, setPulledAt] = useState<number | null>(null);
 
   const destDirRef = useRef(destDir);
+  // Advanced by every new attempt, so a superseded pull's result is never applied.
+  const attempt = useRef(0);
   useEffect(() => {
     destDirRef.current = destDir;
   }, [destDir]);
@@ -85,9 +99,12 @@ export function useDevicePull() {
    * state. A pull that ended before its last event arrived is shown ended.
    */
   const restorePull = useCallback((running: DevicePullState) => {
+    // The running pull's own folder is a dated one inside the folder chosen (EPOCH-504).
+    const chosen = parentFolder(running.destDir);
     setSelectedDevice(running.device);
-    setDestDir(running.destDir);
-    destDirRef.current = running.destDir;
+    setDestDir(chosen);
+    destDirRef.current = chosen;
+    setPulledDir(running.destDir);
     setPullProgress(running.progress.filter((p) => p.phase !== 'error'));
     setPullStats(running.stats);
     setDeviceAction(running.deviceAction);
@@ -289,10 +306,22 @@ export function useDevicePull() {
     }
   };
 
+  /** The previous attempt's log, error and progress: cleared whenever a new
+   * destination or attempt starts, so nothing from it is read as current (EPOCH-503). */
+  const clearAttempt = () => {
+    attempt.current += 1;
+    setPullProgress([]);
+    setPullError(null);
+    setDeviceAction(null);
+    setPullStats(null);
+    setPulledDir(null);
+  };
+
   /** Asks for a destination folder; true when it changed. */
   const handleSelectDestination = async (): Promise<boolean> => {
     const dir = await devicesApi.selectDeviceBackupDestination();
     if (!dir || dir === destDir) return false;
+    clearAttempt();
     setDestDir(dir);
     return true;
   };
@@ -311,26 +340,10 @@ export function useDevicePull() {
     }
   }, [sourceId, selectedDevice, destDir]);
 
-  const refreshDestination = useCallback(async () => {
-    if (!sourceId || !selectedDevice || !destDir) {
-      setDestinationBackup(null);
-      return;
-    }
-    try {
-      setDestinationBackup(await devicesApi.checkPullDestination(sourceId, selectedDevice, destDir));
-    } catch (err) {
-      setDestinationBackup(null);
-      setPullError((prev) => prev ?? ipcErrorMessage(err));
-    }
-  }, [sourceId, selectedDevice, destDir]);
-
-  // An earlier pull may have left a backup in the chosen folder, or in another one.
+  // An earlier pull may have left an unfinished backup in a folder it wrote to.
   useEffect(() => {
-    if (phase === 'available') {
-      void refreshIncomplete();
-      void refreshDestination();
-    }
-  }, [phase, refreshIncomplete, refreshDestination]);
+    if (phase === 'available') void refreshIncomplete();
+  }, [phase, refreshIncomplete]);
 
   const cancelPull = async () => {
     if (!sourceId) return;
@@ -348,12 +361,14 @@ export function useDevicePull() {
     setDeletingIncomplete(backup.path);
     try {
       await devicesApi.deleteIncompleteBackup(sourceId, backup.destDir, selectedDevice);
+      // The attempt that left it is over: its log and error go with it (EPOCH-503).
+      clearAttempt();
+      toast.show(`Unfinished backup deleted (${formatGB(backup.bytes)}).`, 'success');
     } catch (err) {
       setPullError(ipcErrorMessage(err));
     } finally {
       setDeletingIncomplete(null);
       await refreshIncomplete();
-      await refreshDestination();
     }
   };
 
@@ -368,15 +383,13 @@ export function useDevicePull() {
     enableEncryption = false,
     onStarted?: () => void
   ): Promise<'consent-needed' | 'finished'> => {
-    if (!sourceId || !selectedDevice || !destDir || destinationBackup) return 'finished';
+    if (!sourceId || !selectedDevice || !destDir) return 'finished';
     if (!password || password.trim() === '') {
       setPullError('A backup password is required.');
       return 'finished';
     }
-    setPullProgress([]);
-    setPullError(null);
-    setDeviceAction(null);
-    setPullStats(null);
+    clearAttempt();
+    const thisAttempt = attempt.current;
     setIncomplete([]);
     if (!enableEncryption) {
       try {
@@ -394,14 +407,20 @@ export function useDevicePull() {
     try {
       const pulling = devicesApi.pullDeviceBackup(sourceId, selectedDevice, destDir, { password, enableEncryption });
       onStarted?.();
-      await pulling;
+      const written = await pulling;
+      if (attempt.current === thisAttempt) setPulledDir(written);
     } catch (err) {
-      // The pull usually reported its error as progress already.
-      setPullError((prev) => prev ?? ipcErrorMessage(err));
-      setPhase('available');
+      // The pull usually reported its error as progress already. A newer
+      // attempt owns the screen, so an older one's error is not shown.
+      if (attempt.current === thisAttempt) {
+        setPullError((prev) => prev ?? ipcErrorMessage(err));
+        setPhase('available');
+      }
     } finally {
-      setDeviceAction(null);
-      setCancelling(false);
+      if (attempt.current === thisAttempt) {
+        setDeviceAction(null);
+        setCancelling(false);
+      }
     }
     return 'finished';
   };
@@ -441,7 +460,7 @@ export function useDevicePull() {
     incomplete,
     deleteIncomplete,
     deletingIncomplete,
-    destinationBackup,
+    pulledDir,
     runCompileFromSource,
     handleSelectDestination,
     handlePull,

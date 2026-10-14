@@ -5,7 +5,6 @@ import type {
   ToolAcquisitionAction,
   ToolAcquisitionCommand,
   ToolAcquisitionResult,
-  ToolAvailabilityStatus,
   ToolSetupEvent,
   ToolSetupResult,
   ToolSetupStatus,
@@ -28,8 +27,6 @@ export const devicesApi = {
     window.epoch.listIncompleteBackups(sourceId, device, destDir),
   deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) =>
     window.epoch.deleteIncompleteBackup(sourceId, destDir, device),
-  checkPullDestination: (sourceId: string, device: DeviceInfo, destDir: string) =>
-    window.epoch.checkPullDestination(sourceId, device, destDir),
   onDeviceBackupStats: (callback: (stats: BackupStats) => void) => window.epoch.onDeviceBackupStats(callback),
   runToolAcquisitionSteps: (steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> =>
     window.epoch.runToolAcquisitionSteps(steps, installPrefix),

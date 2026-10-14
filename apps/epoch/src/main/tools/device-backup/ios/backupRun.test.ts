@@ -9,11 +9,13 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import {
+  deviceListed,
   existingBackupState,
   folderSize,
   incompleteReason,
   OutputParser,
   receivedPercent,
+  removeFailedPullFolder,
   snapshotState,
 } from './backupRun';
 
@@ -44,6 +46,23 @@ describe('OutputParser', () => {
     assert.deepEqual(events, [
       { kind: 'line', text: 'Receiving files' },
       { kind: 'percent', value: 34 },
+    ]);
+  });
+
+  it('drops the bars a real device prints with their byte counts (EPOCH-507)', () => {
+    // As iPhone17,5 / idevicebackup2 1.4.0 printed them on 2026-10-14: each
+    // redraw used to become its own log line, thousands of them.
+    const parser = new OutputParser();
+    const events = [
+      ...parser.push('Receiving files\n'),
+      ...parser.push('\r[=                                                 ]   0% (16 Bytes/3.3 GB)'),
+      ...parser.push('\r[==                                                ]   3% (93.4 MB/3.3 GB)'),
+      ...parser.push('\r[===========                                       ]  22% (701.4 MB/3.3 GB)\n'),
+      ...parser.push('ERROR: Could not receive from mobilebackup2 (-4)\n'),
+    ];
+    assert.deepEqual(events, [
+      { kind: 'line', text: 'Receiving files' },
+      { kind: 'line', text: 'ERROR: Could not receive from mobilebackup2 (-4)' },
     ]);
   });
 
@@ -200,5 +219,68 @@ describe('incompleteReason', () => {
 
   it('names a missing Status.plist', async () => {
     assert.equal(await incompleteReason(fakePlistutil(status('finished')), tmp), 'it has no Status.plist');
+  });
+});
+
+describe('removeFailedPullFolder (EPOCH-505)', () => {
+  const deviceDir = () => path.join(tmp, 'DEVICE');
+
+  it('removes a folder the device sent no backup data into, and says how much it held', async () => {
+    fs.mkdirSync(deviceDir());
+    fs.writeFileSync(path.join(deviceDir(), 'Info.plist'), 'x'.repeat(2048));
+    assert.equal(await removeFailedPullFolder(fakePlistutil(status('finished')), deviceDir()), 2048);
+    assert.equal(fs.existsSync(deviceDir()), false);
+  });
+
+  it('keeps an unfinished backup (it has a Status.plist), which is offered for deletion instead', async () => {
+    fs.mkdirSync(deviceDir());
+    fs.writeFileSync(path.join(deviceDir(), 'Status.plist'), 'bplist00');
+    assert.equal(await removeFailedPullFolder(fakePlistutil(status('uploading')), deviceDir()), null);
+    assert.equal(fs.existsSync(path.join(deviceDir(), 'Status.plist')), true);
+  });
+
+  it('does nothing when there is no folder', async () => {
+    assert.equal(await removeFailedPullFolder(fakePlistutil(status('finished')), deviceDir()), null);
+  });
+
+  // Skipped as root, which ignores folder permissions.
+  it.skipIf(process.getuid?.() === 0)('raises a folder it cannot reach, so the caller records it as kept', async () => {
+    const locked = path.join(tmp, 'LOCKED');
+    fs.mkdirSync(path.join(locked, 'DEVICE'), { recursive: true });
+    fs.chmodSync(locked, 0o000);
+    try {
+      await assert.rejects(removeFailedPullFolder(fakePlistutil(status('finished')), path.join(locked, 'DEVICE')), {
+        code: 'EACCES',
+      });
+    } finally {
+      fs.chmodSync(locked, 0o700);
+    }
+  });
+});
+
+describe('deviceListed (EPOCH-507)', () => {
+  /** A stand-in idevice_id that prints `stdout` and `stderr` and exits with `code`. */
+  const fakeIdeviceId = (stdout: string, stderr: string, code: number) => {
+    const file = path.join(tmp, 'idevice_id');
+    fs.writeFileSync(file, `#!/bin/sh\nprintf '%s' '${stdout}'\nprintf '%s' '${stderr}' >&2\nexit ${code}\n`, {
+      mode: 0o755,
+    });
+    return file;
+  };
+
+  it('finds the device among those listed', () => {
+    assert.equal(deviceListed(fakeIdeviceId('OTHER\nUDID-1\n', '', 0), 'UDID-1'), true);
+    assert.equal(deviceListed(fakeIdeviceId('OTHER\n', '', 0), 'UDID-1'), false);
+  });
+
+  it('counts the device as gone when usbmuxd has stopped with the last device', () => {
+    // What idevice_id 1.4.0 printed on 2026-10-14 after the cable was pulled,
+    // once Debian's udev rules had stopped usbmuxd.
+    assert.equal(deviceListed(fakeIdeviceId('', 'ERROR: Unable to retrieve device list!\n', 255), 'UDID-1'), false);
+  });
+
+  it("can't tell when the tool fails any other way, or isn't there", () => {
+    assert.equal(deviceListed(fakeIdeviceId('', 'something else\n', 1), 'UDID-1'), null);
+    assert.equal(deviceListed(undefined, 'UDID-1'), null);
   });
 });

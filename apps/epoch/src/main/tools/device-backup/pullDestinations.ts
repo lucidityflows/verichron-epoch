@@ -31,3 +31,17 @@ export async function addPullDestination(settingsDir: string, destDir: string): 
   await fs.writeFile(tmp, JSON.stringify(next, null, 2) + '\n');
   await fs.rename(tmp, file);
 }
+
+/**
+ * The folder one pull writes into, inside the folder the examiner chose
+ * (EPOCH-504): its UTC start time, e.g. `2026-10-14T130512Z`. Every pull gets
+ * its own, so a pull never meets an existing backup and two pulls of one
+ * device are listed under different names. Sortable, and safe on every
+ * platform (no colons).
+ */
+export function pullFolderName(at: Date): string {
+  return at
+    .toISOString()
+    .replace(/\.\d{3}Z$/, 'Z')
+    .replace(/:/g, '');
+}

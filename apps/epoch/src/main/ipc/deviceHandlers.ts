@@ -1,5 +1,5 @@
 import { app, ipcMain, dialog, BrowserWindow } from 'electron';
-import { addPullDestination, readPullDestinations } from '../tools/device-backup/pullDestinations';
+import { addPullDestination, pullFolderName, readPullDestinations } from '../tools/device-backup/pullDestinations';
 import { PullStateTracker } from '../tools/device-backup/pullState';
 import path from 'path';
 import fs from 'fs/promises';
@@ -14,7 +14,6 @@ import type {
   ToolAcquisitionCommand,
   BackupProgress,
   BackupStats,
-  DestinationBackup,
   DevicePullState,
   IncompleteBackup,
   PullOptions,
@@ -107,18 +106,6 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     }
   );
 
-  // What the chosen destination already holds for the device (EPOCH-483); a pull refuses it.
-  ipcMain.handle(
-    'epoch:checkPullDestination',
-    async (_event, sourceId: string, device: DeviceInfo, destDir: string): Promise<DestinationBackup | null> => {
-      const source = getDeviceBackupSource(sourceId);
-      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
-      // The running pull's own folder is the backup being written, not one to warn about.
-      if (pull.writes(destDir, device.id)) return null;
-      return source.destinationBackup(destDir, device);
-    }
-  );
-
   ipcMain.handle(
     'epoch:deleteIncompleteBackup',
     async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
@@ -141,12 +128,39 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
       const source = getDeviceBackupSource(sourceId);
       if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
 
-      pull.start(sourceId, device, destDir);
+      // Each pull writes into a folder of its own inside the one chosen
+      // (EPOCH-504), created here and never reused: a pull never meets an
+      // existing backup. Created without `recursive`, so it fails rather than
+      // share a folder with another pull.
+      const pullDir = path.join(destDir, pullFolderName(new Date()));
+      // Reserved before anything awaits, so a second pull is refused before it
+      // creates or registers a folder.
+      pull.start(sourceId, device, pullDir);
+      let created = false;
       try {
-        await addPullDestination(app.getPath('userData'), destDir);
+        try {
+          await fs.mkdir(pullDir);
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+            throw new Error(
+              `Another pull into ${destDir} started this same second (${pullDir}). Wait a moment and try again.`,
+              { cause: err }
+            );
+          }
+          throw err;
+        }
+        created = true;
+        await addPullDestination(app.getPath('userData'), pullDir);
+      } catch (err) {
+        // Nothing has been written into it yet: it leaves no trace (R14).
+        if (created) await fs.rmdir(pullDir).catch(() => undefined);
+        pull.end();
+        throw err;
+      }
+      try {
         return await source.pullBackup(
           device,
-          destDir,
+          pullDir,
           (progress: BackupProgress) => {
             pull.progress(progress);
             sendToRenderer('epoch:deviceBackupProgress', progress);

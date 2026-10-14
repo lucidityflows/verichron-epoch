@@ -1,17 +1,10 @@
-import type {
-  PipelineRunRow,
-  StageStatusRow,
-  ForensicRecordRow,
-  ForensicRecordPage,
-  ForensicRecordQuery,
-} from '@verichron/db-reader';
+import type { PipelineRunRow, StageStatusRow, ForensicRecordPage, ForensicRecordQuery } from '@verichron/db-reader';
 import type { Backup } from '@verichron/contracts';
 import type {
   BackupProgress,
   DeviceInfo,
   PullOptions,
   BackupStats,
-  DestinationBackup,
   DevicePullState,
   IncompleteBackup,
   ToolAcquisitionAction,
@@ -172,11 +165,6 @@ declare global {
         destDir: string | null
       ) => Promise<IncompleteBackup[]>;
       deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) => Promise<void>;
-      checkPullDestination: (
-        sourceId: string,
-        device: DeviceInfo,
-        destDir: string
-      ) => Promise<DestinationBackup | null>;
       onDeviceBackupStats: (callback: (stats: BackupStats) => void) => () => void;
       runToolAcquisitionSteps: (
         steps: ToolAcquisitionCommand[],

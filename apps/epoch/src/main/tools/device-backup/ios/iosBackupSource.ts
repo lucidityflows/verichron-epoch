@@ -19,11 +19,13 @@ import { enableBackupEncryption, PASSCODE_TIMEOUT_MS } from './encryption';
 import { failureMessage } from './deviceErrors';
 import { lastLines, StreamLines } from './toolchain/process';
 import {
+  deviceListed,
   existingBackupState,
   folderSize,
   incompleteReason,
   OutputParser,
   receivedPercent,
+  removeFailedPullFolder,
   snapshotState,
   type OutputEvent,
 } from './backupRun';
@@ -247,6 +249,7 @@ export class IosBackupSource implements DeviceBackupSource {
       finished_at: null,
       backup_encryption: 'unknown',
       received_bytes: null,
+      device_listed: null,
       outcome: 'failed',
       error: null,
     };
@@ -255,13 +258,23 @@ export class IosBackupSource implements DeviceBackupSource {
       onProgress({ phase: 'error', message });
       throw new Error(message);
     };
+    // What has arrived so far, so a failed or cancelled pull records it too.
+    let receivedSoFar: number | null = null;
+    const reportStats = (stats: BackupStats) => {
+      receivedSoFar = stats.receivedBytes;
+      onStats(stats);
+    };
 
     if (this.cancelRequested !== null) throw new Error('A backup is already running.');
     this.cancelRequested = false;
     let recorded = false;
+    // True once the device's folder is known not to exist: anything in it
+    // afterwards was written by this pull (EPOCH-505).
+    let folderIsThisPulls = false;
     try {
       const existing = await this.destinationBackup(destDir, device);
       if (existing) fail(destinationRefusal(device, existing));
+      folderIsThisPulls = true;
 
       // The device checks the computer's free space before it starts and
       // refuses with ErrorCode 105 when it judges it too small. Check first,
@@ -323,13 +336,14 @@ export class IosBackupSource implements DeviceBackupSource {
         destDir,
         password,
         onProgress,
-        onStats,
+        reportStats,
         estimatedBytes,
         {
           setProcess: (proc) => {
             this.running = proc;
           },
           cancelled: () => this.cancelRequested === true,
+          connected: () => (record.device_listed = deviceListed(tools.idevice_id, device.id)),
         }
       );
       const plistutil = trustedToolPath('plistutil');
@@ -359,6 +373,7 @@ export class IosBackupSource implements DeviceBackupSource {
     } catch (err) {
       if (this.cancelRequested) record.outcome = 'cancelled';
       record.error = err instanceof Error ? err.message : String(err);
+      record.received_bytes ??= receivedSoFar;
       throw err;
     } finally {
       this.running = null;
@@ -366,10 +381,57 @@ export class IosBackupSource implements DeviceBackupSource {
       // A failed or cancelled pull keeps its own error if the record can't be written.
       if (!recorded) {
         record.finished_at = new Date().toISOString();
-        await appendPullRecord(destDir, record).catch((err) => console.error('Failed to record the device pull', err));
+        recorded = await appendPullRecord(destDir, record).then(
+          () => true,
+          (err) => {
+            console.error('Failed to record the device pull', err);
+            return false;
+          }
+        );
+      }
+      // A pull the device refused before sending any backup data leaves a
+      // folder no one can use: remove it, and say so in the record (EPOCH-505).
+      // Only once the pull is recorded, so nothing is removed without a trace.
+      if (record.outcome !== 'completed' && folderIsThisPulls && recorded) {
+        await removeOwnLeftover(destDir, device).catch((err) =>
+          console.error('Failed to record the folder a failed pull left', err)
+        );
       }
     }
   }
+}
+
+/**
+ * Removes the device folder a failed pull created when it holds no backup
+ * data, and records it. A folder that couldn't be checked or removed is
+ * recorded as kept, with the reason, so the record never hides it (R19).
+ */
+async function removeOwnLeftover(destDir: string, device: DeviceInfo): Promise<void> {
+  const backupDir = backupFolder(destDir, device);
+  const kept = (reason: string) =>
+    appendPullRecord(destDir, {
+      event: 'failed-pull-folder-kept',
+      udid: device.id,
+      path: backupDir,
+      reason,
+      at: new Date().toISOString(),
+    });
+  const plistutil = trustedToolPath('plistutil');
+  if (!plistutil) return kept('plistutil is not available, so the folder could not be checked');
+  let bytes: number | null;
+  try {
+    bytes = await removeFailedPullFolder(plistutil, backupDir);
+  } catch (err) {
+    return kept(err instanceof Error ? err.message : String(err));
+  }
+  if (bytes === null) return;
+  await appendPullRecord(destDir, {
+    event: 'failed-pull-folder-removed',
+    udid: device.id,
+    path: backupDir,
+    bytes,
+    removed_at: new Date().toISOString(),
+  });
 }
 
 /** Why a pull refuses a destination that already holds something for the device (EPOCH-483). */
@@ -434,6 +496,8 @@ interface RunControl {
   /** The running backup process, so Cancel can stop it. */
   setProcess: (proc: ChildProcess | null) => void;
   cancelled: () => boolean;
+  /** Whether the device is still connected; null when that can't be told. */
+  connected: () => boolean | null;
 }
 
 /**
@@ -543,6 +607,8 @@ function runBackup(
       // the running guard and refuse every later pull.
       try {
         const received = await folderSize(backupDir, startedAt);
+        // The last measure, so a failed or cancelled pull records what arrived.
+        onStats({ ...stats, receivedBytes: received });
         if (control.cancelled()) fail(`The backup of ${device.name} was cancelled.`);
         else if (code === 0) resolve(received);
         else {
@@ -552,6 +618,8 @@ function runBackup(
               device: device.name,
               destDir,
               freeBytes: free,
+              connected: control.connected(),
+              receivedBytes: received,
             })
           );
         }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { FolderOpen, HardDriveDownload, Trash2, XCircle } from 'lucide-react';
-import type { BackupStats, DestinationBackup, IncompleteBackup } from '../../../shared/types/tools';
+import { HardDriveDownload, Trash2, XCircle } from 'lucide-react';
+import type { BackupStats, IncompleteBackup } from '../../../shared/types/tools';
 import { Button } from '../../components/ui/Button';
 
 export function formatBytes(bytes: number): string {
@@ -93,10 +93,8 @@ interface IncompleteBackupNoticeProps {
   deviceName: string;
   incomplete: IncompleteBackup;
   deleting: boolean;
-  /** True when it is in the folder chosen for the next pull, which is then refused (EPOCH-483). */
-  blocksPull: boolean;
   onDelete: () => void;
-  /** The other way forward: choose another folder, or set the notice aside for now. */
+  /** The other way forward: set the notice aside for now. */
   secondary: { label: string; onClick: () => void };
 }
 
@@ -105,7 +103,6 @@ export function IncompleteBackupNotice({
   deviceName,
   incomplete,
   deleting,
-  blocksPull,
   onDelete,
   secondary,
 }: IncompleteBackupNoticeProps) {
@@ -115,7 +112,6 @@ export function IncompleteBackupNotice({
       <p className="text-data text-foreground">
         A backup of {deviceName} that didn't finish is taking {formatBytes(incomplete.bytes)} in{' '}
         <span className="font-mono break-all">{incomplete.path}</span>. It can't be resumed or used.
-        {blocksPull && " Epoch won't pull into this folder until it is deleted or you choose another folder."}
       </p>
       <div className="flex items-center gap-3">
         <Button variant="outline" tone="danger" onClick={onDelete} loading={deleting} loadingText="Deleting…">
@@ -123,41 +119,6 @@ export function IncompleteBackupNotice({
         </Button>
         <Button variant="outline" onClick={secondary.onClick} disabled={deleting}>
           {secondary.label}
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-interface DestinationBackupNoticeProps {
-  deviceName: string;
-  destination: DestinationBackup;
-  onChooseAnotherFolder: () => void;
-}
-
-/**
- * The chosen folder already holds a backup of the device, or a folder Epoch
- * can't read as a backup. A pull never writes into it (EPOCH-483).
- */
-export function DestinationBackupNotice({
-  deviceName,
-  destination,
-  onChooseAnotherFolder,
-}: DestinationBackupNoticeProps) {
-  return (
-    <section className="rounded-lg bg-flag/10 border border-flag/30 shadow-elevation-1 p-5 mt-4 flex flex-col gap-3">
-      <h3 className="font-display text-heading text-flag">Choose Another Folder</h3>
-      <p className="text-data text-foreground">
-        <span className="font-mono break-all">{destination.path}</span>{' '}
-        {destination.state === 'finished'
-          ? `already holds a finished backup of ${deviceName}. Epoch never writes over a backup.`
-          : destination.state === 'unfinished'
-            ? `holds a backup of ${deviceName} that didn't finish. It can't be resumed, and Epoch won't write into it.`
-            : `already exists and isn't a backup Epoch can read. Epoch won't write into it.`}
-      </p>
-      <div className="flex items-center gap-3">
-        <Button variant="outline" onClick={onChooseAnotherFolder}>
-          <FolderOpen size="0.875rem" /> Choose Another Folder
         </Button>
       </div>
     </section>
