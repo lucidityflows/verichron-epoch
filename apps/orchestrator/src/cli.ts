@@ -1,4 +1,5 @@
 import { DECRYPT_MARKER } from '@verichron/contracts';
+import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
@@ -12,16 +13,53 @@ export function printUsage() {
   );
 }
 
-export async function resolvePythonBin(): Promise<string> {
-  const venvPython = path.join(REPO_ROOT, '.venv', 'bin', 'python');
+const PYTHON_PREFLIGHT = `
+import importlib
+import sys
+
+for module in ("runtime_env", "etl_run", "db_writer", "normalized_record", "tool_defects", "psycopg2", "requests"):
+    importlib.import_module(module)
+
+print(".".join(str(part) for part in sys.version_info[:3]))
+`;
+
+export async function resolvePythonBin(repoRoot = REPO_ROOT): Promise<string> {
+  const venvPython = path.join(repoRoot, '.venv', 'bin', 'python');
   try {
     await fsp.access(venvPython);
-    console.log(`[orchestrator] using venv interpreter: ${venvPython}`);
-    return venvPython;
-  } catch {
-    console.warn(`[orchestrator] no virtualenv found at ${venvPython} — falling back to "python3" on PATH.`);
-    return 'python3';
+  } catch (error) {
+    throw new Error(
+      `Python environment is missing at ${venvPython}; run "uv sync" from ${repoRoot} before investigating.`,
+      { cause: error }
+    );
   }
+
+  let version: string;
+  try {
+    version = execFileSync(venvPython, ['-c', PYTHON_PREFLIGHT], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      timeout: 10_000,
+    }).trim();
+  } catch (error) {
+    const stderr = error && typeof error === 'object' && 'stderr' in error ? error.stderr : undefined;
+    const detail =
+      typeof stderr === 'string' && stderr.trim()
+        ? stderr.trim()
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    throw new Error(`Python preflight failed for ${venvPython}: ${detail}`, { cause: error });
+  }
+
+  if (!/^3\.14\.\d+$/.test(version)) {
+    throw new Error(
+      `Python preflight requires Python 3.14 from ${venvPython}; found ${version || 'no version output'}.`
+    );
+  }
+
+  console.log(`[orchestrator] validated Python ${version}: ${venvPython}`);
+  return venvPython;
 }
 
 export async function parseCliConfig(): Promise<CliConfig> {

@@ -1,11 +1,9 @@
-"""Shared Python runtime guard for repo-local virtualenv usage.
- 
+"""Runtime environment helpers for standalone Python commands.
+
 Lives under libs/ rather than inside any single application (packages/etl-db-writer,
 an extractor, etc.) because it doesn't parse forensic artifacts or execute a
-workflow -- it enforces a system-level guardrail (.venv existence) that
-applies to any Python process in the monorepo, migrate.py and extractors
-alike. Locking it inside one package would mean either duplicating it or
-having unrelated applications reach into each other's directories.
+workflow. The orchestrator validates the environment for spawned stages (R29);
+the guard here remains for standalone commands such as migrate.py.
 """
  
 from __future__ import annotations
@@ -23,7 +21,7 @@ def repo_root() -> Path:
  
  
 def ensure_repo_venv() -> Path:
-    """Require a repo-root .venv before any Python pipeline command runs.
+    """Require a repo-root .venv before a standalone Python command runs.
  
     The project expects a local virtual environment in the repository root so all
     Python tooling resolves the same dependencies and the same interpreter. If the

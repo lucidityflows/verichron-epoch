@@ -41,7 +41,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
+from runtime_env import redact_password, require_database_url
 from etl_run import ETLRunResult
 from db_writer import IngestContext, add_context_args, context_from_args, ingest
 from normalized_record import NormalizedRecord, SourceType
@@ -583,7 +583,6 @@ def process_file(conn: sqlite3.Connection, filename: str, chunks: list[str], sch
                 log.debug(f"{filename} chunk {chunk_index + 1}/{len(chunks)}: safe")
 
 def main() -> None:
-    fatal_if_missing_venv()
     db_url = require_database_url()
     args = parse_args()
     ctx = context_from_args(args)
@@ -721,5 +720,4 @@ def main() -> None:
     sys.exit(ingest_result.exit_code)
 
 if __name__ == "__main__":
-    fatal_if_missing_venv()
     main()

@@ -27,7 +27,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
+from runtime_env import redact_password, require_database_url
 
 import psycopg2
 import psycopg2.extras
@@ -629,7 +629,6 @@ def resolve_output_path(output: str | None, report_path: str | None) -> str:
 
 
 def main():
-    fatal_if_missing_venv()
     db_url = require_database_url()
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-id", required=True)
@@ -666,5 +665,4 @@ def main():
 
 
 if __name__ == "__main__":
-    fatal_if_missing_venv()
     main()

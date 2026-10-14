@@ -90,8 +90,7 @@ Numbers are stable: a retired rule keeps its number.
 
 ## Where the code breaks a rule today
 
-Known violations are ticketed and fixed, never waived.
+Known violations are ticketed and fixed, never waived. Resolved entries are
+removed from this current-state table; numbered rules remain stable.
 
-| Rule | Violation | Ticket |
-|---|---|---|
-| R29 | Extractors check their own environment (`fatal_if_missing_venv()`), and the orchestrator falls back to `python3` on PATH when `.venv` is missing | EPOCH-456 |
+No current violations are recorded.

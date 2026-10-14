@@ -15,7 +15,7 @@ import sys
 from itertools import batched
 from pathlib import Path
 
-from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
+from runtime_env import redact_password, require_database_url
 from db_writer import IngestContext, add_context_args, context_from_args, incomplete_ingests, ingest
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
@@ -191,5 +191,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    fatal_if_missing_venv()
     sys.exit(main())

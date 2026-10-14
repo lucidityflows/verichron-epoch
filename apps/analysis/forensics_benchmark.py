@@ -69,5 +69,4 @@ def run_benchmark():
             print(f"Failed to test {model}: Is it installed? Error: {e}\n")
 
 if __name__ == "__main__":
-    fatal_if_missing_venv()
     run_benchmark()

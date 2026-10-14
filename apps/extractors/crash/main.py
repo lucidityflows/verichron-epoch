@@ -27,7 +27,7 @@ from pathlib import Path
 
 from typing import Any
 
-from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
+from runtime_env import redact_password, require_database_url
 from db_writer import IngestContext, add_context_args, context_from_args, ingest
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
@@ -250,7 +250,6 @@ def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
 
 
 def main():
-    fatal_if_missing_venv()
     db_url = require_database_url()
     parser = argparse.ArgumentParser()
     add_context_args(parser)
@@ -280,5 +279,4 @@ def main():
 
 
 if __name__ == "__main__":
-    fatal_if_missing_venv()
     main()
