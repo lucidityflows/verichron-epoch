@@ -72,6 +72,7 @@ export const useEpochStore = create<EpochState>((set) => ({
   setReportLoading: (reportLoading) => set({ reportLoading }),
   resetRunState: () =>
     set({
+      records: [],
       recordsTotal: 0,
       recordsLoaded: false,
       sourceTypeFilter: null,
