@@ -32,6 +32,12 @@ let stub: string;
 let passwordLog: string;
 let ileappDir: string;
 let ileappPython: string;
+/** The stub iLEAPP's module list: one of each status iLEAPP records. */
+const STUB_MODULES = [
+  { module_name: 'Safari', artifact_name: 'safari_history', module_status: 'Complete', file_count: 1 },
+  { module_name: 'AWESearch', artifact_name: 'get_AWESearch', module_status: 'No files found', file_count: 0 },
+  { module_name: 'ZaloChats', artifact_name: 'zalo_messages', module_status: 'Error', file_count: 300 },
+];
 
 /** git in the stub iLEAPP checkout, with an identity so commits work anywhere. */
 const ileappGit = (...args: string[]) =>
@@ -85,8 +91,10 @@ exit 0
 
   // The stub stands in for iLEAPP's interpreter, so it is called as
   //   <python> ileapp.py -t TYPE -i INPUT -o PARENT --custom_output_folder NAME
-  // and writes PARENT/NAME/input-type.
+  // and writes PARENT/NAME/input-type and iLEAPP's module list (EPOCH-457),
+  // logging one plugin error as iLEAPP does.
   // STUB_ILEAPP=fail: exit 1. =hang: never finish. =none: exit 0 having written nothing.
+  // =nolist: a report with no module list.
   ileappPython = path.join(tmp, 'ileapp-python-stub');
   writeFileSync(
     ileappPython,
@@ -97,6 +105,10 @@ case "$STUB_ILEAPP" in
   none) exit 0 ;;
 esac
 mkdir "$7/$9" && echo "$3" > "$7/$9/input-type"
+[ "$STUB_ILEAPP" = nolist ] && exit 0
+echo 'Reading zalo_messages artifact had errors!'
+echo 'Error was list index out of range'
+printf '%s' '${JSON.stringify({ modules: STUB_MODULES })}' > "$7/$9/_lava_data.lava"
 `
   );
   chmodSync(ileappPython, 0o755);
@@ -318,6 +330,12 @@ describe('the decrypt tool (EPOCH-489)', () => {
 });
 
 describe('iLEAPP output (EPOCH-416)', () => {
+  it('gives an output with no module list no marker, and says which file (EPOCH-457)', async () => {
+    const out = await runCli(['--force'], '', { STUB_ILEAPP: 'nolist' });
+    assert.match(out, /could not read iLEAPP's module list from .*_lava_data\.lava/);
+    assert.equal(readIleappMarker(ileapp()), null, 'no marker vouches for it');
+  });
+
   it('runs iLEAPP into ileapp/<label>/ and records the decrypt it read and the iLEAPP commit', async () => {
     const out = await runCli();
     assert.match(out, /\[ileapp\]  (done|already done)/);
@@ -325,7 +343,22 @@ describe('iLEAPP output (EPOCH-416)', () => {
     assert.ok(marker, 'marker written');
     assert.equal(marker.content_root, readDecryptMarker(decrypted())!.content_root);
     assert.deepEqual(marker.tool, { name: 'iLEAPP', version: ileappGit('rev-parse', 'HEAD') });
-    assert.deepEqual(marker.params, { input_type: 'itunes' }, 'the decrypt has a top-level Manifest.db');
+    assert.deepEqual(
+      marker.params,
+      {
+        input_type: 'itunes',
+        modules: {
+          total: 3,
+          complete: 1,
+          no_files_found: ['get_AWESearch'],
+          errors: [
+            { module: 'ZaloChats', artifact: 'zalo_messages', file_count: 300, error: 'list index out of range' },
+          ],
+        },
+      },
+      'the decrypt has a top-level Manifest.db; the plugin error is recorded with the output'
+    );
+    assert.match(out, /plugin errored: zalo_messages \(ZaloChats\): list index out of range/);
     assert.equal(
       readFileSync(path.join(ileapp(), 'input-type'), 'utf8').trim(),
       'itunes',

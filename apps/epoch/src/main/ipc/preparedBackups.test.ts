@@ -32,7 +32,13 @@ function backup(workspace: string, label: string, decryptRoot: string | null, il
   if (ileappRoot) {
     const ile = path.join(workspace, 'ileapp', label);
     mkdirSync(ile, { recursive: true });
-    writeFileSync(path.join(ile, ILEAPP_MARKER), renderIleappMarker(ileappRoot, ILEAPP, { input_type: 'itunes' }));
+    writeFileSync(
+      path.join(ile, ILEAPP_MARKER),
+      renderIleappMarker(ileappRoot, ILEAPP, {
+        input_type: 'itunes',
+        modules: { total: 0, complete: 0, no_files_found: [], errors: [] },
+      })
+    );
   }
 }
 

@@ -63,10 +63,36 @@ export type RepairProvenance = z.infer<typeof RepairProvenance>;
 export const DecryptParams = z.object({ repair: RepairProvenance }).strict();
 export type DecryptParams = z.infer<typeof DecryptParams>;
 
+/** One iLEAPP plugin that errored, from iLEAPP's own module status (EPOCH-457). */
+export const IleappModuleError = z
+  .object({
+    module: z.string(),
+    artifact: z.string(),
+    file_count: z.number().int().nonnegative(),
+    /** iLEAPP's "Error was ..." line from its log, or null if it logged none. */
+    error: z.string().nullable(),
+  })
+  .strict();
+export type IleappModuleError = z.infer<typeof IleappModuleError>;
+
+/** What iLEAPP's modules did, from its `_lava_data.lava` (EPOCH-457). A plugin
+ * error is a fact about the output, recorded here, not a failure of the run. */
+export const IleappModules = z
+  .object({
+    total: z.number().int().nonnegative(),
+    complete: z.number().int().nonnegative(),
+    /** Artifacts whose files aren't in the backup. */
+    no_files_found: z.array(z.string()),
+    errors: z.array(IleappModuleError),
+  })
+  .strict();
+export type IleappModules = z.infer<typeof IleappModules>;
+
 export const IleappParams = z
   .object({
     /** How iLEAPP walked the decrypt (its -t): 'itunes' with a Manifest.db, else 'fs'. */
     input_type: z.enum(['itunes', 'fs']),
+    modules: IleappModules,
   })
   .strict();
 export type IleappParams = z.infer<typeof IleappParams>;

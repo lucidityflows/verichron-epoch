@@ -62,7 +62,11 @@ const ILEAPP = { name: 'iLEAPP', version: '24ba13daf37d8ef3c63c959768e31aae8e630
 
 /** The markers the processor writes once each derivative is done (EPOCH-404, EPOCH-406). */
 const decryptMarker = (root: string, params: DecryptParams = REPAIRED) => renderDecryptMarker(root, DECRYPT, params);
-const ileappMarker = (root: string, tool = ILEAPP) => renderIleappMarker(root, tool, { input_type: 'itunes' });
+const ILEAPP_PARAMS = {
+  input_type: 'itunes' as const,
+  modules: { total: 0, complete: 0, no_files_found: [], errors: [] },
+};
+const ileappMarker = (root: string, tool = ILEAPP) => renderIleappMarker(root, tool, ILEAPP_PARAMS);
 
 let admin: pg.Client;
 let db: pg.Client;
@@ -561,7 +565,7 @@ describe('stages and the completeness predicate', live, () => {
       ]
     );
     assert.deepEqual(rows[0].params, REPAIRED, 'repair counts, failed files and preserved originals are queryable');
-    assert.deepEqual(rows[1].params, { input_type: 'itunes' });
+    assert.deepEqual(rows[1].params, ILEAPP_PARAMS);
     for (const r of rows) assert.match(r.provenance_key, /^[0-9a-f]{64}$/);
     const events = await db.query(
       `SELECT detail FROM evidence_events WHERE kind = 'derivative_registered' ORDER BY event_id`
