@@ -610,7 +610,9 @@ def test_a_report_that_does_not_name_its_ileapp_version_fails_the_stage(tmp_path
         read_manifest(report)
 
 
-def test_an_applied_correction_is_part_of_the_units_identity(tmp_path):
+def test_a_correction_leaves_the_units_identity_alone(tmp_path):
+    """The unit is iLEAPP's content; a correction reaches it through a newer
+    parser version, never through a new identity (EPOCH-511)."""
     report = write_report(tmp_path / "BK1", UBER)
     output = read_manifest(report)
     conn = open_database(output)
@@ -620,7 +622,38 @@ def test_an_applied_correction_is_part_of_the_units_identity(tmp_path):
         corrected = read_artifact(conn, output, artifact, defects_for("iLEAPP", output.tool_version))
     finally:
         conn.close()
-    assert plain.content_hash != corrected.content_hash
+    assert plain.content_hash == corrected.content_hash
+
+
+def current_facts(db) -> list[tuple[dict, datetime | None]]:
+    cur = db.cursor()
+    cur.execute("SELECT fields, event_time FROM current_forensic_records WHERE source_type = 'ileapp_record' ORDER BY id")
+    out = []
+    for fields, when in cur.fetchall():
+        fields = json.loads(fields) if isinstance(fields, str) else fields
+        if isinstance(when, str):
+            when = datetime.fromisoformat(when)
+        out.append((fields, when.astimezone(timezone.utc) if when else None))
+    return out
+
+
+def test_corrected_facts_supersede_the_uncorrected_ones(db, tmp_path):
+    """Seen on the reference backup's first corrected run (2026-10-14): when
+    the correction changed the unit's identity, the uncorrected 1970 facts
+    stayed current beside the corrected ones. With the same identity, the
+    newer parser version replaces them (R8)."""
+    before = write_report(tmp_path / "before", UBER, tool_version="2026.2.0")  # no defect registered
+    ingest_report(db, IngestContext(evidence_id=EVIDENCE_ID, derivative_id=DERIVATIVE_ID, run_id=RUN_ID, parser_version=4), before)
+    assert [w for _, w in current_facts(db)][0] == datetime.fromtimestamp(1791009, timezone.utc)
+
+    after = write_report(tmp_path / "after", UBER)  # 2026.3.0: ILEAPP-0001 applies
+    ingest_report(db, IngestContext(evidence_id=EVIDENCE_ID, derivative_id=DERIVATIVE_ID, run_id=RUN_ID, parser_version=5), after)
+    current = current_facts(db)
+    assert [w for _, w in current] == [
+        datetime.fromtimestamp(1791009000, timezone.utc),
+        datetime.fromtimestamp(1791009794, timezone.utc),
+    ], "only the corrected version is current"
+    assert len(stored(db)) == 4, "the uncorrected facts are history, not deleted"
 
 
 def test_ileapp_record_is_a_declared_source_type():
