@@ -32,6 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from stored_value import is_encoded, stored_value
 from tool_defects import ToolDefect
 
 MANIFEST = "_lava_data.lava"
@@ -332,7 +333,7 @@ def _plan(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifact, defe
 def _read_row(raw: tuple, plan: _Plan, run_time: datetime) -> RowRead:
     """One row as stored. Both passes use this, so the identity and the
     records written always agree."""
-    values = [_json_value(v) for v in raw]
+    values = [stored_value(v) for v in raw]
     # Registered corrections: iLEAPP's value stays in the row, under its
     # header; the corrected value is what the record's time is read from.
     effective = list(raw)
@@ -372,7 +373,7 @@ def _read_row(raw: tuple, plan: _Plan, run_time: datetime) -> RowRead:
         event_time=when,
         corrections=applied,
         review=flagged,
-        encoded=sum(1 for v in values if isinstance(v, dict)),
+        encoded=sum(1 for v in values if is_encoded(v)),
         unconvertible=unconvertible,
     )
 
@@ -582,40 +583,6 @@ def _within_evidence(artifact: Artifact, source: str, relative: str) -> str:
 
 def _quote(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
-
-
-#: The marker for a value stored encoded because PostgreSQL can't hold it as
-#: is (EPOCH-502): binary, or text holding NUL (U+0000), which jsonb rejects.
-#: The value is kept exactly; decode `value` by `$encoded` to get it back.
-ENCODED = "$encoded"
-
-
-def _json_value(value: Any) -> Any:
-    """SQLite values as stored JSON values. Binary and text holding NUL are
-    kept exactly, encoded and marked, never dropped or altered."""
-    if isinstance(value, bytes):
-        return {ENCODED: "hex", "value": value.hex()}
-    if isinstance(value, str) and "\x00" in value:
-        return {ENCODED: "utf8-hex", "value": value.encode("utf-8").hex()}
-    if isinstance(value, float) and math.isinf(value):
-        # JSON has no infinity, and jsonb refuses the `Infinity` token
-        # json.dumps writes (EPOCH-418); SQLite stores NaN as NULL, so an
-        # infinity is the only non-finite value that can arrive.
-        return {ENCODED: "float", "value": "Infinity" if value > 0 else "-Infinity"}
-    return value
-
-
-def decode_value(value: Any) -> Any:
-    """The original value of a stored one: bytes for `hex`, text for
-    `utf8-hex`, anything unmarked as it is."""
-    if isinstance(value, dict) and set(value) == {ENCODED, "value"}:
-        if value[ENCODED] == "hex":
-            return bytes.fromhex(value["value"])
-        if value[ENCODED] == "utf8-hex":
-            return bytes.fromhex(value["value"]).decode("utf-8")
-        if value[ENCODED] == "float":
-            return float(value["value"])
-    return value
 
 
 def _identity_value(value: Any) -> Any:

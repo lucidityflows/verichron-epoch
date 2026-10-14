@@ -110,6 +110,28 @@ def test_a_previously_failed_ips_file_is_retried_on_the_next_run(db, tmp_path):
     assert db.record_count() == 1
 
 
+def test_every_real_ips_shape_is_ingested_and_other_device_files_are_counted(db, tmp_path):
+    """EPOCH-447: the redacted real fixtures (JSON, text and binary bodies)
+    each become one record; the device's other diagnostic files are named in
+    the stage's notes, never dropped silently."""
+    import shutil
+    from pathlib import Path
+
+    fixtures = Path(crash_main.__file__).parent / "fixtures"
+    for ips in fixtures.glob("*.ips"):
+        shutil.copy(ips, tmp_path / ips.name)
+    (tmp_path / "Analytics-2026-01-02.ca").write_text("{}")
+    (tmp_path / "DiagnosticLogs").mkdir()
+    (tmp_path / "DiagnosticLogs" / "boot.log").write_text("log")
+
+    result = crash_main.run(db, ctx(RUN_ID), str(tmp_path))
+
+    assert result.failed == 0, result.failures
+    assert result.succeeded == 4
+    assert db.record_count() == 4
+    assert result.notes == ["2 file(s) not read, not .ips crash reports: 1 .ca, 1 .log"]
+
+
 def test_a_successful_ips_file_is_deduped_not_duplicated(db, tmp_path):
     """A resumed run writes nothing for an already-complete file, so it counts
     zero records (EPOCH-421), and notes the file as already ingested so it
