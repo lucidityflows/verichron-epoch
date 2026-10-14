@@ -367,6 +367,15 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
               ($1, 'later', 'pending', NULL, NULL, NULL, NULL)`,
       [RUN, EVIDENCE]
     );
+    // More stages, so each status has its own count (pending 5, running 4,
+    // failed 3, skipped 2, succeeded 1): a swapped status filter shows.
+    await db.query(
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, status)
+       SELECT $1, status || '_' || n, status::text
+         FROM (VALUES ('pending', 4), ('running', 3), ('failed', 2), ('skipped', 1)) AS extra(status, more),
+              generate_series(1, more) AS n`,
+      [RUN]
+    );
     // Two complete units this run labelled for the decrypt, one incomplete
     // unit, and one complete unit only another run labelled.
     await db.query(
@@ -384,7 +393,7 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
   it("gives each run its device's name and its stage counts", async () => {
     const run = (await getPipelineRuns(db)).find((r) => r.run_id === RUN)!;
     assert.equal(run.device_label, 'test device');
-    assert.deepEqual(run.stage_counts, { pending: 1, running: 1, succeeded: 1, failed: 1, skipped: 1 });
+    assert.deepEqual(run.stage_counts, { pending: 5, running: 4, failed: 3, skipped: 2, succeeded: 1 });
     assert.equal(run.state, 'running', 'the verdict comes from run_completeness, not the counts');
   });
 
