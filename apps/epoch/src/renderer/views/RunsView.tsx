@@ -18,6 +18,7 @@ import { useAnalysisState } from '../hooks/usePipelineState';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
+import { TableSkeleton } from '../components/ui/Skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/Tooltip';
 import { formatDuration, StageCard } from '../features/investigations/StageCard';
 
@@ -79,25 +80,6 @@ interface RunsViewProps {
   onSelectRun: (run: PipelineRunRow) => void;
   onRefreshStages?: (runId: string) => void;
   onRefreshRun?: (runId: string) => void | Promise<void>;
-}
-
-function RunsTableSkeleton() {
-  return (
-    <div className="w-full h-full flex flex-col">
-      <div className="flex px-4 py-3 border-b border-border/60 bg-surface/90 gap-4">
-        <div className="h-4 w-32 rounded bg-muted-foreground/20 animate-pulse" />
-        <div className="h-4 w-24 rounded bg-muted-foreground/20 animate-pulse" />
-        <div className="h-4 w-24 rounded bg-muted-foreground/20 animate-pulse" />
-      </div>
-      {[...Array(6)].map((_, i) => (
-        <div key={i} className="flex px-4 py-3 border-b border-border/40 gap-4">
-          <div className="h-4 w-48 rounded bg-muted-foreground/10 animate-pulse" />
-          <div className="h-4 w-20 rounded bg-muted-foreground/10 animate-pulse" />
-          <div className="h-4 w-32 rounded bg-muted-foreground/10 animate-pulse" />
-        </div>
-      ))}
-    </div>
-  );
 }
 
 export function RunsView({
@@ -339,7 +321,7 @@ export function RunsView({
         </div>
       ) : loading ? (
         <div className="flex-1 overflow-hidden border border-border/40 rounded-lg shadow-elevation-1 bg-surface">
-          <RunsTableSkeleton />
+          <TableSkeleton />
         </div>
       ) : runs.length === 0 ? (
         <EmptyState
