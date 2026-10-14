@@ -69,6 +69,12 @@ PostgreSQL applies the migrations itself on its first boot; `migrate.py` records
 what was applied and applies anything newer. It refuses a database where a
 migration stopped part-way.
 
+Analyze refuses a database that is behind the code: before registering
+anything, the orchestrator compares `migrations/` with `migrate.py`'s
+`schema_migrations` ledger, and a missing ledger or any unlisted file stops the
+run with a message naming them. A database PostgreSQL initialized on first boot
+has no ledger until `migrate.py` has run once.
+
 **Development data is disposable.** When a migration changes existing tables,
 recreate the database instead of patching it:
 
@@ -118,10 +124,17 @@ TEST_DATABASE_URL=postgresql://.../verichron_test uv run pytest
 pnpm --filter @verichron/processor test             # TypeScript (node:test via tsx)
 pnpm --filter @verichron/orchestrator test           # real-Postgres tests need TEST_DATABASE_URL
 pnpm --filter @verichron/etl-db-reader test
+pnpm --filter @verichron/epoch test                  # Vitest: main process in Node, renderer in jsdom
 pnpm check:contracts                                 # schema ↔ TS ↔ Python mirrors in sync
 ```
 
 `mise run test` runs both suites (`mise run test:py`, `mise run test:ts`).
+
+The desktop app's tests run in Vitest: main-process and IPC handler tests in
+Node (the IPC tests against real Postgres, with a stand-in for Electron's
+`ipcMain`), and renderer tests in jsdom with Testing Library. They read the
+reader through its built `dist/`, so build `@verichron/etl-db-reader` first.
+CI also type-checks the app and builds its main, preload and renderer bundles.
 
 External tools are tested through stub executables and servers (a stub decrypt
 interpreter, `sqlite3`, iLEAPP, Ollama), so tests exercise the real process

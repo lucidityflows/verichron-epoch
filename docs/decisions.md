@@ -73,6 +73,7 @@ never silently deleted.
 | A run with no registered evidence is reported as "not registered, not read", never as "nothing found" | Not reading is not finding nothing | EPOCH-403 |
 | Abandoned runs are closed by run id and process liveness, recording why they ended, never by rewriting stage rows or matching paths | History stays truthful, and one process can't touch another's runs | EPOCH-435 |
 | No stage is disabled to make a build look stable without explicit discussion | Hiding a broken stage over-claims what the build does | Team decision, 2026-10-08 |
+| Analyze refuses a database with pending migrations (no `schema_migrations` ledger, or a migration file it doesn't list) before registering anything, and names them; it never applies migrations itself | A database behind the code failed deep inside registration with a constraint error, after a long successful prepare. Who applies migrations automatically is the Lab build's decision (EPOCH-475, 477) | EPOCH-498 |
 
 ## Facts and ingest
 
@@ -125,6 +126,7 @@ never silently deleted.
 | CI runs on Linux only; macOS inputs (NFD names, `\` separators) are simulated in tests | macOS runners cost about 10x; simulation covers what matters | EPOCH-401 |
 | All GitHub Actions are pinned to full commit SHAs | Repository policy | PR #37 |
 | External processes are tested through stub executables and servers (stub mvt-ios, sqlite3, Ollama), not in-process mocks *Changed 2026-10-13 (EPOCH-489): a stub decrypt interpreter replaces stub mvt-ios.* | Tests cover the real process boundary, including argv and environment | Audits, 2026-10-08 |
+| The desktop app has one test runner, Vitest: main-process and IPC handler tests run in Node, renderer tests in jsdom with Testing Library. CI gates on the app's type check, its Vite build and these tests. Other TypeScript packages keep Node's test runner | Vitest can stand in for Electron's `ipcMain` and render React components, which Node's runner can't do without experimental flags | EPOCH-454 |
 | Development data is disposable; there are no backfills or legacy-compatibility paths, and code fails fast | The process is being made tight before real data exists | Team decision, 2026-10-08 |
 | Automated pull request review is CodeRabbit, configured in `.coderabbit.yaml`: it reviews PRs to `main` and `dev`, grounded in `AGENTS.md`, `docs/rules.md` and this page, and skips the iLEAPP submodule and lockfiles | Free for public repositories. Copilot's free plan cannot review pull requests (Copilot Pro is required), and Greptile's free plan reached its monthly limit | Team decision, 2026-10-09 |
 | *Amended 2026-10-09:* CodeRabbit's Linear integration is disabled (`knowledge_base.linear.usage: disabled`) and is not connected. Reviews get ticket context from the PR description | The Linear workspace is private and the repository public, so ticket content must not reach public review comments. The integration also requires a paid CodeRabbit plan, and its only documented connection is OAuth to the whole workspace | Team decision, 2026-10-09 |
