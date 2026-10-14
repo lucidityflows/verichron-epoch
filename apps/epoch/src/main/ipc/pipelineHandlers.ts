@@ -165,16 +165,24 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }
   }
 
-  async function readAnalysisSummary(workspace: string) {
+  /** The orchestrator's summary: each backup's result, and why it refused to
+   * start, if it did (EPOCH-498: a database with pending migrations). */
+  async function readAnalysisSummary(
+    workspace: string
+  ): Promise<{ analysis?: PipelineFinishedResult['analysis']; error?: string }> {
     try {
       const raw = await readFile(path.join(workspace, 'analysis-summary.json'), 'utf8');
       const parsed: unknown = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { results?: unknown }).results)) {
-        return undefined;
+        return {};
       }
-      return (parsed as { results: PipelineFinishedResult['analysis'] }).results;
+      const summary = parsed as { results: PipelineFinishedResult['analysis']; error?: unknown };
+      return {
+        analysis: summary.results,
+        error: typeof summary.error === 'string' ? summary.error : undefined,
+      };
     } catch {
-      return undefined;
+      return {};
     }
   }
 
@@ -435,7 +443,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
 
         void markWorkspaceRunsAborted(workspaceAtClose, closeReason)
           .then(() => readAnalysisSummary(workspaceAtClose))
-          .then((analysis) => {
+          .then(({ analysis, error }) => {
             analysisSession.finish({
               success: false,
               exitCode: code,
@@ -446,13 +454,13 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
                 ? 'Analysis was cancelled.'
                 : timedOut
                   ? `Analysis timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minutes and was stopped.`
-                  : undefined,
+                  : error,
             });
           });
         return;
       }
 
-      void readAnalysisSummary(workspaceAtClose).then((analysis) => {
+      void readAnalysisSummary(workspaceAtClose).then(({ analysis }) => {
         analysisSession.finish({ success: true, exitCode: code, analysis });
       });
     });
@@ -534,19 +542,22 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
             ? `orchestrator timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minute(s)`
             : `orchestrator process exited unexpectedly (code ${code})`;
 
-        void markSingleRunAborted(scopedBackupSource, closeReason).then(() => {
-          analysisSession.finish({
-            success: false,
-            exitCode: code,
-            cancelled,
-            timedOut,
-            error: cancelled
-              ? 'Analysis was cancelled.'
-              : timedOut
-                ? `Analysis timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minutes and was stopped.`
-                : undefined,
+        // The orchestrator writes its summary to the backup's workspace.
+        void markSingleRunAborted(scopedBackupSource, closeReason)
+          .then(() => readAnalysisSummary(path.dirname(path.dirname(scopedBackupSource))))
+          .then(({ error }) => {
+            analysisSession.finish({
+              success: false,
+              exitCode: code,
+              cancelled,
+              timedOut,
+              error: cancelled
+                ? 'Analysis was cancelled.'
+                : timedOut
+                  ? `Analysis timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minutes and was stopped.`
+                  : error,
+            });
           });
-        });
         return;
       }
 

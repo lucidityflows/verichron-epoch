@@ -1,0 +1,46 @@
+import { readdirSync } from 'node:fs';
+import * as path from 'node:path';
+import type { Client } from 'pg';
+import { REPO_ROOT } from './discovery.js';
+
+/** The migrations migrate.py applies, in the order it applies them. */
+export const MIGRATIONS_DIR = path.join(REPO_ROOT, 'packages', 'etl-db-writer', 'migrations');
+
+/** The command docs/development.md gives for applying migrations. */
+const MIGRATE_COMMAND =
+  'uv run python packages/etl-db-writer/migrate.py --db-url "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME"';
+
+export interface MigrationStatus {
+  /** False when the database has no schema_migrations ledger at all. */
+  ledger: boolean;
+  /** Migration files the ledger doesn't list, in filename order. */
+  pending: string[];
+}
+
+/**
+ * The database's migrations as migrate.py sees them (EPOCH-498): the same
+ * files and the same ledger, so the two can't disagree about what is pending.
+ * Without a ledger every file is pending, since nothing records what was
+ * applied (a first-boot database migrate.py has never reconciled).
+ */
+export async function readMigrationStatus(client: Client, dir = MIGRATIONS_DIR): Promise<MigrationStatus> {
+  const files = readdirSync(dir)
+    .filter((name) => name.endsWith('.sql'))
+    .sort();
+  const { rows } = await client.query<{ ledger: boolean }>(
+    `SELECT to_regclass('schema_migrations') IS NOT NULL AS ledger`
+  );
+  if (!rows[0].ledger) return { ledger: false, pending: files };
+  const applied = await client.query<{ filename: string }>('SELECT filename FROM schema_migrations');
+  const recorded = new Set(applied.rows.map((row) => row.filename));
+  return { ledger: true, pending: files.filter((name) => !recorded.has(name)) };
+}
+
+/** Why a run can't start against this database, or null when it is up to date. */
+export function migrationRefusal(status: MigrationStatus): string | null {
+  if (status.ledger && status.pending.length === 0) return null;
+  const cause = status.ledger
+    ? `The database is missing migrations ${status.pending.join(', ')}.`
+    : 'The database has no record of its migrations (no schema_migrations table).';
+  return `${cause} Analysis would fail against it, so nothing was started. Apply the migrations with: ${MIGRATE_COMMAND}`;
+}

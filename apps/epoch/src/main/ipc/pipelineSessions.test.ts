@@ -3,7 +3,7 @@
  * process, so New Investigation can be left and opened again mid-run.
  */
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { applyPrepareLogLine, initPrepareProgress } from '../../shared/prepareProgress';
 import type { PrepareState } from '../../shared/types/window';

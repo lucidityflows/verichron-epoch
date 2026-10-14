@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import {
   existingBackupState,
@@ -159,9 +159,9 @@ describe('existingBackupState', () => {
     assert.equal(await existingBackupState(fakePlistutil(status('finished')), dir), null);
   });
 
-  it(
+  // Skipped as root, which ignores folder permissions.
+  it.skipIf(process.getuid?.() === 0)(
     'raises an error it cannot read past, rather than letting a pull write there',
-    { skip: process.getuid?.() === 0 && 'root ignores folder permissions' },
     async () => {
       const locked = path.join(tmp, 'LOCKED');
       fs.mkdirSync(path.join(locked, 'DEVICE'), { recursive: true });

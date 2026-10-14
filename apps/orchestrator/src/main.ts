@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { Client } from 'pg';
 import { parseCliConfig, resolvePythonBin } from './cli.js';
 import { discoverStages } from './discovery.js';
+import { migrationRefusal, readMigrationStatus } from './migrations.js';
 import { runPipelineForBackup } from './pipeline.js';
 
 async function main() {
@@ -23,8 +24,24 @@ async function main() {
     return;
   }
 
+  const workspacePath = path.dirname(path.dirname(cfg.backupPaths[0]));
+  const summaryPath = path.join(workspacePath, 'analysis-summary.json');
+  // The app reads this file after the process exits; a summary left by an
+  // earlier run must never be read as this one's.
+  await fsp.rm(summaryPath, { force: true });
   const client = new Client({ connectionString: cfg.dbUrl });
   await client.connect();
+
+  // EPOCH-498: a database behind the code fails deep inside registration with
+  // a constraint error. Refuse before registering anything, and say why.
+  const refusal = migrationRefusal(await readMigrationStatus(client));
+  if (refusal) {
+    await client.end();
+    console.error(`[orchestrator] ${refusal}`);
+    await fsp.writeFile(summaryPath, JSON.stringify({ results: [], error: refusal }, null, 2));
+    process.exitCode = 1;
+    return;
+  }
 
   let failedBackups = 0;
   const analysisResults: Array<{
@@ -66,11 +83,7 @@ async function main() {
   }
 
   await client.end();
-  const workspacePath = path.dirname(path.dirname(cfg.backupPaths[0]));
-  await fsp.writeFile(
-    path.join(workspacePath, 'analysis-summary.json'),
-    JSON.stringify({ results: analysisResults }, null, 2)
-  );
+  await fsp.writeFile(summaryPath, JSON.stringify({ results: analysisResults }, null, 2));
 
   if (failedBackups > 0) process.exitCode = 1;
 }

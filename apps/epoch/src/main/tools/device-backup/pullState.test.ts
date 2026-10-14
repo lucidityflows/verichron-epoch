@@ -3,7 +3,7 @@
  * that mounts mid-pull shows that pull instead of offering another.
  */
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import type { DeviceInfo } from '../../../shared/types/tools';
 import { nextDeviceAction, PULL_STATE_PROGRESS_LIMIT, PullStateTracker } from './pullState';

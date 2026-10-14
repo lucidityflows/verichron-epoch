@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { after, describe, it } from 'node:test';
+import { afterAll, describe, it } from 'vitest';
 
 import { DECRYPT_MARKER, ILEAPP_MARKER, renderDecryptMarker, renderIleappMarker } from '@verichron/contracts';
 
@@ -18,7 +18,7 @@ const DECRYPT = { name: 'iphone_backup_decrypt', version: '0.10.0' };
 const ILEAPP = { name: 'iLEAPP', version: 'c'.repeat(40) };
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'prepared-'));
-after(() => rmSync(tmp, { recursive: true, force: true }));
+afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
 function backup(workspace: string, label: string, decryptRoot: string | null, ileappRoot: string | null): void {
   const dec = path.join(workspace, 'decrypted', label);
