@@ -1,8 +1,8 @@
 name: TS Tests
 
-# EPOCH-401: first TypeScript test job in the repo. Scoped to the processor and
-# its workspace dependencies (the `...` filter) so the Electron app's install
-# isn't pulled into every run. Widen the filter as other packages gain tests.
+# EPOCH-401: first TypeScript test job in the repo. Each package is installed
+# with its workspace dependencies (the `...` filter). EPOCH-454 adds the desktop
+# app; its install skips Electron's binary, which no step here launches.
 #
 # Linux only, by decision (2026-10-07): the macOS-specific inputs the evidence
 # manifest must be invariant to (NFD filenames, `\` separators) are simulated
@@ -47,7 +47,9 @@ jobs:
           version: 2026.10.4
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter verichron-epoch --filter "@verichron/processor..." --filter "@verichron/etl-db-writer..." --filter "@verichron/etl-db-reader..." --filter "@verichron/orchestrator..."
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: pnpm install --frozen-lockfile --filter verichron-epoch --filter "@verichron/processor..." --filter "@verichron/etl-db-writer..." --filter "@verichron/etl-db-reader..." --filter "@verichron/orchestrator..." --filter "@verichron/epoch..."
 
       # EPOCH-469: every TypeScript file in the repo, the desktop app included,
       # in the layout .prettierrc.json gives it.
@@ -83,3 +85,18 @@ jobs:
       # completeness predicate, against a throwaway database on this server.
       - name: Test orchestrator (real Postgres)
         run: pnpm --filter @verichron/orchestrator test
+
+      # EPOCH-454: the desktop app reads the reader through its built dist/.
+      - name: Build etl-db-reader
+        run: pnpm --filter @verichron/etl-db-reader build
+
+      - name: Typecheck app
+        run: pnpm --filter @verichron/epoch typecheck
+
+      - name: Build app (main, preload, renderer)
+        run: pnpm --filter @verichron/epoch build:vite
+
+      # Main-process and IPC tests in Node (the IPC handlers against a
+      # throwaway database on this server); renderer tests in jsdom.
+      - name: Test app
+        run: pnpm --filter @verichron/epoch test
