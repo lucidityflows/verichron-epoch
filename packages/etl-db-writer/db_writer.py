@@ -53,14 +53,8 @@ sequence by accident. `write_record`/`write_records` no longer commit at all
 change asks for and incidentally stops `write_record` from paying a commit per
 row.
  
-A future TypeScript extractor uses packages-ts/etl-db-writer/dbWriter.ts, which
-mirrors this file's semantics with a callback in place of the context
-manager. It used to live under packages-ts/orchestrator/src/ alongside a
-now-deleted, never-imported IngestionOrchestrator class; moving it kept the
-one real thing in that directory and dropped the dead one, rather than
-implying the orchestrator itself depends on it (it never did — see
-main-orchestrator/main.ts, which writes nothing to Postgres directly and
-only spawns the Python extractors that do).
+This Python module is the sole fact writer. A future TypeScript stage that
+needs to write facts requires a separately ticketed writer implementation.
 """
  
 from __future__ import annotations

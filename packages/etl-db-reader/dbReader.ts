@@ -1,27 +1,8 @@
 /**
- * Postgres read helpers for TypeScript callers -- the query-side counterpart
- * to packages/etl-db-writer/dbWriter.ts.
- *
- * Why this is a separate package rather than more exports on etl-db-writer
- * ----------------------------------------------------------------------
- * etl-db-writer's own header comment stakes out a deliberately narrow scope: it
- * owns the atomic ingest boundary for ingested_files/forensic_records, and
- * nothing else. apps/orchestrator already reads pipeline_runs /
- * pipeline_stage_status directly with raw `pg` rather than going through
- * etl-db-writer, and etl-db-writer's comment calls that "the correct boundary for
- * that table pair." Folding read helpers into etl-db-writer would blur exactly
- * the line that comment was written to protect -- someone debugging a slow
- * dashboard query six months from now could reasonably start adding raw SQL
- * next to `ingest()` and nobody would notice the atomicity guarantee's
- * chokepoint had quietly grown a side door.
- *
- * This package is the query side instead: no BEGIN/COMMIT, no dedup keys, no
- * invariants to protect. Just SELECTs, given an already-open client. Every
- * function here takes a `Db` the same way etl-db-writer's do -- this package does
- * not own a Pool, does not read DB_* env vars, and does not know how its
- * caller manages connections. apps/epoch's main process owns the Pool today;
- * a future NestJS service would own a different pool with the exact same
- * query functions underneath.
+ * Read-only Postgres query helpers for TypeScript callers. This package does
+ * not own a Pool, read DB_* env vars, or manage its caller's connections.
+ * Fact ingestion is handled by the Python writer; the orchestrator owns
+ * pipeline run-state writes.
  *
  * Every table/column name below was checked against
  * packages/etl-db-writer/migrations/0001_init.sql and 0002_ingest_completion.sql

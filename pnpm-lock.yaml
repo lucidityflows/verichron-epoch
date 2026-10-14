@@ -16,7 +16,7 @@ catalogs:
       specifier: ^24.13.3
       version: 24.13.3
     '@types/pg':
-      specifier: ^8.23.0ss
+      specifier: ^8.23.0
       version: 8.23.1
     dotenv:
       specifier: ^18.0.3
@@ -273,31 +273,6 @@ importers:
         version: 6.0.3
 
   packages/etl-db-reader:
-    dependencies:
-      '@verichron/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.13.3
-      '@types/pg':
-        specifier: 'catalog:'
-        version: 8.23.1
-      dotenv:
-        specifier: 'catalog:'
-        version: 18.0.6
-      pg:
-        specifier: 'catalog:'
-        version: 8.23.0
-      tsx:
-        specifier: 'catalog:'
-        version: 4.23.12
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-
-  packages/etl-db-writer:
     dependencies:
       '@verichron/contracts':
         specifier: workspace:*

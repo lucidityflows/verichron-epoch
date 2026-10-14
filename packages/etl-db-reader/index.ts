@@ -1,8 +1,8 @@
 /**
  * Public entry point for `@verichron/db-reader`.
  *
- * Query-side counterpart to `@verichron/etl-db-writer` -- see dbReader.ts for
- * why this is a separate package rather than more exports on etl-db-writer.
+ * Read-only query helpers for TypeScript consumers. Fact ingestion is handled
+ * by the Python writer; run-state writes are owned by the orchestrator.
  *
  * Every table/column name here was verified against
  * packages/etl-db-writer/migrations/0001_init.sql and 0002_ingest_completion.sql. The

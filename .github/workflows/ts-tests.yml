@@ -49,7 +49,7 @@ jobs:
       - name: Install dependencies
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-        run: pnpm install --frozen-lockfile --filter verichron-epoch --filter "@verichron/processor..." --filter "@verichron/etl-db-writer..." --filter "@verichron/etl-db-reader..." --filter "@verichron/orchestrator..." --filter "@verichron/epoch..."
+        run: pnpm install --frozen-lockfile --filter verichron-epoch --filter "@verichron/processor..." --filter "@verichron/etl-db-reader..." --filter "@verichron/orchestrator..." --filter "@verichron/epoch..."
 
       # EPOCH-469: every TypeScript file in the repo, the desktop app included,
       # in the layout .prettierrc.json gives it.
@@ -65,12 +65,6 @@ jobs:
 
       - name: Test
         run: pnpm --filter @verichron/processor test
-
-      - name: Typecheck etl-db-writer
-        run: pnpm --filter @verichron/etl-db-writer typecheck
-
-      - name: Test etl-db-writer
-        run: pnpm --filter @verichron/etl-db-writer test
 
       - name: Typecheck etl-db-reader
         run: pnpm --filter @verichron/etl-db-reader typecheck

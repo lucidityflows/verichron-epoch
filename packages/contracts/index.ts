@@ -1,8 +1,8 @@
 /**
  * Public entry point for `@verichron/contracts`.
  *
- * `epoch` and `@verichron/etl-db-writer` both declare a dependency on this
- * package, and its package.json has always pointed `main` at `dist/index.js`.
+ * TypeScript consumers declare a dependency on this package, and its
+ * package.json has always pointed `main` at `dist/index.js`.
  * TypeScript consumers validate with the Zod model exported here.
  *
  * The canonical JSON Schema (`normalized-record.schema.json`, a sibling of
