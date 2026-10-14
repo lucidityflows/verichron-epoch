@@ -66,3 +66,16 @@ verichron-reporting = { workspace = true }
 [tool.pytest.ini_options]
 testpaths = ["packages", "scripts", "apps"]
 norecursedirs = ["iLEAPP", "node_modules", ".venv", "dist", ".git", "infra"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 120
+extend-exclude = ["apps/extractors/ileapp_bridge/iLEAPP"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[dependency-groups]
+dev = [
+    "ruff==0.17.0",
+]

@@ -16,12 +16,11 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import UTC
 from pathlib import Path
 
-import psycopg2.extras
-import pytest
-
 import crash.main as crash_main
+import pytest
 from db_writer import IngestContext, ingest
 from normalized_record import NormalizedRecord, SourceType
 from testing.pg_real import BACKENDS, PgReal, open_db
@@ -276,7 +275,13 @@ def test_the_report_says_what_produced_each_derivative_the_run_read(db, tmp_path
             "INSERT INTO evidence_derivatives "
             "(derivative_id, evidence_id, parent_derivative_id, kind, path, tool, params, provenance_key) "
             "VALUES (%s, %s, %s, 'ileapp_output', '/pytest/ileapp-old', %s, %s, repeat('2', 64))",
-            (older, EVIDENCE, DERIVATIVE, json.dumps({"name": "iLEAPP", "version": "d" * 40}), json.dumps(ILEAPP_PARAMS)),
+            (
+                older,
+                EVIDENCE,
+                DERIVATIVE,
+                json.dumps({"name": "iLEAPP", "version": "d" * 40}),
+                json.dumps(ILEAPP_PARAMS),
+            ),
         )
     db.commit()
     table = tmp_path / "artifact.tsv"
@@ -290,7 +295,10 @@ def test_the_report_says_what_produced_each_derivative_the_run_read(db, tmp_path
     report = out.read_text()
     section = report.split("## Provenance", 1)[1].split("---", 1)[0]
     inputs, sources = section.split("### Where the facts in this report come from", 1)
-    assert "produced by iphone_backup_decrypt 0.10.0; repair by sqlite3 3.45.1: 12 database(s) checked, 2 repaired" in inputs
+    assert (
+        "produced by iphone_backup_decrypt 0.10.0; repair by sqlite3 3.45.1: 12 database(s) checked, 2 repaired"
+        in inputs
+    )
     assert "1 could not be fully recovered, 2 original(s) preserved" in inputs
     assert "not fully recovered: `HomeDomain/Library/SMS/sms.db`" in inputs
     assert "**iLEAPP output** (`/pytest/ileapp`): produced by iLEAPP cccccccccccc, read as `itunes`" in inputs
@@ -355,15 +363,22 @@ def test_the_report_names_every_ileapp_plugin_that_errored_and_counts_the_rest(d
         "total": 879,
         "complete": 217,
         "no_files_found": ["get_AWESearch"] * 661,
-        "errors": [{"module": "ZaloChats", "artifact": "zalo_messages", "file_count": 300, "error": "list index out of range"}],
+        "errors": [
+            {"module": "ZaloChats", "artifact": "zalo_messages", "file_count": 300, "error": "list index out of range"}
+        ],
     }
     with db.cursor() as cur:
         cur.execute(
             "INSERT INTO evidence_derivatives "
             "(derivative_id, evidence_id, parent_derivative_id, kind, path, tool, params, provenance_key) "
             "VALUES (%s, %s, %s, 'ileapp_output', '/pytest/ileapp', %s, %s, repeat('3', 64))",
-            (output, EVIDENCE, DERIVATIVE, json.dumps({"name": "iLEAPP", "version": "c" * 40}),
-             json.dumps({"input_type": "itunes", "modules": modules})),
+            (
+                output,
+                EVIDENCE,
+                DERIVATIVE,
+                json.dumps({"name": "iLEAPP", "version": "c" * 40}),
+                json.dumps({"input_type": "itunes", "modules": modules}),
+            ),
         )
         cur.execute(
             "INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id) "
@@ -376,7 +391,10 @@ def test_the_report_names_every_ileapp_plugin_that_errored_and_counts_the_rest(d
     generate_report(db._conn, RUN_A, EVIDENCE, str(out))
     report = out.read_text()
     not_examined = report.split("## Not Examined", 1)[1].split("---", 1)[0]
-    assert "**iLEAPP plugins that errored** (`/pytest/ileapp`): 1. Their artifacts were not produced in this output:" in not_examined
+    assert (
+        "**iLEAPP plugins that errored** (`/pytest/ileapp`): 1. Their artifacts were not produced in this output:"
+        in not_examined
+    )
     assert "  - `zalo_messages` (ZaloChats, 300 file(s)): list index out of range" in not_examined
     coverage = report.split("## Coverage", 1)[1].split("\n---\n", 1)[0]
     assert (
@@ -433,12 +451,12 @@ def test_the_report_summarizes_ileapp_records_by_artifact(db, tmp_path):
     timeline position. Rows are never listed."""
     if not isinstance(db, PgReal):
         pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from reporting.generate_report import generate_report
 
     def at(day: int) -> datetime:
-        return datetime(2026, 10, day, 12, 0, 0, tzinfo=timezone.utc)
+        return datetime(2026, 10, day, 12, 0, 0, tzinfo=UTC)
 
     artifacts = {
         "Safari History": [at(1), at(3), at(2)],
@@ -464,7 +482,9 @@ def test_the_report_summarizes_ileapp_records_by_artifact(db, tmp_path):
     generate_report(db._conn, RUN_A, EVIDENCE, str(out))
     report = out.read_text()
     section = report.split("## iLEAPP Records by Artifact", 1)[1].split("\n---\n", 1)[0]
-    rows = [line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| Artifact", "| :"))]
+    rows = [
+        line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| Artifact", "| :"))
+    ]
     assert rows == [
         "| Installed Apps | 4 | 0 | no timeline position |  |",
         "| Safari History | 3 | 3 | 2026-10-01 12:00:00 UTC | 2026-10-03 12:00:00 UTC |",
@@ -480,14 +500,20 @@ def test_the_report_discloses_tool_corrections_and_times_for_review(db, tmp_path
     are listed for review, kept as the tool gave them."""
     if not isinstance(db, PgReal):
         pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from reporting.generate_report import generate_report
 
     def utc(seconds: int) -> datetime:
-        return datetime.fromtimestamp(seconds, timezone.utc)
+        return datetime.fromtimestamp(seconds, UTC)
 
-    correction = {"defect": "ILEAPP-0001", "column": "Last hit", "original": 1791009, "corrected": 1791009000, "resolution": 1000}
+    correction = {
+        "defect": "ILEAPP-0001",
+        "column": "Last hit",
+        "original": 1791009,
+        "corrected": 1791009000,
+        "resolution": 1000,
+    }
     review = [{"column": "Last Modification Time", "time": "1976-04-01T00:00:00+00:00", "check": "before_device_era"}]
     seeded = [
         ("Uber - Cached Locations", utc(1791009000), {"Last hit": 1791009, "corrections": [correction]}),
@@ -499,25 +525,33 @@ def test_the_report_discloses_tool_corrections_and_times_for_review(db, tmp_path
         table = tmp_path / f"{i}.tsv"
         table.write_text(f"{i}: {name}")  # distinct content, so each is its own unit
         with ingest(db, ctx(RUN_A), table, source_type="ileapp_record", payload_kind="full") as unit:
-            unit.write([
-                NormalizedRecord(
-                    source_type=SourceType.ILEAPP_RECORD,
-                    event_time=when,
-                    fields={"engine": "iLEAPP", "source_artifact": name, **extra},
-                )
-            ])
+            unit.write(
+                [
+                    NormalizedRecord(
+                        source_type=SourceType.ILEAPP_RECORD,
+                        event_time=when,
+                        fields={"engine": "iLEAPP", "source_artifact": name, **extra},
+                    )
+                ]
+            )
 
     out = tmp_path / "report.md"
     generate_report(db._conn, RUN_A, EVIDENCE, str(out))
     section = out.read_text().split("## Tool Checks and Corrections", 1)[1].split("\n---\n", 1)[0]
-    rows = [line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| Defect", "| Artifact", "| :"))]
+    rows = [
+        line
+        for line in section.splitlines()
+        if line.startswith("| ") and not line.startswith(("| Defect", "| Artifact", "| :"))
+    ]
     assert rows[0].startswith(
-        "| ILEAPP-0001 (EPOCH-510) | iLEAPP 2026.3.0 | Uber - Cached Locations | Last hit | 1 | 2026-10-03 06:30:00 UTC |"
+        "| ILEAPP-0001 (EPOCH-510) | iLEAPP 2026.3.0 | Uber - Cached Locations | "
+        "Last hit | 1 | 2026-10-03 06:30:00 UTC |"
     )
     assert "divides Uber's timestamp_ms by 1,000" in rows[0]
     assert rows[0].endswith("| not reported |")
     assert rows[1:] == [
-        "| Calendar Events | Last Modification Time | before 2007-06-29, the first iPhone | 1 | 1976-04-01 00:00:00 UTC |",
+        "| Calendar Events | Last Modification Time | before 2007-06-29, the first iPhone | "
+        "1 | 1976-04-01 00:00:00 UTC |",
     ], "every flagged column is listed, not only event_time; ordinary times are not"
 
 
@@ -544,12 +578,20 @@ def test_an_artifact_name_with_a_pipe_or_line_break_keeps_its_table_row_whole(db
     table = tmp_path / "odd.tsv"
     table.write_text("odd")
     with ingest(db, ctx(RUN_A), table, source_type="ileapp_record", payload_kind="full") as unit:
-        unit.write([NormalizedRecord(source_type=SourceType.ILEAPP_RECORD, fields={"source_artifact": "Calls | FaceTime\nlog"})])
+        unit.write(
+            [
+                NormalizedRecord(
+                    source_type=SourceType.ILEAPP_RECORD, fields={"source_artifact": "Calls | FaceTime\nlog"}
+                )
+            ]
+        )
 
     out = tmp_path / "report.md"
     generate_report(db._conn, RUN_A, EVIDENCE, str(out))
     section = out.read_text().split("## iLEAPP Records by Artifact", 1)[1].split("\n---\n", 1)[0]
-    rows = [line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| Artifact", "| :"))]
+    rows = [
+        line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| Artifact", "| :"))
+    ]
     assert rows == ["| Calls \\| FaceTime log | 1 | 0 | no timeline position |  |"]
 
 
@@ -588,7 +630,9 @@ READERS = [
     REPO_ROOT / "apps" / "reporting" / "generate_report.py",
     REPO_ROOT / "scripts" / "db_peek.py",
 ]
-FACT_SOURCES = re.compile(r"forensic_records|current_forensic_records|forensic_records_history|ingested_files|\$\{source\}")
+FACT_SOURCES = re.compile(
+    r"forensic_records|current_forensic_records|forensic_records_history|ingested_files|\$\{source\}"
+)
 #: R7's label: a fact unit lists the runs that produced it. Matching a run
 #: against it reads what that run produced (EPOCH-501).
 LABEL_READ = re.compile(r"(\S+)\s*=\s*ANY\s*\(\s*(?:\w+\.)?produced_by_runs\s*\)", re.I)

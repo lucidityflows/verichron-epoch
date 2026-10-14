@@ -7,7 +7,7 @@ from reporting.generate_report import render_stage_preface
 
 
 def rows(lines: list[str]) -> list[str]:
-    return [l for l in lines if l.startswith("| ") and not l.startswith(("| Stage", "| :"))]
+    return [line for line in lines if line.startswith("| ") and not line.startswith(("| Stage", "| :"))]
 
 
 def stage(name: str, status: str, error_message=None, warnings=None) -> dict:
@@ -32,7 +32,9 @@ def test_a_quiet_succeeded_stage_has_an_empty_note():
 
 
 def test_a_failed_stage_is_unchanged_and_warnings_never_replace_its_error():
-    [row] = rows(render_stage_preface([stage("crash", "failed", error_message="boom", warnings="ignored")], "run-1", "now"))
+    [row] = rows(
+        render_stage_preface([stage("crash", "failed", error_message="boom", warnings="ignored")], "run-1", "now")
+    )
     assert row.startswith("| crash | failed | FAILED — boom. Fix and re-run")
     assert "ignored" not in row
 

@@ -23,7 +23,6 @@ from urllib.parse import urlsplit, urlunsplit
 
 import psycopg2
 import pytest
-
 from testing.pg_real import TEST_DATABASE_URL_ENV
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

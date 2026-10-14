@@ -36,10 +36,24 @@ def _dependencies(pyproject: Path) -> list[str]:
 # The environments tools/ileapp is built for: Python 3.14 (.python-version) on
 # Linux and macOS. Requirement markers are evaluated against each of these.
 TARGET_ENVIRONMENTS = [
-    {"python_version": "3.14", "python_full_version": "3.14.8", "implementation_name": "cpython",
-     "os_name": "posix", "sys_platform": "linux", "platform_system": "Linux", "platform_machine": "x86_64"},
-    {"python_version": "3.14", "python_full_version": "3.14.8", "implementation_name": "cpython",
-     "os_name": "posix", "sys_platform": "darwin", "platform_system": "Darwin", "platform_machine": "arm64"},
+    {
+        "python_version": "3.14",
+        "python_full_version": "3.14.8",
+        "implementation_name": "cpython",
+        "os_name": "posix",
+        "sys_platform": "linux",
+        "platform_system": "Linux",
+        "platform_machine": "x86_64",
+    },
+    {
+        "python_version": "3.14",
+        "python_full_version": "3.14.8",
+        "implementation_name": "cpython",
+        "os_name": "posix",
+        "sys_platform": "darwin",
+        "platform_system": "Darwin",
+        "platform_machine": "arm64",
+    },
 ]
 
 
@@ -72,9 +86,7 @@ def _ileapp_submodule_requirements() -> list[str]:
 @pytest.mark.parametrize("environment", TARGET_ENVIRONMENTS, ids=lambda e: e["sys_platform"])
 def test_ileapp_environment_matches_submodule_requirements(environment):
     if not ILEAPP_REQUIREMENTS.exists():
-        raise AssertionError(
-            f"{ILEAPP_REQUIREMENTS} is missing; initialize the iLEAPP submodule (`mise run setup`)"
-        )
+        raise AssertionError(f"{ILEAPP_REQUIREMENTS} is missing; initialize the iLEAPP submodule (`mise run setup`)")
     expected = _applicable(_ileapp_submodule_requirements(), environment)
     declared = _applicable(_dependencies(REPO_ROOT / "tools" / "ileapp" / "pyproject.toml"), environment)
 

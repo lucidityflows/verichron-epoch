@@ -53,7 +53,7 @@ class ETLRunResult:
     failures: list[tuple[str, str]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
-    def ok(self, count: int = 1) -> "ETLRunResult":
+    def ok(self, count: int = 1) -> ETLRunResult:
         """Record `count` items that completed successfully.
 
         Rejects a negative count rather than silently letting `succeeded`
@@ -64,7 +64,7 @@ class ETLRunResult:
         self.succeeded += count
         return self
 
-    def fail(self, item_label: str, error: BaseException | str) -> "ETLRunResult":
+    def fail(self, item_label: str, error: BaseException | str) -> ETLRunResult:
         """Record one failed item. `item_label` should identify the
         specific item (filename, alert index, table name) so the printed
         error is actionable without re-running with more logging.
@@ -76,7 +76,7 @@ class ETLRunResult:
         self.failures.append((item_label, reason))
         return self
 
-    def note(self, message: str) -> "ETLRunResult":
+    def note(self, message: str) -> ETLRunResult:
         """Record an informational message that should be surfaced but
         must NOT affect exit_code — e.g. an optional input file simply
         wasn't present for this backup.
@@ -85,7 +85,7 @@ class ETLRunResult:
         self.notes.append(message)
         return self
 
-    def merge(self, other: "ETLRunResult") -> "ETLRunResult":
+    def merge(self, other: ETLRunResult) -> ETLRunResult:
         """Combines two independently-tracked runs into one for a single
         exit-code decision. Used when a stage processes more than one
         input file/source independently (EXTRACTOR_CONTRACT.md #5).
@@ -94,9 +94,7 @@ class ETLRunResult:
         `other` is mutated.
         """
         if not isinstance(other, ETLRunResult):
-            raise TypeError(
-                f"ETLRunResult.merge() expects another ETLRunResult, got {type(other).__name__}"
-            )
+            raise TypeError(f"ETLRunResult.merge() expects another ETLRunResult, got {type(other).__name__}")
         return ETLRunResult(
             succeeded=self.succeeded + other.succeeded,
             failed=self.failed + other.failed,
@@ -119,7 +117,7 @@ class ETLRunResult:
     # individually — a malformed 250k-row timeline.csv can fail every row.
     _MAX_ITEMIZED_FAILURES = 20
 
-    def print_summary(self, tag: str, stream: "IO[str] | None" = None) -> None:
+    def print_summary(self, tag: str, stream: IO[str] | None = None) -> None:
         """Prints the run summary and, if anything needs attention, the
         detail behind it.
 

@@ -92,8 +92,12 @@ class PgReal:
                         (evidence_id, _hex64(f"root:{evidence_id}"), device_id),
                     )
                     cur.execute(
-                        "INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key) "
-                        "VALUES (%s, %s, 'decrypted', %s, '{\"name\": \"pytest\", \"version\": \"0\"}', '{\"repair\": {\"status\": \"skipped\", \"reason\": \"pytest fixture\"}}', repeat('0', 64))",
+                        "INSERT INTO evidence_derivatives "
+                        "(derivative_id, evidence_id, kind, path, tool, params, provenance_key) "
+                        "VALUES (%s, %s, 'decrypted', %s, "
+                        '\'{"name": "pytest", "version": "0"}\', '
+                        '\'{"repair": {"status": "skipped", "reason": "pytest fixture"}}\', '
+                        "repeat('0', 64))",
                         (derivative_id, evidence_id, f"/pytest/decrypted/{evidence_id[:8]}"),
                     )
                 for run_id in run_ids:
@@ -150,8 +154,7 @@ class PgReal:
 
     def records(self) -> list[dict[str, Any]]:
         return self._dicts(
-            "SELECT *, fields::text AS fields, evidence_id::text AS evidence_id "
-            "FROM forensic_records ORDER BY id"
+            "SELECT *, fields::text AS fields, evidence_id::text AS evidence_id FROM forensic_records ORDER BY id"
         )
 
     def record_count(self, file_hash: str | None = None) -> int:

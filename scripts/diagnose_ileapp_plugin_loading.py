@@ -97,7 +97,10 @@ def main() -> int:
             print(f"  __artifacts__ present:    {v1 is not None}" + (f" ({len(v1)} entries)" if v1 is not None else ""))
             if v2 is None and v1 is None:
                 print("  -> load_module_lazy() did not raise, but neither attribute was found.")
-                print(f"     Non-dunder attributes actually present: {[a for a in dir(mod) if not a.startswith('_')][:20]}")
+                print(
+                    "     Non-dunder attributes actually present: "
+                    f"{[a for a in dir(mod) if not a.startswith('_')][:20]}"
+                )
         except Exception:
             print("  load_module_lazy() raised an exception:")
             traceback.print_exc()
@@ -109,6 +112,7 @@ def main() -> int:
         print("--- probing same file with an ordinary (non-lazy) load, for comparison ---")
         try:
             import importlib.util as ilu
+
             spec = ilu.spec_from_file_location(f"eager.{sample.stem}", sample)
             if spec is None or spec.loader is None:
                 print("  could not build an import spec/loader for this file -- skipping.")
@@ -117,8 +121,14 @@ def main() -> int:
                 spec.loader.exec_module(eager_mod)
                 v2e = getattr(eager_mod, "__artifacts_v2__", None)
                 v1e = getattr(eager_mod, "__artifacts__", None)
-                print(f"  __artifacts_v2__ present: {v2e is not None}" + (f" ({len(v2e)} entries)" if v2e is not None else ""))
-                print(f"  __artifacts__ present:    {v1e is not None}" + (f" ({len(v1e)} entries)" if v1e is not None else ""))
+                print(
+                    f"  __artifacts_v2__ present: {v2e is not None}"
+                    + (f" ({len(v2e)} entries)" if v2e is not None else "")
+                )
+                print(
+                    f"  __artifacts__ present:    {v1e is not None}"
+                    + (f" ({len(v1e)} entries)" if v1e is not None else "")
+                )
         except Exception:
             print("  eager load raised an exception:")
             traceback.print_exc()

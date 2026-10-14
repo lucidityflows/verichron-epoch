@@ -1,49 +1,49 @@
 """
 extractors/db_writer.py
- 
+
 Shared Postgres write helpers every Python extractor imports. This is the
 concrete thing that makes the extractor contract's idempotency and
 validation requirements load-bearing instead of aspirational — an
 extractor author doesn't hand-write ingest/write SQL and hope it matches
 the contract, they call these functions.
- 
+
 Owns exactly what the two shared tables need:
   - ingest()      -> a transaction that covers the ingested_files row AND the
                      forensic_records rows for one file, or neither. Units are
                      evidence-scoped (EPOCH-402): see IngestContext.
   - write_record() / write_records() -> validated insert into forensic_records
- 
+
 Deliberately does NOT own:
   - source-format parsing (each extractor's own code)
   - the `fields` sub-shape (each extractor owns and documents its own, per
     EXTRACTOR_CONTRACT.md #4)
- 
+
 Why `ingest()` is a context manager and not the old `ingest_file()`
 -------------------------------------------------------------------
 The previous API was two independent calls, each of which committed:
- 
+
     file_hash, already = ingest_file(conn, ...)   # committed here
     if already: return
     records = parse(...)                          # <-- anything failing here
     write_records(conn, run_id, file_hash, records)   # committed here
- 
+
 and dedup was keyed on the ledger row merely existing:
- 
+
     SELECT 1 FROM ingested_files WHERE file_hash = %s
     if found: skip this file entirely
- 
+
 Those two facts combine into permanent silent data loss. If anything went
 wrong between the two commits, the ledger claimed the file was ingested while
 none of its records existed, and every later run skipped it — reporting
 success — forever. In a chain-of-custody tool, evidence disappeared and
 nothing said so.
- 
+
 That was not a rare interruption case. Every extractor hit it on its
 ordinary error paths: crash/main.py `continue`s when parse_ips_file fails,
 ileapp_bridge `return`s when
 every record in an artifact fails to normalize — each after ingest_file() had
 already committed the ledger row.
- 
+
 The fix is structural rather than a rule to follow. `ingest()` owns the
 transaction: the ledger row, the raw payload, the records, and the completion
 flag all commit together or roll back together. There is no exposed call that
@@ -52,31 +52,32 @@ sequence by accident. `write_record`/`write_records` no longer commit at all
 (they are also used inside a unit), which is what the caller-owns-the-boundary
 change asks for and incidentally stops `write_record` from paying a commit per
 row.
- 
+
 This Python module is the sole fact writer. A future TypeScript stage that
 needs to write facts requires a separately ticketed writer implementation.
 """
- 
+
 from __future__ import annotations
- 
+
 import hashlib
 import re
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator
- 
+from typing import Any
+
 import psycopg2
 import psycopg2.extras
- 
+
 # Resolve packages-py directory
 _EXTRACTORS_DIR = Path(__file__).resolve().parent
 _PACKAGES_PY = _EXTRACTORS_DIR.parent
 sys.path.insert(0, str(_PACKAGES_PY / "contracts" / "python"))
 from normalized_record import NormalizedRecord  # noqa: E402
- 
- 
+
+
 def compute_file_hash(path: str | Path) -> str:
     """sha256 of file contents — the idempotency key for ingested_files.
     Streamed in chunks so this doesn't load a large SMS attachment or
@@ -86,8 +87,8 @@ def compute_file_hash(path: str | Path) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
- 
- 
+
+
 PAYLOAD_KINDS = ("full", "summary", "none")
 
 
@@ -125,9 +126,7 @@ def add_context_args(parser) -> None:
     """The identity flags every extractor accepts from the orchestrator."""
     parser.add_argument("--run-id", required=True, help="pipeline_runs.run_id of this run")
     parser.add_argument("--evidence-id", required=True, help="evidence_items.evidence_id being processed")
-    parser.add_argument(
-        "--derivative-id", required=True, help="evidence_derivatives.derivative_id this stage reads"
-    )
+    parser.add_argument("--derivative-id", required=True, help="evidence_derivatives.derivative_id this stage reads")
     parser.add_argument(
         "--parser-version", required=True, type=int, help="this stage's parserVersion from its stage.json"
     )

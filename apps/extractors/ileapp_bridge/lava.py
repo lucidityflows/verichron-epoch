@@ -26,10 +26,11 @@ import json
 import math
 import posixpath
 import sqlite3
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterator, Sequence
+from typing import Any
 
 from tool_defects import ToolDefect
 
@@ -45,7 +46,7 @@ METADATA_KEYS = ("engine", "source_artifact", "module", "category", "source_path
 #: The tool name iLEAPP records in its manifest, and the registry it is checked against.
 TOOL = "iLEAPP"
 #: The first iPhone went on sale on this day: no device time can be earlier.
-DEVICE_ERA = datetime(2007, 6, 29, tzinfo=timezone.utc)
+DEVICE_ERA = datetime(2007, 6, 29, tzinfo=UTC)
 
 
 class LavaError(Exception):
@@ -305,7 +306,9 @@ def _plan(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifact, defe
         raise ArtifactError(f"{artifact.name}: header(s) {', '.join(clashing)} clash with this stage's own field names")
     time_index = columns.index(artifact.event_time_column) if artifact.event_time_column in columns else None
     if artifact.event_time_column and time_index is None:
-        raise ArtifactError(f"{artifact.name}: declared datetime column {artifact.event_time_column} is not in the table")
+        raise ArtifactError(
+            f"{artifact.name}: declared datetime column {artifact.event_time_column} is not in the table"
+        )
     # The registered defects that correct a column of this artifact (R36).
     fixes: list[tuple[ToolDefect, int, str]] = []
     for defect in defects:
@@ -313,9 +316,15 @@ def _plan(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifact, defe
         if header is None:
             continue
         if header not in headers:
-            raise ArtifactError(f"{artifact.name}: registered defect {defect.id} names column {header!r}, which it doesn't have")
+            raise ArtifactError(
+                f"{artifact.name}: registered defect {defect.id} names column {header!r}, which it doesn't have"
+            )
         fixes.append((defect, headers.index(header), header))
-    time_columns = [(columns.index(c), artifact.column_map[c]) for c, t in artifact.object_columns.items() if t == "datetime" and c in columns]
+    time_columns = [
+        (columns.index(c), artifact.column_map[c])
+        for c, t in artifact.object_columns.items()
+        if t == "datetime" and c in columns
+    ]
     plan = _Plan(columns, headers, evidence_relative(artifact, output), time_index, fixes, time_columns)
     return cursor, plan
 
@@ -333,29 +342,33 @@ def _read_row(raw: tuple, plan: _Plan, run_time: datetime) -> RowRead:
         if value is None:
             continue
         effective[index] = value
-        applied.append({
-            "defect": defect.id,
-            "column": header,
-            "original": raw[index],
-            "corrected": value,
-            # iLEAPP discarded what lies below this, so the corrected value
-            # is the start of an interval this wide, in the column's unit.
-            "resolution": defect.correction.factor,
-        })
+        applied.append(
+            {
+                "defect": defect.id,
+                "column": header,
+                "original": raw[index],
+                "corrected": value,
+                # iLEAPP discarded what lies below this, so the corrected value
+                # is the start of an interval this wide, in the column's unit.
+                "resolution": defect.correction.factor,
+            }
+        )
     flagged = []
     for index, header in plan.time_columns:
         moment = unix_utc(effective[index])
         if moment is not None and (moment < DEVICE_ERA or moment > run_time):
             # On the record too, so the report lists every column, not only event_time.
-            flagged.append({
-                "column": header,
-                "time": moment.isoformat(),
-                "check": "before_device_era" if moment < DEVICE_ERA else "after_run",
-            })
+            flagged.append(
+                {
+                    "column": header,
+                    "time": moment.isoformat(),
+                    "check": "before_device_era" if moment < DEVICE_ERA else "after_run",
+                }
+            )
     when = unix_utc(effective[plan.time_index]) if plan.time_index is not None else None
     unconvertible = plan.time_index is not None and when is None and raw[plan.time_index] not in (None, "")
     return RowRead(
-        row=dict(zip(plan.headers, values)),
+        row=dict(zip(plan.headers, values, strict=True)),
         event_time=when,
         corrections=applied,
         review=flagged,
@@ -377,21 +390,25 @@ def scan_artifact(
     # (the first datetime is event_time), and every row. A report that
     # changes any of these is new content, not a dedup hit.
     digest = hashlib.sha256()
-    digest.update(_canonical({
-        "table": artifact.tablename,
-        "name": artifact.name,
-        "module": artifact.module,
-        "category": artifact.category,
-        "source_path": plan.source_path,
-        "columns": [[c, artifact.column_map[c]] for c in plan.columns],
-        "object_columns": [[c, t] for c, t in artifact.object_columns.items()],
-        "event_time_column": artifact.event_time_column,
-        # Corrections are not part of the identity: the unit is iLEAPP's
-        # content, so a corrected re-ingest at a newer parser version
-        # supersedes the uncorrected facts (R8). A registry change reaches
-        # stored facts through that bump (`applied_from`, R36).
-    }))
-    run_time = datetime.now(timezone.utc)
+    digest.update(
+        _canonical(
+            {
+                "table": artifact.tablename,
+                "name": artifact.name,
+                "module": artifact.module,
+                "category": artifact.category,
+                "source_path": plan.source_path,
+                "columns": [[c, artifact.column_map[c]] for c in plan.columns],
+                "object_columns": [[c, t] for c, t in artifact.object_columns.items()],
+                "event_time_column": artifact.event_time_column,
+                # Corrections are not part of the identity: the unit is iLEAPP's
+                # content, so a corrected re-ingest at a newer parser version
+                # supersedes the uncorrected facts (R8). A registry change reaches
+                # stored facts through that bump (`applied_from`, R36).
+            }
+        )
+    )
+    run_time = datetime.now(UTC)
     rows = 0
     sample: list[dict[str, Any]] = []
     unconvertible = 0
@@ -430,15 +447,19 @@ def scan_artifact(
             'or an infinite number) and are stored exactly, encoded as {"$encoded": ..., "value": ...}'
         )
     if unconvertible:
+        if artifact.event_time_column is None:
+            raise ArtifactError(f"{artifact.name}: unconvertible event times have no declared datetime column")
         notes.append(
-            f"{artifact.name}: {unconvertible} row(s) have a value in {artifact.column_map[artifact.event_time_column]} "
+            f"{artifact.name}: {unconvertible} row(s) have a value in "
+            f"{artifact.column_map[artifact.event_time_column]} "
             "that is not Unix seconds; their event_time is null and the raw value is kept"
         )
     for defect, _, header in plan.fixes:
         if corrected.get(defect.id):
             notes.append(
                 f"{artifact.name}: {corrected[defect.id]} value(s) in {header} corrected for {TOOL} defect {defect.id} "
-                f"({defect.ticket}), to within {defect.correction.factor:,} of the column's unit (seconds, for a time); "
+                f"({defect.ticket}), to within {defect.correction.factor:,} of the column's unit "
+                "(seconds, for a time); "
                 "iLEAPP's value is kept"
             )
     for header, (n, first, last) in early.items():
@@ -514,8 +535,8 @@ def unix_utc(value: Any) -> datetime | None:
     if isinstance(value, float) and not math.isfinite(value):
         return None
     try:
-        return datetime.fromtimestamp(value, tz=timezone.utc)
-    except (OverflowError, OSError, ValueError):
+        return datetime.fromtimestamp(value, tz=UTC)
+    except OverflowError, OSError, ValueError:
         return None
 
 

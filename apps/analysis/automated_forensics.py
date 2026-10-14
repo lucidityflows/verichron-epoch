@@ -39,19 +39,16 @@ import logging
 import os
 import sqlite3
 import sys
-from pathlib import Path
-
-from runtime_env import redact_password, require_database_url
-from etl_run import ETLRunResult
-from db_writer import IngestContext, add_context_args, context_from_args, ingest
-from normalized_record import NormalizedRecord, SourceType
-import psycopg2
-
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
+import psycopg2
 import requests
+from db_writer import IngestContext, add_context_args, context_from_args, ingest
+from etl_run import ETLRunResult
+from normalized_record import NormalizedRecord, SourceType
+from runtime_env import redact_password, require_database_url
 
 # ----------------------------------------------------------------------------
 # DEFAULT CONFIGURATION
@@ -77,10 +74,10 @@ LOG_PATH = "automated_forensics.log"
 
 MAX_ATTEMPTS_PER_CHUNK = 3
 RETRY_BACKOFF_SECONDS = 5  # paced sleep on failure, so a struggling/restarting
-                            # Ollama isn't hammered by concurrent workers all
-                            # retrying at once — safe to sleep here since it
-                            # runs inside a worker thread, not the main thread
-                            # that owns the single SQLite connection.
+# Ollama isn't hammered by concurrent workers all
+# retrying at once — safe to sleep here since it
+# runs inside a worker thread, not the main thread
+# that owns the single SQLite connection.
 
 SYSTEM_PROMPT = (
     "You are an expert iOS digital forensics analyst. Analyze this small chunk of MVT JSON logs.\n"
@@ -96,6 +93,7 @@ SYSTEM_PROMPT = (
 # ----------------------------------------------------------------------------
 # LOGGING
 # ----------------------------------------------------------------------------
+
 
 def setup_logging() -> logging.Logger:
     logger = logging.getLogger("forensics")
@@ -116,11 +114,13 @@ def setup_logging() -> logging.Logger:
 
     return logger
 
+
 log = setup_logging()
 
 # ----------------------------------------------------------------------------
 # CHECKPOINT STORE (SQLite)
 # ----------------------------------------------------------------------------
+
 
 def init_checkpoint_db(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
@@ -150,6 +150,7 @@ def init_checkpoint_db(db_path: str) -> sqlite3.Connection:
     conn.commit()
     return conn
 
+
 def ensure_chunks_registered(conn: sqlite3.Connection, file_name: str, total_chunks: int) -> None:
     """Idempotently registers every chunk index for a file as 'pending' if not already tracked.
     Never overwrites an existing row — this is what preserves already-successful chunks across runs."""
@@ -165,6 +166,7 @@ def ensure_chunks_registered(conn: sqlite3.Connection, file_name: str, total_chu
         )
     conn.commit()
 
+
 def get_outstanding_chunks(conn: sqlite3.Connection, file_name: str) -> list[int]:
     """Chunks that still need work: never attempted, or failed and under the retry cap."""
     cur = conn.execute(
@@ -178,6 +180,7 @@ def get_outstanding_chunks(conn: sqlite3.Connection, file_name: str) -> list[int
         (file_name, MAX_ATTEMPTS_PER_CHUNK),
     )
     return [row[0] for row in cur.fetchall()]
+
 
 def record_chunk_result(
     conn: sqlite3.Connection,
@@ -200,10 +203,18 @@ def record_chunk_result(
             attempts = attempts + 1, updated_at = ?
         WHERE file_name = ? AND chunk_index = ?
         """,
-        (status, json.dumps(result_rows) if result_rows else None, error_message,
-         model_name, now, file_name, chunk_index),
+        (
+            status,
+            json.dumps(result_rows) if result_rows else None,
+            error_message,
+            model_name,
+            now,
+            file_name,
+            chunk_index,
+        ),
     )
     conn.commit()
+
 
 def stale_model_chunk_counts(conn: sqlite3.Connection, current_model: str) -> list[tuple[str | None, int]]:
     """Counts already-completed ('safe'/'flagged') chunks whose recorded
@@ -220,6 +231,7 @@ def stale_model_chunk_counts(conn: sqlite3.Connection, current_model: str) -> li
         (current_model,),
     )
     return cur.fetchall()
+
 
 def reset_stale_model_chunks(conn: sqlite3.Connection, current_model: str) -> int:
     """Requeues every stale-model chunk (see stale_model_chunk_counts) back
@@ -239,6 +251,7 @@ def reset_stale_model_chunks(conn: sqlite3.Connection, current_model: str) -> in
     conn.commit()
     return cur.rowcount
 
+
 def models_used_for_file(conn: sqlite3.Connection, file_name: str) -> list[str]:
     """Distinct models whose results are currently backing this file's
     completed chunks — surfaced in the report so a mixed-provenance file is
@@ -253,13 +266,17 @@ def models_used_for_file(conn: sqlite3.Connection, file_name: str) -> list[str]:
     )
     return [row[0] for row in cur.fetchall()]
 
+
 def file_completion_summary(conn: sqlite3.Connection, file_name: str) -> dict:
     cur = conn.execute("SELECT status, COUNT(*) FROM chunk_status WHERE file_name = ? GROUP BY status", (file_name,))
     counts = {status: count for status, count in cur.fetchall()}
     total = sum(counts.values())
     terminal = counts.get("safe", 0) + counts.get("flagged", 0)
 
-    cur = conn.execute("SELECT COUNT(*) FROM chunk_status WHERE file_name = ? AND status = 'failed' AND attempts >= ?", (file_name, MAX_ATTEMPTS_PER_CHUNK))
+    cur = conn.execute(
+        "SELECT COUNT(*) FROM chunk_status WHERE file_name = ? AND status = 'failed' AND attempts >= ?",
+        (file_name, MAX_ATTEMPTS_PER_CHUNK),
+    )
     exhausted_failures = cur.fetchone()[0]
 
     return {
@@ -271,6 +288,7 @@ def file_completion_summary(conn: sqlite3.Connection, file_name: str) -> dict:
         "complete": terminal == total,
         "exhausted_failures": exhausted_failures,
     }
+
 
 def collect_flagged_rows(conn: sqlite3.Connection, file_name: str) -> list[str]:
     cur = conn.execute(
@@ -355,9 +373,11 @@ def ingest_file_findings(
     result.ok(record_count)
     return result
 
+
 # ----------------------------------------------------------------------------
 # CHUNKING & PARSING HELPERS
 # ----------------------------------------------------------------------------
+
 
 def get_chunk_size(filename: str) -> int:
     if "datausage" in filename or "interaction_c" in filename:
@@ -366,10 +386,11 @@ def get_chunk_size(filename: str) -> int:
         return 90
     return 130
 
+
 def extract_schema_keys(file_path: str) -> list[str]:
     """Safely extracts the top-level keys of the JSON file to provide context to the LLM."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
             if isinstance(data, list) and len(data) > 0:
                 return list(data[0].keys())
@@ -379,8 +400,9 @@ def extract_schema_keys(file_path: str) -> list[str]:
         pass
     return ["Unknown Schema"]
 
+
 def chunk_log_file(file_path: str, chunk_size: int) -> list[str]:
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         try:
             data = json.load(f)
             lines = json.dumps(data, indent=2).split("\n")
@@ -389,9 +411,11 @@ def chunk_log_file(file_path: str, chunk_size: int) -> list[str]:
             lines = f.readlines()
     return ["\n".join(lines[i : i + chunk_size]) for i in range(0, len(lines), chunk_size)]
 
+
 # ----------------------------------------------------------------------------
 # JUNK ROW FILTERING (fixes header/separator leakage into results)
 # ----------------------------------------------------------------------------
+
 
 def is_junk_row(row: str) -> bool:
     """Detects markdown table headers and separator rows the model produced
@@ -402,9 +426,11 @@ def is_junk_row(row: str) -> bool:
     stripped = row.replace("|", "").replace("-", "").replace(" ", "").replace(":", "")
     return stripped == ""  # separator row, e.g. "| :--- | :--- |"
 
+
 # ----------------------------------------------------------------------------
 # OLLAMA API INTERACTION
 # ----------------------------------------------------------------------------
+
 
 def check_ollama_reachable() -> tuple[bool, str]:
     try:
@@ -415,13 +441,16 @@ def check_ollama_reachable() -> tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+
 def query_local_llm(log_chunk: str, schema_keys: list[str], model_name: str) -> tuple[bool, list[str], str | None]:
     """Returns (ok, clean_rows, error_message). ok=True and empty rows means
     the model reported SAFE for this chunk — that's a real, storable result,
     distinct from a failed request. Runs inside a worker thread (see
     process_file) — the retry sleeps below are safe here specifically
     because this function never touches the shared SQLite connection."""
-    context_prompt = f"DATABASE SCHEMA FIELDS FOR REFERENCE: {schema_keys}\n\n{SYSTEM_PROMPT}\n\nLOG DATA CHUNK:\n{log_chunk}"
+    context_prompt = (
+        f"DATABASE SCHEMA FIELDS FOR REFERENCE: {schema_keys}\n\n{SYSTEM_PROMPT}\n\nLOG DATA CHUNK:\n{log_chunk}"
+    )
     payload = {"model": model_name, "prompt": context_prompt, "stream": False}
     try:
         response = requests.post(OLLAMA_URL, json=payload, timeout=120)
@@ -442,9 +471,11 @@ def query_local_llm(log_chunk: str, schema_keys: list[str], model_name: str) -> 
     clean_rows = [row for row in clean_rows if not is_junk_row(row)]
     return True, clean_rows, None
 
+
 # ----------------------------------------------------------------------------
 # DIFFERENTIAL ANALYSIS & REPORTING (unchanged in spirit, not chunked, cheap to redo)
 # ----------------------------------------------------------------------------
+
 
 def run_differential_analysis(results_dir: str, diff_baseline: str | None) -> list[str]:
     """Compares `results_dir` (this run's backup) against `diff_baseline`
@@ -473,9 +504,13 @@ def run_differential_analysis(results_dir: str, diff_baseline: str | None) -> li
         size_baseline = os.path.getsize(path_baseline)
         size_current = os.path.getsize(path_current)
         if size_current < (size_baseline * 0.5) and size_baseline > 1024:
-            tampering_alerts.append(f"| N/A | `{f}` | HIGH | File size dropped significantly from {size_baseline} to {size_current} bytes. |")
+            tampering_alerts.append(
+                f"| N/A | `{f}` | HIGH | File size dropped significantly "
+                f"from {size_baseline} to {size_current} bytes. |"
+            )
 
     return tampering_alerts
+
 
 def write_final_report(
     conn: sqlite3.Connection,
@@ -509,7 +544,10 @@ def write_final_report(
             if len(models) > 1:
                 models_display = f"⚠️ MIXED: {models_display}"
                 any_mixed_model = True
-            repo.write(f"| `{fname}` | {s['total']} | {s['safe']} | {s['flagged']} | {s['failed']} | {s['pending']} | {models_display} | {status} |\n")
+            repo.write(
+                f"| `{fname}` | {s['total']} | {s['safe']} | {s['flagged']} | "
+                f"{s['failed']} | {s['pending']} | {models_display} | {status} |\n"
+            )
 
         repo.write("\n")
         if any_incomplete:
@@ -532,7 +570,9 @@ def write_final_report(
             repo.write("> No database wiping detected between snapshots.\n")
 
         repo.write("\n## 🤖 AI-Flagged Behavioral Telemetry\n")
-        repo.write("| Source File | Timestamp | Process / Domain / Artifact | Risk Level | Brief Technical Justification |\n")
+        repo.write(
+            "| Source File | Timestamp | Process / Domain / Artifact | Risk Level | Brief Technical Justification |\n"
+        )
         repo.write("| :--- | :--- | :--- | :--- | :--- |\n")
         any_rows = False
         for fname in all_files:
@@ -542,27 +582,57 @@ def write_final_report(
         if not any_rows:
             repo.write("| _none_ | | | | No indicators of compromise isolated across completed chunks. |\n")
 
+
 # ----------------------------------------------------------------------------
 # MAIN EXECUTION
 # ----------------------------------------------------------------------------
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="LLM-assisted triage over MVT log output.")
     add_context_args(parser)
-    parser.add_argument("--backup-path", default=None, help="Accepted for contract consistency with every other stage; unused here (--results-path is what this stage actually reads).")
-    parser.add_argument("--results-path", type=str, required=True, help="the processor's results/<n>/ output directory to analyze (orchestrator passes this automatically).")
-    parser.add_argument("--diff-baseline", type=str, default=None, help="Optional: an earlier results/<n>/ snapshot of the same device, to flag files that vanished or shrank between the two runs. Skipped entirely if omitted.")
+    parser.add_argument(
+        "--backup-path",
+        default=None,
+        help="Accepted for contract consistency with every other stage; unused here "
+        "(--results-path is what this stage actually reads).",
+    )
+    parser.add_argument(
+        "--results-path",
+        type=str,
+        required=True,
+        help="the processor's results/<n>/ output directory to analyze (orchestrator passes this automatically).",
+    )
+    parser.add_argument(
+        "--diff-baseline",
+        type=str,
+        default=None,
+        help="Optional: an earlier results/<n>/ snapshot of the same device, to flag files that vanished or shrank "
+        "between the two runs. Skipped entirely if omitted.",
+    )
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL_NAME, help="Ollama model name to run.")
-    parser.add_argument("--max-concurrent", type=int, default=DEFAULT_MAX_CONCURRENT_CHUNKS, help="Max concurrent request threads.")
+    parser.add_argument(
+        "--max-concurrent", type=int, default=DEFAULT_MAX_CONCURRENT_CHUNKS, help="Max concurrent request threads."
+    )
     parser.add_argument("--remodel", action="store_true", help="Re-queue chunks processed under a different model.")
     return parser.parse_args()
 
-def process_file(conn: sqlite3.Connection, filename: str, chunks: list[str], schema_keys: list[str], outstanding: list[int], model_name: str, max_concurrent: int) -> None:
+
+def process_file(
+    conn: sqlite3.Connection,
+    filename: str,
+    chunks: list[str],
+    schema_keys: list[str],
+    outstanding: list[int],
+    model_name: str,
+    max_concurrent: int,
+) -> None:
     """Dispatches every outstanding chunk to a thread pool for the Ollama
     round-trip, then records each result back on the SQLite connection from
     this (main) thread as futures complete. The worker threads (_run) never
     touch `conn` — that split is what keeps this safe with max_concurrent > 1
     without any locking. See the module docstring for the full rationale."""
+
     def _run(chunk_index: int) -> tuple[int, bool, list[str], str | None]:
         ok, rows, error = query_local_llm(chunks[chunk_index], schema_keys, model_name)
         return chunk_index, ok, rows, error
@@ -581,6 +651,7 @@ def process_file(conn: sqlite3.Connection, filename: str, chunks: list[str], sch
             else:
                 record_chunk_result(conn, filename, chunk_index, "safe", model_name)
                 log.debug(f"{filename} chunk {chunk_index + 1}/{len(chunks)}: safe")
+
 
 def main() -> None:
     db_url = require_database_url()
@@ -603,9 +674,14 @@ def main() -> None:
         stale_desc = ", ".join(f"{count} from {name or 'untracked'}" for name, count in stale)
         if args.remodel:
             reset_count = reset_stale_model_chunks(conn, args.model)
-            log.info(f"--remodel active: Re-queued {reset_count} chunk(s) ({stale_desc}) for re-analysis under {args.model}.")
+            log.info(
+                f"--remodel active: Re-queued {reset_count} chunk(s) ({stale_desc}) for re-analysis under {args.model}."
+            )
         else:
-            log.warning(f"{sum(c for _, c in stale)} chunk(s) were analyzed under a different model ({stale_desc}). Pass --remodel to reprocess.")
+            log.warning(
+                f"{sum(c for _, c in stale)} chunk(s) were analyzed under a different model ({stale_desc}). "
+                "Pass --remodel to reprocess."
+            )
 
     log.info("Phase 1: Gathering differential statistics")
     differential_alerts = run_differential_analysis(args.results_path, args.diff_baseline)
@@ -628,7 +704,10 @@ def main() -> None:
         sys.exit(1)
 
     all_json_files = sorted([f for f in os.listdir(args.results_path) if f.endswith(".json")])
-    log.info(f"Phase 2: Analyzing {len(all_json_files)} file(s) with model '{args.model}' (Concurrency: {args.max_concurrent})")
+    log.info(
+        f"Phase 2: Analyzing {len(all_json_files)} file(s) with model '{args.model}' "
+        f"(Concurrency: {args.max_concurrent})"
+    )
 
     for filename in all_json_files:
         file_path = os.path.join(args.results_path, filename)
@@ -658,7 +737,9 @@ def main() -> None:
         process_file(conn, filename, chunks, schema_keys, outstanding, args.model, args.max_concurrent)
         # Report is rewritten after every file so progress is never lost,
         # and it always reflects true per-chunk completeness, not a guess.
-        write_final_report(conn, report_path, args.results_path, args.diff_baseline, differential_alerts, all_json_files)
+        write_final_report(
+            conn, report_path, args.results_path, args.diff_baseline, differential_alerts, all_json_files
+        )
 
     log.info("Phase 3: Finalizing forensic report")
     write_final_report(conn, report_path, args.results_path, args.diff_baseline, differential_alerts, all_json_files)
@@ -702,8 +783,7 @@ def main() -> None:
         log.warning(f"{len(incomplete_files)} file(s) incomplete — re-run this script to continue:")
         for fname, s in incomplete_files:
             log.warning(
-                f"  {fname}: {s['pending']} pending, {s['failed']} failed "
-                f"({s['exhausted_failures']} exhausted retries)"
+                f"  {fname}: {s['pending']} pending, {s['failed']} failed ({s['exhausted_failures']} exhausted retries)"
             )
     else:
         log.info("All files fully analyzed.")
@@ -718,6 +798,7 @@ def main() -> None:
     # is Postgres ingestion itself failing, the same bar every other stage
     # in the pipeline uses.
     sys.exit(ingest_result.exit_code)
+
 
 if __name__ == "__main__":
     main()

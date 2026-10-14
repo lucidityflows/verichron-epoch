@@ -10,13 +10,16 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-import pytest
-
 import db_writer
+import pytest
 from db_writer import IngestContext, compute_file_hash
+from normalized_record import NormalizedRecord, SourceType
+from testing.pg_real import BACKENDS, open_db
+from tool_defects import defects_for
+
 from ileapp_bridge.lava import (
     ArtifactError,
     LavaError,
@@ -28,9 +31,6 @@ from ileapp_bridge.lava import (
     unix_utc,
 )
 from ileapp_bridge.main import ingest_report
-from normalized_record import NormalizedRecord, SourceType
-from tool_defects import defects_for
-from testing.pg_real import BACKENDS, open_db
 
 RUN_ID = "dddddddd-0000-0000-0000-000000000000"
 EVIDENCE_ID = "dddd0000-0000-0000-0000-00000000000d"
@@ -58,7 +58,11 @@ def db(request):
 
 
 def write_report(
-    report: Path, *artifacts: dict, status: str = "Complete", extra_tables: tuple[str, ...] = (), tool_version: str = TOOL_VERSION
+    report: Path,
+    *artifacts: dict,
+    status: str = "Complete",
+    extra_tables: tuple[str, ...] = (),
+    tool_version: str = TOOL_VERSION,
 ) -> Path:
     """A report as iLEAPP writes it. An artifact dict may override
     `record_count`, omit keys, or carry `listed=False` to leave it out of the
@@ -91,16 +95,20 @@ def write_report(
             manifest_artifacts.setdefault(a["category"], []).append(entry)
     conn.commit()
     conn.close()
-    (report / "_lava_data.lava").write_text(json.dumps({
-        "lava_schema_version": 2,
-        "parser_info": {"leapp_name": "iLEAPP", "leapp_version": tool_version},
-        "processing_status": status,
-        "lava_db_name": "_lava_artifacts.db",
-        "param_input": INPUT,
-        "param_output": str(report),
-        "modules": [],
-        "artifacts": manifest_artifacts,
-    }))
+    (report / "_lava_data.lava").write_text(
+        json.dumps(
+            {
+                "lava_schema_version": 2,
+                "parser_info": {"leapp_name": "iLEAPP", "leapp_version": tool_version},
+                "processing_status": status,
+                "lava_db_name": "_lava_artifacts.db",
+                "param_input": INPUT,
+                "param_output": str(report),
+                "modules": [],
+                "artifacts": manifest_artifacts,
+            }
+        )
+    )
     return report
 
 
@@ -112,7 +120,7 @@ def stored(db) -> list[tuple[dict, datetime | None]]:
         fields = json.loads(fields) if isinstance(fields, str) else fields
         if isinstance(when, str):
             when = datetime.fromisoformat(when)
-        out.append((fields, when.astimezone(timezone.utc) if when else None))
+        out.append((fields, when.astimezone(UTC) if when else None))
     return out
 
 
@@ -144,7 +152,7 @@ def test_rows_keep_original_headers_and_the_declared_time(db, tmp_path):
     records = stored(db)
     assert [f["URL"] for f, _ in records] == ["https://example.org/", "https://example.net/"]
     fields, when = records[0]
-    assert when == datetime.fromtimestamp(VISIT, timezone.utc)
+    assert when == datetime.fromtimestamp(VISIT, UTC)
     assert fields["Visit Timestamp"] == VISIT, "the time column is kept in fields too"
     assert fields["source_artifact"] == "Safari Browser - History"
     assert (fields["module"], fields["category"]) == ("safariHistory", "Safari Browser")
@@ -167,18 +175,23 @@ def test_nothing_is_read_from_exports_or_input_copies(db, tmp_path):
 
 def test_the_first_declared_datetime_is_the_event_time_and_every_one_is_kept(tmp_path):
     calls = {
-        "category": "Call History", "name": "Call History", "module": "callHistory", "tablename": "callhistory",
+        "category": "Call History",
+        "name": "Call History",
+        "module": "callHistory",
+        "tablename": "callhistory",
         "columns": [("ended", "Ended", "datetime"), ("started", "Started", "datetime"), ("number", "Number", None)],
         "rows": [(2000000000, 1999999000, "+15555550100")],
     }
     read = read_one(write_report(tmp_path / "BK1", calls), "Call History")
-    assert read.event_times == [datetime.fromtimestamp(2000000000, timezone.utc)]
+    assert read.event_times == [datetime.fromtimestamp(2000000000, UTC)]
     assert read.rows[0] == {"Ended": 2000000000, "Started": 1999999000, "Number": "+15555550100"}
 
 
 def test_an_artifact_with_no_declared_datetime_is_untimed(tmp_path):
     info = {
-        "category": "iTunes Backup", "name": "iTunes Backup Information", "module": "iTunesBackupInfo",
+        "category": "iTunes Backup",
+        "name": "iTunes Backup Information",
+        "module": "iTunesBackupInfo",
         "tablename": "itunes_backup_info",
         "columns": [("property", "Property", None), ("property_value", "Property Value", None)],
         "rows": [("Device Name", "Phone"), ("Last Backup Date", "2026-10-08 12:00:00")],
@@ -188,9 +201,12 @@ def test_an_artifact_with_no_declared_datetime_is_untimed(tmp_path):
 
 
 def test_unconvertible_and_pre_1970_times(tmp_path):
-    odd = dict(SAFARI, rows=[(-86400.5, "https://a/", "pre-1970"), ("not a time", "https://b/", "bad"), (None, "https://c/", "none")])
+    odd = dict(
+        SAFARI,
+        rows=[(-86400.5, "https://a/", "pre-1970"), ("not a time", "https://b/", "bad"), (None, "https://c/", "none")],
+    )
     read = read_one(write_report(tmp_path / "BK1", odd), "Safari Browser - History")
-    assert read.event_times[0] == datetime(1969, 12, 30, 23, 59, 59, 500000, tzinfo=timezone.utc)
+    assert read.event_times[0] == datetime(1969, 12, 30, 23, 59, 59, 500000, tzinfo=UTC)
     assert read.event_times[1:] == [None, None]
     assert read.rows[1]["Visit Timestamp"] == "not a time", "the raw value is kept"
     assert read.unconvertible_times == 1, "a missing time is untimed, not unconvertible"
@@ -263,7 +279,9 @@ def test_a_report_that_does_not_describe_itself_fails_the_stage(tmp_path, kwargs
 def test_a_listed_table_missing_from_the_database_fails_the_stage(tmp_path):
     report = write_report(tmp_path / "BK1", SAFARI)
     manifest = json.loads((report / "_lava_data.lava").read_text())
-    manifest["artifacts"]["Safari Browser"].append(dict(manifest["artifacts"]["Safari Browser"][0], name="Gone", tablename="gone"))
+    manifest["artifacts"]["Safari Browser"].append(
+        dict(manifest["artifacts"]["Safari Browser"][0], name="Gone", tablename="gone")
+    )
     (report / "_lava_data.lava").write_text(json.dumps(manifest))
     output = read_manifest(report)
     with pytest.raises(LavaError, match="missing from _lava_artifacts.db: gone"):
@@ -281,7 +299,14 @@ def test_a_missing_manifest_or_unknown_schema_fails_the_stage(tmp_path):
 
 
 def test_a_header_that_clashes_with_the_stages_fields_fails_the_artifact(db, tmp_path):
-    clash = dict(SAFARI, columns=[("visit_timestamp", "Visit Timestamp", "datetime"), ("url", "source_path", None), ("title", "Title", None)])
+    clash = dict(
+        SAFARI,
+        columns=[
+            ("visit_timestamp", "Visit Timestamp", "datetime"),
+            ("url", "source_path", None),
+            ("title", "Title", None),
+        ],
+    )
     result = ingest_report(db, CTX, write_report(tmp_path / "BK1", clash))
     assert result.failed == 1 and "clash" in str(result.failures)
     assert ledger(db) == []
@@ -298,7 +323,10 @@ def test_absolute_source_paths_are_recorded_relative_to_the_evidence(tmp_path):
 
     report = tmp_path / "b"
     under_copy = dict(SAFARI, source_path=f"{report}/data/private/var/mobile/Library/Safari/History.db")
-    assert read_one(write_report(report, under_copy), SAFARI["name"]).source_path == "private/var/mobile/Library/Safari/History.db"
+    assert (
+        read_one(write_report(report, under_copy), SAFARI["name"]).source_path
+        == "private/var/mobile/Library/Safari/History.db"
+    )
 
     elsewhere = dict(SAFARI, source_path="/somewhere/else/History.db")
     with pytest.raises(ArtifactError, match="outside the input iLEAPP read"):
@@ -308,11 +336,11 @@ def test_absolute_source_paths_are_recorded_relative_to_the_evidence(tmp_path):
 @pytest.mark.parametrize(
     "source_path",
     [
-        "../outside/History.db",                       # climbs out of a relative path
-        "private/../../outside/History.db",            # climbs out after descending
-        f"{INPUT}/../../etc/passwd",                   # looks under the input, isn't
-        f"{INPUT}/../BK2/Info.plist",                  # another backup's file
-        INPUT,                                         # the evidence root, not a file
+        "../outside/History.db",  # climbs out of a relative path
+        "private/../../outside/History.db",  # climbs out after descending
+        f"{INPUT}/../../etc/passwd",  # looks under the input, isn't
+        f"{INPUT}/../BK2/Info.plist",  # another backup's file
+        INPUT,  # the evidence root, not a file
         ".",
     ],
 )
@@ -371,21 +399,28 @@ def test_changed_metadata_or_time_declarations_are_new_content(db, tmp_path):
     written, not skipped as already ingested."""
     two_times = dict(
         SAFARI,
-        columns=[("visit_timestamp", "Visit Timestamp", "datetime"), ("url", "URL", None), ("loaded", "Loaded", "datetime")],
+        columns=[
+            ("visit_timestamp", "Visit Timestamp", "datetime"),
+            ("url", "URL", None),
+            ("loaded", "Loaded", "datetime"),
+        ],
         rows=[(VISIT, "https://example.org/", VISIT + 5)],
     )
     ingest_report(db, CTX, write_report(tmp_path / "base", two_times))
     ingest_report(db, CTX, write_report(tmp_path / "renamed", dict(two_times, name="Safari - Visits")))
     ingest_report(db, CTX, write_report(tmp_path / "moved", dict(two_times, source_path="private/var/History.db")))
-    reordered = dict(two_times, columns=[two_times["columns"][2], two_times["columns"][1], two_times["columns"][0]],
-                     rows=[(VISIT + 5, "https://example.org/", VISIT)])
+    reordered = dict(
+        two_times,
+        columns=[two_times["columns"][2], two_times["columns"][1], two_times["columns"][0]],
+        rows=[(VISIT + 5, "https://example.org/", VISIT)],
+    )
     ingest_report(db, CTX, write_report(tmp_path / "reordered", reordered))
 
     assert len({h for _, h in ledger(db)}) == 4, "each change is its own unit"
     records = stored(db)
     assert {f["source_artifact"] for f, _ in records} == {"Safari Browser - History", "Safari - Visits"}
     assert {f["source_path"] for f, _ in records} >= {"private/var/History.db"}
-    assert records[-1][1] == datetime.fromtimestamp(VISIT + 5, timezone.utc), "the newly first datetime is event_time"
+    assert records[-1][1] == datetime.fromtimestamp(VISIT + 5, UTC), "the newly first datetime is event_time"
 
 
 def test_reversed_datetime_declarations_alone_are_new_content(db, tmp_path):
@@ -393,7 +428,11 @@ def test_reversed_datetime_declarations_alone_are_new_content(db, tmp_path):
     columns reversed: event_time changes, so the unit must too."""
     two_times = dict(
         SAFARI,
-        columns=[("visit_timestamp", "Visit Timestamp", "datetime"), ("url", "URL", None), ("loaded", "Loaded", "datetime")],
+        columns=[
+            ("visit_timestamp", "Visit Timestamp", "datetime"),
+            ("url", "URL", None),
+            ("loaded", "Loaded", "datetime"),
+        ],
         rows=[(VISIT, "https://example.org/", VISIT + 5)],
     )
     first = write_report(tmp_path / "first", two_times)
@@ -407,13 +446,16 @@ def test_reversed_datetime_declarations_alone_are_new_content(db, tmp_path):
     ingest_report(db, CTX, second)
     assert len(ledger(db)) == 2
     assert [when for _, when in stored(db)] == [
-        datetime.fromtimestamp(VISIT, timezone.utc),
-        datetime.fromtimestamp(VISIT + 5, timezone.utc),
+        datetime.fromtimestamp(VISIT, UTC),
+        datetime.fromtimestamp(VISIT + 5, UTC),
     ]
 
 
 def test_two_columns_with_one_header_fail_the_artifact(tmp_path):
-    dup = dict(SAFARI, columns=[("visit_timestamp", "Visit Timestamp", "datetime"), ("url", "URL", None), ("title", "URL", None)])
+    dup = dict(
+        SAFARI,
+        columns=[("visit_timestamp", "Visit Timestamp", "datetime"), ("url", "URL", None), ("title", "URL", None)],
+    )
     with pytest.raises(ArtifactError, match="more than one column has the header"):
         read_one(write_report(tmp_path / "BK1", dup), SAFARI["name"])
 
@@ -423,7 +465,9 @@ def test_reading_never_changes_the_derivative(tmp_path):
     before = compute_file_hash(report / "_lava_artifacts.db")
     read_one(report, SAFARI["name"])
     assert compute_file_hash(report / "_lava_artifacts.db") == before
-    assert sorted(p.name for p in report.iterdir()) == ["_lava_artifacts.db", "_lava_data.lava"], "no journal or lock files"
+    assert sorted(p.name for p in report.iterdir()) == ["_lava_artifacts.db", "_lava_data.lava"], (
+        "no journal or lock files"
+    )
 
 
 @pytest.mark.parametrize("suffix", ["-wal", "-journal"])
@@ -496,7 +540,10 @@ def test_encoding_for_storage_keeps_existing_binary_artifacts_identity(tmp_path)
 #: iLEAPP's uberClient output as on the reference backup: Unix seconds divided
 #: by 1,000 once too often (ILEAPP-0001), beside a value the plugin got right.
 UBER = {
-    "category": "Uber", "name": "Uber - Cached Locations", "module": "uberClient", "tablename": "ubercachedlocations",
+    "category": "Uber",
+    "name": "Uber - Cached Locations",
+    "module": "uberClient",
+    "tablename": "ubercachedlocations",
     "columns": [("last_hit", "Last hit", "datetime"), ("name", "Name", None)],
     "rows": [(1791009, "A"), (1791009794, "B")],
 }
@@ -508,12 +555,18 @@ def test_a_registered_defect_is_corrected_and_the_tools_value_kept(db, tmp_path)
     assert result.failed == 0, result.failures
 
     (wrong, wrong_time), (right, right_time) = stored(db)
-    assert wrong_time == datetime.fromtimestamp(1791009000, timezone.utc), "corrected, not 1970-01-21"
+    assert wrong_time == datetime.fromtimestamp(1791009000, UTC), "corrected, not 1970-01-21"
     assert wrong["Last hit"] == 1791009, "iLEAPP's own value stays under its header"
     assert wrong["corrections"] == [
-        {"defect": "ILEAPP-0001", "column": "Last hit", "original": 1791009, "corrected": 1791009000, "resolution": 1000}
+        {
+            "defect": "ILEAPP-0001",
+            "column": "Last hit",
+            "original": 1791009,
+            "corrected": 1791009000,
+            "resolution": 1000,
+        }
     ]
-    assert right_time == datetime.fromtimestamp(1791009794, timezone.utc)
+    assert right_time == datetime.fromtimestamp(1791009794, UTC)
     assert "corrections" not in right, "a value the tool got right is never touched"
     assert any("corrected for iLEAPP defect ILEAPP-0001" in n for n in result.notes)
 
@@ -526,7 +579,7 @@ def test_a_version_the_defect_is_not_registered_for_is_not_corrected(tmp_path):
         read = read_artifact(conn, output, output.artifacts[0], defects_for("iLEAPP", output.tool_version))
     finally:
         conn.close()
-    assert read.event_times[0] == datetime.fromtimestamp(1791009, timezone.utc)
+    assert read.event_times[0] == datetime.fromtimestamp(1791009, UTC)
     assert read.corrections == [[], []]
     assert any("before 2007-06-29, the first iPhone" in n for n in read.notes), "still reported for review"
 
@@ -544,12 +597,15 @@ def test_a_registered_column_the_artifact_lacks_fails_that_artifact(tmp_path):
 
 def test_times_outside_the_device_era_are_kept_and_reported_for_review(tmp_path):
     calendar = {
-        "category": "Calendar", "name": "Calendar Events", "module": "calendarAll", "tablename": "calendarevents",
+        "category": "Calendar",
+        "name": "Calendar Events",
+        "module": "calendarAll",
+        "tablename": "calendarevents",
         "columns": [("start", "Start Time", "datetime"), ("modified", "Last Modification Time", "datetime")],
         "rows": [(4102444800, 197164800), (1791140650, 1791140650)],  # 2100-01-01 and 1976-04-01; then ordinary
     }
     read = read_one(write_report(tmp_path / "BK1", calendar), "Calendar Events")
-    assert read.event_times[0] == datetime.fromtimestamp(4102444800, timezone.utc), "kept, not nulled"
+    assert read.event_times[0] == datetime.fromtimestamp(4102444800, UTC), "kept, not nulled"
     assert read.rows[0]["Last Modification Time"] == 197164800
     assert any("1 time(s) in Last Modification Time fall before 2007-06-29" in n for n in read.notes)
     assert any("1 time(s) in Start Time fall after this run" in n for n in read.notes)
@@ -563,13 +619,16 @@ def test_times_outside_the_device_era_are_kept_and_reported_for_review(tmp_path)
 
 def test_time_review_markers_reach_the_stored_record(db, tmp_path):
     calendar = {
-        "category": "Calendar", "name": "Calendar Events", "module": "calendarAll", "tablename": "calendarevents",
+        "category": "Calendar",
+        "name": "Calendar Events",
+        "module": "calendarAll",
+        "tablename": "calendarevents",
         "columns": [("start", "Start Time", "datetime"), ("modified", "Last Modification Time", "datetime")],
         "rows": [(1791140650, 197164800)],  # an ordinary start; modified 1976-04-01
     }
     ingest_report(db, CTX, write_report(tmp_path / "BK1", calendar))
     [(fields, when)] = stored(db)
-    assert when == datetime.fromtimestamp(1791140650, timezone.utc)
+    assert when == datetime.fromtimestamp(1791140650, UTC)
     assert fields["time_review"] == [
         {"column": "Last Modification Time", "time": "1976-04-01T00:00:00+00:00", "check": "before_device_era"}
     ]
@@ -584,7 +643,7 @@ def test_a_same_named_artifact_from_another_module_is_not_corrected(tmp_path):
     finally:
         conn.close()
     assert read.corrections == [[], []], "outside the registered scope"
-    assert read.event_times[0] == datetime.fromtimestamp(1791009, timezone.utc)
+    assert read.event_times[0] == datetime.fromtimestamp(1791009, UTC)
 
 
 @pytest.mark.parametrize(
@@ -627,13 +686,15 @@ def test_a_correction_leaves_the_units_identity_alone(tmp_path):
 
 def current_facts(db) -> list[tuple[dict, datetime | None]]:
     cur = db.cursor()
-    cur.execute("SELECT fields, event_time FROM current_forensic_records WHERE source_type = 'ileapp_record' ORDER BY id")
+    cur.execute(
+        "SELECT fields, event_time FROM current_forensic_records WHERE source_type = 'ileapp_record' ORDER BY id"
+    )
     out = []
     for fields, when in cur.fetchall():
         fields = json.loads(fields) if isinstance(fields, str) else fields
         if isinstance(when, str):
             when = datetime.fromisoformat(when)
-        out.append((fields, when.astimezone(timezone.utc) if when else None))
+        out.append((fields, when.astimezone(UTC) if when else None))
     return out
 
 
@@ -643,15 +704,19 @@ def test_corrected_facts_supersede_the_uncorrected_ones(db, tmp_path):
     stayed current beside the corrected ones. With the same identity, the
     newer parser version replaces them (R8)."""
     before = write_report(tmp_path / "before", UBER, tool_version="2026.2.0")  # no defect registered
-    ingest_report(db, IngestContext(evidence_id=EVIDENCE_ID, derivative_id=DERIVATIVE_ID, run_id=RUN_ID, parser_version=4), before)
-    assert [w for _, w in current_facts(db)][0] == datetime.fromtimestamp(1791009, timezone.utc)
+    ingest_report(
+        db, IngestContext(evidence_id=EVIDENCE_ID, derivative_id=DERIVATIVE_ID, run_id=RUN_ID, parser_version=4), before
+    )
+    assert [w for _, w in current_facts(db)][0] == datetime.fromtimestamp(1791009, UTC)
 
     after = write_report(tmp_path / "after", UBER)  # 2026.3.0: ILEAPP-0001 applies
-    ingest_report(db, IngestContext(evidence_id=EVIDENCE_ID, derivative_id=DERIVATIVE_ID, run_id=RUN_ID, parser_version=5), after)
+    ingest_report(
+        db, IngestContext(evidence_id=EVIDENCE_ID, derivative_id=DERIVATIVE_ID, run_id=RUN_ID, parser_version=5), after
+    )
     current = current_facts(db)
     assert [w for _, w in current] == [
-        datetime.fromtimestamp(1791009000, timezone.utc),
-        datetime.fromtimestamp(1791009794, timezone.utc),
+        datetime.fromtimestamp(1791009000, UTC),
+        datetime.fromtimestamp(1791009794, UTC),
     ], "only the corrected version is current"
     assert len(stored(db)) == 4, "the uncorrected facts are history, not deleted"
 

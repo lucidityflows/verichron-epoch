@@ -26,7 +26,6 @@ from pathlib import Path
 import psycopg2
 import psycopg2.extras
 import pytest
-
 from db_writer import IngestContext, compute_file_hash, incomplete_ingests, ingest, write_records
 from normalized_record import NormalizedRecord, SourceType
 from testing.pg_real import BACKENDS, PgReal, open_db
@@ -86,8 +85,18 @@ def strand(db, file_hash: str, file_path: str) -> int:
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, ARRAY[%s::uuid])
             RETURNING ingest_id
             """,
-            (EVIDENCE_A, DERIVATIVE_A, file_hash, "crash_report", 1, file_path,
-             Path(file_path).name, "full", psycopg2.extras.Json({}), RUN_ID),
+            (
+                EVIDENCE_A,
+                DERIVATIVE_A,
+                file_hash,
+                "crash_report",
+                1,
+                file_path,
+                Path(file_path).name,
+                "full",
+                psycopg2.extras.Json({}),
+                RUN_ID,
+            ),
         )
         return cur.fetchone()[0]
 
@@ -139,8 +148,14 @@ def test_both_backends_refuse_nul_in_a_records_fields(db, artifact):
 
 def test_both_backends_refuse_nul_in_a_units_raw_payload(db, artifact):
     with pytest.raises(Exception, match="(?i)unicode escape"):
-        with ingest(db, ctx(RUN_ID), artifact, source_type="crash_report", payload_kind="summary",
-                    raw_payload={"sample": ["a\x00b"]}):
+        with ingest(
+            db,
+            ctx(RUN_ID),
+            artifact,
+            source_type="crash_report",
+            payload_kind="summary",
+            raw_payload={"sample": ["a\x00b"]},
+        ):
             pass
     assert db.ledger() == []
 
@@ -191,8 +206,7 @@ def test_a_retried_file_is_ingested_on_the_next_run(db, artifact):
     # already_ingested=True and the file was never read again.
     with ingest(db, ctx("22222222-2222-2222-2222-222222222222"), artifact, **UNIT) as unit:
         assert not unit.already_ingested, (
-            "a file whose first ingest failed was reported as already ingested -- "
-            "this is the permanent-data-loss bug"
+            "a file whose first ingest failed was reported as already ingested -- this is the permanent-data-loss bug"
         )
         unit.write([record(0)])
 
@@ -656,14 +670,14 @@ def test_migration_backfill_leaves_recordless_rows_incomplete():
         "backfill should derive record_count from actual records"
     )
     assert "ingested_files_completion_consistent" in sql, (
-        "the CHECK constraint is what stops a future writer setting ingest_complete "
-        "without record_count"
+        "the CHECK constraint is what stops a future writer setting ingest_complete without record_count"
     )
 
 
 # ==========================================================================
 # The writer exposes only the atomic ingest boundary
 # ==========================================================================
+
 
 def test_writer_exposes_no_standalone_ledger_write():
     """The defect was reassemblable from public parts: `ingest_file()` committed a
@@ -680,14 +694,21 @@ def test_a_part_of_a_file_is_its_own_unit_by_content_hash(db, artifact):
     hash of each table's content rather than the file's bytes."""
     first, second = "1" * 64, "2" * 64
     for content_hash in (first, second):
-        with ingest(db, ctx(), f"{artifact}#{content_hash[0]}", source_type="ileapp_record",
-                    payload_kind="none", content_hash=content_hash) as unit:
+        with ingest(
+            db,
+            ctx(),
+            f"{artifact}#{content_hash[0]}",
+            source_type="ileapp_record",
+            payload_kind="none",
+            content_hash=content_hash,
+        ) as unit:
             unit.write([record()])
     cur = db.cursor()
     cur.execute("SELECT file_hash, file_name FROM ingested_files ORDER BY file_hash")
     assert cur.fetchall() == [(first, f"{artifact.name}#1"), (second, f"{artifact.name}#2")]
-    with ingest(db, ctx(), f"{artifact}#1", source_type="ileapp_record", payload_kind="none",
-                content_hash=first) as unit:
+    with ingest(
+        db, ctx(), f"{artifact}#1", source_type="ileapp_record", payload_kind="none", content_hash=first
+    ) as unit:
         assert unit.already_ingested
 
 

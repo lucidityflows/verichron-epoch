@@ -5,24 +5,25 @@ an extractor, etc.) because it doesn't parse forensic artifacts or execute a
 workflow. The orchestrator validates the environment for spawned stages (R29);
 the guard here remains for standalone commands such as migrate.py.
 """
- 
+
 from __future__ import annotations
- 
+
 import sys
+from os import environ
 from pathlib import Path
-from os import environ, path as os_path
 from urllib.parse import quote, unquote, urlsplit
- 
+
+
 def repo_root() -> Path:
     # This file lives at libs/runtime-env/runtime_env.py -- two directories
     # below the monorepo root, hence three .parent calls. If this file moves
     # again, update the parent count to match its new depth.
     return Path(__file__).resolve().parent.parent.parent
- 
- 
+
+
 def ensure_repo_venv() -> Path:
     """Require a repo-root .venv before a standalone Python command runs.
- 
+
     The project expects a local virtual environment in the repository root so all
     Python tooling resolves the same dependencies and the same interpreter. If the
     venv is missing, the script exits with a clear setup message instead of the
@@ -39,8 +40,8 @@ def ensure_repo_venv() -> Path:
             "packages/etl-db-writer, packages/contracts, apps/extractors/*) in one step."
         )
     return venv_python
- 
- 
+
+
 def fatal_if_missing_venv() -> None:
     """Common entrypoint guard used by Python scripts and extractors: without
     the venv, print why and exit 2. The message is the whole story, so no
@@ -50,6 +51,7 @@ def fatal_if_missing_venv() -> None:
     except RuntimeError as exc:
         print(f"[env] {exc}", file=sys.stderr)
         sys.exit(2)
+
 
 def load_root_env() -> None:
     """Load the repo-root .env, mirroring packages/contracts/ts/env.ts's
@@ -82,10 +84,10 @@ def resolve_database_url() -> str:
         # the same encoding as encodeURIComponent for these characters.
         def enc(value: str) -> str:
             return quote(value, safe="!'()*-._~")
+
         return f"postgresql://{enc(user)}:{enc(password)}@{host}:{port}/{enc(name)}"
     raise RuntimeError(
-        "Database configuration is required: set DATABASE_URL, or all of "
-        "DB_USER, DB_PASSWORD, and DB_NAME."
+        "Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME."
     )
 
 

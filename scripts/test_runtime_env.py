@@ -9,15 +9,10 @@ import sys
 from pathlib import Path
 
 import pytest
-
 import runtime_env
 
-
 DATABASE_URL_CASES = json.loads(
-    (
-        Path(__file__).resolve().parents[1]
-        / "packages/contracts/testdata/database_url_cases.json"
-    ).read_text()
+    (Path(__file__).resolve().parents[1] / "packages/contracts/testdata/database_url_cases.json").read_text()
 )
 DATABASE_ENV_KEYS = ("DATABASE_URL", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_HOST", "DB_PORT")
 
@@ -38,10 +33,7 @@ def test_resolve_database_url_matches_shared_cases(case, monkeypatch):
 
 def test_runtime_sources_have_no_builtin_database_credential():
     forbidden = "forensics_dev_only"
-    source_roots = [
-        Path(__file__).resolve().parents[1] / name
-        for name in ("apps", "libs", "packages")
-    ]
+    source_roots = [Path(__file__).resolve().parents[1] / name for name in ("apps", "libs", "packages")]
     for root in source_roots:
         for source in root.rglob("*"):
             if {"dist", "node_modules", "__pycache__"}.intersection(source.parts):
@@ -144,4 +136,3 @@ def test_libpq_reads_back_db_values_that_need_encoding(monkeypatch):
     monkeypatch.setenv("DB_NAME", "epoch db")
     parsed = parse_dsn(runtime_env.resolve_database_url())
     assert (parsed["user"], parsed["password"], parsed["dbname"]) == ("epoch user", "p@ss:w/rd?#%", "epoch db")
-

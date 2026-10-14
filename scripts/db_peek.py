@@ -20,7 +20,6 @@ environment or the repo-root .env, never from the command line (R30).
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 
 import psycopg2
@@ -111,9 +110,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     load_root_env()
     parser.add_argument("--run-id", default=None, help="defaults to the most recent run")
-    parser.add_argument(
-        "--evidence-id", default=None, help="defaults to the run's pipeline_runs.evidence_id"
-    )
+    parser.add_argument("--evidence-id", default=None, help="defaults to the run's pipeline_runs.evidence_id")
     args = parser.parse_args()
 
     try:

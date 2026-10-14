@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-
 MODULE_PATH = Path(__file__).with_name("db_peek.py")
 SPEC = importlib.util.spec_from_file_location("db_peek", MODULE_PATH)
 db_peek = importlib.util.module_from_spec(SPEC)

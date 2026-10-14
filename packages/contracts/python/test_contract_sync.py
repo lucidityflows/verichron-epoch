@@ -21,11 +21,10 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-
 from adapter import SCHEMA_PATH, load_schema, source_types, validate
 from normalized_record import NormalizedRecord, SourceType
 
@@ -37,7 +36,7 @@ TS_ENUM_MIRROR = CONTRACTS_DIR / "ts" / "sourceType.ts"
 
 # Reusable fixture timestamp — avoids repeating raw ISO strings in test bodies
 # and prevents Pylance/mypy from rejecting str where datetime is expected.
-FIXTURE_TIMESTAMP = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+FIXTURE_TIMESTAMP = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
 
 
 # --------------------------------------------------------------------------
@@ -164,10 +163,15 @@ def test_sync_contracts_detects_enum_drift(tmp_path):
 
     written = subprocess.run([sys.executable, str(script), "--write"], capture_output=True, text=True)
     assert written.returncode == 0
-    assert re.search(r'KEYCHAIN_ENTRY\s+= "keychain_entry"', (sandbox / "packages/contracts/python/source_type.py").read_text())
-    assert re.search(r"KEYCHAIN_ENTRY:\s+'keychain_entry',", (sandbox / "packages/contracts/ts/sourceType.ts").read_text())
-    assert _ts_enum_values((sandbox / "packages/contracts/ts/sourceType.ts").read_text()) == (
-        schema["properties"]["source_type"]["enum"]
+    assert re.search(
+        r'KEYCHAIN_ENTRY\s+= "keychain_entry"', (sandbox / "packages/contracts/python/source_type.py").read_text()
+    )
+    assert re.search(
+        r"KEYCHAIN_ENTRY:\s+'keychain_entry',", (sandbox / "packages/contracts/ts/sourceType.ts").read_text()
+    )
+    assert (
+        _ts_enum_values((sandbox / "packages/contracts/ts/sourceType.ts").read_text())
+        == (schema["properties"]["source_type"]["enum"])
     )
 
     assert subprocess.run([sys.executable, str(script), "--check"]).returncode == 0
@@ -251,6 +255,7 @@ def test_load_schema_returns_an_independent_copy():
     first = load_schema()
     first["properties"]["source_type"]["enum"].append("mutated")
     assert "mutated" not in load_schema()["properties"]["source_type"]["enum"]
+
 
 # --------------------------------------------------------------------------
 # Evidence sidecar (EPOCH-401). The Zod half of this check, plus Zod/JSON

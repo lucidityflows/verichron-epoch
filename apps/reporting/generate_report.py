@@ -24,14 +24,14 @@ Three things this file must always do, per the "fix, don't punish" principle:
 
 import argparse
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
-from runtime_env import redact_password, require_database_url
 
 import psycopg2
 import psycopg2.extras
+from runtime_env import redact_password, require_database_url
 from tool_defects import defect as registered_defect
+
 
 def fetch_stage_status(conn, run_id: str) -> list[dict]:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -94,7 +94,10 @@ def render_stage_preface(stages: list[dict], run_id: str, generated: str) -> lis
         status = s["status"]
         note = s["error_message"] or ""
         if status == "failed":
-            note = f"FAILED — {note}. Fix and re-run the pipeline against the same backup; already-succeeded stages will not be redone."
+            note = (
+                f"FAILED — {note}. Fix and re-run the pipeline against the same backup; "
+                "already-succeeded stages will not be redone."
+            )
         elif status == "pending":
             note = "never ran"
         elif status == "succeeded" and s.get("warnings"):
@@ -162,7 +165,10 @@ def describe_derivative(d: dict) -> list[str]:
     params = d["params"]
     produced = f"produced by {tool['name']} {tool['version']}"
     if d["kind"] == "ileapp_output":
-        return [f"- **iLEAPP output** (`{d['path']}`): produced by iLEAPP {tool['version'][:12]}, read as `{params['input_type']}`"]
+        return [
+            f"- **iLEAPP output** (`{d['path']}`): produced by iLEAPP {tool['version'][:12]}, "
+            f"read as `{params['input_type']}`"
+        ]
     repair = params["repair"]
     if repair["status"] == "skipped":
         repair_note = f"repair skipped ({repair['reason']})"
@@ -271,9 +277,7 @@ def render_crash_section(records: list[dict]) -> list[str]:
             f"- **OS:** `{fields.get('os_version')}` | **Hardware:** `{fields.get('hardware_model')}` "
             f"| **Arch:** `{fields.get('cpu_type')}`"
         )
-        lines.append(
-            f"- **Bundle:** `{r['bundle_id']}` (`{fields.get('bundle_version')}`)"
-        )
+        lines.append(f"- **Bundle:** `{r['bundle_id']}` (`{fields.get('bundle_version')}`)")
         lines.append(
             f"- **Process:** `{r['process_name']}` (PID `{r['pid']}`), spawned by "
             f"`{fields.get('parent_proc')}` (PID `{fields.get('parent_pid')}`)"
@@ -332,7 +336,7 @@ def _table_cell(text: str) -> str:
 
 
 def _utc(value) -> str:
-    return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 def render_ileapp_section(rows: list[dict]) -> list[str]:
@@ -357,7 +361,7 @@ def render_ileapp_section(rows: list[dict]) -> list[str]:
 # --- tool checks and corrections (R36, EPOCH-511) -------------------------
 
 #: The first iPhone went on sale on this day: no device time can be earlier.
-DEVICE_ERA = datetime(2007, 6, 29, tzinfo=timezone.utc)
+DEVICE_ERA = datetime(2007, 6, 29, tzinfo=UTC)
 
 
 def fetch_corrections(conn, evidence_id: str) -> list[dict]:
@@ -431,7 +435,8 @@ def render_tool_checks_section(corrections: list[dict], review: list[dict]) -> l
     ]
     if corrections:
         lines += [
-            "| Defect | Tool | Artifact | Column | Records | Corrected time | What the tool got wrong | Reported to the tool |",
+            "| Defect | Tool | Artifact | Column | Records | Corrected time | "
+            "What the tool got wrong | Reported to the tool |",
             "| :--- | :--- | :--- | :--- | ---: | :--- | :--- | :--- |",
         ]
         for c in corrections:
@@ -510,8 +515,7 @@ def render_coverage_section(counts: list[dict], ileapp_outputs: list[dict]) -> l
     lines = [
         "## Coverage",
         "",
-        "Every type of fact recorded for this evidence, how many records it has, and where this "
-        "report shows it.",
+        "Every type of fact recorded for this evidence, how many records it has, and where this report shows it.",
         "",
     ]
     if not counts:
@@ -520,7 +524,9 @@ def render_coverage_section(counts: list[dict], ileapp_outputs: list[dict]) -> l
         lines += ["| Fact type | Records | Shown in |", "| :--- | ---: | :--- |"]
         for row in counts:
             section = RENDERERS.get(row["source_type"])
-            shown = f"{section[0]} section" if section else "**not shown in this report**; view them in Forensic Records"
+            shown = (
+                f"{section[0]} section" if section else "**not shown in this report**; view them in Forensic Records"
+            )
             lines.append(f"| `{row['source_type']}` | {row['records']} | {shown} |")
         lines.append(f"| **All facts** | {sum(row['records'] for row in counts)} | |")
         lines.append("")
@@ -555,7 +561,7 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     """
     if evidence_id is None:
         evidence_id = fetch_run_evidence(conn, run_id)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     stages = fetch_stage_status(conn, run_id)
 
     lines = [
@@ -593,11 +599,9 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
 
     lines += render_coverage_section(fetch_fact_counts(conn, evidence_id), ileapp_outputs)
     lines += render_not_examined_section(ileapp_outputs)
-    lines += render_tool_checks_section(
-        fetch_corrections(conn, evidence_id), fetch_time_review(conn, evidence_id)
-    )
+    lines += render_tool_checks_section(fetch_corrections(conn, evidence_id), fetch_time_review(conn, evidence_id))
 
-    for source_type, (title, fetch, render) in RENDERERS.items():
+    for title, fetch, render in RENDERERS.values():
         rows = fetch(conn, evidence_id)
         if not rows:
             continue
@@ -642,8 +646,12 @@ def main():
     parser.add_argument("--derivative-id", required=False)
     parser.add_argument("--derivative-path", required=False)
     parser.add_argument("--backup-path", required=False)  # unused here, present for contract consistency
-    parser.add_argument("--report-path", required=False, help="the folder the report is written to (see resolve_output_path)")
-    parser.add_argument("--output", default=None, help="write the report here instead of <report-path>/investigation_report.md")
+    parser.add_argument(
+        "--report-path", required=False, help="the folder the report is written to (see resolve_output_path)"
+    )
+    parser.add_argument(
+        "--output", default=None, help="write the report here instead of <report-path>/investigation_report.md"
+    )
     args = parser.parse_args()
 
     output_path = resolve_output_path(args.output, args.report_path)

@@ -26,11 +26,9 @@ the fix changed the extractors and not just db_writer.py.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-
-import pytest
 
 import crash.main as crash_main
+import pytest
 from db_writer import IngestContext
 from testing.pg_real import BACKENDS, open_db
 

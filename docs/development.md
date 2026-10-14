@@ -121,6 +121,7 @@ There are two test tiers, and both run in CI (R33):
   database, never your dev one.
 
 ```bash
+mise run lint
 uv run pytest                                        # Python: packages/, scripts/, apps/
 TEST_DATABASE_URL=postgresql://.../verichron_test uv run pytest
 
@@ -132,6 +133,7 @@ pnpm check:contracts                                 # schema ↔ TS ↔ Python 
 ```
 
 `mise run test` runs both suites (`mise run test:py`, `mise run test:ts`).
+`mise run lint` runs Ruff checks and formatting validation on first-party Python.
 
 The desktop app's tests run in Vitest: main-process and IPC handler tests in
 Node (the IPC tests against real Postgres, with a stand-in for Electron's
@@ -168,7 +170,7 @@ New device behaviour seen during these checks is added to the verified list in
 
 | Workflow | Runs |
 |---|---|
-| `.github/workflows/python-tests.yml` | Migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
+| `.github/workflows/python-tests.yml` | Ruff lint and format checks, migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
 | `.github/workflows/ts-tests.yml` | The formatting check, then typecheck and tests for the processor, the writer, the reader and the orchestrator, with real PostgreSQL, and the desktop app's typecheck, Vite build and tests |
 
 Both workflows install the toolchain from `mise.toml` and Python from
@@ -187,9 +189,11 @@ pinned to full commit SHAs.
   `migrate.py`. Never edit a merged migration; add a new one.
 - **Contracts:** add a `source_type` to `normalized-record.schema.json` first,
   then run `pnpm sync:contracts`.
-- **Formatting:** Prettier formats the TypeScript (`.ts`, `.tsx`, `.mts`) with
-  the settings in `.prettierrc.json`. Run `pnpm format` before committing; CI
-  runs `pnpm format:check`. Markdown, YAML and JSON aren't formatted. The
+- **Formatting:** Ruff formats first-party Python (`packages/`, `libs/`,
+  `apps/`, `scripts/`); run `mise run lint` to check lint and formatting.
+  Prettier formats TypeScript (`.ts`, `.tsx`, `.mts`) with the settings in
+  `.prettierrc.json`. Run `pnpm format` before committing; CI runs
+  `pnpm format:check`. Markdown, YAML and JSON aren't formatted. The
   one-time reformat is listed in `.git-blame-ignore-revs`; run
   `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so `git blame`
   skips it (GitHub's blame view does this already).
