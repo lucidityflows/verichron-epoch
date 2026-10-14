@@ -28,10 +28,11 @@ description = "Check prerequisites, then install every environment from the lock
 run = "scripts/bootstrap-dev.sh"
 
 [tasks.lint]
-description = "Lint first-party Python and check its formatting"
+description = "Lint, format-check and type-check first-party Python"
 run = [
   "uv run ruff check packages libs apps scripts",
   "uv run ruff format --check packages libs apps scripts",
+  "uv run pyright",
 ]
 
 [tasks."test:py"]

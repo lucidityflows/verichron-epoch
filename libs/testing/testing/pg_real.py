@@ -85,7 +85,10 @@ class PgReal:
                         "INSERT INTO devices (device_key, label) VALUES (%s, %s) RETURNING device_id",
                         (_hex64(f"device:{evidence_id}"), f"pytest device {evidence_id[:8]}"),
                     )
-                    device_id = cur.fetchone()[0]
+                    device_row = cur.fetchone()
+                    if device_row is None:
+                        raise RuntimeError("Postgres INSERT did not return the newly created device")
+                    device_id = device_row[0]
                     cur.execute(
                         "INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes) "
                         "VALUES (%s, %s, %s, 0, 0)",
@@ -167,7 +170,10 @@ class PgReal:
                     "WHERE i.file_hash = %s",
                     (file_hash,),
                 )
-            return cur.fetchone()[0]
+            count_row = cur.fetchone()
+            if count_row is None:
+                raise RuntimeError("Postgres COUNT query returned no row")
+            return count_row[0]
 
 
 BACKENDS = ("pgdouble", "postgres")

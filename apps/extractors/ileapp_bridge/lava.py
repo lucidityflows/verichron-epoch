@@ -448,7 +448,7 @@ def scan_artifact(
         )
     if unconvertible:
         if artifact.event_time_column is None:
-            raise ArtifactError(f"{artifact.name}: unconvertible event times have no declared datetime column")
+            raise ArtifactError(f"{artifact.name}: has unconvertible times without a declared event_time column")
         notes.append(
             f"{artifact.name}: {unconvertible} row(s) have a value in "
             f"{artifact.column_map[artifact.event_time_column]} "

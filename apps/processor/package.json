@@ -18,6 +18,7 @@
     "predev": "pnpm run build:contracts",
     "dev": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --project tsconfig.test.json",
     "pretest": "pnpm run build:contracts",
     "test": "tsx --test 'src/**/*.test.ts'"
   },

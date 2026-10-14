@@ -18,6 +18,7 @@ from __future__ import annotations
 import pathlib
 import sys
 import traceback
+from importlib import import_module
 
 
 def main() -> int:
@@ -57,7 +58,7 @@ def main() -> int:
 
     sys.path.insert(0, str(ileapp_dir))
 
-    import scripts.plugin_loader as plugin_loader  # noqa: E402
+    plugin_loader = import_module("scripts.plugin_loader")
 
     resolved_from = getattr(plugin_loader, "__file__", "<unknown>")
     print(f"plugin_loader module resolved from: {resolved_from}")

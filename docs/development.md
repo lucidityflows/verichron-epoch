@@ -25,6 +25,7 @@ Each version is declared once, in the file the enforcing tool reads:
 | pnpm | 10.34.5 | `packageManager` in `package.json` |
 | uv | 0.12.23 | `mise.toml` (`required-version` in `pyproject.toml` guards it) |
 | Python | 3.14.8, a uv-managed CPython; system interpreters are never used | `.python-version` |
+| Pyright | 1.1.414 | `pyproject.toml` |
 | Electron | 44.7.0 | `apps/epoch/package.json` |
 | iphone_backup_decrypt | 0.10.0 (exact; the decrypt uses two of its internals) | `tools/decrypt/pyproject.toml` |
 | iLEAPP | v2026.3.1 (submodule) | `.gitmodules` pin; its dependencies in `tools/ileapp/pyproject.toml` |
@@ -123,9 +124,13 @@ There are two test tiers, and both run in CI (R33):
 ```bash
 mise run lint
 uv run pytest                                        # Python: packages/, scripts/, apps/
+uv run pyright                                       # Python type checking
 TEST_DATABASE_URL=postgresql://.../verichron_test uv run pytest
 
 pnpm --filter @verichron/processor test             # TypeScript (node:test via tsx)
+pnpm --filter @verichron/processor typecheck:tests  # Includes *.test.ts
+pnpm --filter @verichron/etl-db-reader typecheck:tests
+pnpm --filter @verichron/orchestrator typecheck:tests
 pnpm --filter @verichron/orchestrator test           # real-Postgres tests need TEST_DATABASE_URL
 pnpm --filter @verichron/etl-db-reader test
 pnpm --filter @verichron/epoch test                  # Vitest: main process in Node, renderer in jsdom
@@ -133,7 +138,7 @@ pnpm check:contracts                                 # schema ↔ TS ↔ Python 
 ```
 
 `mise run test` runs both suites (`mise run test:py`, `mise run test:ts`).
-`mise run lint` runs Ruff checks and formatting validation on first-party Python.
+`mise run lint` runs Ruff, Python formatting validation and Pyright on first-party code.
 
 The desktop app's tests run in Vitest: main-process and IPC handler tests in
 Node (the IPC tests against real Postgres, with a stand-in for Electron's

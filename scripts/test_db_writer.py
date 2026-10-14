@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypedDict
 
 import psycopg2
 import psycopg2.extras
@@ -54,8 +56,14 @@ EVIDENCE_B = "bbbb0000-0000-0000-0000-00000000000b"
 DERIVATIVE_B = "bbbb0000-0000-0000-0000-0000000000db"
 SEEDED_EVIDENCE = {EVIDENCE_A: DERIVATIVE_A, EVIDENCE_B: DERIVATIVE_B}
 
+
 #: The unit-shape arguments every crash-report ingest below shares.
-UNIT = {"source_type": "crash_report", "payload_kind": "full"}
+class UnitArguments(TypedDict):
+    source_type: str
+    payload_kind: str
+
+
+UNIT: UnitArguments = {"source_type": "crash_report", "payload_kind": "full"}
 
 
 def ctx(run_id: str = RUN_ID, evidence_id: str = EVIDENCE_A, version: int = 1) -> IngestContext:
@@ -111,7 +119,7 @@ def artifact(tmp_path) -> Path:
 def record(n: int = 0) -> NormalizedRecord:
     return NormalizedRecord(
         source_type=SourceType.CRASH_REPORT,
-        event_time="2024-01-15T10:30:00+00:00",
+        event_time=datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
         process_name=f"proc_{n}",
         pid=1000 + n,
         fields={"index": n},
@@ -419,7 +427,7 @@ def test_same_content_under_two_evidence_items_is_two_units(db, tmp_path):
     evidence item silently got nothing. Identity is per evidence (R6)."""
     empty = tmp_path / "artifact.tsv"
     empty.write_text("")
-    unit_shape = {"source_type": "ileapp_record", "payload_kind": "full"}
+    unit_shape: UnitArguments = {"source_type": "ileapp_record", "payload_kind": "full"}
 
     with ingest(db, ctx(RUN_ID, EVIDENCE_A), empty, **unit_shape) as unit:
         unit.write([])
@@ -520,7 +528,7 @@ def test_ingest_requires_a_complete_context():
 
 def test_ingest_rejects_a_bare_run_id_where_the_context_belongs(db, artifact):
     with pytest.raises(TypeError, match="IngestContext"):
-        with ingest(db, RUN_ID, artifact, **UNIT):
+        with ingest(db, RUN_ID, artifact, **UNIT):  # pyright: ignore[reportArgumentType]  # Intentional runtime rejection test.
             pass
     assert db.ledger() == []
 

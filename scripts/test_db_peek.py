@@ -6,6 +6,8 @@ import pytest
 
 MODULE_PATH = Path(__file__).with_name("db_peek.py")
 SPEC = importlib.util.spec_from_file_location("db_peek", MODULE_PATH)
+if SPEC is None or SPEC.loader is None:
+    raise ImportError(f"Could not load db_peek from {MODULE_PATH}")
 db_peek = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(db_peek)
 

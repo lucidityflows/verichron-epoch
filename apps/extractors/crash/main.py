@@ -228,8 +228,10 @@ def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
                     continue
 
                 parsed, err = parse_ips_file(file_path)
-                if err:
+                if err is not None:
                     raise ValueError(err)
+                if parsed is None:
+                    raise RuntimeError("parse_ips_file returned neither data nor an error")
 
                 unit.set_raw_payload(parsed)
 

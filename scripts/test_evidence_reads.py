@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 import crash.main as crash_main
@@ -52,7 +52,7 @@ def db(request):
 def record(name: str) -> NormalizedRecord:
     return NormalizedRecord(
         source_type=SourceType.CRASH_REPORT,
-        event_time="2024-01-15T10:30:00+00:00",
+        event_time=datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
         process_name=name,
         fields={},
     )
@@ -70,8 +70,13 @@ def current(db, evidence_id: str = EVIDENCE, view: str = "current_forensic_recor
 
 
 def write(db, path: Path, version: int, names: list[str], evidence_id: str = EVIDENCE) -> None:
-    shape = {"source_type": "crash_report", "payload_kind": "full"}
-    with ingest(db, ctx(evidence_id=evidence_id, version=version), path, **shape) as unit:
+    with ingest(
+        db,
+        ctx(evidence_id=evidence_id, version=version),
+        path,
+        source_type="crash_report",
+        payload_kind="full",
+    ) as unit:
         unit.write([record(n) for n in names])
 
 
@@ -441,7 +446,10 @@ def test_the_report_states_its_coverage_against_the_golden_file(db, tmp_path):
     assert _report_outline(report) == GOLDEN.read_text()
     with db.cursor() as cur:
         cur.execute("SELECT count(*) FROM current_forensic_records WHERE evidence_id = %s", (EVIDENCE,))
-        total = cur.fetchone()[0]
+        total_row = cur.fetchone()
+        if total_row is None:
+            raise RuntimeError("Postgres COUNT query returned no row")
+        total = total_row[0]
     assert f"| **All facts** | {total} | |" in report, "the coverage counts add up to every current fact"
 
 
