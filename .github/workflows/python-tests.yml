@@ -53,16 +53,21 @@ jobs:
         run: uv sync --locked --all-extras
 
       - name: Ruff lint
-        run: uv run ruff check packages libs apps scripts
+        run: uv run ruff check packages libs apps scripts tools
 
       - name: Ruff format
-        run: uv run ruff format --check packages libs apps scripts
+        run: uv run ruff format --check packages libs apps scripts tools
 
       - name: Pyright
         run: uv run pyright
 
       - name: Build the decrypt tool's environment
         run: uv sync --locked --project tools/decrypt
+
+      # The decrypt runs from its own environment, so Pyright checks it
+      # against that environment (tools/decrypt/pyrightconfig.json).
+      - name: Pyright (decrypt tool)
+        run: uv run pyright -p tools/decrypt
 
       # The iLEAPP end-to-end test runs the real iLEAPP from this environment
       # (VER-16). Building it compiles two native packages; the runner has a

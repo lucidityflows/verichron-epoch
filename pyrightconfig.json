@@ -19,7 +19,7 @@
     "scripts"
   ],
   "exclude": [
-    "apps/extractors/ileapp_bridge/iLEAPP",
+    "tools/ileapp/iLEAPP",
     "**/node_modules",
     "**/.venv",
     "**/dist"

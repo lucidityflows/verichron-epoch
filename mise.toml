@@ -30,9 +30,10 @@ run = "scripts/bootstrap-dev.sh"
 [tasks.lint]
 description = "Lint, format-check and type-check first-party Python"
 run = [
-  "uv run ruff check packages libs apps scripts",
-  "uv run ruff format --check packages libs apps scripts",
+  "uv run ruff check packages libs apps scripts tools",
+  "uv run ruff format --check packages libs apps scripts tools",
   "uv run pyright",
+  "uv run pyright -p tools/decrypt",
 ]
 
 [tasks."test:py"]

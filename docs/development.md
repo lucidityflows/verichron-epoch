@@ -126,6 +126,7 @@ There are two test tiers, and both run in CI (R33):
 mise run lint
 uv run pytest                                        # Python: packages/, scripts/, apps/
 uv run pyright                                       # Python type checking
+uv run pyright -p tools/decrypt                      # the decrypt, against its own environment
 TEST_DATABASE_URL=postgresql://.../verichron_test uv run pytest
 
 pnpm --filter @verichron/processor test             # TypeScript (node:test via tsx)
@@ -139,7 +140,11 @@ pnpm check:contracts                                 # schema ↔ TS ↔ Python 
 ```
 
 `mise run test` runs both suites (`mise run test:py`, `mise run test:ts`).
-`mise run lint` runs Ruff, Python formatting validation and Pyright on first-party code.
+`mise run lint` runs Ruff, Python formatting validation and Pyright on first-party
+code: `packages/`, `libs/`, `apps/`, `scripts/` and `tools/`, without the iLEAPP
+submodule (`tools/ileapp/iLEAPP`), which both tools exclude. Pyright checks
+`tools/decrypt` separately, against the decrypt's own environment
+(`tools/decrypt/pyrightconfig.json`), so `mise run setup` must have built it.
 
 The desktop app's tests run in Vitest: main-process and IPC handler tests in
 Node (the IPC tests against real Postgres, with a stand-in for Electron's
@@ -176,7 +181,7 @@ New device behaviour seen during these checks is added to the verified list in
 
 | Workflow | Runs |
 |---|---|
-| `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright, migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
+| `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
 | `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, Vite build and tests |
 
 Both workflows install the toolchain from `mise.toml` and Python from
@@ -196,11 +201,12 @@ pinned to full commit SHAs.
 - **Contracts:** add a `source_type` to `normalized-record.schema.json` first,
   then run `pnpm sync:contracts`.
 - **Formatting:** Ruff formats first-party Python (`packages/`, `libs/`,
-  `apps/`, `scripts/`); run `mise run lint` to check lint and formatting.
+  `apps/`, `scripts/`, `tools/`); run `mise run lint` to check lint and formatting.
   Prettier formats TypeScript (`.ts`, `.tsx`, `.mts`) with the settings in
   `.prettierrc.json`. Run `pnpm format` before committing; CI runs
-  `pnpm format:check`. Markdown, YAML and JSON aren't formatted. The
-  one-time reformat is listed in `.git-blame-ignore-revs`; run
+  `pnpm format:check`. Markdown, YAML and JSON aren't formatted. Prettier's
+  one-time reformat is listed in `.git-blame-ignore-revs` (Ruff's isn't; see
+  [decisions](decisions.md#testing-and-ci)); run
   `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so `git blame`
   skips it (GitHub's blame view does this already).
 - **Fail fast:** no fallbacks, backfills or legacy-compatibility paths for
