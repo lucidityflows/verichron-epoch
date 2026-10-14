@@ -313,6 +313,15 @@ Text on a filled accent, success or danger button uses `background`: 9.6,
 9.1 and 6.4:1. The tiers separate by 1.03 (inset to background), 1.14
 (background to surface) and 1.22 (surface to raised).
 
+**A secondary button is tinted, never surface-coloured** (EPOCH-506, decided
+2026-10-14): `outline` is `bg-accent/15` with `text-accent`, so it reads as a
+button on every tier, including the raised panels where a surface-coloured
+button disappeared. Accent text on that fill is 7.7, 7.3, 6.2 and 5.1:1 on
+inset, background, surface and surface-raised, and the fill stands 1.29 to
+1.35:1 off each tier. A destructive one (`tone="danger"`: Delete It, Cancel) is
+`bg-danger/15` with `foreground` text: danger text on that fill is only 3.8:1
+on surface-raised, while foreground is 9.2 to 13.4:1.
+
 The surface tiers are `inset` 6%, `background` 8%, `surface` 14% and
 `surface-raised` 21% lightness, at hue 224, saturation 32%: deep blue ink
 rather than grey, so the page itself carries colour. A new colour token is

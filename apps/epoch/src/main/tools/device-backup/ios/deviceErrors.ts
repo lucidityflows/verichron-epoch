@@ -15,6 +15,10 @@ export interface FailureContext {
   destDir: string;
   /** Free space in destDir when the step failed; null when unknown. */
   freeBytes: number | null;
+  /** Whether the device was still connected when the step failed; null when unknown. */
+  connected?: boolean | null;
+  /** What this pull had written when it failed; null when unknown. */
+  receivedBytes?: number | null;
 }
 
 const gb = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`;
@@ -30,8 +34,24 @@ const KNOWN_CODES: Record<number, (ctx: FailureContext) => string> = {
   208: ({ device }) => `${device} was locked, so it refused the backup. Unlock it, keep it unlocked, and try again.`,
 };
 
-/** A plain-language cause when the reason is a known device error code. */
+/**
+ * What idevicebackup2 prints when the connection to the device drops
+ * mid-backup, as seen on a real device when the cable was pulled (EPOCH-507).
+ */
+const LOST_CONNECTION = /^ERROR: Could not receive from mobilebackup2 \(-4\)/;
+
+/**
+ * A plain-language cause when the reason is a known device error code, or a
+ * lost connection confirmed by the device no longer being listed.
+ */
 export function explainFailure(reason: string | undefined, ctx: FailureContext): string | undefined {
+  if (reason && LOST_CONNECTION.test(reason) && ctx.connected === false) {
+    const arrived = ctx.receivedBytes ? ` (${gb(ctx.receivedBytes)} had arrived)` : '';
+    return (
+      `${ctx.device} was disconnected during the backup${arrived}. Reconnect it and start again; ` +
+      `the unfinished backup can't be resumed.`
+    );
+  }
   const code = reason?.match(/^ErrorCode (\d+):/)?.[1];
   return code ? KNOWN_CODES[Number(code)]?.(ctx) : undefined;
 }

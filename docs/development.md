@@ -151,9 +151,11 @@ model, iOS version, tool version, what happened) recorded on the ticket:
 3. Unplugging the device mid-pull ends the pull with the device's reason.
 4. Starting with the device locked shows the passcode request on screen first.
 5. A destination without enough free space is refused before the device is touched.
-6. A destination holding a finished backup of the device is refused.
-7. A destination holding an unfinished backup is refused until it is deleted or
-   another folder is chosen.
+6. A second pull of the device into the same folder lands in a new dated
+   folder, and the earlier backup is unchanged (its `Manifest.db` hash before
+   and after).
+7. An unfinished backup left by an earlier pull is offered for deletion, and
+   Delete It removes it and records it.
 8. Leaving New Investigation and returning mid-pull shows the running pull, with Cancel.
 
 New device behaviour seen during these checks is added to the verified list in

@@ -12,11 +12,13 @@ export type OutputEvent = { kind: 'line'; text: string } | { kind: 'percent'; va
 
 /**
  * idevicebackup2 redraws progress bars with `\r` and no newline:
- * `[=====     ]  34%` for each file, and the same bar followed by
- * " Finished" for the whole backup. Bars aren't shown as log lines; the
- * overall one becomes a percentage.
+ * `[=====     ]  34%` for each file, with the bytes so far
+ * (`[==  ]   3% (93.4 MB/3.3 GB)`, as a real device prints them), and the
+ * same bar followed by " Finished" for the whole backup. Bars aren't shown as
+ * log lines (EPOCH-507: thousands of them filled the log and the copied
+ * report); the overall one becomes a percentage.
  */
-const BAR = /^\[[= ]*\]\s*(\d+)%(\s+Finished)?$/;
+const BAR = /^\[[= ]*\]\s*(\d+)%(?:\s+\([^)]*\))?(\s+Finished)?$/;
 
 export class OutputParser {
   private carry = '';
@@ -147,4 +149,24 @@ export async function incompleteReason(plistutil: string, backupDir: string): Pr
     return 'it has no Manifest.db';
   }
   return null;
+}
+
+/**
+ * Removes the device folder a failed or cancelled pull created, when the
+ * device sent no backup data into it (no Status.plist), and returns the bytes
+ * removed; null when it leaves the folder (EPOCH-505). Only for a folder the
+ * pull itself created: EPOCH-483 refuses a pull whose folder already exists.
+ * A folder with a Status.plist is an unfinished backup and stays, offered
+ * for deletion.
+ */
+export async function removeFailedPullFolder(plistutil: string, backupDir: string): Promise<number | null> {
+  try {
+    await fs.access(backupDir);
+  } catch {
+    return null;
+  }
+  if ((await snapshotState(plistutil, backupDir)) !== null) return null;
+  const bytes = await folderSize(backupDir);
+  await fs.rm(backupDir, { recursive: true });
+  return bytes;
 }

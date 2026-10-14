@@ -5,7 +5,8 @@ import path from 'path';
  * One line per device pull, appended to PULL_RECORD_FILE beside the backups
  * it describes (EPOCH-466). It records the device, the tool, the outcome, and
  * whether Epoch changed the device's backup-encryption setting. Deleting an
- * incomplete backup adds a line of its own. Backup
+ * incomplete backup, or a failed pull removing the folder it created, adds a
+ * line of its own. Backup
  * discovery skips files at the top of the folder, so the record is never
  * read as a backup.
  */
@@ -41,6 +42,18 @@ export interface IncompleteBackupDeleted {
   deleted_at: string;
 }
 
-export async function appendPullRecord(destDir: string, record: PullRecord | IncompleteBackupDeleted): Promise<void> {
+/** A failed pull removed the device folder it had created, which held no backup data (EPOCH-505). */
+export interface FailedPullFolderRemoved {
+  event: 'failed-pull-folder-removed';
+  udid: string;
+  path: string;
+  bytes: number;
+  removed_at: string;
+}
+
+export async function appendPullRecord(
+  destDir: string,
+  record: PullRecord | IncompleteBackupDeleted | FailedPullFolderRemoved
+): Promise<void> {
   await fs.appendFile(path.join(destDir, PULL_RECORD_FILE), JSON.stringify(record) + '\n');
 }

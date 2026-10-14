@@ -205,6 +205,36 @@ describe('failureMessage', () => {
     );
   });
 
+  // A real lost connection: the cable pulled mid-transfer (iPhone17,5,
+  // idevicebackup2 1.4.0, 2026-10-14).
+  const UNPLUGGED = [
+    '[===========                                       ]  22% (701.4 MB/3.3 GB)',
+    'ERROR: Could not receive from mobilebackup2 (-4)',
+    'Received 37 files from device.',
+    'Backup Aborted.',
+  ];
+
+  it('explains a lost connection once the device is no longer listed (EPOCH-507)', () => {
+    assert.equal(
+      failureMessage('The backup of iPhone failed.', UNPLUGGED, 255, {
+        ...ctx,
+        connected: false,
+        receivedBytes: 674_000_000,
+      }),
+      'iPhone was disconnected during the backup (0.7 GB had arrived). Reconnect it and start again; ' +
+        "the unfinished backup can't be resumed. idevicebackup2: ERROR: Could not receive from mobilebackup2 (-4)"
+    );
+  });
+
+  it("doesn't call it a disconnect while the device is still listed, or when that can't be told", () => {
+    for (const connected of [true, null]) {
+      assert.equal(
+        failureMessage('The backup of iPhone failed.', UNPLUGGED, 255, { ...ctx, connected }),
+        'The backup of iPhone failed. idevicebackup2: ERROR: Could not receive from mobilebackup2 (-4)'
+      );
+    }
+  });
+
   it('falls back to the exit code when there was no output', () => {
     assert.equal(
       failureMessage('The backup of iPhone failed.', [], 255, ctx),

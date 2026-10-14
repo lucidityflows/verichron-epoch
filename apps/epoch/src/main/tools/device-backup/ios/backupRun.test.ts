@@ -14,6 +14,7 @@ import {
   incompleteReason,
   OutputParser,
   receivedPercent,
+  removeFailedPullFolder,
   snapshotState,
 } from './backupRun';
 
@@ -44,6 +45,23 @@ describe('OutputParser', () => {
     assert.deepEqual(events, [
       { kind: 'line', text: 'Receiving files' },
       { kind: 'percent', value: 34 },
+    ]);
+  });
+
+  it('drops the bars a real device prints with their byte counts (EPOCH-507)', () => {
+    // As iPhone17,5 / idevicebackup2 1.4.0 printed them on 2026-10-14: each
+    // redraw used to become its own log line, thousands of them.
+    const parser = new OutputParser();
+    const events = [
+      ...parser.push('Receiving files\n'),
+      ...parser.push('\r[=                                                 ]   0% (16 Bytes/3.3 GB)'),
+      ...parser.push('\r[==                                                ]   3% (93.4 MB/3.3 GB)'),
+      ...parser.push('\r[===========                                       ]  22% (701.4 MB/3.3 GB)\n'),
+      ...parser.push('ERROR: Could not receive from mobilebackup2 (-4)\n'),
+    ];
+    assert.deepEqual(events, [
+      { kind: 'line', text: 'Receiving files' },
+      { kind: 'line', text: 'ERROR: Could not receive from mobilebackup2 (-4)' },
     ]);
   });
 
@@ -200,5 +218,27 @@ describe('incompleteReason', () => {
 
   it('names a missing Status.plist', async () => {
     assert.equal(await incompleteReason(fakePlistutil(status('finished')), tmp), 'it has no Status.plist');
+  });
+});
+
+describe('removeFailedPullFolder (EPOCH-505)', () => {
+  const deviceDir = () => path.join(tmp, 'DEVICE');
+
+  it('removes a folder the device sent no backup data into, and says how much it held', async () => {
+    fs.mkdirSync(deviceDir());
+    fs.writeFileSync(path.join(deviceDir(), 'Info.plist'), 'x'.repeat(2048));
+    assert.equal(await removeFailedPullFolder(fakePlistutil(status('finished')), deviceDir()), 2048);
+    assert.equal(fs.existsSync(deviceDir()), false);
+  });
+
+  it('keeps an unfinished backup (it has a Status.plist), which is offered for deletion instead', async () => {
+    fs.mkdirSync(deviceDir());
+    fs.writeFileSync(path.join(deviceDir(), 'Status.plist'), 'bplist00');
+    assert.equal(await removeFailedPullFolder(fakePlistutil(status('uploading')), deviceDir()), null);
+    assert.equal(fs.existsSync(path.join(deviceDir(), 'Status.plist')), true);
+  });
+
+  it('does nothing when there is no folder', async () => {
+    assert.equal(await removeFailedPullFolder(fakePlistutil(status('finished')), deviceDir()), null);
   });
 });

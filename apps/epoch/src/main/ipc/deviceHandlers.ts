@@ -1,5 +1,5 @@
 import { app, ipcMain, dialog, BrowserWindow } from 'electron';
-import { addPullDestination, readPullDestinations } from '../tools/device-backup/pullDestinations';
+import { addPullDestination, pullFolderName, readPullDestinations } from '../tools/device-backup/pullDestinations';
 import { PullStateTracker } from '../tools/device-backup/pullState';
 import path from 'path';
 import fs from 'fs/promises';
@@ -14,7 +14,6 @@ import type {
   ToolAcquisitionCommand,
   BackupProgress,
   BackupStats,
-  DestinationBackup,
   DevicePullState,
   IncompleteBackup,
   PullOptions,
@@ -107,18 +106,6 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     }
   );
 
-  // What the chosen destination already holds for the device (EPOCH-483); a pull refuses it.
-  ipcMain.handle(
-    'epoch:checkPullDestination',
-    async (_event, sourceId: string, device: DeviceInfo, destDir: string): Promise<DestinationBackup | null> => {
-      const source = getDeviceBackupSource(sourceId);
-      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
-      // The running pull's own folder is the backup being written, not one to warn about.
-      if (pull.writes(destDir, device.id)) return null;
-      return source.destinationBackup(destDir, device);
-    }
-  );
-
   ipcMain.handle(
     'epoch:deleteIncompleteBackup',
     async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
@@ -141,12 +128,18 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
       const source = getDeviceBackupSource(sourceId);
       if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
 
-      pull.start(sourceId, device, destDir);
+      // Each pull writes into a folder of its own inside the one chosen
+      // (EPOCH-504), created here and never reused: a pull never meets an
+      // existing backup. Created without `recursive`, so it fails rather than
+      // share a folder with another pull.
+      const pullDir = path.join(destDir, pullFolderName(new Date()));
+      await fs.mkdir(pullDir);
+      pull.start(sourceId, device, pullDir);
       try {
-        await addPullDestination(app.getPath('userData'), destDir);
+        await addPullDestination(app.getPath('userData'), pullDir);
         return await source.pullBackup(
           device,
-          destDir,
+          pullDir,
           (progress: BackupProgress) => {
             pull.progress(progress);
             sendToRenderer('epoch:deviceBackupProgress', progress);

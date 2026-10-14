@@ -60,14 +60,33 @@ analyze → report**. The orchestrator coordinates the last three.
 The desktop app pulls a full, encrypted backup with `idevicebackup2`
 (EPOCH-466). Three rules protect the evidence (EPOCH-483):
 
-- **A pull writes only into a new folder.** When the destination already holds
-  anything for the device, whether a finished backup, an unfinished one, or a
-  folder Epoch can't read, the pull is refused before the device is touched.
-  The examiner chooses another folder, or deletes an unfinished backup.
+- **A pull writes only into a new folder.** Each pull writes into a dated
+  folder of its own inside the one the examiner chose (EPOCH-504), so a pull
+  never meets an existing backup, and the same device can be pulled again into
+  the same folder. If the device's folder exists anyway, the pull is refused
+  before the device is touched.
 - **An unfinished backup can't be resumed.** It is offered for deletion, never
-  deleted automatically, and never written into.
+  deleted automatically, and never written into. A pull the device refused
+  before sending any backup data (no `Status.plist`) removes the folder it
+  created, and records that it did (EPOCH-505).
 - **Success is checked, not assumed.** A pull is reported complete only when the
   backup's `Status.plist` says `finished` and its `Manifest.db` exists.
+
+**The acquisition layout** (EPOCH-504). Stages and parsers rely on this,
+never on a path guessed from the layout (R18):
+
+```
+<chosen folder>/
+  <UTC start>/                   one pull, e.g. 2026-10-14T130512Z
+    epoch-pulls.jsonl            the pull record: device, tool, outcome, and any folder it removed
+    <device ID>/                 the backup, as idevicebackup2 writes it
+      Manifest.db, Manifest.plist, Status.plist, Info.plist, 00/ … ff/
+```
+
+New Investigation lists the backups under the chosen folder and names each
+after its top-level folder there, which is the pull's `<UTC start>`. Two pulls
+of one device therefore get different names, and different `decrypted/<label>`
+folders in the workspace.
 
 ### Verified device behaviour
 
@@ -82,6 +101,9 @@ from a real device's output, with the date, model, iOS version and tool version.
 | An interrupted backup is not resumed. Run again without `--full` over the unfinished folder (`Status.plist`: `BackupState` empty, `SnapshotState` uploading), the tool chose incremental mode; the device read `Status.plist`, refused with ErrorCode 105 (19 GB free), and sent no files. The folder was unchanged (92,158,497,093 bytes before and after) | `Incremental backup mode.` … `Sending '<device>/Status.plist' (192 Bytes)` … `ErrorCode 105` … `Received 0 files from device.` | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-12 |
 | The tool's overall percentage doesn't follow the data received | Shown in the app as 35–50% when 86 of about 96 GB had arrived | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-11 |
 | A full pull into a new folder finished and passed the completion check, in 3 h 14 min, receiving 77,217,764,077 bytes against an estimate of about 96 GB | `Status.plist`: `SnapshotState` finished; `Manifest.db` present; `Manifest.plist`: `IsEncrypted` true | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-12 |
+| A pull the device refuses before the transfer (a wrong passcode on a locked device) leaves the device folder with only `Info.plist` (2.9 MB) and no `Status.plist` | `ErrorCode 208: Device locked (MBErrorDomain/208)`, 9 s after the start | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-14 |
+| Pulling the cable mid-transfer ends the pull at once; the device is no longer listed, and the folder keeps `Status.plist` (`SnapshotState` uploading) and what arrived (674 MB) | `ERROR: Could not receive from mobilebackup2 (-4)` … `Received 37 files from device.` `Backup Aborted.` | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-14 |
+| Progress bars carry the bytes so far, redrawn with `\r` | `[==   ]   3% (93.4 MB/3.3 GB)` | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-14 |
 | `IsFullBackup` in `Status.plist` is false after a full backup, so it isn't a measure of completeness. The tool was run with `--full` (it sends `ForceFullBackup`) into a folder that didn't exist; idevicebackup2 never writes the key, so the device sets it. Published Finder and iTunes backups also show false | `IsFullBackup` false, `BackupState` new, `Version` 3.3 | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-12 |
 
 ### Verified processing of a real backup

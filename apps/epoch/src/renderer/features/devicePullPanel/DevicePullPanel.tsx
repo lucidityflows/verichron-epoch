@@ -24,7 +24,7 @@ import { FieldError } from '../../components/ui/FieldError';
 import { ToolSetup } from './ToolSetup';
 import { StepList, type Step } from '../../components/ui/StepList';
 import { CopyButton } from '../../components/ui/CopyButton';
-import { BackupProgressCard, DestinationBackupNotice, formatBytes, IncompleteBackupNotice } from './BackupProgressCard';
+import { BackupProgressCard, formatBytes, IncompleteBackupNotice } from './BackupProgressCard';
 import type { DeviceInfo } from '../../../shared/types/tools';
 
 /**
@@ -73,7 +73,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
     incomplete,
     deleteIncomplete,
     deletingIncomplete,
-    destinationBackup,
+    pulledDir,
     runCompileFromSource,
     setupStatus,
     setupRun,
@@ -160,9 +160,9 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
   };
 
   const pullLocked = phase === 'pulling' || encryptionConsent;
-  // A destination that already holds a backup of the device is refused (EPOCH-483), so
-  // there is nothing to ask a password for until another folder is chosen.
-  const askPassword = !!selectedDevice && !!destDir && !destinationBackup && phase !== 'pulling' && phase !== 'pulled';
+  // Each pull writes into a new dated folder inside the one chosen (EPOCH-504),
+  // so any chosen folder can take a pull.
+  const askPassword = !!selectedDevice && !!destDir && phase !== 'pulling' && phase !== 'pulled';
 
   // The step rail (DESIGN.md §9): each step's state, in order.
   const started = phase === 'pulling' || phase === 'pulled';
@@ -170,7 +170,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
     { label: 'Device', state: selectedDevice ? 'done' : 'current' },
     {
       label: 'Destination',
-      state: !selectedDevice ? 'pending' : destinationBackup ? 'blocked' : destDir ? 'done' : 'current',
+      state: !selectedDevice ? 'pending' : destDir ? 'done' : 'current',
     },
     {
       label: 'Password',
@@ -542,16 +542,10 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           {selectedDevice && destDir && phase !== 'pulled' && !encryptionConsent && (
             <Button
               onClick={() => onPullClick()}
-              disabled={!passwordProvided || !!destinationBackup}
+              disabled={!passwordProvided}
               loading={phase === 'pulling'}
               loadingText="Pulling encrypted backup…"
-              title={
-                destinationBackup
-                  ? 'This folder already holds a backup of this device'
-                  : !passwordProvided
-                    ? 'Enter a backup password to continue'
-                    : undefined
-              }
+              title={!passwordProvided ? 'Enter a backup password to continue' : undefined}
             >
               Pull Encrypted Backup
             </Button>
@@ -602,40 +596,19 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           )}
           {phase !== 'pulling' &&
             selectedDevice &&
-            destinationBackup &&
-            // An unfinished backup here is shown below, with Delete It, once its size is known.
-            !(
-              destinationBackup.state === 'unfinished' &&
-              incomplete.some((backup) => backup.path === destinationBackup.path)
-            ) && (
-              <DestinationBackupNotice
-                deviceName={selectedDevice.name}
-                destination={destinationBackup}
-                onChooseAnotherFolder={onChooseDestination}
-              />
-            )}
-          {phase !== 'pulling' &&
-            selectedDevice &&
             incomplete
-              .filter((backup) => backup.path === destinationBackup?.path || !setAside.includes(backup.path))
-              .map((backup) => {
-                const blocksPull = backup.path === destinationBackup?.path;
-                return (
-                  <IncompleteBackupNotice
-                    key={backup.path}
-                    deviceName={selectedDevice.name}
-                    incomplete={backup}
-                    deleting={deletingIncomplete === backup.path}
-                    blocksPull={blocksPull}
-                    onDelete={() => deleteIncomplete(backup)}
-                    secondary={
-                      blocksPull
-                        ? { label: 'Choose Another Folder', onClick: onChooseDestination }
-                        : { label: 'Not Now', onClick: () => setSetAside((prev) => [...prev, backup.path]) }
-                    }
-                  />
-                );
-              })}
+              .filter((backup) => !setAside.includes(backup.path))
+              // A leftover never blocks a pull: each pull gets a new folder (EPOCH-504).
+              .map((backup) => (
+                <IncompleteBackupNotice
+                  key={backup.path}
+                  deviceName={selectedDevice.name}
+                  incomplete={backup}
+                  deleting={deletingIncomplete === backup.path}
+                  onDelete={() => deleteIncomplete(backup)}
+                  secondary={{ label: 'Not Now', onClick: () => setSetAside((prev) => [...prev, backup.path]) }}
+                />
+              ))}
           {phase === 'pulled' && destDir && (
             // The pull's results (EPOCH-437): what was made, then the one next step.
             <div className="bg-success/10 border border-success/30 shadow-elevation-1 rounded-lg p-5 mt-4">
@@ -662,8 +635,8 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                   </>
                 )}
                 <dt className="text-muted-foreground">Saved to</dt>
-                <dd className="font-mono text-foreground truncate" title={destDir}>
-                  {destDir}
+                <dd className="font-mono text-foreground truncate" title={pulledDir ?? destDir}>
+                  {pulledDir ?? destDir}
                 </dd>
               </dl>
               <Button onClick={() => onBackupPulled(destDir)}>
