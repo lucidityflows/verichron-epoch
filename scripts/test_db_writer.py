@@ -661,94 +661,17 @@ def test_migration_backfill_leaves_recordless_rows_incomplete():
 
 
 # ==========================================================================
-# The two writers must not drift apart
+# The writer exposes only the atomic ingest boundary
 # ==========================================================================
 
-TS_WRITER = REPO_ROOT / "packages" / "etl-db-writer" / "dbWriter.ts"
-
-#: Statements that carry the atomicity guarantee. If either writer stops
-#: emitting one of these, the guarantee is gone in that language.
-LOAD_BEARING_SQL = (
-    "SELECT ingest_id, ingest_complete FROM ingested_files",
-    "INSERT INTO ingested_files",
-    "ON CONFLICT (evidence_id, file_hash, source_type, parser_version) DO UPDATE SET",
-    "DELETE FROM forensic_records WHERE ingest_id",
-    "SET ingest_complete = TRUE",
-    "array_append(produced_by_runs",
-    "INSERT INTO forensic_records",
-    "WHERE NOT ingest_complete",
-)
-
-
-def _statement(source: str, start: str, end: str) -> str:
-    """One SQL statement out of a writer's source, normalized so the two
-    languages compare equal: placeholders (`%s` / `$n`) become `?`, and
-    whitespace collapses."""
-    begin = source.index(start)
-    stop = source.index(end, begin) + len(end)
-    sql = re.sub(r"%s|\$\d+", "?", source[begin:stop])
-    return " ".join(sql.split())
-
-
-@pytest.mark.parametrize(
-    "start, end",
-    [
-        ("SELECT ingest_id, ingest_complete FROM ingested_files", "parser_version = "),
-        ("INSERT INTO ingested_files", "RETURNING ingest_id, ingest_complete"),
-        ("SET produced_by_runs = array_append", "= ANY(produced_by_runs))"),
-    ],
-    ids=["dedup-check", "upsert", "run-label"],
-)
-def test_both_writers_emit_identical_dedup_and_upsert_sql(start, end):
-    """EPOCH-402: the dedup check and the ingest upsert are the same statement,
-    character for character after normalization, in both writers. A fragment
-    check alone would let a column or a CASE arm drift."""
-    py = (REPO_ROOT / "packages" / "etl-db-writer" / "db_writer.py").read_text()
-    ts = TS_WRITER.read_text()
-    assert _statement(py, start, end) == _statement(ts, start, end)
-
-
-@pytest.mark.parametrize("statement", LOAD_BEARING_SQL)
-def test_both_writers_emit_the_same_load_bearing_sql(statement):
-    """Two implementations of one invariant in two languages is the drift risk
-    this fix introduces. The Python side has real transactional tests above; the
-    TypeScript side currently has no consumer and no test runner in this repo, so
-    this is the guard that keeps it from quietly diverging in the meantime.
-
-    Deliberately a string check, not a behavioral one. It cannot prove the TS
-    writer is correct -- only that it has not lost a step the Python writer
-    considers essential. When the TS writer gains a consumer it should get its
-    own transactional tests and this can shrink.
-    """
-    py = (REPO_ROOT / "packages" / "etl-db-writer" / "db_writer.py").read_text()
-    ts = TS_WRITER.read_text()
-
-    assert statement in py, f"Python writer no longer emits: {statement}"
-    assert statement in ts, f"TypeScript writer no longer emits: {statement}"
-
-
-def test_typescript_writer_manages_its_own_transaction():
-    """node-postgres autocommits by default, so the TS writer must issue BEGIN
-    explicitly -- the original had none at all, meaning there was not even a
-    transaction to lose. Python gets this from psycopg2's implicit transaction.
-    """
-    ts = TS_WRITER.read_text()
-    for keyword in ("'BEGIN'", "'COMMIT'", "'ROLLBACK'"):
-        assert keyword in ts, f"TypeScript writer never issues {keyword}"
-
-
-def test_neither_writer_exposes_a_standalone_ledger_write():
+def test_writer_exposes_no_standalone_ledger_write():
     """The defect was reassemblable from public parts: `ingest_file()` committed a
     ledger row on its own, and dedup keyed on that row existing. Removing it is
-    the structural half of the fix -- callers can no longer build the broken
-    sequence, only the correct one.
+    the structural fix -- callers can no longer build the broken sequence,
+    only the correct one.
     """
     py = (REPO_ROOT / "packages" / "etl-db-writer" / "db_writer.py").read_text()
-    ts = TS_WRITER.read_text()
-
     assert "def ingest_file(" not in py
-    assert "export async function ingestFile" not in ts
-    assert "export function ingestFile" not in ts
 
 
 def test_a_part_of_a_file_is_its_own_unit_by_content_hash(db, artifact):
