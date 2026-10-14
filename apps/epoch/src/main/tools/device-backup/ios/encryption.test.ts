@@ -142,6 +142,7 @@ describe('appendPullRecord', () => {
       finished_at: '2026-10-10T00:05:00.000Z',
       backup_encryption: 'turned-on-by-epoch',
       received_bytes: 1024,
+      device_listed: null,
       outcome: 'completed',
       error: null,
     };

@@ -78,7 +78,7 @@ never on a path guessed from the layout (R18):
 ```
 <chosen folder>/
   <UTC start>/                   one pull, e.g. 2026-10-14T130512Z
-    epoch-pulls.jsonl            the pull record: device, tool, outcome, and any folder it removed
+    epoch-pulls.jsonl            the pull record: device, tool, outcome, whether the device was still listed, and any folder it removed
     <device ID>/                 the backup, as idevicebackup2 writes it
       Manifest.db, Manifest.plist, Status.plist, Info.plist, 00/ … ff/
 ```
@@ -103,6 +103,7 @@ from a real device's output, with the date, model, iOS version and tool version.
 | A full pull into a new folder finished and passed the completion check, in 3 h 14 min, receiving 77,217,764,077 bytes against an estimate of about 96 GB | `Status.plist`: `SnapshotState` finished; `Manifest.db` present; `Manifest.plist`: `IsEncrypted` true | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-12 |
 | A pull the device refuses before the transfer (a wrong passcode on a locked device) leaves the device folder with only `Info.plist` (2.9 MB) and no `Status.plist` | `ErrorCode 208: Device locked (MBErrorDomain/208)`, 9 s after the start | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-14 |
 | Pulling the cable mid-transfer ends the pull at once; the device is no longer listed, and the folder keeps `Status.plist` (`SnapshotState` uploading) and what arrived (674 MB) | `ERROR: Could not receive from mobilebackup2 (-4)` … `Received 37 files from device.` `Backup Aborted.` | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-14 |
+| On Debian, pulling the cable of the only connected device stops usbmuxd (its packaged udev rule: "Exit usbmuxd when the last device is removed"), so `idevice_id -l` fails rather than listing no devices. The app counts that as not listed | `ERROR: Unable to retrieve device list!`, exit 255; `usbmuxd.service` inactive | iPhone17,5 · 26.6.1 · idevice_id 1.4.0 · Debian 13 | 2026-10-14 |
 | Progress bars carry the bytes so far, redrawn with `\r` | `[==   ]   3% (93.4 MB/3.3 GB)` | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-14 |
 | `IsFullBackup` in `Status.plist` is false after a full backup, so it isn't a measure of completeness. The tool was run with `--full` (it sends `ForceFullBackup`) into a folder that didn't exist; idevicebackup2 never writes the key, so the device sets it. Published Finder and iTunes backups also show false | `IsFullBackup` false, `BackupState` new, `Version` 3.3 | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-12 |
 

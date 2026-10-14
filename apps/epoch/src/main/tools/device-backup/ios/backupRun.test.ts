@@ -9,6 +9,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import {
+  deviceListed,
   existingBackupState,
   folderSize,
   incompleteReason,
@@ -254,5 +255,32 @@ describe('removeFailedPullFolder (EPOCH-505)', () => {
     } finally {
       fs.chmodSync(locked, 0o700);
     }
+  });
+});
+
+describe('deviceListed (EPOCH-507)', () => {
+  /** A stand-in idevice_id that prints `stdout` and `stderr` and exits with `code`. */
+  const fakeIdeviceId = (stdout: string, stderr: string, code: number) => {
+    const file = path.join(tmp, 'idevice_id');
+    fs.writeFileSync(file, `#!/bin/sh\nprintf '%s' '${stdout}'\nprintf '%s' '${stderr}' >&2\nexit ${code}\n`, {
+      mode: 0o755,
+    });
+    return file;
+  };
+
+  it('finds the device among those listed', () => {
+    assert.equal(deviceListed(fakeIdeviceId('OTHER\nUDID-1\n', '', 0), 'UDID-1'), true);
+    assert.equal(deviceListed(fakeIdeviceId('OTHER\n', '', 0), 'UDID-1'), false);
+  });
+
+  it('counts the device as gone when usbmuxd has stopped with the last device', () => {
+    // What idevice_id 1.4.0 printed on 2026-10-14 after the cable was pulled,
+    // once Debian's udev rules had stopped usbmuxd.
+    assert.equal(deviceListed(fakeIdeviceId('', 'ERROR: Unable to retrieve device list!\n', 255), 'UDID-1'), false);
+  });
+
+  it("can't tell when the tool fails any other way, or isn't there", () => {
+    assert.equal(deviceListed(fakeIdeviceId('', 'something else\n', 1), 'UDID-1'), null);
+    assert.equal(deviceListed(undefined, 'UDID-1'), null);
   });
 });

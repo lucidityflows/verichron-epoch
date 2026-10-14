@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import { execFile, execFileSync } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -173,4 +173,23 @@ export async function removeFailedPullFolder(plistutil: string, backupDir: strin
   const bytes = await folderSize(backupDir);
   await fs.rm(backupDir, { recursive: true });
   return bytes;
+}
+
+/**
+ * Whether `udid` is among the connected devices; null when that can't be told.
+ * With no device left, usbmuxd may not be running at all: Debian's udev rules
+ * stop it when the last device is unplugged, and `idevice_id -l` then fails
+ * with "Unable to retrieve device list!" rather than listing none (EPOCH-507).
+ * No device can be reached then, so it counts as not listed.
+ */
+export function deviceListed(ideviceId: string | undefined, udid: string): boolean | null {
+  if (!ideviceId) return null;
+  try {
+    return execFileSync(ideviceId, ['-l'], { encoding: 'utf-8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] })
+      .split('\n')
+      .some((line) => line.trim() === udid);
+  } catch (err) {
+    const stderr = String((err as { stderr?: unknown }).stderr ?? '');
+    return stderr.includes('Unable to retrieve device list') ? false : null;
+  }
 }

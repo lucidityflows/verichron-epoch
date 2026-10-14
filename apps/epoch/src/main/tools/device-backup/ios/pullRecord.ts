@@ -29,6 +29,12 @@ export interface PullRecord {
   backup_encryption: 'unknown' | 'already-on' | 'off-unchanged' | 'turn-on-failed' | 'turned-on-by-epoch';
   /** Bytes this pull wrote to the backup folder; null when it didn't reach the backup. */
   received_bytes: number | null;
+  /**
+   * Whether the device was still listed when the backup failed, which decides
+   * whether it is reported as disconnected (EPOCH-507); null when it wasn't
+   * checked or couldn't be told.
+   */
+  device_listed: boolean | null;
   outcome: 'completed' | 'failed' | 'cancelled';
   /** Why the pull failed or stopped, as shown to the user; null when it completed. */
   error: string | null;

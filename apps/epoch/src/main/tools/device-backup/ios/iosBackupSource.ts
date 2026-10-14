@@ -19,6 +19,7 @@ import { enableBackupEncryption, PASSCODE_TIMEOUT_MS } from './encryption';
 import { failureMessage } from './deviceErrors';
 import { lastLines, StreamLines } from './toolchain/process';
 import {
+  deviceListed,
   existingBackupState,
   folderSize,
   incompleteReason,
@@ -248,6 +249,7 @@ export class IosBackupSource implements DeviceBackupSource {
       finished_at: null,
       backup_encryption: 'unknown',
       received_bytes: null,
+      device_listed: null,
       outcome: 'failed',
       error: null,
     };
@@ -341,7 +343,7 @@ export class IosBackupSource implements DeviceBackupSource {
             this.running = proc;
           },
           cancelled: () => this.cancelRequested === true,
-          connected: () => deviceListed(tools.idevice_id, device.id),
+          connected: () => (record.device_listed = deviceListed(tools.idevice_id, device.id)),
         }
       );
       const plistutil = trustedToolPath('plistutil');
@@ -423,18 +425,6 @@ async function removeOwnLeftover(destDir: string, device: DeviceInfo): Promise<v
     bytes,
     removed_at: new Date().toISOString(),
   });
-}
-
-/** Whether `udid` is among the connected devices; null when that can't be told. */
-function deviceListed(ideviceId: string | undefined, udid: string): boolean | null {
-  if (!ideviceId) return null;
-  try {
-    return execFileSync(ideviceId, ['-l'], { encoding: 'utf-8', timeout: 10_000 })
-      .split('\n')
-      .some((line) => line.trim() === udid);
-  } catch {
-    return null;
-  }
 }
 
 /** Why a pull refuses a destination that already holds something for the device (EPOCH-483). */
