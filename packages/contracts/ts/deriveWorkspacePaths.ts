@@ -22,3 +22,10 @@ export function deriveReportPath(backupSource: string): string | undefined {
 export function deriveIleappPath(backupSource: string): string | undefined {
   return siblingOfDecrypted(backupSource, 'ileapp');
 }
+
+/** Where the orchestrator exports one run's summary from the database:
+ * <workspace>/runs/<label>/<run_id>.json, one file per run (EPOCH-409). */
+export function deriveRunSummaryPath(backupSource: string, runId: string): string | undefined {
+  const dir = siblingOfDecrypted(backupSource, 'runs');
+  return dir ? path.join(dir, `${runId}.json`) : undefined;
+}

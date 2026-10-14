@@ -1,7 +1,9 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import { randomUUID } from 'node:crypto';
+import os from 'node:os';
 import path from 'node:path';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, rm, stat } from 'node:fs/promises';
 import type { Pool } from 'pg';
 import { discoverBackups, type Backup } from '@verichron/contracts';
 import type { PipelineFinishedResult, AnalysisRunStatus, PipelineLogEntry } from '../../shared/types/window';
@@ -165,13 +167,20 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }
   }
 
-  /** The orchestrator's summary: each backup's result, and why it refused to
-   * start, if it did (EPOCH-498: a database with pending migrations). */
+  /** A file of its own for one orchestrator call's result (EPOCH-409), so no
+   * call ever reads another's. */
+  function newSummaryPath(): string {
+    return path.join(os.tmpdir(), `epoch-analysis-${randomUUID()}.json`);
+  }
+
+  /** One orchestrator call's result: each backup's outcome, and why the call
+   * stopped before any backup, if it did (EPOCH-498: pending migrations). The
+   * file is the app's own temporary file, removed once read. */
   async function readAnalysisSummary(
-    workspace: string
+    summaryPath: string
   ): Promise<{ analysis?: PipelineFinishedResult['analysis']; error?: string }> {
     try {
-      const raw = await readFile(path.join(workspace, 'analysis-summary.json'), 'utf8');
+      const raw = await readFile(summaryPath, 'utf8');
       const parsed: unknown = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { results?: unknown }).results)) {
         return {};
@@ -183,6 +192,8 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       };
     } catch {
       return {};
+    } finally {
+      await rm(summaryPath, { force: true });
     }
   }
 
@@ -375,10 +386,20 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       throw new Error('An analysis workspace is required.');
     }
     const trimmedWorkspace = workspace.trim();
+    const summaryPath = newSummaryPath();
 
     const child = spawn(
       'pnpm',
-      ['--filter', '@verichron/orchestrator', 'investigate', '--', '--workspace', trimmedWorkspace],
+      [
+        '--filter',
+        '@verichron/orchestrator',
+        'investigate',
+        '--',
+        '--workspace',
+        trimmedWorkspace,
+        '--summary-path',
+        summaryPath,
+      ],
       { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] }
     );
     runningOrchestratorProcess = child;
@@ -409,6 +430,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       if (workspaceAtFailure) {
         void markWorkspaceRunsAborted(workspaceAtFailure, `orchestrator process error: ${err.message}`);
       }
+      void rm(summaryPath, { force: true });
       analysisSession.finish({
         success: false,
         error: err.message,
@@ -442,7 +464,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
             : `orchestrator process exited unexpectedly (code ${code})`;
 
         void markWorkspaceRunsAborted(workspaceAtClose, closeReason)
-          .then(() => readAnalysisSummary(workspaceAtClose))
+          .then(() => readAnalysisSummary(summaryPath))
           .then(({ analysis, error }) => {
             analysisSession.finish({
               success: false,
@@ -460,7 +482,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
         return;
       }
 
-      void readAnalysisSummary(workspaceAtClose).then(({ analysis }) => {
+      void readAnalysisSummary(summaryPath).then(({ analysis }) => {
         analysisSession.finish({ success: true, exitCode: code, analysis });
       });
     });
@@ -485,11 +507,13 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       throw new Error('A backup source is required.');
     }
     const trimmedBackupSource = backupSource.trim();
+    const summaryPath = newSummaryPath();
 
-    const child = spawn('pnpm', ['--filter', '@verichron/orchestrator', 'investigate', '--', trimmedBackupSource], {
-      cwd: repoRoot,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const child = spawn(
+      'pnpm',
+      ['--filter', '@verichron/orchestrator', 'investigate', '--', '--summary-path', summaryPath, trimmedBackupSource],
+      { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] }
+    );
     runningOrchestratorProcess = child;
     runningOrchestratorBackupSource = trimmedBackupSource;
     orchestratorTerminationReason = null;
@@ -514,6 +538,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       if (scopedBackupSource) {
         void markSingleRunAborted(scopedBackupSource, `orchestrator process error: ${err.message}`);
       }
+      void rm(summaryPath, { force: true });
       analysisSession.finish({
         success: false,
         error: err.message,
@@ -542,9 +567,8 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
             ? `orchestrator timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minute(s)`
             : `orchestrator process exited unexpectedly (code ${code})`;
 
-        // The orchestrator writes its summary to the backup's workspace.
         void markSingleRunAborted(scopedBackupSource, closeReason)
-          .then(() => readAnalysisSummary(path.dirname(path.dirname(scopedBackupSource))))
+          .then(() => readAnalysisSummary(summaryPath))
           .then(({ error }) => {
             analysisSession.finish({
               success: false,
@@ -561,6 +585,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
         return;
       }
 
+      void rm(summaryPath, { force: true });
       analysisSession.finish({ success: true, exitCode: code });
     });
 

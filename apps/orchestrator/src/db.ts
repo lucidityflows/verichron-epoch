@@ -21,8 +21,17 @@ export async function hasCompleteRunFor(
   registration: Pick<Registration, 'evidenceId'> & RegisteredDerivatives,
   enabled: StageSet['enabled']
 ): Promise<boolean> {
-  const { rows } = await client.query(
-    `SELECT 1 FROM run_completeness c
+  return (await findCompleteRunFor(client, registration, enabled)) !== null;
+}
+
+/** The complete run hasCompleteRunFor finds, or null: the latest one. */
+export async function findCompleteRunFor(
+  client: Client,
+  registration: Pick<Registration, 'evidenceId'> & RegisteredDerivatives,
+  enabled: StageSet['enabled']
+): Promise<string | null> {
+  const { rows } = await client.query<{ run_id: string }>(
+    `SELECT c.run_id FROM run_completeness c
       WHERE c.evidence_id = $1 AND c.derivative_id = $2 AND c.state = 'complete'
         AND NOT EXISTS (
           SELECT 1 FROM unnest($3::text[], $4::int[], $5::uuid[]) AS want(stage_name, parser_version, derivative_id)
@@ -33,6 +42,7 @@ export async function hasCompleteRunFor(
                 AND s.status = 'succeeded'
                 AND s.parser_version IS NOT DISTINCT FROM want.parser_version
                 AND s.derivative_id IS NOT DISTINCT FROM want.derivative_id))
+      ORDER BY c.finished_at DESC
       LIMIT 1`,
     [
       registration.evidenceId,
@@ -42,7 +52,7 @@ export async function hasCompleteRunFor(
       enabled.map((stage) => derivativeFor(stage, registration)),
     ]
   );
-  return rows.length > 0;
+  return rows[0]?.run_id ?? null;
 }
 
 /** A run's state from the canonical predicate, or null if no such run. */

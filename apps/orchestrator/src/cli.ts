@@ -7,7 +7,9 @@ import { REPO_ROOT } from './discovery.js';
 import { loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
 
 export function printUsage() {
-  console.error(`Usage:\n  pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace-dir>`);
+  console.error(
+    `Usage:\n  pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace-dir> [--summary-path <file>]`
+  );
 }
 
 export async function resolvePythonBin(): Promise<string> {
@@ -32,10 +34,12 @@ export async function parseCliConfig(): Promise<CliConfig> {
     args: cleanArgs,
     options: {
       workspace: { type: 'string' },
+      'summary-path': { type: 'string' },
     },
     allowPositionals: true,
   });
   const dbUrl = resolveDatabaseUrl();
+  const summaryPath = values['summary-path'];
 
   if (values.workspace) {
     const decryptedDir = path.join(values.workspace, 'decrypted');
@@ -57,12 +61,12 @@ export async function parseCliConfig(): Promise<CliConfig> {
       if (markerExists) backupPaths.push(dir);
     }
     backupPaths.sort();
-    return { backupPaths, dbUrl };
+    return { backupPaths, dbUrl, summaryPath };
   }
 
   if (positionals.length === 0) {
     printUsage();
     process.exit(1);
   }
-  return { backupPaths: positionals, dbUrl };
+  return { backupPaths: positionals, dbUrl, summaryPath };
 }

@@ -21,6 +21,7 @@ what a stage must do is in the
 ```bash
 pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace>
 pnpm --filter @verichron/orchestrator investigate -- <decrypted-backup-dir> [...]
+# either form takes --summary-path <file> for the call's result as JSON
 ```
 
 With `--workspace`, it runs every `decrypted/<label>` that has a decrypt marker.
@@ -35,7 +36,8 @@ The database comes from `DATABASE_URL` or `DB_*` in `.env`.
 | `src/registration.ts` | Evidence, device-key and derivative registration |
 | `src/pipeline.ts` | Per-backup flow, stage subprocesses, stage arguments |
 | `src/db.ts` | Run creation, stage status, the resume check |
-| `src/main.ts` | Entry point; writes `analysis-summary.json` to the workspace |
+| `src/main.ts` | Entry point; writes the call's result to `--summary-path`, if given |
+| `src/runSummary.ts` | Exports each run's summary from the database to `runs/<label>/<run_id>.json` |
 
 ## Test
 

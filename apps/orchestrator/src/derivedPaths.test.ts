@@ -7,13 +7,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { deriveIleappPath, deriveReportPath } from '@verichron/contracts';
+import { deriveIleappPath, deriveReportPath, deriveRunSummaryPath } from '@verichron/contracts';
 
 describe('derivative paths beside a decrypt', () => {
   it("replace the decrypt's own parent", () => {
     assert.equal(deriveReportPath('/ws/decrypted/BK1'), '/ws/reports/BK1');
     assert.equal(deriveIleappPath('/ws/decrypted/BK1'), '/ws/ileapp/BK1');
     assert.equal(deriveIleappPath('/ws/decrypted/BK1/'), '/ws/ileapp/BK1');
+    assert.equal(deriveRunSummaryPath('/ws/decrypted/BK1', 'r1'), '/ws/runs/BK1/r1.json');
   });
 
   it('ignore a decrypted directory higher up the path', () => {
@@ -23,6 +24,7 @@ describe('derivative paths beside a decrypt', () => {
 
   it('are undefined when the backup is not directly under decrypted/', () => {
     assert.equal(deriveIleappPath('/mnt/decrypted/BK1/nested'), undefined);
+    assert.equal(deriveRunSummaryPath('/mnt/decrypted/BK1/nested', 'r1'), undefined);
     assert.equal(deriveReportPath('/backups/BK1'), undefined);
   });
 });

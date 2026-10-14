@@ -129,10 +129,17 @@ The processor creates one workspace per batch of backups. Each backup is a
   decrypted/<label>/                       decrypted backup (iTunes layout) + .decrypted_ok marker
   ileapp/<label>/                          iLEAPP's report + .ileapp_ok marker
   reports/<label>/investigation_report.md  the report stage's output
+  runs/<label>/<run_id>.json               one run's summary, exported from the database
   logs/<label>.ileapp.log                  iLEAPP output
   logs/<label>.ileapp-modules.json         each iLEAPP module's timing
   summary.json, summary.md                 the processor's run summary
 ```
+
+Each run writes its own summary file, so no run touches another's. The
+database stays the source of truth; the file is a copy of it (EPOCH-409). What
+a single orchestrator call did (each backup's outcome, or why it stopped before
+any backup) goes to a file the caller names with `--summary-path`; the app
+gives each call its own temporary file, so no call reads another's result.
 
 Today the orchestrator and app find these directories by layout. A workspace
 manifest replaces that (R18, EPOCH-427).

@@ -31,6 +31,7 @@ import pg from 'pg';
 
 import {
   DECRYPT_MARKER,
+  deriveRunSummaryPath,
   ILEAPP_MARKER,
   renderDecryptMarker,
   renderIleappMarker,
@@ -39,6 +40,7 @@ import {
 
 import { getRunState, hasCompleteRunFor } from './db.js';
 import { runPipelineForBackup } from './pipeline.js';
+import { readRunSummary } from './runSummary.js';
 import { deviceKey, loadDeviceSecret, readPlistStrings, registerEvidence, RegistrationError } from './registration.js';
 import type { StageDefinition, StageSet } from './types.js';
 
@@ -632,6 +634,68 @@ describe('stages and the completeness predicate', live, () => {
     const second = await run(ws.backupPath, { enabled: [failing], disabled: [] });
     assert.notEqual(second.skipped, true);
     assert.notEqual(second.runId, first.runId, 'a new run (D5), not a reopened one');
+  });
+});
+
+describe('per-run summaries (EPOCH-409)', live, () => {
+  const summaryOf = (backupPath: string, runId: string) => deriveRunSummaryPath(backupPath, runId)!;
+
+  it('a complete run whose summary went missing gets it back when the backup is skipped', async () => {
+    const ws = makeWorkspace('summary-repair', { label: 'A' });
+    const stages = { enabled: [recordingStage('ok', 10)], disabled: [] };
+    const first = await run(ws.backupPath, stages);
+    const file = summaryOf(ws.backupPath, first.runId!);
+    // What a failed export after the run was marked complete leaves behind.
+    rmSync(file);
+
+    const again = await run(ws.backupPath, stages);
+    assert.equal(again.skipped, true);
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), await readRunSummary(db, first.runId!));
+  });
+
+  it("writes each run's summary to its own file, as the database records it", async () => {
+    const ws = makeWorkspace('summary-db', { label: 'A' });
+    const result = await run(ws.backupPath, { enabled: [recordingStage('ok', 10)], disabled: [] });
+    const file = summaryOf(ws.backupPath, result.runId!);
+    assert.equal(file, path.join(ws.workspace, 'runs', 'A', `${result.runId}.json`));
+    const written = JSON.parse(readFileSync(file, 'utf8'));
+    assert.deepEqual(written, await readRunSummary(db, result.runId!));
+    assert.equal(written.state, 'complete');
+    assert.deepEqual(
+      written.stages.map((s: { stage_name: string; status: string }) => [s.stage_name, s.status]),
+      [['ok', 'succeeded']]
+    );
+  });
+
+  it("running another backup in the same workspace leaves the first run's summary byte-identical", async () => {
+    const a = makeWorkspace('summary-shared', { label: 'A' });
+    const b = makeWorkspace('summary-shared', { label: 'B', manifest: 'b'.repeat(64) + '  Manifest.db\n' });
+    const stages = { enabled: [recordingStage('ok', 10)], disabled: [] };
+    const first = await run(a.backupPath, stages);
+    const before = readFileSync(summaryOf(a.backupPath, first.runId!));
+
+    const other = await run(b.backupPath, stages);
+    assert.notEqual(other.runId, first.runId);
+    assert.ok(readFileSync(summaryOf(b.backupPath, other.runId!)).length > 0);
+    assert.deepEqual(readFileSync(summaryOf(a.backupPath, first.runId!)), before);
+  });
+
+  it('a failed run writes its summary too, incomplete, and a rerun gets a file of its own', async () => {
+    const ws = makeWorkspace('summary-failed', { label: 'A' });
+    const failing = recordingStage('fails', 10);
+    writeFileSync(path.join(failing.dir, 'stage.mjs'), 'process.exit(3);\n');
+    const first = await run(ws.backupPath, { enabled: [failing], disabled: [] });
+    const firstFile = summaryOf(ws.backupPath, first.runId!);
+    const before = readFileSync(firstFile);
+    assert.equal(JSON.parse(before.toString()).state, 'incomplete');
+
+    const second = await run(ws.backupPath, { enabled: [failing], disabled: [] });
+    assert.ok(readFileSync(summaryOf(ws.backupPath, second.runId!)).length > 0);
+    assert.deepEqual(readFileSync(firstFile), before, 'the earlier run keeps its own summary');
+    assert.deepEqual(
+      readdirSync(path.join(ws.workspace, 'runs', 'A')).sort(),
+      [`${first.runId}.json`, `${second.runId}.json`].sort()
+    );
   });
 });
 

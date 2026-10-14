@@ -6,29 +6,52 @@ import { discoverStages } from './discovery.js';
 import { migrationRefusal, readMigrationStatus } from './migrations.js';
 import { runPipelineForBackup } from './pipeline.js';
 
+type AnalysisResult = {
+  backupPath: string;
+  status: 'succeeded' | 'failed' | 'skipped';
+  runId?: string;
+  stages?: { stage: string; success: boolean }[];
+  error?: string;
+};
+
+/** This call's result, at the path its caller gave (EPOCH-409): each backup's
+ * outcome, and why the call stopped before any backup, if it did. */
+async function writeCallSummary(
+  summaryPath: string | undefined,
+  results: AnalysisResult[],
+  error?: string
+): Promise<void> {
+  if (!summaryPath) return;
+  await fsp.mkdir(path.dirname(summaryPath), { recursive: true });
+  // Owner-only, and created new: the caller's path is often in a shared
+  // temporary folder, and the result names backups and their errors.
+  await fsp.writeFile(summaryPath, JSON.stringify(error ? { results, error } : { results }, null, 2), {
+    mode: 0o600,
+    flag: 'wx',
+  });
+}
+
 async function main() {
   const cfg = await parseCliConfig();
   const pythonBin = await resolvePythonBin();
   const stages = await discoverStages();
 
   if (stages.enabled.length === 0) {
-    console.error(
-      '[orchestrator] no enabled stages discovered under apps/extractors/ or apps/reporting/ — nothing to run.'
-    );
-    process.exit(1);
-  }
-
-  if (cfg.backupPaths.length === 0) {
-    console.error('[orchestrator] no successfully decrypted backups were found in the workspace.');
+    const error = 'No enabled stages were found under apps/extractors/ or apps/reporting/, so there is nothing to run.';
+    console.error(`[orchestrator] ${error}`);
+    await writeCallSummary(cfg.summaryPath, [], error);
     process.exitCode = 1;
     return;
   }
 
-  const workspacePath = path.dirname(path.dirname(cfg.backupPaths[0]));
-  const summaryPath = path.join(workspacePath, 'analysis-summary.json');
-  // The app reads this file after the process exits; a summary left by an
-  // earlier run must never be read as this one's.
-  await fsp.rm(summaryPath, { force: true });
+  if (cfg.backupPaths.length === 0) {
+    const error = 'No successfully decrypted backups were found in the workspace.';
+    console.error(`[orchestrator] ${error}`);
+    await writeCallSummary(cfg.summaryPath, [], error);
+    process.exitCode = 1;
+    return;
+  }
+
   const client = new Client({ connectionString: cfg.dbUrl });
   await client.connect();
 
@@ -38,19 +61,13 @@ async function main() {
   if (refusal) {
     await client.end();
     console.error(`[orchestrator] ${refusal}`);
-    await fsp.writeFile(summaryPath, JSON.stringify({ results: [], error: refusal }, null, 2));
+    await writeCallSummary(cfg.summaryPath, [], refusal);
     process.exitCode = 1;
     return;
   }
 
   let failedBackups = 0;
-  const analysisResults: Array<{
-    backupPath: string;
-    status: 'succeeded' | 'failed' | 'skipped';
-    runId?: string;
-    stages?: { stage: string; success: boolean }[];
-    error?: string;
-  }> = [];
+  const analysisResults: AnalysisResult[] = [];
 
   for (const backupPath of cfg.backupPaths) {
     try {
@@ -83,7 +100,7 @@ async function main() {
   }
 
   await client.end();
-  await fsp.writeFile(summaryPath, JSON.stringify({ results: analysisResults }, null, 2));
+  await writeCallSummary(cfg.summaryPath, analysisResults);
 
   if (failedBackups > 0) process.exitCode = 1;
 }

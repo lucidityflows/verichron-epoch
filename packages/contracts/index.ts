@@ -16,7 +16,7 @@
 export { NormalizedRecord } from './ts/normalizedRecord.js';
 export { discoverBackups, BACKUP_SEARCH_MAX_DEPTH } from './ts/discoverBackups.js';
 export type { Backup } from './ts/discoverBackups.js';
-export { deriveReportPath, deriveIleappPath } from './ts/deriveWorkspacePaths.js';
+export { deriveReportPath, deriveIleappPath, deriveRunSummaryPath } from './ts/deriveWorkspacePaths.js';
 export { deriveEvidencePath } from './ts/deriveEvidencePath.js';
 export { EvidenceSidecar } from './ts/evidenceSidecar.js';
 export { contractVersion, CONTRACT_SCHEMAS } from './ts/contractVersion.js';
