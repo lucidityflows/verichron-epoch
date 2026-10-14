@@ -484,7 +484,9 @@ READERS = [
 FACT_SOURCES = re.compile(r"forensic_records|current_forensic_records|forensic_records_history|ingested_files|\$\{source\}")
 #: R7's label: a fact unit lists the runs that produced it. Matching a run
 #: against it reads what that run produced (EPOCH-501).
-LABEL_READ = re.compile(r"\S+\s*=\s*ANY\s*\(\s*(?:\w+\.)?produced_by_runs\s*\)", re.I)
+LABEL_READ = re.compile(r"(\S+)\s*=\s*ANY\s*\(\s*(?:\w+\.)?produced_by_runs\s*\)", re.I)
+#: A run id given to the query: `$1` in TypeScript, `%s` in Python.
+PARAMETER = re.compile(r"\$\d+|%s|%\(\w+\)s")
 #: The per-stage audit table: keyed by run, holds no facts.
 STAGE_STATUS_ALIAS = re.compile(r"\bpipeline_stage_status\s+(?:AS\s+)?(\w+)", re.I)
 
@@ -497,10 +499,18 @@ def run_route(sql: str) -> str | None:
     reads `pipeline_runs`, next to a fact source routes facts through a run."""
     if not FACT_SOURCES.search(sql):
         return None
-    rest = LABEL_READ.sub(" ", sql)
-    for alias in STAGE_STATUS_ALIAS.findall(rest):
-        rest = re.sub(rf"\b{re.escape(alias)}\.run_id\b", " ", rest)
-    found = re.search(r"\brun_id\b|\b(?:FROM|JOIN)\s+pipeline_runs\b", rest, re.I)
+    stage_run_ids = {f"{alias}.run_id" for alias in STAGE_STATUS_ALIAS.findall(sql)}
+
+    def label_read(match: re.Match) -> str:
+        # Only a given run id or the stage row's own run may be matched; any
+        # other left side (a fact's run_id) stays visible to the check below.
+        left = match.group(1)
+        return " " if PARAMETER.fullmatch(left) or left in stage_run_ids else match.group(0)
+
+    rest = LABEL_READ.sub(label_read, sql)
+    for run_id in stage_run_ids:
+        rest = re.sub(rf"\b{re.escape(run_id)}\b", " ", rest)
+    found = re.search(r"\brun_id\b|(?:\bFROM|\bJOIN|,)\s*pipeline_runs\b", rest, re.I)
     return found.group(0) if found else None
 
 
@@ -541,6 +551,10 @@ def test_the_guard_allows_reading_r7s_label(sql):
            JOIN pipeline_runs r ON r.evidence_id = f.evidence_id WHERE r.started_at > $1""",
         """SELECT f.* FROM ingested_files f JOIN pipeline_stage_status s ON s.derivative_id = f.derivative_id
            WHERE f.run_id = $1""",
+        # A fact's own run_id, even when matched against the label.
+        "SELECT * FROM ingested_files f WHERE f.run_id = ANY (f.produced_by_runs)",
+        # A comma join through the runs table.
+        "SELECT f.* FROM ingested_files f, pipeline_runs r WHERE r.evidence_id = f.evidence_id",
     ],
 )
 def test_the_guard_refuses_other_routes_from_a_run_to_facts(sql):
