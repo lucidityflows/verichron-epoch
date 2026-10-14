@@ -162,8 +162,12 @@ export async function incompleteReason(plistutil: string, backupDir: string): Pr
 export async function removeFailedPullFolder(plistutil: string, backupDir: string): Promise<number | null> {
   try {
     await fs.access(backupDir);
-  } catch {
-    return null;
+  } catch (err) {
+    // Only a folder that isn't there is nothing to do; one that can't be
+    // reached is raised, so the caller records it as kept.
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return null;
+    throw err;
   }
   if ((await snapshotState(plistutil, backupDir)) !== null) return null;
   const bytes = await folderSize(backupDir);

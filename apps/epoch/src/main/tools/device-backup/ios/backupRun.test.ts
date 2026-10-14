@@ -241,4 +241,18 @@ describe('removeFailedPullFolder (EPOCH-505)', () => {
   it('does nothing when there is no folder', async () => {
     assert.equal(await removeFailedPullFolder(fakePlistutil(status('finished')), deviceDir()), null);
   });
+
+  // Skipped as root, which ignores folder permissions.
+  it.skipIf(process.getuid?.() === 0)('raises a folder it cannot reach, so the caller records it as kept', async () => {
+    const locked = path.join(tmp, 'LOCKED');
+    fs.mkdirSync(path.join(locked, 'DEVICE'), { recursive: true });
+    fs.chmodSync(locked, 0o000);
+    try {
+      await assert.rejects(removeFailedPullFolder(fakePlistutil(status('finished')), path.join(locked, 'DEVICE')), {
+        code: 'EACCES',
+      });
+    } finally {
+      fs.chmodSync(locked, 0o700);
+    }
+  });
 });

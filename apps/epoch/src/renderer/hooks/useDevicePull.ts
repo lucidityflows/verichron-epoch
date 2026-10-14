@@ -410,12 +410,17 @@ export function useDevicePull() {
       const written = await pulling;
       if (attempt.current === thisAttempt) setPulledDir(written);
     } catch (err) {
-      // The pull usually reported its error as progress already.
-      setPullError((prev) => prev ?? ipcErrorMessage(err));
-      setPhase('available');
+      // The pull usually reported its error as progress already. A newer
+      // attempt owns the screen, so an older one's error is not shown.
+      if (attempt.current === thisAttempt) {
+        setPullError((prev) => prev ?? ipcErrorMessage(err));
+        setPhase('available');
+      }
     } finally {
-      setDeviceAction(null);
-      setCancelling(false);
+      if (attempt.current === thisAttempt) {
+        setDeviceAction(null);
+        setCancelling(false);
+      }
     }
     return 'finished';
   };
