@@ -14,6 +14,7 @@ import { execFile } from 'node:child_process';
 import {
   chmodSync,
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -470,6 +471,29 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(await getRunState(db, result.runId!), 'complete');
   });
 
+  it('a stage reading crash logs this evidence lacks is skipped with the reason, never run, and the run is complete (EPOCH-447)', async () => {
+    const ws = makeWorkspace('no-crash-logs');
+    const crash = recordingStage('crash-reader', 10, { reads: 'crash_reports', parserVersion: 1 });
+    const result = await run(ws.backupPath, { enabled: [crash], disabled: [] });
+    assert.equal(result.success, true, JSON.stringify(result));
+    assert.ok(!existsSync(path.join(crash.dir, 'argv.json')), 'a stage with no input is never spawned');
+
+    const { rows } = await db.query(
+      `SELECT status, error_message, derivative_id, finished_at IS NOT NULL AS finished
+         FROM pipeline_stage_status WHERE run_id = $1`,
+      [result.runId]
+    );
+    assert.equal(rows[0].status, 'skipped');
+    assert.match(rows[0].error_message, /Crash logs were not acquired for this evidence/);
+    assert.match(rows[0].error_message, /An iOS backup does not contain the device's crash logs/);
+    assert.equal(rows[0].derivative_id, null);
+    assert.equal(rows[0].finished, true);
+    assert.equal(await getRunState(db, result.runId!), 'complete');
+
+    const again = await run(ws.backupPath, { enabled: [crash], disabled: [] });
+    assert.equal(again.skipped, true, 'still no crash logs, so the complete run stands');
+  });
+
   it('a finished run with a stage stuck pending or running is incomplete, not succeeded', async () => {
     const ws = makeWorkspace('killed');
     const result = await run(ws.backupPath, { enabled: [recordingStage('ok', 10)], disabled: [] });
@@ -481,6 +505,7 @@ describe('stages and the completeness predicate', live, () => {
         evidenceId: result.evidenceId!,
         decryptedDerivativeId: derivative.rows[0].derivative_id,
         ileappDerivativeId: null,
+        crashReportsDerivativeId: null,
       };
       assert.equal(await hasCompleteRunFor(db, registration, []), false);
     }

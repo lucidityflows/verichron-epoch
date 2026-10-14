@@ -329,6 +329,33 @@ def test_the_report_says_indicator_checks_and_ai_analysis_were_not_run(db, tmp_p
     assert "**AI-assisted analysis:** not run" in section
 
 
+def test_the_report_lists_each_skipped_stage_and_its_reason_as_not_examined(db, tmp_path):
+    """EPOCH-447: an iOS backup holds no crash logs, so the crash stage is
+    skipped; the report says so rather than leaving an empty section that
+    reads like "no crashes"."""
+    if not isinstance(db, PgReal):
+        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
+    from reporting.generate_report import generate_report
+
+    reason = (
+        "Crash logs were not acquired for this evidence. An iOS backup does not contain the device's "
+        "crash logs; they are copied from the device separately."
+    )
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO pipeline_stage_status (run_id, stage_name, status, error_message) VALUES "
+            "(%s, 'crash', 'skipped', %s), (%s, 'stub', 'skipped', 'stage disabled in its stage.json')",
+            (RUN_A, reason, RUN_A),
+        )
+    db.commit()
+
+    out = tmp_path / "report.md"
+    generate_report(db._conn, RUN_A, EVIDENCE, str(out))
+    section = out.read_text().split("## Not Examined", 1)[1].split("---", 1)[0]
+    assert f"- **The `crash` stage did not run:** {reason}" in section
+    assert "- **The `stub` stage did not run:** stage disabled in its stage.json" in section
+
+
 def test_the_report_leaves_out_its_own_stage_which_is_still_running(db, tmp_path):
     """EPOCH-499: the orchestrator marks the reporting stage running while the
     report is written, so a finished report used to list itself as running."""

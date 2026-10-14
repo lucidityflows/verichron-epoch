@@ -42,29 +42,52 @@ async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { 
 const DERIVATIVE_NAMES: Record<DerivativeKind, string> = {
   decrypted: 'the decrypted backup',
   ileapp_output: 'iLEAPP output',
+  crash_reports: "the device's crash logs",
 };
+
+/**
+ * Derivatives that only some acquisitions produce, so their absence is a fact
+ * about the evidence, not a step left undone: a stage reading one is recorded
+ * as skipped, with this reason, and the report lists it as not examined
+ * (EPOCH-447). Every other missing derivative fails the stage.
+ */
+const NOT_ACQUIRED: Partial<Record<DerivativeKind, string>> = {
+  crash_reports:
+    "Crash logs were not acquired for this evidence. An iOS backup does not contain the device's crash logs; " +
+    'they are copied from the device separately.',
+};
+
+export type StageOutcome = { status: 'succeeded' | 'failed'; stderr: string } | { status: 'skipped'; reason: string };
 
 /**
  * Runs one stage against the derivative its stage.json says it reads, passing
  * that derivative's id and path. A stage whose derivative wasn't registered
- * (the processor hasn't completed it) fails before it is spawned.
+ * (the processor hasn't completed it) fails before it is spawned, unless that
+ * derivative is one only some acquisitions produce (NOT_ACQUIRED).
  */
 export function runStage(
   stage: StageDefinition,
   config: RunConfig,
   runId: string,
   registration: Registration
-): Promise<{ success: boolean; stderr: string }> {
+): Promise<StageOutcome> {
   const paths: Record<DerivativeKind, string | undefined> = {
     decrypted: config.backupPath,
     ileapp_output: config.ileappPath,
+    // Nothing acquires crash logs yet (EPOCH-514).
+    crash_reports: undefined,
   };
   // Identity comes from here, never from the stage (R16): the evidence, the
   // derivative this stage reads, and its declared parser version.
   const derivativeId = derivativeFor(stage, registration);
   const derivativePath = paths[stage.manifest.reads];
+  const notAcquired = NOT_ACQUIRED[stage.manifest.reads];
+  if (!derivativeId && notAcquired) {
+    return Promise.resolve({ status: 'skipped', reason: notAcquired });
+  }
   if (!derivativeId || !derivativePath) {
     return Promise.resolve({
+      status: 'failed',
       success: false,
       stderr:
         `stage "${stage.name}" reads ${DERIVATIVE_NAMES[stage.manifest.reads]}, but none is registered for ` +
@@ -107,8 +130,8 @@ export function runStage(
     child.stderr?.on('data', (text: string) => {
       stderr += text;
     });
-    child.on('error', (err) => resolve({ success: false, stderr: err.message }));
-    child.on('close', (code) => resolve({ success: code === 0, stderr: stderr.trim() }));
+    child.on('error', (err) => resolve({ status: 'failed', stderr: err.message }));
+    child.on('close', (code) => resolve({ status: code === 0 ? 'succeeded' : 'failed', stderr: stderr.trim() }));
   });
 }
 
@@ -207,21 +230,25 @@ export async function runPipelineForBackup(
   try {
     for (const stage of stages.enabled) {
       await markStage(client, runId, stage.name, 'running');
-      const { success, stderr } = await runStage(
+      const outcome = await runStage(
         stage,
         { backupPath, reportPath, ileappPath, dbUrl, pythonBin },
         runId,
         registration
       );
 
-      if (success) {
+      if (outcome.status === 'skipped') {
+        // Nothing failed, and nothing was examined: the reason says which
+        // input this evidence lacks, and the report repeats it (EPOCH-447).
+        await markStage(client, runId, stage.name, 'skipped', outcome.reason);
+      } else if (outcome.status === 'succeeded') {
         // What a stage printed to stderr while succeeding is its notes:
         // kept, not discarded (EPOCH-420).
-        await markStage(client, runId, stage.name, 'succeeded', undefined, stderr || undefined);
+        await markStage(client, runId, stage.name, 'succeeded', undefined, outcome.stderr || undefined);
       } else {
-        await markStage(client, runId, stage.name, 'failed', stderr || 'unknown error');
+        await markStage(client, runId, stage.name, 'failed', outcome.stderr || 'unknown error');
       }
-      results.push({ stage: stage.name, success });
+      results.push({ stage: stage.name, success: outcome.status !== 'failed' });
     }
 
     await client.query(`UPDATE pipeline_runs SET finished_at = now() WHERE run_id = $1`, [runId]);

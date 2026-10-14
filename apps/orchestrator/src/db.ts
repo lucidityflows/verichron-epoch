@@ -11,7 +11,10 @@ export type RunState = 'running' | 'incomplete' | 'complete';
  * state in the run_completeness view is 'complete' (R23, migration 0005; not
  * re-derived here) AND in which every stage enabled now succeeded at the
  * parserVersion its stage.json declares now, reading the derivative it would
- * read now. A parserVersion bump (R8), a newly enabled stage, or a new
+ * read now. A stage whose derivative this evidence lacks (crash logs that
+ * were never acquired, EPOCH-447) counts when it was skipped for that same
+ * reason. A parserVersion bump (R8), a newly enabled stage, newly acquired
+ * crash logs, or a new
  * iLEAPP output (e.g. a new iLEAPP commit, EPOCH-416) therefore gets a new run
  * instead of being skipped as done; unchanged stages dedup in the ledger, so
  * re-running them writes nothing new.
@@ -39,7 +42,7 @@ export async function findCompleteRunFor(
              SELECT 1 FROM pipeline_stage_status s
               WHERE s.run_id = c.run_id
                 AND s.stage_name = want.stage_name
-                AND s.status = 'succeeded'
+                AND (s.status = 'succeeded' OR (s.status = 'skipped' AND want.derivative_id IS NULL))
                 AND s.parser_version IS NOT DISTINCT FROM want.parser_version
                 AND s.derivative_id IS NOT DISTINCT FROM want.derivative_id))
       ORDER BY c.finished_at DESC
@@ -118,13 +121,14 @@ export async function createRun(
 /**
  * A stage's status. A failed stage's output goes in `errorMessage`; a
  * succeeded stage's in `warnings` (EPOCH-420), so its notes aren't lost and
- * are never read as a failure.
+ * are never read as a failure. A skipped stage's reason goes in
+ * `errorMessage`, as for a disabled stage.
  */
 export async function markStage(
   client: Client,
   runId: string,
   stageName: string,
-  status: 'running' | 'succeeded' | 'failed',
+  status: 'running' | 'succeeded' | 'failed' | 'skipped',
   errorMessage?: string,
   warnings?: string
 ): Promise<void> {

@@ -2,8 +2,10 @@
 """
 extractors/crash/main.py
 
-Crash-report extractor. Parses iOS .ips crash/telemetry files out of a
-decrypted backup and writes them into the shared forensic_records table.
+Crash-report extractor. Parses iOS .ips crash/telemetry files from the
+device's crash logs (the crash_reports derivative) and writes them into the
+shared forensic_records table. An iOS backup holds no crash logs (EPOCH-447),
+so the orchestrator never runs this stage on a backup alone.
 
 This is a port of the original deep_ips_report.py, split per the contract:
   - PARSING logic (parse_ips_file, extract_rich_telemetry) moves here,
@@ -41,7 +43,9 @@ def parse_ips_file(file_path: Path) -> tuple[dict | None, str | None]:
     followed by a payload block) or a single JSON block.
     """
     try:
-        with open(file_path, encoding="utf-8", errors="ignore") as f:
+        # Strict: an undecodable byte fails the file, which stays retryable,
+        # instead of being dropped from the evidence silently (EPOCH-447).
+        with open(file_path, encoding="utf-8", errors="strict") as f:
             lines = f.readlines()
 
         if not lines:
@@ -186,7 +190,7 @@ def telemetry_to_record(telemetry: dict) -> NormalizedRecord:
 # --- main --------------------------------------------------------------
 
 
-def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
+def run(conn, ctx: IngestContext, crash_reports_path: str) -> ETLRunResult:
     """
     Partial-failure choice (per EXTRACTOR_CONTRACT.md #5): a malformed or
     unparseable .ips file is skipped and logged, everything else still
@@ -207,7 +211,7 @@ def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
     non-atomic pattern `ingest()` exists to close off (see db_writer.py's
     module docstring).
     """
-    ips_files = list(Path(backup_path).rglob("*.ips"))
+    ips_files = list(Path(crash_reports_path).rglob("*.ips"))
     result = ETLRunResult()
 
     for file_path in ips_files:
@@ -251,7 +255,9 @@ def main():
     db_url = require_database_url()
     parser = argparse.ArgumentParser()
     add_context_args(parser)
-    parser.add_argument("--backup-path", required=True)
+    # The backup's path is passed to every stage; this one reads the crash
+    # logs at --derivative-path instead.
+    parser.add_argument("--backup-path", required=True, help="unused; passed to every stage")
     # Unused here: only the report stage writes to the report folder. The
     # orchestrator passes --report-path to every stage (EXTRACTOR_CONTRACT.md
     # section 2), so this extractor accepts and ignores it.
@@ -265,7 +271,7 @@ def main():
         sys.exit(1)
 
     try:
-        result = run(conn, context_from_args(args), args.backup_path)
+        result = run(conn, context_from_args(args), args.derivative_path)
     except Exception as e:
         print(f"[crash] unhandled error: {e}", file=sys.stderr)
         sys.exit(1)

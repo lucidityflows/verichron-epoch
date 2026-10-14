@@ -33,11 +33,11 @@ describe('stage manifests', () => {
     assert.equal(isStageManifest({ ...VALID, requiresResultsPath: true }), false, 'the replaced key is refused');
   });
 
-  it("every stage in the repository has a valid manifest, and the iLEAPP bridge reads iLEAPP's output", async () => {
+  it("every stage in the repository has a valid manifest; the iLEAPP bridge reads iLEAPP's output and the crash stage the device's crash logs", async () => {
     const { enabled } = await discoverStages();
     const reads = Object.fromEntries(enabled.map((s) => [s.name, s.manifest.reads]));
     assert.equal(reads.ileapp_bridge, 'ileapp_output');
-    assert.equal(reads.crash, 'decrypted');
+    assert.equal(reads.crash, 'crash_reports', 'an iOS backup holds no crash logs (EPOCH-447)');
     assert.deepEqual(
       enabled.map((s) => s.name).sort(),
       ['crash', 'ileapp_bridge', 'reporting'],

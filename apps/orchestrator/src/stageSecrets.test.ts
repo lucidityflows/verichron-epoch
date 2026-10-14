@@ -45,8 +45,9 @@ it('passes the database URL in the environment, never on the command line', asyn
       deviceId: 'device-1',
       decryptedDerivativeId: 'derivative-1',
       ileappDerivativeId: null,
+      crashReportsDerivativeId: null,
     });
-    assert.equal(result.success, true, result.stderr);
+    assert.equal(result.status, 'succeeded', JSON.stringify(result));
 
     const seen = JSON.parse(fs.readFileSync(seenPath, 'utf8')) as { argv: string[]; url: string };
     assert.equal(seen.url, DB_URL);

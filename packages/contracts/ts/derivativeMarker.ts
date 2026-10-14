@@ -23,8 +23,13 @@ import { z } from 'zod';
 export const DECRYPT_MARKER = '.decrypted_ok';
 export const ILEAPP_MARKER = '.ileapp_ok';
 
-/** The derivative kinds evidence_derivatives.kind allows (migration 0009). */
-export const DerivativeKind = z.enum(['decrypted', 'ileapp_output']);
+/**
+ * The derivative kinds evidence_derivatives.kind allows (migration 0011).
+ * `crash_reports` is the device's crash logs, copied from the device
+ * separately because an iOS backup doesn't contain them (EPOCH-447); nothing
+ * produces it until EPOCH-514, so a stage reading it is recorded as skipped.
+ */
+export const DerivativeKind = z.enum(['decrypted', 'ileapp_output', 'crash_reports']);
 export type DerivativeKind = z.infer<typeof DerivativeKind>;
 
 const ContentRoot = z.string().regex(/^[0-9a-f]{64}$/);

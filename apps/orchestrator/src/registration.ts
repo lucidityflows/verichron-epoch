@@ -53,15 +53,22 @@ export interface Registration {
   decryptedDerivativeId: string;
   /** iLEAPP's output for that decrypt, when complete (EPOCH-416). */
   ileappDerivativeId: string | null;
+  /** The device's crash logs. An iOS backup holds none, and nothing acquires
+   * them yet (EPOCH-514), so this is null for now (EPOCH-447). */
+  crashReportsDerivativeId: string | null;
 }
 
-export type RegisteredDerivatives = Pick<Registration, 'decryptedDerivativeId' | 'ileappDerivativeId'>;
+export type RegisteredDerivatives = Pick<
+  Registration,
+  'decryptedDerivativeId' | 'ileappDerivativeId' | 'crashReportsDerivativeId'
+>;
 
 /** The derivative a stage reads, as its stage.json declares; null when that one isn't registered. */
 export function derivativeFor(stage: StageDefinition, registration: RegisteredDerivatives): string | null {
   const byKind: Record<DerivativeKind, string | null> = {
     decrypted: registration.decryptedDerivativeId,
     ileapp_output: registration.ileappDerivativeId,
+    crash_reports: registration.crashReportsDerivativeId,
   };
   return byKind[stage.manifest.reads];
 }
@@ -465,7 +472,7 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
       : null;
 
     await client.query('COMMIT');
-    return { evidenceId, deviceId, decryptedDerivativeId, ileappDerivativeId };
+    return { evidenceId, deviceId, decryptedDerivativeId, ileappDerivativeId, crashReportsDerivativeId: null };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;

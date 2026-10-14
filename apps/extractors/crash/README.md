@@ -1,14 +1,18 @@
 # crash stage
 
 Parses iOS `.ips` crash and analytics files into `crash_report` facts, one per
-file. Order 10; it reads the **decrypted backup**. It follows the
+file. Order 10; it reads the **device's crash logs** (the `crash_reports`
+derivative). It follows the
 [stage contract](../../../packages/contracts/EXTRACTOR_CONTRACT.md).
 
-> **Open question (EPOCH-447):** the stage collects `*.ips` files from the
-> decrypted backup (`rglob("*.ips")`). An iTunes/Finder backup stores files under
-> hashed names without extensions, and probably holds no crash logs at all. If
-> that's confirmed, this stage finds nothing on real backups until crash reports
-> get their own source.
+**Source (EPOCH-447).** An iOS backup holds none of the device's crash logs:
+on the real reference backup, `Manifest.db` listed no file under
+`DiagnosticReports` or `CrashReporter`. Crash logs are copied from the device
+separately: EPOCH-514 adds this to the iPhone pull, and EPOCH-515 reads them
+from full-filesystem extractions. Until one of those has produced crash logs
+for the evidence, the orchestrator records this stage as skipped, with that
+reason, and the report lists it under Not Examined. The stage never searches a
+backup for crash logs.
 
 ## Parsing
 
@@ -35,6 +39,9 @@ Top-level columns:
   "asi": ["..."], "vm_region_info": "..."
 }
 ```
+
+Files are decoded as strict UTF-8: a file with an undecodable byte fails and
+stays retryable, rather than losing bytes silently.
 
 The field mapping was worked out from real samples. Apple publishes no format
 spec, so a new iOS version may leave some fields null rather than raise an error.
