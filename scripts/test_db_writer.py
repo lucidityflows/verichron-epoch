@@ -127,6 +127,24 @@ def test_successful_unit_commits_ledger_and_records_together(db, artifact):
     assert db.record_count() == 2
 
 
+def test_both_backends_refuse_nul_in_a_records_fields(db, artifact):
+    # PostgreSQL's jsonb can't hold U+0000 (EPOCH-502). PgDouble must refuse it
+    # too, or a test passes that real ingest fails. The unit rolls back.
+    with pytest.raises(Exception, match="(?i)unicode escape"):
+        with ingest(db, ctx(RUN_ID), artifact, **UNIT) as unit:
+            unit.write([NormalizedRecord(source_type=SourceType.CRASH_REPORT, fields={"value": "a\x00b"})])
+    assert db.ledger() == []
+    assert db.record_count() == 0
+
+
+def test_both_backends_refuse_nul_in_a_units_raw_payload(db, artifact):
+    with pytest.raises(Exception, match="(?i)unicode escape"):
+        with ingest(db, ctx(RUN_ID), artifact, source_type="crash_report", payload_kind="summary",
+                    raw_payload={"sample": ["a\x00b"]}):
+            pass
+    assert db.ledger() == []
+
+
 def test_failure_mid_unit_leaves_no_ledger_row_at_all(db, artifact):
     """The heart of it. Before this fix the ledger row survived a mid-unit
     failure, and that survival is what made the loss permanent."""

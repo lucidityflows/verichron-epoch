@@ -39,6 +39,7 @@ import re
 import sqlite3
 from typing import Any
 
+import psycopg2.errors
 import psycopg2.extras
 
 #: UPSERT needs 3.24, RETURNING needs 3.35. Checked explicitly so a stale
@@ -148,11 +149,28 @@ def _translate(sql: str) -> str:
     return sql
 
 
+def _holds_nul(value: Any) -> bool:
+    if isinstance(value, str):
+        return "\x00" in value
+    if isinstance(value, dict):
+        return any(_holds_nul(k) or _holds_nul(v) for k, v in value.items())
+    if isinstance(value, (list, tuple)):
+        return any(_holds_nul(v) for v in value)
+    return False
+
+
 def _adapt(value: Any) -> Any:
-    """psycopg2 parameter -> SQLite parameter."""
+    """psycopg2 parameter -> SQLite parameter. Refuses NUL (U+0000) the way
+    PostgreSQL does, so the double can't accept what the database rejects
+    (EPOCH-502): in jsonb the server raises UntranslatableCharacter, and in
+    text psycopg2 itself raises ValueError."""
     if isinstance(value, psycopg2.extras.Json):
         # .adapted is the original Python object handed to Json(...)
+        if _holds_nul(value.adapted):
+            raise psycopg2.errors.UntranslatableCharacter("unsupported Unicode escape sequence: \\u0000 in jsonb")
         return json.dumps(value.adapted)
+    if isinstance(value, str) and "\x00" in value:
+        raise ValueError("A string literal cannot contain NUL (0x00) characters.")
     if isinstance(value, bool):
         return 1 if value else 0
     if value is None or isinstance(value, (int, float, str, bytes)):

@@ -48,7 +48,10 @@ chosen or parsed by name.
 ## `fields`
 
 - every column of the row, under **iLEAPP's original header** (e.g. `Visit
-  Timestamp`, `URL`), binary values hex-encoded;
+  Timestamp`, `URL`). Binary values, and text holding NUL (which `jsonb`
+  can't store), are kept exactly as `{"$encoded": "hex" | "utf8-hex", "value":
+  "<hex>"}` (`lava.decode_value` returns the original), and counted in the
+  stage's notes;
 - `engine`: always `"iLEAPP"`;
 - `source_artifact`, `module`, `category`: the artifact as the manifest names it;
 - `source_path`: the input file the artifact was read from, relative to the

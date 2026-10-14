@@ -231,9 +231,13 @@ def read_artifact(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifa
     rows: list[dict[str, Any]] = []
     event_times: list[datetime | None] = []
     unconvertible = 0
+    encoded = 0
     for raw in cursor:
+        # The identity covers the values as read (binary as hex), so encoding
+        # a value for storage never changes which unit it belongs to.
+        digest.update(_canonical([_identity_value(v) for v in raw]))
         values = [_json_value(v) for v in raw]
-        digest.update(_canonical(values))
+        encoded += sum(1 for v in values if isinstance(v, dict))
         rows.append(dict(zip(headers, values)))
         if time_index is None:
             event_times.append(None)
@@ -249,6 +253,11 @@ def read_artifact(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifa
             f"but the manifest records {artifact.record_count}"
         )
     notes = []
+    if encoded:
+        notes.append(
+            f"{artifact.name}: {encoded} value(s) can't be stored as text (binary, or text holding NUL) "
+            'and are stored exactly, encoded as {"$encoded": ..., "value": ...}'
+        )
     if unconvertible:
         notes.append(
             f"{artifact.name}: {unconvertible} row(s) have a value in {artifact.column_map[artifact.event_time_column]} "
@@ -320,11 +329,37 @@ def _quote(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
 
 
+#: The marker for a value stored encoded because PostgreSQL can't hold it as
+#: is (EPOCH-502): binary, or text holding NUL (U+0000), which jsonb rejects.
+#: The value is kept exactly; decode `value` by `$encoded` to get it back.
+ENCODED = "$encoded"
+
+
 def _json_value(value: Any) -> Any:
-    """SQLite values as JSON values; binary is hex-encoded, never dropped."""
+    """SQLite values as stored JSON values. Binary and text holding NUL are
+    kept exactly, encoded and marked, never dropped or altered."""
     if isinstance(value, bytes):
-        return value.hex()
+        return {ENCODED: "hex", "value": value.hex()}
+    if isinstance(value, str) and "\x00" in value:
+        return {ENCODED: "utf8-hex", "value": value.encode("utf-8").hex()}
     return value
+
+
+def decode_value(value: Any) -> Any:
+    """The original value of a stored one: bytes for `hex`, text for
+    `utf8-hex`, anything unmarked as it is."""
+    if isinstance(value, dict) and set(value) == {ENCODED, "value"}:
+        if value[ENCODED] == "hex":
+            return bytes.fromhex(value["value"])
+        if value[ENCODED] == "utf8-hex":
+            return bytes.fromhex(value["value"]).decode("utf-8")
+    return value
+
+
+def _identity_value(value: Any) -> Any:
+    """A value as the unit's identity hash covers it: binary as plain hex,
+    as before EPOCH-502, and everything else as read."""
+    return value.hex() if isinstance(value, bytes) else value
 
 
 def _canonical(value: Any) -> bytes:
