@@ -5,9 +5,10 @@ import path from 'node:path';
 import test from 'node:test';
 import { resolvePythonBin } from './cli.js';
 
-async function withRepoRoot(run: (root: string) => Promise<void>): Promise<void> {
+async function withRepoRoot(run: (root: string) => Promise<void>, pinned = '3.14.8'): Promise<void> {
   const root = await mkdtemp(path.join(os.tmpdir(), 'epoch-python-preflight-'));
   try {
+    await writeFile(path.join(root, '.python-version'), `${pinned}\n`);
     await run(root);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -31,7 +32,7 @@ test('Python preflight fails clearly rather than falling back when the managed e
   });
 });
 
-test('Python preflight selects the managed 3.14 interpreter', async () => {
+test('Python preflight selects the interpreter .python-version pins', async () => {
   await withRepoRoot(async (root) => {
     const pythonPath = await writePythonStub(root, '3.14.8');
     assert.equal(await resolvePythonBin(root), pythonPath);
@@ -41,8 +42,22 @@ test('Python preflight selects the managed 3.14 interpreter', async () => {
 test('Python preflight rejects an unsupported interpreter version', async () => {
   await withRepoRoot(async (root) => {
     await writePythonStub(root, '3.13.5');
-    await assert.rejects(resolvePythonBin(root), /requires Python 3\.14.*found 3\.13\.5/);
+    await assert.rejects(resolvePythonBin(root), /requires Python 3\.14\.8 \(\.python-version\).*found 3\.13\.5/);
   });
+});
+
+test('Python preflight rejects another patch release than the exact pin', async () => {
+  await withRepoRoot(async (root) => {
+    await writePythonStub(root, '3.14.7');
+    await assert.rejects(resolvePythonBin(root), /requires Python 3\.14\.8/);
+  });
+});
+
+test('Python preflight accepts any patch release of a major.minor pin', async () => {
+  await withRepoRoot(async (root) => {
+    const pythonPath = await writePythonStub(root, '3.14.2');
+    assert.equal(await resolvePythonBin(root), pythonPath);
+  }, '3.14');
 });
 
 test('Python preflight reports workspace import failures', async () => {

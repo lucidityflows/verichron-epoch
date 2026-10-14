@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import requests
+from runtime_env import fatal_if_missing_venv
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODELS = ["qwen2.5:3b-instruct", "llama3:8b-instruct-q4_K_M"]
@@ -73,4 +74,6 @@ def run_benchmark():
 
 
 if __name__ == "__main__":
+    # A standalone script, not a stage the orchestrator validates (R29).
+    fatal_if_missing_venv()
     run_benchmark()

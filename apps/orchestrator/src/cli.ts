@@ -52,9 +52,11 @@ export async function resolvePythonBin(repoRoot = REPO_ROOT): Promise<string> {
     throw new Error(`Python preflight failed for ${venvPython}: ${detail}`, { cause: error });
   }
 
-  if (!/^3\.14\.\d+$/.test(version)) {
+  // The version is declared once, in .python-version (docs/development.md).
+  const pinned = (await fsp.readFile(path.join(repoRoot, '.python-version'), 'utf8')).trim();
+  if (version !== pinned && !version.startsWith(`${pinned}.`)) {
     throw new Error(
-      `Python preflight requires Python 3.14 from ${venvPython}; found ${version || 'no version output'}.`
+      `Python preflight requires Python ${pinned} (.python-version) from ${venvPython}; found ${version || 'no version output'}.`
     );
   }
 

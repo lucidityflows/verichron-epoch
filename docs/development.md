@@ -26,6 +26,7 @@ Each version is declared once, in the file the enforcing tool reads:
 | uv | 0.12.23 | `mise.toml` (`required-version` in `pyproject.toml` guards it) |
 | Python | 3.14.8, a uv-managed CPython; system interpreters are never used | `.python-version` |
 | Pyright | 1.1.414 | `pyproject.toml` |
+| Ruff | 0.17.0 | `pyproject.toml` |
 | Electron | 44.7.0 | `apps/epoch/package.json` |
 | iphone_backup_decrypt | 0.10.0 (exact; the decrypt uses two of its internals) | `tools/decrypt/pyproject.toml` |
 | iLEAPP | v2026.3.1 (submodule) | `.gitmodules` pin; its dependencies in `tools/ileapp/pyproject.toml` |
@@ -175,8 +176,8 @@ New device behaviour seen during these checks is added to the verified list in
 
 | Workflow | Runs |
 |---|---|
-| `.github/workflows/python-tests.yml` | Ruff lint and format checks, migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
-| `.github/workflows/ts-tests.yml` | The formatting check, then typecheck and tests for the processor, the writer, the reader and the orchestrator, with real PostgreSQL, and the desktop app's typecheck, Vite build and tests |
+| `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright, migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
+| `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, Vite build and tests |
 
 Both workflows install the toolchain from `mise.toml` and Python from
 `.python-version`, the same files a development machine uses. All Actions are
