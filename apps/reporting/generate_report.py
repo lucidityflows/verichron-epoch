@@ -209,12 +209,27 @@ def render_provenance_section(inputs: list[dict], fact_sources: list[dict] | Non
 # --- what was not examined (EPOCH-489) ------------------------------------
 
 
-def render_not_examined_section() -> list[str]:
+def render_not_examined_section(ileapp_outputs: list[dict]) -> list[str]:
     """Checks this report cannot speak to, stated so their absence is never
-    read as a clean result."""
-    return [
-        "## Not Examined",
-        "",
+    read as a clean result: including every iLEAPP plugin that errored on the
+    output this run read (EPOCH-457), whose artifact is therefore missing."""
+    lines = ["## Not Examined", ""]
+    for d in ileapp_outputs:
+        errors = d["params"]["modules"]["errors"]
+        if not errors:
+            lines.append(f"- **iLEAPP plugins** (`{d['path']}`): none errored.")
+            continue
+        lines.append(
+            f"- **iLEAPP plugins that errored** (`{d['path']}`): {len(errors)}. "
+            "Their artifacts are missing from this report:"
+        )
+        for e in errors:
+            reason = e["error"] or "iLEAPP logged no error text"
+            lines.append(
+                f"  - `{_table_cell(e['artifact'])}` ({_table_cell(e['module'])}, "
+                f"{e['file_count']} file(s)): {_table_cell(reason)}"
+            )
+    return lines + [
         "- **Indicators of compromise:** no indicator check was run. Indicator matching is being "
         "rebuilt on the project's own facts and is not available yet. No match is reported "
         "because nothing was checked, not because the device was found clean.",
@@ -361,9 +376,11 @@ def fetch_fact_counts(conn, evidence_id: str) -> list[dict]:
         return cur.fetchall()
 
 
-def render_coverage_section(counts: list[dict]) -> list[str]:
+def render_coverage_section(counts: list[dict], ileapp_outputs: list[dict]) -> list[str]:
     """What the report shows of the evidence's facts, and what it doesn't, so
-    "not shown" can never read as "not found"."""
+    "not shown" can never read as "not found". Also what iLEAPP's modules did
+    on the output this run read (EPOCH-457): an artifact type with no files in
+    the backup is absent, not missed."""
     lines = [
         "## Coverage",
         "",
@@ -372,14 +389,25 @@ def render_coverage_section(counts: list[dict]) -> list[str]:
         "",
     ]
     if not counts:
-        return lines + ["No facts are recorded for this evidence.", "", "---", ""]
-    lines += ["| Fact type | Records | Shown in |", "| :--- | ---: | :--- |"]
-    for row in counts:
-        section = RENDERERS.get(row["source_type"])
-        shown = f"{section[0]} section" if section else "**not shown in this report**; view them in Forensic Records"
-        lines.append(f"| `{row['source_type']}` | {row['records']} | {shown} |")
-    lines.append(f"| **All facts** | {sum(row['records'] for row in counts)} | |")
-    lines += ["", "---", ""]
+        lines += ["No facts are recorded for this evidence.", ""]
+    else:
+        lines += ["| Fact type | Records | Shown in |", "| :--- | ---: | :--- |"]
+        for row in counts:
+            section = RENDERERS.get(row["source_type"])
+            shown = f"{section[0]} section" if section else "**not shown in this report**; view them in Forensic Records"
+            lines.append(f"| `{row['source_type']}` | {row['records']} | {shown} |")
+        lines.append(f"| **All facts** | {sum(row['records'] for row in counts)} | |")
+        lines.append("")
+    for d in ileapp_outputs:
+        m = d["params"]["modules"]
+        lines.append(
+            f"iLEAPP (`{d['path']}`) ran {m['total']} module(s): {m['complete']} completed, "
+            f"{len(m['no_files_found'])} found no files in the backup, and {len(m['errors'])} errored "
+            "(see Not Examined)."
+        )
+    if ileapp_outputs:
+        lines.append("")
+    lines += ["---", ""]
     return lines
 
 
@@ -414,8 +442,10 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
         "",
     ]
     lines += render_stage_preface(stages, run_id, timestamp)
+    inputs = fetch_run_derivatives(conn, run_id)
+    ileapp_outputs = [d for d in inputs if d["kind"] == "ileapp_output"]
     lines += render_provenance_section(
-        fetch_run_derivatives(conn, run_id),
+        inputs,
         fetch_fact_derivatives(conn, evidence_id) if evidence_id else None,
     )
     lines.append("---")
@@ -435,8 +465,8 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
         print(f"[reporting] wrote {output_path} (no evidence registered for run {run_id})")
         return
 
-    lines += render_coverage_section(fetch_fact_counts(conn, evidence_id))
-    lines += render_not_examined_section()
+    lines += render_coverage_section(fetch_fact_counts(conn, evidence_id), ileapp_outputs)
+    lines += render_not_examined_section(ileapp_outputs)
 
     for source_type, (title, fetch, render) in RENDERERS.items():
         rows = fetch(conn, evidence_id)

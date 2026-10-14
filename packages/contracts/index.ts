@@ -28,6 +28,8 @@ export {
   RepairProvenance,
   DecryptParams,
   IleappParams,
+  IleappModules,
+  IleappModuleError,
   DecryptMarker,
   IleappMarker,
   readDecryptMarker,

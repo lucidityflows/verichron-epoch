@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import type { IleappParams, ToolVersion } from '@verichron/contracts';
+import type { IleappModules, IleappParams, ToolVersion } from '@verichron/contracts';
 
 import { closeWriteStream } from './fs.js';
 import { lineReader } from './lines.js';
@@ -361,4 +361,71 @@ export async function runIleapp(opts: IleappRun): Promise<void> {
   if (!fs.existsSync(outputDir)) {
     throw new Error(`iLEAPP exited cleanly but wrote no report at ${outputDir}`);
   }
+}
+
+/** iLEAPP's manifest of its run, beside the report it describes. */
+export const LAVA_MANIFEST = '_lava_data.lava';
+
+/** The statuses iLEAPP records for a module (scripts/lavafuncs.py). */
+const MODULE_STATUSES = new Set(['Complete', 'No files found', 'Error']);
+
+/**
+ * What iLEAPP's modules did (EPOCH-457), from the `modules` list in its
+ * `_lava_data.lava`, with each error's text from iLEAPP's log. iLEAPP runs
+ * each plugin in its own try/except and still exits 0 when one errors, so
+ * this is the only record that a parser failed. Throws, so the output gets no
+ * marker, when the list is missing or holds anything unexpected.
+ */
+export function readModuleOutcomes(outputDir: string, logText: string): IleappModules {
+  const manifestPath = path.join(outputDir, LAVA_MANIFEST);
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  } catch (err) {
+    throw new Error(
+      `could not read iLEAPP's module list from ${manifestPath}: ${err instanceof Error ? err.message : err}`
+    );
+  }
+  const modules = (manifest as { modules?: unknown }).modules;
+  if (!Array.isArray(modules)) throw new Error(`${manifestPath} has no modules list`);
+
+  const errorText = moduleErrorText(logText);
+  const outcomes: IleappModules = { total: modules.length, complete: 0, no_files_found: [], errors: [] };
+  for (const entry of modules) {
+    const m = entry as Record<string, unknown>;
+    const status = m.module_status;
+    if (
+      typeof m.module_name !== 'string' ||
+      typeof m.artifact_name !== 'string' ||
+      typeof status !== 'string' ||
+      !MODULE_STATUSES.has(status) ||
+      !Number.isInteger(m.file_count) ||
+      (m.file_count as number) < 0
+    ) {
+      throw new Error(`${manifestPath} has a module entry this reader doesn't understand: ${JSON.stringify(entry)}`);
+    }
+    if (status === 'Complete') outcomes.complete += 1;
+    else if (status === 'No files found') outcomes.no_files_found.push(m.artifact_name);
+    else
+      outcomes.errors.push({
+        module: m.module_name,
+        artifact: m.artifact_name,
+        file_count: m.file_count as number,
+        error: errorText.get(m.artifact_name) ?? null,
+      });
+  }
+  return outcomes;
+}
+
+/** iLEAPP logs a plugin error as "Reading <artifact> artifact had errors!"
+ * followed by "Error was <message>"; the message, by artifact. */
+function moduleErrorText(logText: string): Map<string, string> {
+  const found = new Map<string, string>();
+  const lines = logText.split(/\r?\n/);
+  for (let i = 0; i < lines.length - 1; i++) {
+    const reading = /^Reading (.+) artifact had errors!$/.exec(lines[i].trim());
+    const error = /^Error was (.*)$/.exec(lines[i + 1].trim());
+    if (reading && error) found.set(reading[1], error[1]);
+  }
+  return found;
 }

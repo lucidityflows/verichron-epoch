@@ -21,7 +21,7 @@ import {
 import { parseFlags, type Config } from './utils/cli.js';
 import { pathExists, writeFileAtomic, writeMarker } from './utils/fs.js';
 import { PROGRESS_INTERVAL_MS, throttled, withDecryptProgress } from './utils/progress.js';
-import { ileappInputType, ileappToolVersion, runIleapp } from './utils/ileapp.js';
+import { ileappInputType, ileappToolVersion, readModuleOutcomes, runIleapp } from './utils/ileapp.js';
 import { decryptBackup, decryptToolVersion, isWrongPasswordError, type DecryptTool } from './utils/decrypt.js';
 import { hashTree } from './utils/manifest.js';
 import { repairDecrypted } from './utils/repair.js';
@@ -310,21 +310,30 @@ async function runBackups(
       await fsp.rm(ileDir, { recursive: true, force: true });
       try {
         const inputType = ileappInputType(decDir);
+        const logPath = path.join(cfg.workspace, 'logs', `${name}.ileapp.log`);
         await runIleapp({
           python: cfg.ileappPython,
           ileappDir: cfg.ileappDir,
           decryptedDir: decDir,
           inputType,
           outputDir: ileDir,
-          logPath: path.join(cfg.workspace, 'logs', `${name}.ileapp.log`),
+          logPath,
           modulesPath: path.join(cfg.workspace, 'logs', `${name}.ileapp-modules.json`),
           moduleTimeoutMs: cfg.ileappModuleTimeoutMs,
         });
+        // A plugin that errored is recorded with the output, not treated as a
+        // failed run (EPOCH-457): it fails the same way every time.
+        const modules = readModuleOutcomes(ileDir, await fsp.readFile(logPath, 'utf8'));
         await writeFileAtomic(
           path.join(ileDir, ILEAPP_MARKER),
-          renderIleappMarker(contentRoot, tools.ileapp, { input_type: inputType })
+          renderIleappMarker(contentRoot, tools.ileapp, { input_type: inputType, modules })
         );
-        console.log('  [ileapp]  done ->', ileDir);
+        for (const e of modules.errors)
+          console.log(`  [ileapp]  plugin errored: ${e.artifact} (${e.module}): ${e.error ?? 'no error text logged'}`);
+        console.log(
+          `  [ileapp]  done -> ${ileDir} (${modules.complete} of ${modules.total} modules completed, ` +
+            `${modules.no_files_found.length} found no files, ${modules.errors.length} errored)`
+        );
       } catch (err) {
         console.error(`  [ileapp] error: ${err instanceof Error ? err.message : err}`);
         failedBackups.add(name);

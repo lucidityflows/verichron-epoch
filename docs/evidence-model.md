@@ -64,6 +64,16 @@ is missing, malformed, or names different evidence. That's how a backup that
 changed under the same label can never have its old decrypt filed under the new
 evidence.
 
+**iLEAPP's module outcomes are part of its output's provenance** (EPOCH-457).
+iLEAPP runs each plugin in its own `try`/`except` and still exits 0 when one
+errors, so the processor reads the `modules` list from `_lava_data.lava` and
+records it in `.ileapp_ok`: how many modules completed, the artifacts with no
+files in the backup, and each plugin that errored (module, artifact, file count
+and iLEAPP's logged error). An output without a readable module list gets no
+marker. The report states every error under "Not Examined", and the counts
+under "Coverage". A plugin error doesn't fail the stage: it fails the same way
+on every run, so no retry can get past it.
+
 **Indicator sets.** No derivative records an indicator set at the moment:
 indicator checks were removed with their tool (EPOCH-489). Indicator sets return
 as versioned, hashed data the project's own matching reads (EPOCH-490, 491).

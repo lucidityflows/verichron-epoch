@@ -4,7 +4,15 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 
-import { IleappProgress, ileappInputType, runIleapp, UNIFIEDLOG_ITERATOR_DISABLED, type IleappRun } from './ileapp.js';
+import {
+  IleappProgress,
+  ileappInputType,
+  LAVA_MANIFEST,
+  readModuleOutcomes,
+  runIleapp,
+  UNIFIEDLOG_ITERATOR_DISABLED,
+  type IleappRun,
+} from './ileapp.js';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'ileapp-input-'));
 after(() => rmSync(tmp, { recursive: true, force: true }));
@@ -229,5 +237,66 @@ describe('IleappProgress stop messages (EPOCH-487)', () => {
     progress.line('Processes completed.', 30);
     assert.equal(progress.line('Report generation Completed.', 40), true, 'the wait for iLEAPP to exit is timed');
     assert.match(progress.stop(5000, 1000), /^iLEAPP wrote its report but did not exit within the 1 s limit/);
+  });
+});
+
+describe('readModuleOutcomes (EPOCH-457)', () => {
+  const report = (name: string, manifest: unknown) => {
+    const dir = path.join(tmp, name);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, LAVA_MANIFEST), JSON.stringify(manifest));
+    return dir;
+  };
+  const module = (module_name: string, artifact_name: string, module_status: string, file_count: number) => ({
+    module_name,
+    artifact_name,
+    module_status,
+    file_count,
+  });
+  // As iLEAPP logged ZaloChats on the reference backup.
+  const LOG = [
+    '[864/879] zalo_messages [ZaloChats] artifact started',
+    'Reading zalo_messages artifact had errors!',
+    'Error was list index out of range',
+    'Exception Traceback: Traceback (most recent call last):',
+  ].join('\n');
+
+  it('records completed modules, artifacts with no files, and each error with its logged text', () => {
+    const dir = report('outcomes', {
+      modules: [
+        module('Safari', 'safari_history', 'Complete', 1),
+        module('AWESearch', 'get_AWESearch', 'No files found', 0),
+        module('ZaloChats', 'zalo_messages', 'Error', 300),
+      ],
+    });
+    assert.deepEqual(readModuleOutcomes(dir, LOG), {
+      total: 3,
+      complete: 1,
+      no_files_found: ['get_AWESearch'],
+      errors: [{ module: 'ZaloChats', artifact: 'zalo_messages', file_count: 300, error: 'list index out of range' }],
+    });
+  });
+
+  it('records an error iLEAPP logged no text for as null, not a guess', () => {
+    const dir = report('no-text', { modules: [module('ZaloChats', 'zalo_messages', 'Error', 300)] });
+    assert.equal(readModuleOutcomes(dir, '').errors[0].error, null);
+  });
+
+  it('refuses an output with no readable module list, naming the file', () => {
+    const missing = path.join(tmp, 'no-manifest');
+    mkdirSync(missing, { recursive: true });
+    assert.throws(() => readModuleOutcomes(missing, ''), new RegExp(`could not read .*${LAVA_MANIFEST}`));
+    assert.throws(() => readModuleOutcomes(report('no-list', { artifacts: {} }), ''), /has no modules list/);
+  });
+
+  it('refuses a status or entry it does not understand', () => {
+    assert.throws(
+      () => readModuleOutcomes(report('odd-status', { modules: [module('X', 'x', 'Skipped', 0)] }), ''),
+      /doesn't understand/
+    );
+    assert.throws(
+      () => readModuleOutcomes(report('odd-count', { modules: [module('X', 'x', 'Complete', -1)] }), ''),
+      /doesn't understand/
+    );
   });
 });
