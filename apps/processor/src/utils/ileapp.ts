@@ -417,15 +417,20 @@ export function readModuleOutcomes(outputDir: string, logText: string): IleappMo
   return outcomes;
 }
 
-/** iLEAPP logs a plugin error as "Reading <artifact> artifact had errors!"
- * followed by "Error was <message>"; the message, by artifact. */
+/** The two lines iLEAPP logs before "Error was <message>" when a plugin
+ * errors (ileapp.py): the plugin itself failed, or its report directory
+ * couldn't be created. Both record the module as Error. */
+const MODULE_ERROR_HEADERS = [/^Reading (.+) artifact had errors!$/, /^Error creating (.+) report directory at path /];
+
+/** The message of each plugin error iLEAPP logged, by artifact. */
 function moduleErrorText(logText: string): Map<string, string> {
   const found = new Map<string, string>();
   const lines = logText.split(/\r?\n/);
   for (let i = 0; i < lines.length - 1; i++) {
-    const reading = /^Reading (.+) artifact had errors!$/.exec(lines[i].trim());
+    const line = lines[i].trim();
+    const artifact = MODULE_ERROR_HEADERS.map((header) => header.exec(line)?.[1]).find(Boolean);
     const error = /^Error was (.*)$/.exec(lines[i + 1].trim());
-    if (reading && error) found.set(reading[1], error[1]);
+    if (artifact && error) found.set(artifact, error[1]);
   }
   return found;
 }

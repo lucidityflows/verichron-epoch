@@ -221,7 +221,7 @@ def render_not_examined_section(ileapp_outputs: list[dict]) -> list[str]:
             continue
         lines.append(
             f"- **iLEAPP plugins that errored** (`{d['path']}`): {len(errors)}. "
-            "Their artifacts are missing from this report:"
+            "Their artifacts were not produced in this output:"
         )
         for e in errors:
             reason = e["error"] or "iLEAPP logged no error text"

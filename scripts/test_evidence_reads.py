@@ -376,7 +376,7 @@ def test_the_report_names_every_ileapp_plugin_that_errored_and_counts_the_rest(d
     generate_report(db._conn, RUN_A, EVIDENCE, str(out))
     report = out.read_text()
     not_examined = report.split("## Not Examined", 1)[1].split("---", 1)[0]
-    assert "**iLEAPP plugins that errored** (`/pytest/ileapp`): 1. Their artifacts are missing from this report:" in not_examined
+    assert "**iLEAPP plugins that errored** (`/pytest/ileapp`): 1. Their artifacts were not produced in this output:" in not_examined
     assert "  - `zalo_messages` (ZaloChats, 300 file(s)): list index out of range" in not_examined
     coverage = report.split("## Coverage", 1)[1].split("\n---\n", 1)[0]
     assert (

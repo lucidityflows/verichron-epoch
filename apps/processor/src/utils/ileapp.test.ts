@@ -277,6 +277,16 @@ describe('readModuleOutcomes (EPOCH-457)', () => {
     });
   });
 
+  it("reads the error text of a plugin whose report directory couldn't be created", () => {
+    // ileapp.py logs this form before skipping the plugin.
+    const dir = report('report-dir', { modules: [module('Safari', 'safari_history', 'Error', 1)] });
+    const log = [
+      'Error creating safari_history report directory at path /out/_HTML/Safari Browser',
+      'Error was [Errno 2] No such file or directory',
+    ].join('\n');
+    assert.equal(readModuleOutcomes(dir, log).errors[0].error, '[Errno 2] No such file or directory');
+  });
+
   it('records an error iLEAPP logged no text for as null, not a guess', () => {
     const dir = report('no-text', { modules: [module('ZaloChats', 'zalo_messages', 'Error', 300)] });
     assert.equal(readModuleOutcomes(dir, '').errors[0].error, null);
