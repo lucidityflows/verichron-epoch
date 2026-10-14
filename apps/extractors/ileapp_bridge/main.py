@@ -64,13 +64,13 @@ def _summary(read: ArtifactRows) -> dict:
 
 
 def ingest_artifact(conn, lava_conn, ctx: IngestContext, output: LavaOutput, artifact: Artifact) -> ETLRunResult:
-    """One artifact table, one ingest unit (R13): every row commits, or none."""
+    """One artifact table, one ingest unit (R13): every row commits, or none.
+    An artifact with no rows is a unit too, completed with 0 records, so the
+    evidence shows it was examined and later runs skip it (EPOCH-417)."""
     result = ETLRunResult()
     read = read_artifact(lava_conn, output, artifact)
     for note in read.notes:
         result.note(note)
-    if not read.rows:
-        return result  # an artifact with no rows: nothing to file, not a failure
     records = build_records(read)
 
     with ingest(

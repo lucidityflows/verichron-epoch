@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+import db_writer
 from db_writer import IngestContext, compute_file_hash
 from ileapp_bridge.lava import (
     ArtifactError,
@@ -209,6 +210,33 @@ def test_a_record_count_mismatch_fails_that_artifact_and_leaves_no_partial_inges
     assert len(stored(db)) == 2
 
 
+def test_a_row_that_fails_partway_through_its_unit_writes_nothing_for_that_artifact(db, tmp_path, monkeypatch):
+    # The write fails after the artifact's first rows are already in the
+    # transaction, as a row the database refuses would (EPOCH-417): the whole
+    # artifact rolls back, stays retryable, and the stage fails.
+    other = dict(SAFARI, name="Safari Copy", tablename="safaricopy", module="safariCopy")
+    real_write = db_writer.IngestUnit.write
+
+    def write_then_fail(unit, records):
+        written = real_write(unit, records[:1])
+        if unit.file_path.name.endswith("#safarihistory"):
+            raise ValueError("row 2 refused")
+        return written + real_write(unit, records[1:])
+
+    monkeypatch.setattr(db_writer.IngestUnit, "write", write_then_fail)
+    report = write_report(tmp_path / "BK1", SAFARI, other)
+    result = ingest_report(db, CTX, report)
+    assert result.failed == 1 and result.exit_code == 1
+    assert "row 2 refused" in str(result.failures)
+    assert [name for name, _ in ledger(db)] == ["_lava_artifacts.db#safaricopy"], "only the good artifact lands"
+    assert len(stored(db)) == 2, "the good artifact's two rows, and none of the failed one's"
+
+    monkeypatch.setattr(db_writer.IngestUnit, "write", real_write)
+    retry = ingest_report(db, CTX, report)
+    assert retry.failed == 0
+    assert len(ledger(db)) == 2 and len(stored(db)) == 4, "the failed artifact ingests once the cause is gone"
+
+
 @pytest.mark.parametrize(
     "kwargs, message",
     [
@@ -379,9 +407,19 @@ def test_a_database_with_pending_changes_beside_it_is_refused(tmp_path, suffix):
         open_database(read_manifest(report))
 
 
-def test_an_artifact_with_no_rows_files_nothing(db, tmp_path):
-    result = ingest_report(db, CTX, write_report(tmp_path / "BK1", dict(SAFARI, rows=[])))
-    assert result.failed == 0 and ledger(db) == []
+def test_an_artifact_with_no_rows_is_filed_complete_with_no_records_and_skipped_after(db, tmp_path):
+    report = write_report(tmp_path / "BK1", dict(SAFARI, rows=[]))
+    first = ingest_report(db, CTX, report)
+    assert first.failed == 0
+    assert [name for name, _ in ledger(db)] == ["_lava_artifacts.db#safarihistory"]
+    cur = db.cursor()
+    cur.execute("SELECT record_count FROM ingested_files WHERE ingest_complete")
+    assert [row[0] for row in cur.fetchall()] == [0]
+    assert stored(db) == []
+
+    again = ingest_report(db, CTX, report)
+    assert again.failed == 0 and again.succeeded == 1, "the next run finds it already ingested"
+    assert len(ledger(db)) == 1
 
 
 # --------------------------------------------------------------------------

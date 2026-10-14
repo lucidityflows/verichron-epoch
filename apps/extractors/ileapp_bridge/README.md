@@ -36,7 +36,8 @@ iLEAPP's copies of the input, so none of them is read.
    first `datetime` is `event_time`) and its rows. It is recorded as
    `_lava_artifacts.db#<table>`. An unchanged artifact from a re-run of
    iLEAPP is a dedup hit; any change is a new unit. The payload is a `summary`: the artifact, its counts and a sample
-   of rows.
+   of rows. An artifact with no rows is a unit too, completed with 0 records,
+   so the evidence shows it was examined and later runs skip it.
 
 **Time.** iLEAPP's plugins convert their sources' time formats themselves and
 declare the result `datetime`, stored as Unix UTC seconds. `event_time` is the
