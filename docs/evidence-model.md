@@ -101,6 +101,12 @@ Every fact enters through one door, `ingest()` in `db_writer.py` (R13).
 - **Each unit declares its payload** (R12): `full`, `summary` or `none`.
 - **Versions are append-only (R8).** Bumping a stage's `parserVersion` re-ingests
   each file as a new unit beside the old one.
+- **A value PostgreSQL can't hold is stored encoded, never altered** (EPOCH-502).
+  `jsonb` rejects NUL (U+0000), and JSON has no binary, so such a value is kept
+  exactly as `{"$encoded": "<encoding>", "value": "<hex>"}`: `hex` for binary
+  (decode to bytes) and `utf8-hex` for text holding NUL (decode the bytes as
+  UTF-8). Any other value is stored as it is. The stage's notes count the
+  values it encoded.
 
 Reads go through two views (R27):
 

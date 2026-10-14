@@ -21,6 +21,7 @@ from ileapp_bridge.lava import (
     ArtifactError,
     LavaError,
     check_tables,
+    decode_value,
     open_database,
     read_artifact,
     read_manifest,
@@ -422,6 +423,40 @@ def test_an_artifact_with_no_rows_is_filed_complete_with_no_records_and_skipped_
     again = ingest_report(db, CTX, report)
     assert again.failed == 0 and again.succeeded == 1, "the next run finds it already ingested"
     assert len(ledger(db)) == 1
+
+
+# --------------------------------------------------------------------------
+# Values PostgreSQL can't hold (EPOCH-502)
+# --------------------------------------------------------------------------
+
+
+def test_values_postgres_cannot_hold_are_stored_exactly_encoded_and_counted(db, tmp_path):
+    # EPOCH-502: a NUL in text, which jsonb rejects, and binary are kept
+    # exactly as marked encoded values; the artifact ingests on both backends.
+    blob = bytes([0, 1, 254, 255])
+    odd = dict(SAFARI, rows=[(VISIT, "nul\x00inside", blob), (VISIT + 60, "https://example.net/", "Other")])
+    result = ingest_report(db, CTX, write_report(tmp_path / "BK1", odd))
+    assert result.failed == 0
+    assert any("2 value(s) can't be stored as text" in note for note in result.notes)
+
+    first, second = (fields for fields, _ in stored(db))
+    assert first["URL"] == {"$encoded": "utf8-hex", "value": "6e756c00696e73696465"}
+    assert first["Title"] == {"$encoded": "hex", "value": "0001feff"}
+    assert decode_value(first["URL"]) == "nul\x00inside"
+    assert decode_value(first["Title"]) == blob
+    assert second["URL"] == "https://example.net/" and decode_value(second["URL"]) == "https://example.net/"
+
+
+def test_encoding_for_storage_keeps_existing_binary_artifacts_identity(tmp_path):
+    # The unit's identity still covers binary as plain hex, as before EPOCH-502,
+    # so artifacts already ingested aren't filed again as new units with
+    # duplicate facts. Known limit, unchanged: binary and text spelling its hex
+    # hash alike.
+    blob = bytes([0, 1, 254, 255])
+    as_binary = read_one(write_report(tmp_path / "A", dict(SAFARI, rows=[(VISIT, "u", blob)])), SAFARI["name"])
+    as_hex_text = read_one(write_report(tmp_path / "B", dict(SAFARI, rows=[(VISIT, "u", blob.hex())])), SAFARI["name"])
+    assert as_binary.content_hash == as_hex_text.content_hash
+    assert as_binary.rows[0]["Title"] != as_hex_text.rows[0]["Title"], "but what is stored differs"
 
 
 # --------------------------------------------------------------------------
