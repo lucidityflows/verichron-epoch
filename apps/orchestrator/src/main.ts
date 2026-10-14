@@ -23,7 +23,12 @@ async function writeCallSummary(
 ): Promise<void> {
   if (!summaryPath) return;
   await fsp.mkdir(path.dirname(summaryPath), { recursive: true });
-  await fsp.writeFile(summaryPath, JSON.stringify(error ? { results, error } : { results }, null, 2));
+  // Owner-only, and created new: the caller's path is often in a shared
+  // temporary folder, and the result names backups and their errors.
+  await fsp.writeFile(summaryPath, JSON.stringify(error ? { results, error } : { results }, null, 2), {
+    mode: 0o600,
+    flag: 'wx',
+  });
 }
 
 async function main() {

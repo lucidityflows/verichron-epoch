@@ -9,7 +9,7 @@
 
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -78,6 +78,7 @@ async function investigate(): Promise<{
   code: number;
   error?: string;
   results: Array<{ status: string; error?: string }>;
+  mode: number;
 }> {
   const workspace = mkdtempSync(path.join(tmp, 'ws-'));
   const backup = path.join(workspace, 'decrypted', 'backup');
@@ -95,7 +96,7 @@ async function investigate(): Promise<{
     (err: { code?: number }) => err.code ?? -1
   );
   const summary = JSON.parse(readFileSync(summaryPath, 'utf8'));
-  return { code, error: summary.error, results: summary.results };
+  return { code, error: summary.error, results: summary.results, mode: statSync(summaryPath).mode & 0o777 };
 }
 
 async function registeredRows(): Promise<number> {
@@ -111,8 +112,9 @@ describe('pending migrations (EPOCH-498)', live, () => {
     await db.query('DROP TABLE IF EXISTS schema_migrations');
     assert.deepEqual(await readMigrationStatus(db), { ledger: false, pending: FILES });
 
-    const { code, error } = await investigate();
+    const { code, error, mode } = await investigate();
     assert.equal(code, 1);
+    assert.equal(mode, 0o600, "the call's result is readable by its owner only");
     assert.match(error ?? '', /no record of its migrations/);
     assert.match(error ?? '', /migrate\.py/, 'the refusal gives the command that applies them');
     assert.equal(await registeredRows(), 0);

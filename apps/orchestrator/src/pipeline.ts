@@ -4,7 +4,7 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { Client } from 'pg';
 import type { StageDefinition, StageSet, RunConfig } from './types.js';
-import { createRun, hasCompleteRunFor, markStage, markRunFailed, type RunProvenance } from './db.js';
+import { createRun, findCompleteRunFor, markStage, markRunFailed, type RunProvenance } from './db.js';
 import { derivativeFor, registerEvidence, RegistrationError, type Registration } from './registration.js';
 import {
   contractVersion,
@@ -181,7 +181,14 @@ export async function runPipelineForBackup(
   // registered from another mount path is the same evidence. It is also
   // keyed by the stage plan: a bumped parserVersion or a newly enabled stage
   // is not "already done".
-  if (await hasCompleteRunFor(client, registration, stages.enabled)) {
+  const completeRun = await findCompleteRunFor(client, registration, stages.enabled);
+  if (completeRun) {
+    // A run marked complete whose summary export then failed (a full disk)
+    // would otherwise never get its file: write it now (EPOCH-409).
+    const existing = deriveRunSummaryPath(backupPath, completeRun);
+    if (existing && !(await fsp.stat(existing).catch(() => null))) {
+      await exportRunSummary(client, completeRun, existing);
+    }
     return { success: true, skipped: true, evidenceId: registration.evidenceId };
   }
 

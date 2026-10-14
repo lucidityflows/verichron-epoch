@@ -640,6 +640,19 @@ describe('stages and the completeness predicate', live, () => {
 describe('per-run summaries (EPOCH-409)', live, () => {
   const summaryOf = (backupPath: string, runId: string) => deriveRunSummaryPath(backupPath, runId)!;
 
+  it('a complete run whose summary went missing gets it back when the backup is skipped', async () => {
+    const ws = makeWorkspace('summary-repair', { label: 'A' });
+    const stages = { enabled: [recordingStage('ok', 10)], disabled: [] };
+    const first = await run(ws.backupPath, stages);
+    const file = summaryOf(ws.backupPath, first.runId!);
+    // What a failed export after the run was marked complete leaves behind.
+    rmSync(file);
+
+    const again = await run(ws.backupPath, stages);
+    assert.equal(again.skipped, true);
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), await readRunSummary(db, first.runId!));
+  });
+
   it("writes each run's summary to its own file, as the database records it", async () => {
     const ws = makeWorkspace('summary-db', { label: 'A' });
     const result = await run(ws.backupPath, { enabled: [recordingStage('ok', 10)], disabled: [] });
