@@ -6,7 +6,14 @@ import { Client } from 'pg';
 import type { StageDefinition, StageSet, RunConfig } from './types.js';
 import { createRun, hasCompleteRunFor, markStage, markRunFailed, type RunProvenance } from './db.js';
 import { derivativeFor, registerEvidence, RegistrationError, type Registration } from './registration.js';
-import { contractVersion, deriveIleappPath, deriveReportPath, type DerivativeKind } from '@verichron/contracts';
+import {
+  contractVersion,
+  deriveIleappPath,
+  deriveReportPath,
+  deriveRunSummaryPath,
+  type DerivativeKind,
+} from '@verichron/contracts';
+import { exportRunSummary } from './runSummary.js';
 
 async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!backupPath || backupPath.startsWith('-')) {
@@ -180,6 +187,9 @@ export async function runPipelineForBackup(
 
   const runId = await createRun(client, backupPath, stages, collectProvenance(pythonBin), registration);
   const results: { stage: string; success: boolean }[] = [];
+  // Registration located the workspace, so a backup that reached here has one.
+  const summaryPath = deriveRunSummaryPath(backupPath, runId);
+  if (!summaryPath) throw new Error(`no workspace for ${backupPath}; registration should have refused it`);
 
   try {
     for (const stage of stages.enabled) {
@@ -200,10 +210,13 @@ export async function runPipelineForBackup(
     }
 
     await client.query(`UPDATE pipeline_runs SET finished_at = now() WHERE run_id = $1`, [runId]);
-    return { runId, results, evidenceId: registration.evidenceId, success: results.every((result) => result.success) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await markRunFailed(client, runId, message);
+    await exportRunSummary(client, runId, summaryPath);
     throw err;
   }
+  // EPOCH-409: each run's summary in its own file, so no run touches another's.
+  await exportRunSummary(client, runId, summaryPath);
+  return { runId, results, evidenceId: registration.evidenceId, success: results.every((result) => result.success) };
 }

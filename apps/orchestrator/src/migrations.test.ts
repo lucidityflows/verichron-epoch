@@ -82,14 +82,19 @@ async function investigate(): Promise<{
   const workspace = mkdtempSync(path.join(tmp, 'ws-'));
   const backup = path.join(workspace, 'decrypted', 'backup');
   const main = path.resolve(import.meta.dirname, 'main.ts');
-  const code = await promisify(execFile)(process.execPath, ['--import', 'tsx', main, backup], {
-    cwd: import.meta.dirname,
-    env: { ...process.env, DATABASE_URL: dbUrl, XDG_CONFIG_HOME: path.join(tmp, 'config') },
-  }).then(
+  const summaryPath = path.join(workspace, 'call-summary.json');
+  const code = await promisify(execFile)(
+    process.execPath,
+    ['--import', 'tsx', main, '--summary-path', summaryPath, backup],
+    {
+      cwd: import.meta.dirname,
+      env: { ...process.env, DATABASE_URL: dbUrl, XDG_CONFIG_HOME: path.join(tmp, 'config') },
+    }
+  ).then(
     () => 0,
     (err: { code?: number }) => err.code ?? -1
   );
-  const summary = JSON.parse(readFileSync(path.join(workspace, 'analysis-summary.json'), 'utf8'));
+  const summary = JSON.parse(readFileSync(summaryPath, 'utf8'));
   return { code, error: summary.error, results: summary.results };
 }
 

@@ -35,4 +35,7 @@ export interface RunConfig {
 export interface CliConfig {
   backupPaths: string[];
   dbUrl: string;
+  /** Where this call writes its result for the caller (EPOCH-409); none when
+   * omitted. Each caller passes its own, so no call overwrites another's. */
+  summaryPath?: string;
 }
