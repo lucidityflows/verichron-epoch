@@ -35,12 +35,16 @@ The orchestrator registers the evidence before the run and passes every stage:
 | `--parser-version` | From `stage.json`, when declared |
 | `--backup-path` | Where the decrypted backup is |
 | `--report-path` | The folder the report stage writes the investigation report to (`<workspace>/reports/<label>/`). Passed to every stage; only the report stage uses it |
-| `--db-url` | The database. *Moving to the environment (EPOCH-423).* |
 
 Python stages register the identity arguments and `--derivative-path` with
 `db_writer.add_context_args` and build one `IngestContext` with
-`context_from_args`. Add `--backup-path`, `--report-path` and `--db-url`
-separately. **Never invent, default or
+`context_from_args`. Add `--backup-path` and `--report-path` separately.
+
+The database URL is not an argument: it carries a password, so the
+orchestrator puts it in the stage's environment as `DATABASE_URL` (R30).
+Python stages read it with `runtime_env.require_database_url()`, which exits
+2 with the reason when it is missing, and print connection errors through
+`runtime_env.redact_password()`. **Never invent, default or
 edit these values (R16).** A stage reads only the derivative it was given.
 
 ## 3. Write facts through `ingest()`, one source file per unit

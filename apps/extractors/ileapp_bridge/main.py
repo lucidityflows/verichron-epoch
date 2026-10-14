@@ -14,7 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from runtime_env import fatal_if_missing_venv
+from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
 from db_writer import IngestContext, add_context_args, context_from_args, incomplete_ingests, ingest
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
@@ -152,17 +152,17 @@ def process_output_directory(db_url: str, ctx: IngestContext, report_dir: str | 
 
 
 def main() -> int:
+    db_url = require_database_url()
     parser = argparse.ArgumentParser(description="Ingest the iLEAPP output the processor produced for one backup")
     add_context_args(parser)
     parser.add_argument("--backup-path", required=True, help="the decrypted backup the output was made from")
-    parser.add_argument("--db-url", required=True, help="Postgres connection string")
     parser.add_argument("--report-path", default=None, help="unused; passed to every stage")
     args = parser.parse_args()
 
     try:
-        result = process_output_directory(args.db_url, context_from_args(args), args.derivative_path)
+        result = process_output_directory(db_url, context_from_args(args), args.derivative_path)
     except Exception as exc:
-        print(f"[ileapp] ingest failed: {exc}", file=sys.stderr)
+        print(f"[ileapp] ingest failed: {redact_password(str(exc), db_url)}", file=sys.stderr)
         return 1
 
     print(f"[+] Persisted {result.succeeded} iLEAPP record(s) to Postgres for run {args.run_id}.")

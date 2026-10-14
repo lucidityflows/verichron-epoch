@@ -152,6 +152,5 @@ cat <<EOF
 
 [setup] complete. Next:
   docker compose -f infra/docker-compose.yml up -d postgres
-  set -a; . ./.env; set +a
-  uv run python packages/etl-db-writer/migrate.py --db-url "postgresql://\$DB_USER:\$DB_PASSWORD@\$DB_HOST:\$DB_PORT/\$DB_NAME"
+  uv run python packages/etl-db-writer/migrate.py
 EOF

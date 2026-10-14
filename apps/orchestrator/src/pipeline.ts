@@ -49,7 +49,7 @@ const DERIVATIVE_NAMES: Record<DerivativeKind, string> = {
  * that derivative's id and path. A stage whose derivative wasn't registered
  * (the processor hasn't completed it) fails before it is spawned.
  */
-function runStage(
+export function runStage(
   stage: StageDefinition,
   config: RunConfig,
   runId: string,
@@ -80,8 +80,6 @@ function runStage(
       registration.evidenceId,
       '--backup-path',
       config.backupPath,
-      '--db-url',
-      config.dbUrl,
       '--derivative-id',
       derivativeId,
       '--derivative-path',
@@ -94,7 +92,12 @@ function runStage(
     const entrypointPath = path.join(stage.dir, stage.manifest.entrypoint);
     const bin = stage.manifest.runtime === 'python' ? config.pythonBin : process.execPath;
 
-    const child = spawn(bin, [entrypointPath, ...extraArgs], { stdio: ['ignore', 'pipe', 'pipe'] });
+    // The database URL carries its password, so it goes in the stage's
+    // environment, never on the command line (R30).
+    const child = spawn(bin, [entrypointPath, ...extraArgs], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, DATABASE_URL: config.dbUrl },
+    });
 
     let stderr = '';
     child.stdout?.pipe(process.stdout);

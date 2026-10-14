@@ -108,7 +108,7 @@ never silently deleted.
 
 | Decision | Why | Where |
 |---|---|---|
-| The database URL comes only from `DATABASE_URL` or `DB_*`; there is no URL flag and no hard-coded credential | A URL flag puts the password on the command line (R30) | EPOCH-423, 424 |
+| The database URL comes only from `DATABASE_URL` or `DB_*`; there is no URL flag and no hard-coded credential *Changed 2026-10-14 (EPOCH-424, 423): `DB_*` must be complete (`DB_USER`, `DB_PASSWORD`, `DB_NAME`), and missing configuration fails clearly, with no development default behind a flag; the `DB_*` values are percent-encoded into the URL. The orchestrator gives each stage `DATABASE_URL` in its environment, and a connection error is printed with the password redacted.* | A URL flag puts the password on the command line (R30) | EPOCH-423, 424 |
 | Contract parity across TS, Python and JSON schemas is validated sync (`sync_contracts.py --check` and tests), not code generation | Already enforced in CI, with tests for each mirror | EPOCH-451 |
 | No class hierarchies for stages, extractors or devices; plain functions plus `stage.json` | Every audit that proposed one found the need already met more simply | Audits, 2026-10-08 |
 | The unused Qdrant service is removed | Unused network services are attack surface | EPOCH-438 |

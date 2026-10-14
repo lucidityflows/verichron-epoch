@@ -37,12 +37,14 @@ export function resolveDatabaseUrl(): string {
   const user = process.env.DB_USER;
   const password = process.env.DB_PASSWORD;
   const name = process.env.DB_NAME;
-  const host = process.env.DB_HOST ?? 'localhost';
-  const port = process.env.DB_PORT ?? '5432';
+  const host = process.env.DB_HOST || 'localhost';
+  const port = process.env.DB_PORT || '5432';
 
   if (user && password && name) {
-    return `postgresql://${user}:${password}@${host}:${port}/${name}`;
+    // Encoded, so a password holding ?, #, @ or / still parses as itself.
+    const enc = encodeURIComponent;
+    return `postgresql://${enc(user)}:${enc(password)}@${host}:${port}/${enc(name)}`;
   }
 
-  return 'postgresql://forensics:forensics_dev_only@localhost:5432/forensics';
+  throw new Error('Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME.');
 }

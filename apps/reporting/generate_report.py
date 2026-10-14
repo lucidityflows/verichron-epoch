@@ -24,7 +24,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from runtime_env import fatal_if_missing_venv
+from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
 
 import psycopg2
 import psycopg2.extras
@@ -501,6 +501,7 @@ def resolve_output_path(output: str | None, report_path: str | None) -> str:
 
 def main():
     fatal_if_missing_venv()
+    db_url = require_database_url()
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-id", required=True)
     parser.add_argument(
@@ -514,7 +515,6 @@ def main():
     parser.add_argument("--derivative-path", required=False)
     parser.add_argument("--backup-path", required=False)  # unused here, present for contract consistency
     parser.add_argument("--report-path", required=False, help="the folder the report is written to (see resolve_output_path)")
-    parser.add_argument("--db-url", required=True)
     parser.add_argument("--output", default=None, help="write the report here instead of <report-path>/investigation_report.md")
     args = parser.parse_args()
 
@@ -522,9 +522,9 @@ def main():
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        conn = psycopg2.connect(args.db_url)
+        conn = psycopg2.connect(db_url)
     except Exception as e:
-        print(f"[reporting] could not connect to database: {e}", file=sys.stderr)
+        print(f"[reporting] could not connect to database: {redact_password(str(e), db_url)}", file=sys.stderr)
         sys.exit(1)
 
     try:

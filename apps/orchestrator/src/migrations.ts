@@ -7,8 +7,7 @@ import { REPO_ROOT } from './discovery.js';
 export const MIGRATIONS_DIR = path.join(REPO_ROOT, 'packages', 'etl-db-writer', 'migrations');
 
 /** The command docs/development.md gives for applying migrations. */
-const MIGRATE_COMMAND =
-  'uv run python packages/etl-db-writer/migrate.py --db-url "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME"';
+const MIGRATE_COMMAND = 'uv run python packages/etl-db-writer/migrate.py';
 
 export interface MigrationStatus {
   /** False when the database has no schema_migrations ledger at all. */

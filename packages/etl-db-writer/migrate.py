@@ -13,7 +13,10 @@ pick it up. This script is what keeps a long-lived database in sync with
 migrations/ as the schema evolves after first boot.
 
 Usage:
-    python3 packages/etl-db-writer/migrate.py --db-url postgresql://forensics:forensics_dev_only@localhost:5432/forensics
+    uv run python packages/etl-db-writer/migrate.py
+
+The database comes from DATABASE_URL or DB_* (R28), read from the
+environment or the repo-root .env, never from the command line (R30).
 
 Tracks applied migrations in a schema_migrations table. Migrations are
 applied in filename order (hence the 0001_, 0002_ prefix convention), each
@@ -28,7 +31,7 @@ import sys
 from pathlib import Path
 
 import psycopg2
-from runtime_env import fatal_if_missing_venv, load_root_env
+from runtime_env import fatal_if_missing_venv, load_root_env, redact_password, require_database_url
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -203,14 +206,13 @@ def apply_migration(conn, path: Path) -> None:
 def main() -> None:
     load_root_env()
     fatal_if_missing_venv()
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--db-url", required=True)
-    args = parser.parse_args()
+    db_url = require_database_url()
+    argparse.ArgumentParser(description="Apply pending migrations to the configured database.").parse_args()
 
     try:
-        conn = psycopg2.connect(args.db_url)
+        conn = psycopg2.connect(db_url)
     except Exception as e:
-        print(f"[migrate] could not connect to database: {e}", file=sys.stderr)
+        print(f"[migrate] could not connect to database: {redact_password(str(e), db_url)}", file=sys.stderr)
         sys.exit(1)
 
     try:
