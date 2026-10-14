@@ -29,7 +29,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Sequence
+from typing import Any, Iterator, Sequence
 
 from tool_defects import ToolDefect
 
@@ -221,12 +221,69 @@ def check_tables(conn: sqlite3.Connection, output: LavaOutput) -> None:
         raise LavaError("; ".join(problems))
 
 
-def read_artifact(
-    conn: sqlite3.Connection, output: LavaOutput, artifact: Artifact, defects: Sequence[ToolDefect] = ()
-) -> ArtifactRows:
-    """Read one artifact's table, correcting the registered `defects` that
-    affect it. Raises ArtifactError if it can't be read exactly as the
-    manifest describes it."""
+@dataclass(frozen=True)
+class RowRead:
+    """One row as the stage stores it, with what this reader decided about it."""
+
+    row: dict[str, Any]
+    event_time: datetime | None
+    #: registered corrections applied to this row (R36); usually empty
+    corrections: list[dict[str, Any]]
+    #: declared times outside the device era, kept and listed for review
+    review: list[dict[str, Any]]
+    #: values stored encoded because PostgreSQL can't hold them as they are
+    encoded: int
+    #: the event-time column held a value that isn't Unix seconds
+    unconvertible: bool
+
+
+@dataclass(frozen=True)
+class _Plan:
+    """What an artifact table's columns mean, decided once before any row is read."""
+
+    columns: list[str]
+    headers: list[str]
+    source_path: str | None
+    time_index: int | None
+    #: registered defects that correct a column of this artifact: (defect, index, header)
+    fixes: list[tuple[ToolDefect, int, str]]
+    #: every declared datetime column: (index, header)
+    time_columns: list[tuple[int, str]]
+
+
+@dataclass
+class ArtifactScan:
+    """An artifact's first pass (EPOCH-418): its identity, row count, notes and
+    a sample, checked without holding its rows. The rows are read again, one
+    at a time, by iter_rows."""
+
+    artifact: Artifact
+    plan: _Plan
+    #: sha256 over the table's name, columns, declared types and rows: the unit's identity
+    content_hash: str
+    row_count: int
+    #: the first rows, as stored, for the unit's summary
+    sample: list[dict[str, Any]]
+    #: the moment both passes judge "after the run" against, so they agree
+    run_time: datetime
+    unconvertible_times: int = 0
+    notes: list[str] = field(default_factory=list)
+    #: defect id -> how many values it corrected
+    corrected: dict[str, int] = field(default_factory=dict)
+    tool_version: str = ""
+
+    @property
+    def source_path(self) -> str | None:
+        return self.plan.source_path
+
+
+#: Rows kept for a unit's summary (R12).
+SAMPLE_ROWS = 10
+
+
+def _plan(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifact, defects: Sequence[ToolDefect]):
+    """Check the table against the manifest and open a cursor over its rows.
+    Raises ArtifactError if it can't be read exactly as the manifest describes it."""
     if not artifact.tablename:
         raise ArtifactError(f"{artifact.name}: the manifest names no table")
     if artifact.record_count is None:
@@ -246,7 +303,6 @@ def read_artifact(
     clashing = sorted(h for h in headers if h in METADATA_KEYS)
     if clashing:
         raise ArtifactError(f"{artifact.name}: header(s) {', '.join(clashing)} clash with this stage's own field names")
-    source_path = evidence_relative(artifact, output)
     time_index = columns.index(artifact.event_time_column) if artifact.event_time_column in columns else None
     if artifact.event_time_column and time_index is None:
         raise ArtifactError(f"{artifact.name}: declared datetime column {artifact.event_time_column} is not in the table")
@@ -260,6 +316,61 @@ def read_artifact(
             raise ArtifactError(f"{artifact.name}: registered defect {defect.id} names column {header!r}, which it doesn't have")
         fixes.append((defect, headers.index(header), header))
     time_columns = [(columns.index(c), artifact.column_map[c]) for c, t in artifact.object_columns.items() if t == "datetime" and c in columns]
+    plan = _Plan(columns, headers, evidence_relative(artifact, output), time_index, fixes, time_columns)
+    return cursor, plan
+
+
+def _read_row(raw: tuple, plan: _Plan, run_time: datetime) -> RowRead:
+    """One row as stored. Both passes use this, so the identity and the
+    records written always agree."""
+    values = [_json_value(v) for v in raw]
+    # Registered corrections: iLEAPP's value stays in the row, under its
+    # header; the corrected value is what the record's time is read from.
+    effective = list(raw)
+    applied = []
+    for defect, index, header in plan.fixes:
+        value = defect.correction.apply(raw[index])
+        if value is None:
+            continue
+        effective[index] = value
+        applied.append({
+            "defect": defect.id,
+            "column": header,
+            "original": raw[index],
+            "corrected": value,
+            # iLEAPP discarded what lies below this, so the corrected value
+            # is the start of an interval this wide, in the column's unit.
+            "resolution": defect.correction.factor,
+        })
+    flagged = []
+    for index, header in plan.time_columns:
+        moment = unix_utc(effective[index])
+        if moment is not None and (moment < DEVICE_ERA or moment > run_time):
+            # On the record too, so the report lists every column, not only event_time.
+            flagged.append({
+                "column": header,
+                "time": moment.isoformat(),
+                "check": "before_device_era" if moment < DEVICE_ERA else "after_run",
+            })
+    when = unix_utc(effective[plan.time_index]) if plan.time_index is not None else None
+    unconvertible = plan.time_index is not None and when is None and raw[plan.time_index] not in (None, "")
+    return RowRead(
+        row=dict(zip(plan.headers, values)),
+        event_time=when,
+        corrections=applied,
+        review=flagged,
+        encoded=sum(1 for v in values if isinstance(v, dict)),
+        unconvertible=unconvertible,
+    )
+
+
+def scan_artifact(
+    conn: sqlite3.Connection, output: LavaOutput, artifact: Artifact, defects: Sequence[ToolDefect] = ()
+) -> ArtifactScan:
+    """The first pass over one artifact's table: check it, hash it, count it
+    and note what it holds, without keeping its rows (EPOCH-418). Raises
+    ArtifactError if it can't be read exactly as the manifest describes it."""
+    cursor, plan = _plan(conn, output, artifact, defects)
 
     # The unit's identity covers everything its records carry: the artifact's
     # metadata, its columns and headers in order, its declared types in order
@@ -271,8 +382,8 @@ def read_artifact(
         "name": artifact.name,
         "module": artifact.module,
         "category": artifact.category,
-        "source_path": source_path,
-        "columns": [[c, artifact.column_map[c]] for c in columns],
+        "source_path": plan.source_path,
+        "columns": [[c, artifact.column_map[c]] for c in plan.columns],
         "object_columns": [[c, t] for c, t in artifact.object_columns.items()],
         "event_time_column": artifact.event_time_column,
         # Corrections are not part of the identity: the unit is iLEAPP's
@@ -280,84 +391,50 @@ def read_artifact(
         # supersedes the uncorrected facts (R8). A registry change reaches
         # stored facts through that bump (`applied_from`, R36).
     }))
-    rows: list[dict[str, Any]] = []
-    event_times: list[datetime | None] = []
+    run_time = datetime.now(timezone.utc)
+    rows = 0
+    sample: list[dict[str, Any]] = []
     unconvertible = 0
     encoded = 0
-    corrections: list[list[dict[str, Any]]] = []
     corrected: dict[str, int] = {}
-    review: list[list[dict[str, Any]]] = []
     # Declared times outside the device era, per column: (count, earliest, latest).
     early: dict[str, tuple[int, datetime, datetime]] = {}
     late: dict[str, tuple[int, datetime, datetime]] = {}
-    run_time = datetime.now(timezone.utc)
     for raw in cursor:
         # The identity covers the values as read (binary as hex), so encoding
         # a value for storage never changes which unit it belongs to.
         digest.update(_canonical([_identity_value(v) for v in raw]))
-        values = [_json_value(v) for v in raw]
-        encoded += sum(1 for v in values if isinstance(v, dict))
-        rows.append(dict(zip(headers, values)))
-        # Registered corrections: iLEAPP's value stays in the row, under its
-        # header; the corrected value is what the record's time is read from.
-        effective = list(raw)
-        applied = []
-        for defect, index, header in fixes:
-            value = defect.correction.apply(raw[index])
-            if value is None:
-                continue
-            effective[index] = value
-            corrected[defect.id] = corrected.get(defect.id, 0) + 1
-            applied.append({
-                "defect": defect.id,
-                "column": header,
-                "original": raw[index],
-                "corrected": value,
-                # iLEAPP discarded what lies below this, so the corrected value
-                # is the start of an interval this wide, in the column's unit.
-                "resolution": defect.correction.factor,
-            })
-        corrections.append(applied)
-        flagged = []
-        for index, header in time_columns:
-            moment = unix_utc(effective[index])
-            if moment is not None and (moment < DEVICE_ERA or moment > run_time):
-                bucket = early if moment < DEVICE_ERA else late
-                n, first, last = bucket.get(header, (0, moment, moment))
-                bucket[header] = (n + 1, min(first, moment), max(last, moment))
-                # On the record too, so the report lists every column, not
-                # only event_time.
-                flagged.append({
-                    "column": header,
-                    "time": moment.isoformat(),
-                    "check": "before_device_era" if moment < DEVICE_ERA else "after_run",
-                })
-        review.append(flagged)
-        if time_index is None:
-            event_times.append(None)
-            continue
-        when = unix_utc(effective[time_index])
-        if when is None and raw[time_index] not in (None, ""):
-            unconvertible += 1
-        event_times.append(when)
+        read = _read_row(raw, plan, run_time)
+        rows += 1
+        if len(sample) < SAMPLE_ROWS:
+            sample.append(read.row)
+        encoded += read.encoded
+        unconvertible += read.unconvertible
+        for c in read.corrections:
+            corrected[c["defect"]] = corrected.get(c["defect"], 0) + 1
+        for flag in read.review:
+            moment = datetime.fromisoformat(flag["time"])
+            bucket = early if flag["check"] == "before_device_era" else late
+            n, first, last = bucket.get(flag["column"], (0, moment, moment))
+            bucket[flag["column"]] = (n + 1, min(first, moment), max(last, moment))
 
-    if len(rows) != artifact.record_count:
+    if rows != artifact.record_count:
         raise ArtifactError(
-            f"{artifact.name}: {len(rows)} row(s) in table {artifact.tablename}, "
+            f"{artifact.name}: {rows} row(s) in table {artifact.tablename}, "
             f"but the manifest records {artifact.record_count}"
         )
     notes = []
     if encoded:
         notes.append(
-            f"{artifact.name}: {encoded} value(s) can't be stored as text (binary, or text holding NUL) "
-            'and are stored exactly, encoded as {"$encoded": ..., "value": ...}'
+            f"{artifact.name}: {encoded} value(s) can't be stored as text (binary, text holding NUL, "
+            'or an infinite number) and are stored exactly, encoded as {"$encoded": ..., "value": ...}'
         )
     if unconvertible:
         notes.append(
             f"{artifact.name}: {unconvertible} row(s) have a value in {artifact.column_map[artifact.event_time_column]} "
             "that is not Unix seconds; their event_time is null and the raw value is kept"
         )
-    for defect, _, header in fixes:
+    for defect, _, header in plan.fixes:
         if corrected.get(defect.id):
             notes.append(
                 f"{artifact.name}: {corrected[defect.id]} value(s) in {header} corrected for {TOOL} defect {defect.id} "
@@ -374,18 +451,58 @@ def read_artifact(
             f"{artifact.name}: {n} time(s) in {header} fall after this run ({first.date()} to {last.date()}); "
             "kept, for review (a scheduled event can be genuine)"
         )
-    return ArtifactRows(
+    return ArtifactScan(
         artifact=artifact,
-        rows=rows,
-        event_times=event_times,
+        plan=plan,
         content_hash=digest.hexdigest(),
-        source_path=source_path,
+        row_count=rows,
+        sample=sample,
+        run_time=run_time,
         unconvertible_times=unconvertible,
         notes=notes,
-        corrections=corrections,
         corrected=corrected,
-        review=review,
         tool_version=output.tool_version,
+    )
+
+
+def iter_rows(conn: sqlite3.Connection, scan: ArtifactScan) -> Iterator[RowRead]:
+    """The second pass: the artifact's rows, one at a time, as scan_artifact
+    judged them. A table that no longer holds the rows the first pass counted
+    fails its artifact, so a unit never commits rows its identity didn't cover."""
+    artifact = scan.artifact
+    cursor = conn.execute(f"SELECT * FROM {_quote(artifact.tablename)} ORDER BY rowid")
+    if [d[0] for d in cursor.description] != scan.plan.columns:
+        raise ArtifactError(f"{artifact.name}: table {artifact.tablename} changed between the two passes")
+    rows = 0
+    for raw in cursor:
+        rows += 1
+        yield _read_row(raw, scan.plan, scan.run_time)
+    if rows != scan.row_count:
+        raise ArtifactError(
+            f"{artifact.name}: table {artifact.tablename} held {scan.row_count} row(s) on the first pass "
+            f"and {rows} on the second"
+        )
+
+
+def read_artifact(
+    conn: sqlite3.Connection, output: LavaOutput, artifact: Artifact, defects: Sequence[ToolDefect] = ()
+) -> ArtifactRows:
+    """Both passes, with every row held: for inspection and tests. The stage
+    itself streams (scan_artifact, then iter_rows)."""
+    scan = scan_artifact(conn, output, artifact, defects)
+    reads = list(iter_rows(conn, scan))
+    return ArtifactRows(
+        artifact=artifact,
+        rows=[r.row for r in reads],
+        event_times=[r.event_time for r in reads],
+        content_hash=scan.content_hash,
+        source_path=scan.source_path,
+        unconvertible_times=scan.unconvertible_times,
+        notes=scan.notes,
+        corrections=[r.corrections for r in reads],
+        corrected=scan.corrected,
+        review=[r.review for r in reads],
+        tool_version=scan.tool_version,
     )
 
 
@@ -457,6 +574,11 @@ def _json_value(value: Any) -> Any:
         return {ENCODED: "hex", "value": value.hex()}
     if isinstance(value, str) and "\x00" in value:
         return {ENCODED: "utf8-hex", "value": value.encode("utf-8").hex()}
+    if isinstance(value, float) and math.isinf(value):
+        # JSON has no infinity, and jsonb refuses the `Infinity` token
+        # json.dumps writes (EPOCH-418); SQLite stores NaN as NULL, so an
+        # infinity is the only non-finite value that can arrive.
+        return {ENCODED: "float", "value": "Infinity" if value > 0 else "-Infinity"}
     return value
 
 
@@ -468,6 +590,8 @@ def decode_value(value: Any) -> Any:
             return bytes.fromhex(value["value"])
         if value[ENCODED] == "utf8-hex":
             return bytes.fromhex(value["value"]).decode("utf-8")
+        if value[ENCODED] == "float":
+            return float(value["value"])
     return value
 
 

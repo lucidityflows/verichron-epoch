@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from itertools import batched
 from pathlib import Path
 
 from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
@@ -21,59 +22,55 @@ from normalized_record import NormalizedRecord, SourceType
 from tool_defects import ToolDefect, defects_for
 
 try:
-    from .lava import TOOL, Artifact, ArtifactRows, LavaOutput, check_tables, open_database, read_artifact, read_manifest
+    from .lava import TOOL, Artifact, ArtifactScan, LavaOutput, check_tables, open_database, RowRead, iter_rows, read_manifest, scan_artifact
 except ImportError:
-    from lava import TOOL, Artifact, ArtifactRows, LavaOutput, check_tables, open_database, read_artifact, read_manifest
+    from lava import TOOL, Artifact, ArtifactScan, LavaOutput, check_tables, open_database, RowRead, iter_rows, read_manifest, scan_artifact
 
 import psycopg2
 
-SAMPLE_ROWS = 10
+#: Rows written per call inside an artifact's unit, so memory stays flat
+#: however large the artifact (EPOCH-418); the unit still commits once.
+CHUNK_ROWS = 5000
 
 
-def build_records(read: ArtifactRows) -> list[NormalizedRecord]:
-    """One record per row: the row under iLEAPP's original headers, plus where
-    it came from. event_time is the artifact's declared time, corrected where
-    a registered tool defect applies; `corrections` lists any correction and
+def to_record(scan: ArtifactScan, read: RowRead) -> NormalizedRecord:
+    """One record: the row under iLEAPP's original headers, plus where it came
+    from. event_time is the artifact's declared time, corrected where a
+    registered tool defect applies; `corrections` lists any correction and
     `time_review` any declared time outside the device era (R36). lava.py has
     already refused headers that would clash with these keys."""
-    artifact = read.artifact
-    metadata = {
-        "engine": "iLEAPP",
-        "source_artifact": artifact.name,
-        "module": artifact.module,
-        "category": artifact.category,
-        "source_path": read.source_path,
-    }
-    return [
-        NormalizedRecord(
-            source_type=SourceType.ILEAPP_RECORD,
-            event_time=when,
-            fields={
-                **metadata,
-                **row,
-                **({"corrections": applied} if applied else {}),
-                **({"time_review": flagged} if flagged else {}),
-            },
-        )
-        for row, when, applied, flagged in zip(read.rows, read.event_times, read.corrections, read.review)
-    ]
+    artifact = scan.artifact
+    return NormalizedRecord(
+        source_type=SourceType.ILEAPP_RECORD,
+        event_time=read.event_time,
+        fields={
+            "engine": "iLEAPP",
+            "source_artifact": artifact.name,
+            "module": artifact.module,
+            "category": artifact.category,
+            "source_path": scan.source_path,
+            **read.row,
+            **({"corrections": read.corrections} if read.corrections else {}),
+            **({"time_review": read.review} if read.review else {}),
+        },
+    )
 
 
-def _summary(read: ArtifactRows) -> dict:
+def _summary(scan: ArtifactScan) -> dict:
     """The unit's raw payload: what the artifact is and a sample of its rows (R12)."""
-    artifact = read.artifact
+    artifact = scan.artifact
     return {
         "artifact": artifact.name,
         "category": artifact.category,
         "module": artifact.module,
         "table": artifact.tablename,
-        "source_path": read.source_path,
-        "record_count": len(read.rows),
+        "source_path": scan.source_path,
+        "record_count": scan.row_count,
         "event_time_column": artifact.column_map.get(artifact.event_time_column) if artifact.event_time_column else None,
-        "unconvertible_times": read.unconvertible_times,
-        "tool_version": read.tool_version,
-        "corrections": read.corrected,
-        "sample_records": read.rows[:SAMPLE_ROWS],
+        "unconvertible_times": scan.unconvertible_times,
+        "tool_version": scan.tool_version,
+        "corrections": scan.corrected,
+        "sample_records": scan.sample,
     }
 
 
@@ -81,13 +78,15 @@ def ingest_artifact(
     conn, lava_conn, ctx: IngestContext, output: LavaOutput, artifact: Artifact, defects: tuple[ToolDefect, ...] = ()
 ) -> ETLRunResult:
     """One artifact table, one ingest unit (R13): every row commits, or none.
-    An artifact with no rows is a unit too, completed with 0 records, so the
-    evidence shows it was examined and later runs skip it (EPOCH-417)."""
+    The table is read twice (EPOCH-418): the first pass checks it and fixes
+    the unit's identity, the second writes its rows in chunks inside the unit,
+    so no artifact is ever held in memory whole. An artifact with no rows is
+    a unit too, completed with 0 records, so the evidence shows it was
+    examined and later runs skip it (EPOCH-417)."""
     result = ETLRunResult()
-    read = read_artifact(lava_conn, output, artifact, defects)
-    for note in read.notes:
+    scan = scan_artifact(lava_conn, output, artifact, defects)
+    for note in scan.notes:
         result.note(note)
-    records = build_records(read)
 
     with ingest(
         conn,
@@ -95,20 +94,23 @@ def ingest_artifact(
         Path(f"{output.database}#{artifact.tablename}"),
         source_type=SourceType.ILEAPP_RECORD.value,
         payload_kind="summary",
-        raw_payload=_summary(read),
-        content_hash=read.content_hash,
+        raw_payload=_summary(scan),
+        content_hash=scan.content_hash,
     ) as unit:
         if unit.already_ingested:
             # Already complete in the ledger: this run wrote nothing for it
             # (EPOCH-421), and says so rather than letting it look lost.
             result.note(f"{artifact.name}: already ingested; nothing new was written")
             return result
-        result.ok(unit.write(records))
+        written = 0
+        for chunk in batched((to_record(scan, read) for read in iter_rows(lava_conn, scan)), CHUNK_ROWS):
+            written += unit.write(list(chunk))
+        result.ok(written)
     return result
 
 
-def _warn_about_incomplete_ingests(conn) -> None:
-    """Surface ledger rows that were started and never finished.
+def _warn_about_incomplete_ingests(conn, evidence_id: str) -> None:
+    """Surface this evidence's ledger rows that were started and never finished.
 
     Should be empty. Non-empty means either this process was hard-killed
     mid-unit, or the rows predate the atomicity fix and the 0002 migration could
@@ -117,7 +119,7 @@ def _warn_about_incomplete_ingests(conn) -> None:
     the whole failure mode being fixed here is one that never announced itself.
     """
     try:
-        stranded = incomplete_ingests(conn)
+        stranded = incomplete_ingests(conn, evidence_id)
     except Exception as exc:  # pragma: no cover - diagnostics must not fail a run
         print(f"[ileapp] could not check for incomplete ingests: {exc}", file=sys.stderr)
         return
@@ -163,7 +165,7 @@ def process_output_directory(db_url: str, ctx: IngestContext, report_dir: str | 
     conn = psycopg2.connect(db_url)
     try:
         result = ingest_report(conn, ctx, report_dir)
-        _warn_about_incomplete_ingests(conn)
+        _warn_about_incomplete_ingests(conn, ctx.evidence_id)
         return result
     finally:
         conn.close()

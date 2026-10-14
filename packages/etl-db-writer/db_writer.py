@@ -469,8 +469,10 @@ def write_records(conn, ingest_id: int, evidence_id: str, records: list[Normaliz
     return len(records)
 
 
-def incomplete_ingests(conn) -> list[tuple[str, str]]:
-    """Ledger rows that were started and never finished: (file_hash, file_path).
+def incomplete_ingests(conn, evidence_id: str) -> list[tuple[str, str]]:
+    """One evidence item's ledger rows that were started and never finished:
+    (file_hash, file_path). Scoped to the evidence, so a stage reports its own
+    stranded units, not another case's (EPOCH-418).
 
     Expected to be empty in a healthy database. Non-empty means a hard kill
     mid-unit. The next run retries them; this exists so an operator can see
@@ -481,8 +483,9 @@ def incomplete_ingests(conn) -> list[tuple[str, str]]:
             """
             SELECT file_hash, file_path
             FROM ingested_files
-            WHERE NOT ingest_complete
+            WHERE NOT ingest_complete AND evidence_id = %s
             ORDER BY ingested_at, ingest_id
-            """
+            """,
+            (evidence_id,),
         )
         return [(row[0], row[1]) for row in cur.fetchall()]

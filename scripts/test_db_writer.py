@@ -290,21 +290,22 @@ def test_orphaned_records_from_a_hard_kill_are_not_double_counted(db, artifact):
 
 
 def test_incomplete_ingests_reports_stranded_rows(db, artifact):
-    assert incomplete_ingests(db) == []
+    assert incomplete_ingests(db, EVIDENCE_A) == []
 
     with pytest.raises(ValueError):
         with ingest(db, ctx(RUN_ID), artifact, **UNIT):
             raise ValueError("boom")
 
     # Rolled back entirely, so there is nothing stranded.
-    assert incomplete_ingests(db) == []
+    assert incomplete_ingests(db, EVIDENCE_A) == []
 
     # A row that IS stranded (what a hard kill mid-unit leaves behind).
     strand(db, "deadbeef" * 8, "/old/lost.ips")
     db.commit()
 
-    stranded = incomplete_ingests(db)
+    stranded = incomplete_ingests(db, EVIDENCE_A)
     assert stranded == [("deadbeef" * 8, "/old/lost.ips")]
+    assert incomplete_ingests(db, EVIDENCE_B) == [], "another evidence item's stranded units are not listed (EPOCH-418)"
 
 
 # ==========================================================================
