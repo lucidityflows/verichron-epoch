@@ -51,6 +51,17 @@ secrets such as passwords. In place: the iPhone pull error and the setup
 failure banner (EPOCH-466); other views' error banners follow in the
 EPOCH-464 review.
 
+**Toasts** (`components/ui/Toast`, EPOCH-455; *proposed, awaiting approval*)
+are for confirmations and errors that don't belong to a place on the page, such
+as the result of an action whose panel has closed. They float at the bottom
+right at `shadow-elevation-3` on `surface-raised`, with the role's `/30` border
+(§9): `success` for done, `danger` for failed, and the plain border for
+information. A success or information toast closes itself after five seconds;
+a failure stays until it is dismissed, so it can't be missed. Screen readers
+hear successes politely (`role="status"`) and failures at once
+(`role="alert"`). A toast never replaces an error banner that belongs to a
+view, and never carries a secret.
+
 ## 2. Type scale — four tiers, by role not by size
 
 Each tier is a **composite** Tailwind v4 utility (`text-display`,
@@ -204,7 +215,8 @@ content edge or the title (EPOCH-464).
   (`bg-section/20 text-section`, §9), the state as one `text-heading` line in
   the foreground colour, and an optional muted `text-data` detail. A view never
   shows a bare line of text for these. One exception: a view that is loading
-  *into a table* shows a skeleton of that table (as `RunsView` does), so the
+  *into a table* shows a skeleton of that table (`TableSkeleton` in
+  `components/ui/Skeleton.tsx`, as `RunsView` does), so the
   layout doesn't jump from a centered spinner to a full table when the rows
   arrive. Errors are not empty states: they use the flag banner (§1).
 
