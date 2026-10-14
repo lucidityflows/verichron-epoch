@@ -51,9 +51,9 @@ secrets such as passwords. In place: the iPhone pull error and the setup
 failure banner (EPOCH-466); other views' error banners follow in the
 EPOCH-464 review.
 
-**Toasts** (`components/ui/Toast`, EPOCH-455; *proposed, awaiting approval*)
-are for confirmations and errors that don't belong to a place on the page, such
-as the result of an action whose panel has closed. They float at the bottom
+**Toasts** (`components/ui/Toast`, EPOCH-455; approved 2026-10-14) are for
+confirmations and errors that don't belong to a place on the page, such as
+the result of an action whose panel has closed. They float at the bottom
 right at `shadow-elevation-3` on `surface-raised`, with the role's `/30` border
 (§9): `success` for done, `danger` for failed, and the plain border for
 information. A success or information toast closes itself after five seconds;
