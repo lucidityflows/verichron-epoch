@@ -381,11 +381,18 @@ export class IosBackupSource implements DeviceBackupSource {
       // A failed or cancelled pull keeps its own error if the record can't be written.
       if (!recorded) {
         record.finished_at = new Date().toISOString();
-        await appendPullRecord(destDir, record).catch((err) => console.error('Failed to record the device pull', err));
+        recorded = await appendPullRecord(destDir, record).then(
+          () => true,
+          (err) => {
+            console.error('Failed to record the device pull', err);
+            return false;
+          }
+        );
       }
       // A pull the device refused before sending any backup data leaves a
       // folder no one can use: remove it, and say so in the record (EPOCH-505).
-      if (record.outcome !== 'completed' && folderIsThisPulls) {
+      // Only once the pull is recorded, so nothing is removed without a trace.
+      if (record.outcome !== 'completed' && folderIsThisPulls && recorded) {
         await removeOwnLeftover(destDir, device).catch((err) =>
           console.error('Failed to record the folder a failed pull left', err)
         );
