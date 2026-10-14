@@ -64,11 +64,9 @@ export interface PipelineRunRow {
   state: 'running' | 'incomplete' | 'complete';
   /** The device's name, as registered with the evidence; null without evidence. */
   device_label: string | null;
-  /** Stage counts for a one-line summary (EPOCH-430); `state` stays the verdict. */
-  stages_total: number;
-  stages_succeeded: number;
-  stages_failed: number;
-  stages_skipped: number;
+  /** How many of the run's stages are in each status, for a one-line summary
+   * (EPOCH-430). `state` stays the verdict; never derive it from these. */
+  stage_counts: Record<StageStatus, number>;
 }
 
 export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
@@ -125,17 +123,19 @@ export async function getPipelineRuns(client: Db, limit = 100): Promise<Pipeline
   const result = await client.query<PipelineRunRow>(
     `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id,
             r.contract_version, r.tool_versions, c.state, d.label AS device_label,
-            s.total AS stages_total, s.succeeded AS stages_succeeded,
-            s.failed AS stages_failed, s.skipped AS stages_skipped
+            s.stage_counts
        FROM pipeline_runs r
        JOIN run_completeness c USING (run_id)
        LEFT JOIN evidence_items e ON e.evidence_id = r.evidence_id
        LEFT JOIN devices d ON d.device_id = e.device_id
        CROSS JOIN LATERAL (
-         SELECT count(*)::int AS total,
-                count(*) FILTER (WHERE status = 'succeeded')::int AS succeeded,
-                count(*) FILTER (WHERE status = 'failed')::int AS failed,
-                count(*) FILTER (WHERE status = 'skipped')::int AS skipped
+         SELECT jsonb_build_object(
+                  'pending', count(*) FILTER (WHERE status = 'pending')::int,
+                  'running', count(*) FILTER (WHERE status = 'running')::int,
+                  'succeeded', count(*) FILTER (WHERE status = 'succeeded')::int,
+                  'failed', count(*) FILTER (WHERE status = 'failed')::int,
+                  'skipped', count(*) FILTER (WHERE status = 'skipped')::int
+                ) AS stage_counts
            FROM pipeline_stage_status ps
           WHERE ps.run_id = r.run_id
        ) s

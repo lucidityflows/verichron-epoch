@@ -362,7 +362,9 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
       `INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id, parser_version, started_at, finished_at)
        VALUES ($1, 'crash', 'succeeded', $2, 1, now() - interval '2 minutes', now() - interval '1 minute'),
               ($1, 'ileapp_bridge', 'failed', $2, 3, now() - interval '1 minute', now()),
-              ($1, 'llm', 'skipped', NULL, NULL, NULL, NULL)`,
+              ($1, 'llm', 'skipped', NULL, NULL, NULL, NULL),
+              ($1, 'reporting', 'running', NULL, NULL, now(), NULL),
+              ($1, 'later', 'pending', NULL, NULL, NULL, NULL)`,
       [RUN, EVIDENCE]
     );
     // Two complete units this run labelled for the decrypt, one incomplete
@@ -382,7 +384,8 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
   it("gives each run its device's name and its stage counts", async () => {
     const run = (await getPipelineRuns(db)).find((r) => r.run_id === RUN)!;
     assert.equal(run.device_label, 'test device');
-    assert.deepEqual([run.stages_total, run.stages_succeeded, run.stages_failed, run.stages_skipped], [3, 1, 1, 1]);
+    assert.deepEqual(run.stage_counts, { pending: 1, running: 1, succeeded: 1, failed: 1, skipped: 1 });
+    assert.equal(run.state, 'running', 'the verdict comes from run_completeness, not the counts');
   });
 
   it('gives each stage what it read and the complete units this run labelled for it', async () => {

@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, Inbox, Layers, Loader2, MinusCircle, RefreshCw, XCircle } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  CircleDashed,
+  Inbox,
+  Layers,
+  Loader2,
+  MinusCircle,
+  RefreshCw,
+  XCircle,
+} from 'lucide-react';
 import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 import { Button } from '../components/ui/Button';
 import { TerminalLog } from '../components/layout/TerminalLog';
@@ -41,12 +51,18 @@ function StateIcon({ state }: { state: PipelineRunRow['state'] }) {
   return <AlertCircle size="1.125rem" className="text-flag" />;
 }
 
-/** "3 of 3 succeeded", plus any failed or skipped (EPOCH-430): the tooltip. */
-function stageSummary(run: PipelineRunRow): string {
-  if (run.stages_total === 0) return 'No stages';
-  const parts = [`${run.stages_succeeded} of ${run.stages_total} succeeded`];
-  if (run.stages_failed > 0) parts.push(`${run.stages_failed} failed`);
-  if (run.stages_skipped > 0) parts.push(`${run.stages_skipped} skipped`);
+/** The statuses after "succeeded" that the summary names when present. */
+const OTHER_STAGE_STATUSES = ['failed', 'skipped', 'running', 'pending'] as const;
+
+/** "3 of 3 succeeded", plus any failed, skipped, running or pending
+ * (EPOCH-430): the tooltip. */
+function stageSummary(counts: PipelineRunRow['stage_counts']): string {
+  const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+  if (total === 0) return 'No stages';
+  const parts = [`${counts.succeeded} of ${total} succeeded`];
+  for (const status of OTHER_STAGE_STATUSES) {
+    if (counts[status] > 0) parts.push(`${counts[status]} ${status}`);
+  }
   return parts.join(', ');
 }
 
@@ -205,7 +221,7 @@ export function RunsView({
             {formatTimestamp(row.original.finished_at)}
           </span>
         ) : (
-          <span className="text-muted-foreground">—</span>
+          <span className="text-accent">In progress</span>
         ),
     },
     {
@@ -224,25 +240,37 @@ export function RunsView({
     {
       id: 'stages',
       header: 'Stages',
-      meta: { width: 'minmax(7rem, 0.4fr)' },
+      meta: { width: 'minmax(9rem, 0.5fr)' },
       cell: ({ row }) => {
-        const run = row.original;
+        const counts = row.original.stage_counts;
         return (
-          <IconCell label={stageSummary(run)}>
+          <IconCell label={stageSummary(counts)}>
             <span className="inline-flex items-center gap-1 text-success">
               <CheckCircle2 size="1rem" />
-              <span className="font-mono tabular-nums">{run.stages_succeeded}</span>
+              <span className="font-mono tabular-nums">{counts.succeeded}</span>
             </span>
-            {run.stages_failed > 0 && (
+            {counts.failed > 0 && (
               <span className="inline-flex items-center gap-1 text-danger">
                 <XCircle size="1rem" />
-                <span className="font-mono tabular-nums">{run.stages_failed}</span>
+                <span className="font-mono tabular-nums">{counts.failed}</span>
               </span>
             )}
-            {run.stages_skipped > 0 && (
+            {counts.skipped > 0 && (
               <span className="inline-flex items-center gap-1 text-muted-foreground">
                 <MinusCircle size="1rem" />
-                <span className="font-mono tabular-nums">{run.stages_skipped}</span>
+                <span className="font-mono tabular-nums">{counts.skipped}</span>
+              </span>
+            )}
+            {counts.running > 0 && (
+              <span className="inline-flex items-center gap-1 text-accent">
+                <Loader2 size="1rem" className="animate-spin" />
+                <span className="font-mono tabular-nums">{counts.running}</span>
+              </span>
+            )}
+            {counts.pending > 0 && (
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                <CircleDashed size="1rem" />
+                <span className="font-mono tabular-nums">{counts.pending}</span>
               </span>
             )}
           </IconCell>
