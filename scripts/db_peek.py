@@ -10,8 +10,11 @@ hand-writing SQL each time.
 Uses psycopg2, same as packages/etl-db-writer/db_writer.py, for consistency.
 
 Usage:
-    python3 scripts/db_peek.py --db-url "$DATABASE_URL"
-    python3 scripts/db_peek.py --db-url "$DATABASE_URL" --run-id smoke-test-1
+    uv run python scripts/db_peek.py
+    uv run python scripts/db_peek.py --run-id smoke-test-1
+
+The database comes from DATABASE_URL or DB_* (R28), read from the
+environment or the repo-root .env, never from the command line (R30).
 """
 
 from __future__ import annotations
@@ -107,7 +110,6 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     load_root_env()
-    parser.add_argument("--db-url", default=None)
     parser.add_argument("--run-id", default=None, help="defaults to the most recent run")
     parser.add_argument(
         "--evidence-id", default=None, help="defaults to the run's pipeline_runs.evidence_id"
@@ -115,7 +117,7 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        db_url = args.db_url if args.db_url is not None else resolve_database_url()
+        db_url = resolve_database_url()
     except RuntimeError as exc:
         parser.error(str(exc))
 

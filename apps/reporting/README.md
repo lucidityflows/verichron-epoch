@@ -21,8 +21,11 @@ It runs as part of the pipeline, writing to `<report-path>/investigation_report.
 (`<workspace>/reports/<label>/`). To run it by hand:
 
 ```bash
-uv run python apps/reporting/generate_report.py --run-id <run> --db-url <url> [--report-path <dir>] [--output <file>]
+uv run python apps/reporting/generate_report.py --run-id <run> [--report-path <dir>] [--output <file>]
 ```
+
+The database comes from `DATABASE_URL` or `DB_*` in the environment (R28),
+never from a flag (R30).
 
 Its tests are in `scripts/test_evidence_reads.py`; they run against real
 PostgreSQL. `scripts/golden/report_coverage.md` pins the report's section

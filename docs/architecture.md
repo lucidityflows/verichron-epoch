@@ -206,6 +206,11 @@ switch ([decisions](decisions.md#product-and-builds)).
 `DATABASE_URL` or complete `DB_*` credentials are supplied; see
 [the configuration rules](rules.md#configuration-and-security).
 
+**Built — R30 (EPOCH-423):** the URL never travels on a command line. The
+orchestrator resolves it once and gives each stage `DATABASE_URL` in its
+environment; stages read it with `runtime_env.require_database_url()`, and
+`migrate.py` and `db_peek.py` read `.env` themselves.
+
 ## Changes already decided
 
 These are settled but not yet built; this page will change when they land.
@@ -214,5 +219,3 @@ These are settled but not yet built; this page will change when they land.
 |---|---|
 | The app reads typed events from the processor and the orchestrator instead of scraping logs | EPOCH-443, EPOCH-445 |
 | A workspace manifest replaces path inference | EPOCH-427 |
-| Secrets travel by environment, never on the command line | EPOCH-423 |
-| The TypeScript fact writer is removed; Python is the only writer | EPOCH-452 |

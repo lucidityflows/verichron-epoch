@@ -94,4 +94,3 @@ Known violations are ticketed and fixed, never waived.
 | Rule | Violation | Ticket |
 |---|---|---|
 | R29 | Extractors check their own environment (`fatal_if_missing_venv()`), and the orchestrator falls back to `python3` on PATH when `.venv` is missing | EPOCH-456 |
-| R30 | The database URL is passed on the command line (the orchestrator to every stage, `--db-url`). The backup password reaches the decrypt only in `BACKUP_PASSWORD` (EPOCH-489) | EPOCH-423 |

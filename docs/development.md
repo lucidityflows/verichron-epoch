@@ -55,8 +55,7 @@ mise install                             # Node, pnpm and uv at the pinned versi
 mise run check                           # report any missing prerequisite; changes nothing
 mise run setup                           # check again, then install every environment from the lockfiles
 docker compose -f infra/docker-compose.yml up -d postgres
-set -a; . ./.env; set +a                 # load DB_* into this shell
-uv run python packages/etl-db-writer/migrate.py --db-url "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME"
+uv run python packages/etl-db-writer/migrate.py   # reads DB_* from .env
 ```
 
 `mise run setup` reports every missing prerequisite at once, each with the

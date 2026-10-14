@@ -41,7 +41,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-from runtime_env import fatal_if_missing_venv
+from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
 from etl_run import ETLRunResult
 from db_writer import IngestContext, add_context_args, context_from_args, ingest
 from normalized_record import NormalizedRecord, SourceType
@@ -548,7 +548,6 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="LLM-assisted triage over MVT log output.")
     add_context_args(parser)
     parser.add_argument("--backup-path", default=None, help="Accepted for contract consistency with every other stage; unused here (--results-path is what this stage actually reads).")
-    parser.add_argument("--db-url", required=True, help="Postgres connection string for writing flagged findings.")
     parser.add_argument("--results-path", type=str, required=True, help="the processor's results/<n>/ output directory to analyze (orchestrator passes this automatically).")
     parser.add_argument("--diff-baseline", type=str, default=None, help="Optional: an earlier results/<n>/ snapshot of the same device, to flag files that vanished or shrank between the two runs. Skipped entirely if omitted.")
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL_NAME, help="Ollama model name to run.")
@@ -583,6 +582,7 @@ def process_file(conn: sqlite3.Connection, filename: str, chunks: list[str], sch
 
 def main() -> None:
     fatal_if_missing_venv()
+    db_url = require_database_url()
     args = parse_args()
     ctx = context_from_args(args)
 
@@ -674,9 +674,9 @@ def main() -> None:
     log.info("Phase 4: Writing flagged findings to Postgres")
     ingest_result = ETLRunResult()
     try:
-        pg_conn = psycopg2.connect(args.db_url)
+        pg_conn = psycopg2.connect(db_url)
     except Exception as e:
-        log.error(f"could not connect to database: {e}")
+        log.error(f"could not connect to database: {redact_password(str(e), db_url)}")
         conn.close()
         sys.exit(1)
     try:

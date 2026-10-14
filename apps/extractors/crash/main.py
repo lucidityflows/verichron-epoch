@@ -27,7 +27,7 @@ from pathlib import Path
 
 from typing import Any
 
-from runtime_env import fatal_if_missing_venv
+from runtime_env import fatal_if_missing_venv, redact_password, require_database_url
 from db_writer import IngestContext, add_context_args, context_from_args, ingest
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
@@ -254,10 +254,10 @@ def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
 
 def main():
     fatal_if_missing_venv()
+    db_url = require_database_url()
     parser = argparse.ArgumentParser()
     add_context_args(parser)
     parser.add_argument("--backup-path", required=True)
-    parser.add_argument("--db-url", required=True)
     # Unused here: only the report stage writes to the report folder. The
     # orchestrator passes --report-path to every stage (EXTRACTOR_CONTRACT.md
     # section 2), so this extractor accepts and ignores it.
@@ -265,9 +265,9 @@ def main():
     args = parser.parse_args()
 
     try:
-        conn = psycopg2.connect(args.db_url)
+        conn = psycopg2.connect(db_url)
     except Exception as e:
-        print(f"[crash] could not connect to database: {e}", file=sys.stderr)
+        print(f"[crash] could not connect to database: {redact_password(str(e), db_url)}", file=sys.stderr)
         sys.exit(1)
 
     try:

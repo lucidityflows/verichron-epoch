@@ -2,7 +2,10 @@
 repo's .venv it says why and exits 2, with no traceback after the message."""
 
 import json
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -65,3 +68,68 @@ def test_present_venv_passes(tmp_path, monkeypatch):
     (tmp_path / ".venv" / "bin" / "python").touch()
     monkeypatch.setattr(runtime_env, "repo_root", lambda: tmp_path)
     runtime_env.fatal_if_missing_venv()
+
+
+REPO = Path(__file__).resolve().parents[1]
+
+# The stages the orchestrator spawns: each gets DATABASE_URL in its
+# environment (R30, EPOCH-423). migrate.py and db_peek.py also read the
+# repo's .env, so they aren't run bare here.
+STAGE_ENTRYPOINTS = (
+    "apps/extractors/crash/main.py",
+    "apps/extractors/ileapp_bridge/main.py",
+    "apps/analysis/automated_forensics.py",
+    "apps/reporting/generate_report.py",
+)
+
+
+@pytest.mark.parametrize("entrypoint", STAGE_ENTRYPOINTS)
+def test_stage_refuses_to_start_without_database_configuration(entrypoint):
+    env = {key: value for key, value in os.environ.items() if key not in DATABASE_ENV_KEYS}
+    proc = subprocess.run(
+        [sys.executable, str(REPO / entrypoint)], env=env, capture_output=True, text=True, timeout=120
+    )
+    assert proc.returncode == 2, proc.stderr
+    assert "[env] Database configuration is required" in proc.stderr
+    assert "Traceback" not in proc.stderr
+
+
+def test_no_python_entrypoint_takes_the_database_url_as_a_flag():
+    """A URL flag puts the password on the command line (R30)."""
+    for root in ("apps", "libs", "packages", "scripts"):
+        for source in (REPO / root).rglob("*.py"):
+            if {"iLEAPP", ".venv", "node_modules", "__pycache__"}.intersection(source.parts):
+                continue
+            if source.name.startswith("test_"):
+                continue
+            assert '"--db-url"' not in source.read_text(errors="replace"), source
+
+
+def test_require_database_url_exits_2_naming_the_variables(monkeypatch, capsys):
+    for key in DATABASE_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    with pytest.raises(SystemExit) as exited:
+        runtime_env.require_database_url()
+    assert exited.value.code == 2
+    assert "DATABASE_URL" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("url", "secret"),
+    [
+        ("postgresql://user:plain-pass@host:5432/db", "plain-pass"),
+        ("postgresql://user:p%40ss%3Aword@host:5432/db", "p@ss:word"),
+    ],
+)
+def test_redact_password_removes_it_in_either_form(url, secret):
+    quoted = url.split(":")[2].split("@")[0]
+    message = f"invalid dsn: {url} ({secret})"
+    redacted = runtime_env.redact_password(message, url)
+    assert secret not in redacted
+    assert quoted not in redacted
+    assert "***" in redacted
+
+
+def test_redact_password_leaves_a_url_without_one_unchanged():
+    assert runtime_env.redact_password("text", "postgresql://user@host/db") == "text"
+

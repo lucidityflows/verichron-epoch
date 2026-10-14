@@ -48,4 +48,6 @@ def test_help_does_not_resolve_database_config(monkeypatch, capsys):
         db_peek.main()
 
     assert exited.value.code == 0
-    assert "--db-url" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "--run-id" in out
+    assert "--db-url" not in out, "the URL is never a flag (R30)"

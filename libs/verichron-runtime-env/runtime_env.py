@@ -13,6 +13,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from os import environ, path as os_path
+from urllib.parse import unquote, urlsplit
  
 def repo_root() -> Path:
     # This file lives at libs/runtime-env/runtime_env.py -- two directories
@@ -55,9 +56,8 @@ def fatal_if_missing_venv() -> None:
 def load_root_env() -> None:
     """Load the repo-root .env, mirroring packages/contracts/ts/env.ts's
     loadRootEnv(). Convenience for standalone scripts (migrate.py,
-    db_peek.py) run manually outside the orchestrator -- the orchestrator
-    itself never needs this on the Python side, since it passes --db-url
-    explicitly to every extractor rather than having them read env vars.
+    db_peek.py) run manually outside the orchestrator. Stages never need
+    it: the orchestrator sets DATABASE_URL in each stage's environment.
     No-op if python-dotenv is unavailable or .env doesn't exist.
     """
     try:
@@ -85,3 +85,27 @@ def resolve_database_url() -> str:
         "Database configuration is required: set DATABASE_URL, or all of "
         "DB_USER, DB_PASSWORD, and DB_NAME."
     )
+
+
+def require_database_url() -> str:
+    """The database URL for an entry point, from the environment only (R28):
+    the orchestrator sets DATABASE_URL for each stage it spawns, and a URL
+    never travels on a command line (R30). Exits 2 with the reason when
+    none is configured, before anything connects."""
+    try:
+        return resolve_database_url()
+    except RuntimeError as exc:
+        print(f"[env] {exc}", file=sys.stderr)
+        sys.exit(2)
+
+
+def redact_password(text: str, url: str) -> str:
+    """`text` with `url`'s password replaced, for a message that may quote
+    the connection string, such as a connection error (R30: secrets are
+    never logged)."""
+    password = urlsplit(url).password
+    if not password:
+        return text
+    for form in {password, unquote(password)}:
+        text = text.replace(form, "***")
+    return text
