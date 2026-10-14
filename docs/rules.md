@@ -78,6 +78,7 @@ Numbers are stable: a retired rule keeps its number.
 | R33 | One test body runs against both PgDouble and real Postgres; a double never certifies SQL |
 | R34 | Every mechanically checkable rule is checked in CI |
 | R35 | Every run records its provenance: contract version (schema hash), tool versions and configuration |
+| R36 | Tool output is verified, not trusted. A tool defect confirmed against the evidence is registered, corrected only through the registry (limited to the tool versions affected, with the tool's value kept and the record marked), disclosed in the report, and reported upstream |
 
 ## Deliberately not done
 

@@ -11,6 +11,12 @@ Time is not guessed here. An iLEAPP plugin converts its source's time format
 `datetime`; iLEAPP then stores it as Unix UTC seconds (`scripts/lavafuncs.py`,
 `lava_insert_sqlite_data`). An artifact's event time is its first declared
 `datetime` column; one with none is untimed (R11).
+
+iLEAPP's output is checked, not trusted (R36, EPOCH-511). Every declared time
+before the device era or after the run is reported for review and kept as
+iLEAPP gives it. A defect registered for this iLEAPP version in
+`packages/contracts/tool_defects/iLEAPP.json` is corrected: the row keeps
+iLEAPP's value under its header, and the record lists the correction.
 """
 
 from __future__ import annotations
@@ -23,7 +29,9 @@ import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Sequence
+
+from tool_defects import ToolDefect
 
 MANIFEST = "_lava_data.lava"
 DATABASE = "_lava_artifacts.db"
@@ -33,7 +41,11 @@ SCHEMA_VERSION = 2
 BOOKKEEPING_PREFIX = "_"
 #: Keys the stage adds to every record's fields beside the row's own headers;
 #: a header with one of these names would be overwritten, so it is refused.
-METADATA_KEYS = ("engine", "source_artifact", "module", "category", "source_path")
+METADATA_KEYS = ("engine", "source_artifact", "module", "category", "source_path", "corrections")
+#: The tool name iLEAPP records in its manifest, and the registry it is checked against.
+TOOL = "iLEAPP"
+#: The first iPhone went on sale on this day: no device time can be earlier.
+DEVICE_ERA = datetime(2007, 6, 29, tzinfo=timezone.utc)
 
 
 class LavaError(Exception):
@@ -79,6 +91,12 @@ class ArtifactRows:
     #: rows whose declared time column held a value that isn't Unix seconds
     unconvertible_times: int = 0
     notes: list[str] = field(default_factory=list)
+    #: per row, the registered corrections applied to it (R36); empty for most rows
+    corrections: list[list[dict[str, Any]]] = field(default_factory=list)
+    #: defect id -> how many values it corrected
+    corrected: dict[str, int] = field(default_factory=dict)
+    #: the iLEAPP version the corrections were chosen for
+    tool_version: str = ""
 
 
 @dataclass(frozen=True)
@@ -94,6 +112,11 @@ class LavaOutput:
     @property
     def input_path(self) -> str:
         return str(self.manifest.get("param_input") or "")
+
+    @property
+    def tool_version(self) -> str:
+        """iLEAPP's version as it reports itself; read_manifest has checked it."""
+        return self.manifest["parser_info"]["leapp_version"]
 
 
 def read_manifest(report_dir: str | Path) -> LavaOutput:
@@ -118,6 +141,11 @@ def read_manifest(report_dir: str | Path) -> LavaOutput:
             f"{manifest_path} records processing_status {manifest.get('processing_status')!r}; "
             "iLEAPP did not finish, so its output is incomplete"
         )
+    parser_info = manifest.get("parser_info") or {}
+    if parser_info.get("leapp_name") != TOOL or not parser_info.get("leapp_version"):
+        # Registered defects are limited by version (R36), so a report that
+        # doesn't say which iLEAPP wrote it can't be checked against them.
+        raise LavaError(f"{manifest_path} doesn't record which {TOOL} version wrote it (parser_info)")
     if manifest.get("lava_db_name") != DATABASE:
         raise LavaError(f"{manifest_path} names its database {manifest.get('lava_db_name')!r}, expected {DATABASE}")
 
@@ -186,9 +214,12 @@ def check_tables(conn: sqlite3.Connection, output: LavaOutput) -> None:
         raise LavaError("; ".join(problems))
 
 
-def read_artifact(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifact) -> ArtifactRows:
-    """Read one artifact's table. Raises ArtifactError if it can't be read
-    exactly as the manifest describes it."""
+def read_artifact(
+    conn: sqlite3.Connection, output: LavaOutput, artifact: Artifact, defects: Sequence[ToolDefect] = ()
+) -> ArtifactRows:
+    """Read one artifact's table, correcting the registered `defects` that
+    affect it. Raises ArtifactError if it can't be read exactly as the
+    manifest describes it."""
     if not artifact.tablename:
         raise ArtifactError(f"{artifact.name}: the manifest names no table")
     if artifact.record_count is None:
@@ -212,6 +243,16 @@ def read_artifact(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifa
     time_index = columns.index(artifact.event_time_column) if artifact.event_time_column in columns else None
     if artifact.event_time_column and time_index is None:
         raise ArtifactError(f"{artifact.name}: declared datetime column {artifact.event_time_column} is not in the table")
+    # The registered defects that correct a column of this artifact (R36).
+    fixes: list[tuple[ToolDefect, int, str]] = []
+    for defect in defects:
+        header = defect.column_for(artifact.name)
+        if header is None:
+            continue
+        if header not in headers:
+            raise ArtifactError(f"{artifact.name}: registered defect {defect.id} names column {header!r}, which it doesn't have")
+        fixes.append((defect, headers.index(header), header))
+    time_columns = [(columns.index(c), artifact.column_map[c]) for c, t in artifact.object_columns.items() if t == "datetime" and c in columns]
 
     # The unit's identity covers everything its records carry: the artifact's
     # metadata, its columns and headers in order, its declared types in order
@@ -227,11 +268,19 @@ def read_artifact(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifa
         "columns": [[c, artifact.column_map[c]] for c in columns],
         "object_columns": [[c, t] for c, t in artifact.object_columns.items()],
         "event_time_column": artifact.event_time_column,
+        # A new or changed correction is new content, not a dedup hit.
+        **({"corrections": [[d.id, h, d.correction.model_dump()] for d, _, h in fixes]} if fixes else {}),
     }))
     rows: list[dict[str, Any]] = []
     event_times: list[datetime | None] = []
     unconvertible = 0
     encoded = 0
+    corrections: list[list[dict[str, Any]]] = []
+    corrected: dict[str, int] = {}
+    # Declared times outside the device era, per column: (count, earliest, latest).
+    early: dict[str, tuple[int, datetime, datetime]] = {}
+    late: dict[str, tuple[int, datetime, datetime]] = {}
+    run_time = datetime.now(timezone.utc)
     for raw in cursor:
         # The identity covers the values as read (binary as hex), so encoding
         # a value for storage never changes which unit it belongs to.
@@ -239,10 +288,36 @@ def read_artifact(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifa
         values = [_json_value(v) for v in raw]
         encoded += sum(1 for v in values if isinstance(v, dict))
         rows.append(dict(zip(headers, values)))
+        # Registered corrections: iLEAPP's value stays in the row, under its
+        # header; the corrected value is what the record's time is read from.
+        effective = list(raw)
+        applied = []
+        for defect, index, header in fixes:
+            value = defect.correction.apply(raw[index])
+            if value is None:
+                continue
+            effective[index] = value
+            corrected[defect.id] = corrected.get(defect.id, 0) + 1
+            applied.append({
+                "defect": defect.id,
+                "column": header,
+                "original": raw[index],
+                "corrected": value,
+                # iLEAPP discarded what lies below this, so the corrected value
+                # is the start of an interval this wide, in the column's unit.
+                "resolution": defect.correction.factor,
+            })
+        corrections.append(applied)
+        for index, header in time_columns:
+            moment = unix_utc(effective[index])
+            if moment is not None and (moment < DEVICE_ERA or moment > run_time):
+                bucket = early if moment < DEVICE_ERA else late
+                n, first, last = bucket.get(header, (0, moment, moment))
+                bucket[header] = (n + 1, min(first, moment), max(last, moment))
         if time_index is None:
             event_times.append(None)
             continue
-        when = unix_utc(raw[time_index])
+        when = unix_utc(effective[time_index])
         if when is None and raw[time_index] not in (None, ""):
             unconvertible += 1
         event_times.append(when)
@@ -263,6 +338,23 @@ def read_artifact(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifa
             f"{artifact.name}: {unconvertible} row(s) have a value in {artifact.column_map[artifact.event_time_column]} "
             "that is not Unix seconds; their event_time is null and the raw value is kept"
         )
+    for defect, _, header in fixes:
+        if corrected.get(defect.id):
+            notes.append(
+                f"{artifact.name}: {corrected[defect.id]} value(s) in {header} corrected for {TOOL} defect {defect.id} "
+                f"({defect.ticket}), to within {defect.correction.factor:,} of the column's unit (seconds, for a time); "
+                "iLEAPP's value is kept"
+            )
+    for header, (n, first, last) in early.items():
+        notes.append(
+            f"{artifact.name}: {n} time(s) in {header} fall before {DEVICE_ERA.date()}, the first iPhone "
+            f"({first.date()} to {last.date()}); kept as {TOOL} gives them, for review"
+        )
+    for header, (n, first, last) in late.items():
+        notes.append(
+            f"{artifact.name}: {n} time(s) in {header} fall after this run ({first.date()} to {last.date()}); "
+            "kept, for review (a scheduled event can be genuine)"
+        )
     return ArtifactRows(
         artifact=artifact,
         rows=rows,
@@ -271,6 +363,9 @@ def read_artifact(conn: sqlite3.Connection, output: LavaOutput, artifact: Artifa
         source_path=source_path,
         unconvertible_times=unconvertible,
         notes=notes,
+        corrections=corrections,
+        corrected=corrected,
+        tool_version=output.tool_version,
     )
 
 

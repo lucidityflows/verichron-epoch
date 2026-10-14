@@ -17,6 +17,9 @@ Three things this file must always do, per the "fix, don't punish" principle:
      and EPOCH-442.
   3. Never let a missing/failed domain silently disappear from the report.
      A failed stage gets a visible "not available" note, not omission.
+  4. State what was checked and corrected in the tools' output (R36,
+     EPOCH-511): every correction made for a registered tool defect, and
+     every event time outside the device era, kept for review.
 """
 
 import argparse
@@ -28,6 +31,7 @@ from runtime_env import fatal_if_missing_venv, redact_password, require_database
 
 import psycopg2
 import psycopg2.extras
+from tool_defects import defect as registered_defect
 
 def fetch_stage_status(conn, run_id: str) -> list[dict]:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -346,6 +350,114 @@ def render_ileapp_section(rows: list[dict]) -> list[str]:
     return lines
 
 
+# --- tool checks and corrections (R36, EPOCH-511) -------------------------
+
+#: The first iPhone went on sale on this day: no device time can be earlier.
+DEVICE_ERA = datetime(2007, 6, 29, tzinfo=timezone.utc)
+
+
+def fetch_corrections(conn, evidence_id: str) -> list[dict]:
+    """The corrections recorded on this evidence's current facts, per tool,
+    defect, artifact and column, with the corrected time span."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT r.fields->>'engine' AS tool,
+                   c->>'defect' AS defect,
+                   r.fields->>'source_artifact' AS artifact,
+                   c->>'column' AS column_name,
+                   count(*) AS records,
+                   min(r.event_time) AS earliest,
+                   max(r.event_time) AS latest
+            FROM current_forensic_records r
+            CROSS JOIN LATERAL jsonb_array_elements(r.fields->'corrections') c
+            WHERE r.evidence_id = %s AND jsonb_typeof(r.fields->'corrections') = 'array'
+            GROUP BY 1, 2, 3, 4
+            ORDER BY 2, 3, 4
+            """,
+            (evidence_id,),
+        )
+        return cur.fetchall()
+
+
+def fetch_time_review(conn, evidence_id: str, generated_at: datetime) -> list[dict]:
+    """Per artifact, the event times before the device era or after this
+    report: kept as the tool gave them, listed for review."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT fields->>'source_artifact' AS artifact,
+                   count(*) FILTER (WHERE event_time < %(era)s) AS early,
+                   min(event_time) FILTER (WHERE event_time < %(era)s) AS early_first,
+                   max(event_time) FILTER (WHERE event_time < %(era)s) AS early_last,
+                   count(*) FILTER (WHERE event_time > %(now)s) AS late,
+                   min(event_time) FILTER (WHERE event_time > %(now)s) AS late_first,
+                   max(event_time) FILTER (WHERE event_time > %(now)s) AS late_last
+            FROM current_forensic_records
+            WHERE evidence_id = %(evidence)s AND (event_time < %(era)s OR event_time > %(now)s)
+            GROUP BY 1
+            ORDER BY 1
+            """,
+            {"evidence": evidence_id, "era": DEVICE_ERA, "now": generated_at},
+        )
+        return cur.fetchall()
+
+
+def _date_span(first, last) -> str:
+    return _utc(first) if first == last else f"{_utc(first)} to {_utc(last)}"
+
+
+def render_tool_checks_section(corrections: list[dict], review: list[dict]) -> list[str]:
+    lines = [
+        "## Tool Checks and Corrections",
+        "",
+        "Verichron checks the output of the tools it runs rather than trusting it (R36). "
+        "A defect confirmed against the evidence is registered and corrected; the tool's own value "
+        "is kept in each record beside the correction. Each correction below is an error that would "
+        "otherwise have reached this report.",
+        "",
+    ]
+    if corrections:
+        lines += [
+            "| Defect | Tool | Artifact | Column | Records | Corrected time | What the tool got wrong | Reported to the tool |",
+            "| :--- | :--- | :--- | :--- | ---: | :--- | :--- | :--- |",
+        ]
+        for c in corrections:
+            entry = registered_defect(c["tool"], c["defect"])
+            span = _date_span(c["earliest"], c["latest"]) if c["earliest"] else "no time"
+            upstream = entry.upstream.status + (f" ({entry.upstream.reference})" if entry.upstream.reference else "")
+            lines.append(
+                f"| {c['defect']} ({entry.ticket}) | {_table_cell(c['tool'])} {_table_cell(', '.join(entry.versions))} "
+                f"| {_table_cell(c['artifact'])} | {_table_cell(c['column_name'])} | {c['records']} | {span} "
+                f"| {_table_cell(entry.defect)} Corrected to within {entry.correction.factor:,} of the column's unit "
+                f"(seconds, for a time). | {upstream} |"
+            )
+        lines.append("")
+    else:
+        lines += ["No registered tool defect applied to this evidence, so nothing was corrected.", ""]
+
+    lines += [
+        f"**Times for review.** An event time before {DEVICE_ERA.date()} (the first iPhone) is not a time a "
+        "device can have recorded; one after this report can be genuine, such as a scheduled event. "
+        "Both are kept as the tool gives them.",
+        "",
+    ]
+    if review:
+        lines += [
+            "| Artifact | Before the first iPhone | After this report |",
+            "| :--- | :--- | :--- |",
+        ]
+        for r in review:
+            early = f"{r['early']}: {_date_span(r['early_first'], r['early_last'])}" if r["early"] else "none"
+            late = f"{r['late']}: {_date_span(r['late_first'], r['late_last'])}" if r["late"] else "none"
+            lines.append(f"| {_table_cell(r['artifact'] or '(no artifact name)')} | {early} | {late} |")
+        lines.append("")
+    else:
+        lines += ["No event time falls outside that range.", ""]
+    lines += ["---", ""]
+    return lines
+
+
 # Each fact type the report shows: its section's heading, how to read its
 # facts, and how to render them. The coverage table reads the same mapping,
 # so a type is listed as shown exactly when a section exists for it
@@ -429,7 +541,8 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     """
     if evidence_id is None:
         evidence_id = fetch_run_evidence(conn, run_id)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    generated_at = datetime.now(timezone.utc)
+    timestamp = generated_at.strftime("%Y-%m-%d %H:%M:%S UTC")
     stages = fetch_stage_status(conn, run_id)
 
     lines = [
@@ -467,6 +580,9 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
 
     lines += render_coverage_section(fetch_fact_counts(conn, evidence_id), ileapp_outputs)
     lines += render_not_examined_section(ileapp_outputs)
+    lines += render_tool_checks_section(
+        fetch_corrections(conn, evidence_id), fetch_time_review(conn, evidence_id, generated_at)
+    )
 
     for source_type, (title, fetch, render) in RENDERERS.items():
         rows = fetch(conn, evidence_id)

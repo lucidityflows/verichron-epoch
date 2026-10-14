@@ -474,6 +474,65 @@ def test_the_report_summarizes_ileapp_records_by_artifact(db, tmp_path):
     assert "ROW-CONTENT" not in report, "the report summarizes iLEAPP records and never lists their rows"
 
 
+def test_the_report_discloses_tool_corrections_and_times_for_review(db, tmp_path):
+    """R36, EPOCH-511: every correction made for a registered tool defect is
+    listed with the defect behind it, and event times outside the device era
+    are listed for review, kept as the tool gave them."""
+    if not isinstance(db, PgReal):
+        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
+    from datetime import datetime, timezone
+
+    from reporting.generate_report import generate_report
+
+    def utc(seconds: int) -> datetime:
+        return datetime.fromtimestamp(seconds, timezone.utc)
+
+    correction = {"defect": "ILEAPP-0001", "column": "Last hit", "original": 1791009, "corrected": 1791009000, "resolution": 1000}
+    seeded = [
+        ("Uber - Cached Locations", utc(1791009000), {"Last hit": 1791009, "corrections": [correction]}),
+        ("Calendar Events", utc(197164800), {}),  # 1976-04-01: before the first iPhone
+        ("Calendar Events", utc(4102444800), {}),  # 2100-01-01: after the report
+        ("Safari History", utc(1791140650), {}),  # an ordinary time
+    ]
+    for i, (name, when, extra) in enumerate(seeded):
+        table = tmp_path / f"{i}.tsv"
+        table.write_text(f"{i}: {name}")  # distinct content, so each is its own unit
+        with ingest(db, ctx(RUN_A), table, source_type="ileapp_record", payload_kind="full") as unit:
+            unit.write([
+                NormalizedRecord(
+                    source_type=SourceType.ILEAPP_RECORD,
+                    event_time=when,
+                    fields={"engine": "iLEAPP", "source_artifact": name, **extra},
+                )
+            ])
+
+    out = tmp_path / "report.md"
+    generate_report(db._conn, RUN_A, EVIDENCE, str(out))
+    section = out.read_text().split("## Tool Checks and Corrections", 1)[1].split("\n---\n", 1)[0]
+    rows = [line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| Defect", "| Artifact", "| :"))]
+    assert rows[0].startswith(
+        "| ILEAPP-0001 (EPOCH-510) | iLEAPP 2026.3.0 | Uber - Cached Locations | Last hit | 1 | 2026-10-03 06:30:00 UTC |"
+    )
+    assert "divides Uber's timestamp_ms by 1,000" in rows[0]
+    assert rows[0].endswith("| not reported |")
+    assert rows[1:] == [
+        "| Calendar Events | 1: 1976-04-01 00:00:00 UTC | 1: 2100-01-01 00:00:00 UTC |",
+    ], "the corrected and the ordinary times are not listed for review"
+
+
+def test_the_report_says_when_nothing_was_corrected(db, artifact, tmp_path):
+    if not isinstance(db, PgReal):
+        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
+    from reporting.generate_report import generate_report
+
+    write(db, artifact, 1, ["one"])
+    out = tmp_path / "report.md"
+    generate_report(db._conn, RUN_A, EVIDENCE, str(out))
+    section = out.read_text().split("## Tool Checks and Corrections", 1)[1].split("\n---\n", 1)[0]
+    assert "No registered tool defect applied to this evidence, so nothing was corrected." in section
+    assert "No event time falls outside that range." in section
+
+
 def test_an_artifact_name_with_a_pipe_or_line_break_keeps_its_table_row_whole(db, tmp_path):
     """iLEAPP controls artifact names; a `|` or a line break must not split
     the report's table row (CodeRabbit on PR #78)."""
