@@ -23,7 +23,12 @@ function ipcErrorMessage(err: unknown): string {
 
 export type Phase = 'checking' | 'unavailable' | 'available' | 'acquiring' | 'pulling' | 'pulled';
 
-export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
+/**
+ * A finished pull stays shown until the examiner continues (EPOCH-437): the
+ * panel's results card hands the backup to Prepare Evidence, so the hook
+ * never moves on by itself.
+ */
+export function useDevicePull() {
   const [sources, setSources] = useState<Array<{ id: string; label: string }>>([]);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('checking');
@@ -59,11 +64,8 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
   // What the chosen destination already holds for the device (EPOCH-483); a pull there is refused.
   const [destinationBackup, setDestinationBackup] = useState<DestinationBackup | null>(null);
 
-  // Maintain refs to prevent effect re-registrations on transient prop/state changes
-  const onBackupPulledRef = useRef(onBackupPulled);
-  useEffect(() => {
-    onBackupPulledRef.current = onBackupPulled;
-  }, [onBackupPulled]);
+  // When this panel saw the pull finish; null when it finished before a remount.
+  const [pulledAt, setPulledAt] = useState<number | null>(null);
 
   const destDirRef = useRef(destDir);
   useEffect(() => {
@@ -95,7 +97,6 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       setPhase('available');
     } else if (running.ended && last?.phase === 'done') {
       setPhase('pulled');
-      onBackupPulledRef.current?.(running.destDir);
     } else {
       setPhase('pulling');
     }
@@ -201,9 +202,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
       if (progress.phase === 'done' || progress.phase === 'error') setCancelling(false);
       if (progress.phase === 'done') {
         setPhase('pulled');
-        if (destDirRef.current && onBackupPulledRef.current) {
-          onBackupPulledRef.current(destDirRef.current);
-        }
+        setPulledAt(Date.now());
       } else if (progress.phase === 'error') {
         setPullError(progress.message);
         setPhase('available');
@@ -436,6 +435,7 @@ export function useDevicePull(onBackupPulled?: (destDir: string) => void) {
     cancelEncryptionConsent,
     deviceAction,
     pullStats,
+    pulledAt,
     cancelPull,
     cancelling,
     incomplete,

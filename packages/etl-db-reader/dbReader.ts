@@ -62,6 +62,13 @@ export interface PipelineRunRow {
   /** From the run_completeness view: the ONE completeness predicate (R23,
    * EPOCH-404). Read this; never re-derive it from stage rows. */
   state: 'running' | 'incomplete' | 'complete';
+  /** The device's name, as registered with the evidence; null without evidence. */
+  device_label: string | null;
+  /** Stage counts for a one-line summary (EPOCH-430); `state` stays the verdict. */
+  stages_total: number;
+  stages_succeeded: number;
+  stages_failed: number;
+  stages_skipped: number;
 }
 
 export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
@@ -73,6 +80,17 @@ export interface StageStatusRow {
   error_message: string | null;
   started_at: string | null;
   finished_at: string | null;
+  /** The parser version the stage declared (migration 0006); null if none. */
+  parser_version: number | null;
+  /** The derivative the stage read (migration 0007), and what it is. */
+  derivative_id: string | null;
+  derivative_kind: string | null;
+  derivative_tool: { name: string; version: string } | null;
+  /** The completed ingest units this run labelled for that derivative, and
+   * their records: what the stage covered (EPOCH-431). A unit already
+   * ingested by an earlier run counts too, since this run saw it. */
+  units: number;
+  records: number;
 }
 
 /**
@@ -106,9 +124,21 @@ const RECORD_COLUMNS = `id, ingest_id, evidence_id, derivative_id, file_hash, pa
 export async function getPipelineRuns(client: Db, limit = 100): Promise<PipelineRunRow[]> {
   const result = await client.query<PipelineRunRow>(
     `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id,
-            r.contract_version, r.tool_versions, c.state
+            r.contract_version, r.tool_versions, c.state, d.label AS device_label,
+            s.total AS stages_total, s.succeeded AS stages_succeeded,
+            s.failed AS stages_failed, s.skipped AS stages_skipped
        FROM pipeline_runs r
        JOIN run_completeness c USING (run_id)
+       LEFT JOIN evidence_items e ON e.evidence_id = r.evidence_id
+       LEFT JOIN devices d ON d.device_id = e.device_id
+       CROSS JOIN LATERAL (
+         SELECT count(*)::int AS total,
+                count(*) FILTER (WHERE status = 'succeeded')::int AS succeeded,
+                count(*) FILTER (WHERE status = 'failed')::int AS failed,
+                count(*) FILTER (WHERE status = 'skipped')::int AS skipped
+           FROM pipeline_stage_status ps
+          WHERE ps.run_id = r.run_id
+       ) s
       ORDER BY r.started_at DESC
       LIMIT $1`,
     [limit]
@@ -183,9 +213,19 @@ export const CANONICAL_STAGE_ORDER = ['crash', 'safari', 'sms', 'network', 'gclo
  */
 export async function getStageStatus(client: Db, runId: string): Promise<StageStatusRow[]> {
   const result = await client.query<StageStatusRow>(
-    `SELECT run_id, stage_name, status, error_message, started_at, finished_at
-       FROM pipeline_stage_status
-      WHERE run_id = $1`,
+    `SELECT s.run_id, s.stage_name, s.status, s.error_message, s.started_at, s.finished_at,
+            s.parser_version, s.derivative_id, d.kind AS derivative_kind, d.tool AS derivative_tool,
+            u.units, u.records
+       FROM pipeline_stage_status s
+       LEFT JOIN evidence_derivatives d ON d.derivative_id = s.derivative_id
+       CROSS JOIN LATERAL (
+         SELECT count(f.ingest_id)::int AS units, coalesce(sum(f.record_count), 0)::int AS records
+           FROM ingested_files f
+          WHERE f.derivative_id = s.derivative_id
+            AND s.run_id = ANY (f.produced_by_runs)
+            AND f.ingest_complete
+       ) u
+      WHERE s.run_id = $1`,
     [runId]
   );
 

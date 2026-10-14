@@ -1,12 +1,12 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
-import os from 'node:os';
 import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
 import type { Pool } from 'pg';
 import { discoverBackups, type Backup } from '@verichron/contracts';
 import type { PipelineFinishedResult, AnalysisRunStatus, PipelineLogEntry } from '../../shared/types/window';
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
+import { defaultWorkspace, readPreparedBackups } from './preparedBackups';
 
 interface StartPipelineOptions {
   workspace?: string;
@@ -297,6 +297,11 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     return discoverBackups(source);
   });
 
+  ipcMain.handle('epoch:getPreparedBackups', async (_event, workspace?: string) => {
+    const resolved = workspace?.trim() || defaultWorkspace();
+    return { workspace: resolved, backups: readPreparedBackups(resolved) };
+  });
+
   ipcMain.handle('epoch:startPipeline', async (_event, source: string, options?: StartPipelineOptions) => {
     if (runningProcessor) {
       throw new Error('The processor is already running -- wait for it to finish before starting another.');
@@ -305,7 +310,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       throw new Error('A source directory is required.');
     }
 
-    const workspacePath = options?.workspace?.trim() || path.join(os.homedir(), 'verichron-workspace');
+    const workspacePath = options?.workspace?.trim() || defaultWorkspace();
     const args = ['--filter', '@verichron/processor', 'dev', '--', '--source', source];
     args.push('--workspace', workspacePath);
     if (options?.forceDecrypt) args.push('--force-decrypt');

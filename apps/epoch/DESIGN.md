@@ -340,7 +340,8 @@ button; it becomes an outline button once the step is done.
 
 **Steps show their state.** A multi-step flow (§8) shows its steps as a
 numbered rail: pending (muted), current (accent ring), done (success check),
-blocked (flag). The iPhone pull uses it (`PullSteps`).
+blocked (flag). It is the shared `StepList` (EPOCH-455); the iPhone pull and
+New Investigation use it (§10).
 
 **Long steps show what they have done** (EPOCH-487). A step that runs for
 minutes or hours says how far it has got and how long it has taken, never
@@ -355,3 +356,36 @@ app-wide the tokens, the sidebar, `ViewLayout`, `EmptyState` and `Badge`
 (running is accent, succeeded and complete are success). The other views'
 own panels still use surface opacities and adopt the roles as they are next
 changed.
+
+## 10. Step flows — the user always sees what is done and what comes next
+
+Decided 2026-10-13 (EPOCH-497), after the first full run on a real backup:
+"Prepare Evidence" stayed the main action once preparation was complete, and
+read as needing to be run again; Analyze read like a separate feature rather
+than the step that creates the investigation; and after a restart the page
+forgot what was prepared. "We must guide clearly, or we look untrustworthy."
+
+- **One rail per task.** A page that is one task shows its steps as a
+  `StepList` at the top (§9): New Investigation's are Choose Evidence,
+  Prepare Evidence and Analyze. Done steps read as done, not as actions.
+- **State comes from the evidence, not memory.** What a step has done is read
+  from the workspace (the completion markers), so a restart or another
+  session shows the same state. New Investigation shows each backup as
+  "Not prepared", "Partly prepared · prepare again" (flag) or
+  "Prepared · <date>" (success).
+- **The next step leads.** Once a step is done, its action becomes a
+  secondary outline button with a name that says what it would do again
+  ("Prepare Again", which redoes the step from the start), and the next
+  step's action is the primary button.
+- **An action says what it creates.** Analyze's button is "Analyze and Create
+  Investigation", and its result points to the investigation ("Investigation
+  created." then "View Investigation").
+- **A finished long task hands over explicitly.** A finished iPhone pull shows
+  a results card (device, size, finish time, folder) with one next action,
+  "Continue to Prepare Evidence", instead of moving on by itself.
+- **A card that opens looks like it opens, and one that doesn't, doesn't.**
+  An investigation's stage cards open on click, Enter or Space, with a
+  chevron; closed, they show the status and what the stage produced; open,
+  what it read, what it wrote, exact times and its output (EPOCH-431). A card
+  with nothing to open has no hover lift.
+

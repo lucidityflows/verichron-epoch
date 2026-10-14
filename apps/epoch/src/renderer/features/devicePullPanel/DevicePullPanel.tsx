@@ -13,6 +13,7 @@ import {
   Terminal,
   Lock,
   ShieldCheck,
+  ArrowRight,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -21,9 +22,9 @@ import { useDevicePull } from '../../hooks/useDevicePull';
 import { PasswordField } from '../../components/ui/PasswordField';
 import { FieldError } from '../../components/ui/FieldError';
 import { ToolSetup } from './ToolSetup';
-import { PullSteps, type PullStep } from './PullSteps';
+import { StepList, type Step } from '../../components/ui/StepList';
 import { CopyButton } from '../../components/ui/CopyButton';
-import { BackupProgressCard, DestinationBackupNotice, IncompleteBackupNotice } from './BackupProgressCard';
+import { BackupProgressCard, DestinationBackupNotice, formatBytes, IncompleteBackupNotice } from './BackupProgressCard';
 import type { DeviceInfo } from '../../../shared/types/tools';
 
 /**
@@ -66,6 +67,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
     cancelEncryptionConsent,
     deviceAction,
     pullStats,
+    pulledAt,
     cancelPull,
     cancelling,
     incomplete,
@@ -83,7 +85,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
     handleSelectDestination,
     handlePull,
     checkAvailability,
-  } = useDevicePull(onBackupPulled);
+  } = useDevicePull();
 
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -164,7 +166,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
 
   // The step rail (DESIGN.md §9): each step's state, in order.
   const started = phase === 'pulling' || phase === 'pulled';
-  const pullSteps: PullStep[] = [
+  const pullSteps: Step[] = [
     { label: 'Device', state: selectedDevice ? 'done' : 'current' },
     {
       label: 'Destination',
@@ -387,7 +389,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
             <CheckCircle2 size="1rem" /> Device service ready
           </div>
 
-          <PullSteps steps={pullSteps} />
+          <StepList steps={pullSteps} label="Pull steps" />
 
           {devices.length === 0 ? (
             // The current step, and the examiner has to act: accent, with its action as the primary button (§9).
@@ -634,12 +636,40 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                   />
                 );
               })}
-          {phase === 'pulled' && (
-            <div className="text-data text-success bg-success/10 border border-success/30 shadow-elevation-1 rounded-lg p-4 mt-4 flex items-center gap-2">
-              <CheckCircle2 size="1.125rem" className="shrink-0" />
-              <span>
-                {pullProgress[pullProgress.length - 1]?.message ?? 'Backup complete and verified as finished.'}
-              </span>
+          {phase === 'pulled' && destDir && (
+            // The pull's results (EPOCH-437): what was made, then the one next step.
+            <div className="bg-success/10 border border-success/30 shadow-elevation-1 rounded-lg p-5 mt-4">
+              <p className="flex items-center gap-2 font-display text-heading text-success mb-3">
+                <CheckCircle2 size="1.25rem" className="shrink-0" /> Backup Pulled and Verified
+              </p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-data mb-4">
+                {selectedDevice && (
+                  <>
+                    <dt className="text-muted-foreground">Device</dt>
+                    <dd className="text-foreground">{selectedDevice.name}</dd>
+                  </>
+                )}
+                {pullStats && (
+                  <>
+                    <dt className="text-muted-foreground">Size</dt>
+                    <dd className="text-foreground">{formatBytes(pullStats.receivedBytes)}</dd>
+                  </>
+                )}
+                {pulledAt !== null && (
+                  <>
+                    <dt className="text-muted-foreground">Finished</dt>
+                    <dd className="text-foreground">{new Date(pulledAt).toLocaleString()}</dd>
+                  </>
+                )}
+                <dt className="text-muted-foreground">Saved to</dt>
+                <dd className="font-mono text-foreground truncate" title={destDir}>
+                  {destDir}
+                </dd>
+              </dl>
+              <Button onClick={() => onBackupPulled(destDir)}>
+                Continue to Prepare Evidence
+                <ArrowRight size="1rem" />
+              </Button>
             </div>
           )}
         </div>
