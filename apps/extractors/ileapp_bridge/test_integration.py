@@ -534,12 +534,58 @@ def test_times_outside_the_device_era_are_kept_and_reported_for_review(tmp_path)
     assert read.rows[0]["Last Modification Time"] == 197164800
     assert any("1 time(s) in Last Modification Time fall before 2007-06-29" in n for n in read.notes)
     assert any("1 time(s) in Start Time fall after this run" in n for n in read.notes)
+    # Marked on the record too, so the report lists every column, not only event_time.
+    assert read.review[0] == [
+        {"column": "Start Time", "time": "2100-01-01T00:00:00+00:00", "check": "after_run"},
+        {"column": "Last Modification Time", "time": "1976-04-01T00:00:00+00:00", "check": "before_device_era"},
+    ]
+    assert read.review[1] == []
 
 
-def test_a_report_that_does_not_name_its_ileapp_version_fails_the_stage(tmp_path):
+def test_time_review_markers_reach_the_stored_record(db, tmp_path):
+    calendar = {
+        "category": "Calendar", "name": "Calendar Events", "module": "calendarAll", "tablename": "calendarevents",
+        "columns": [("start", "Start Time", "datetime"), ("modified", "Last Modification Time", "datetime")],
+        "rows": [(1791140650, 197164800)],  # an ordinary start; modified 1976-04-01
+    }
+    ingest_report(db, CTX, write_report(tmp_path / "BK1", calendar))
+    [(fields, when)] = stored(db)
+    assert when == datetime.fromtimestamp(1791140650, timezone.utc)
+    assert fields["time_review"] == [
+        {"column": "Last Modification Time", "time": "1976-04-01T00:00:00+00:00", "check": "before_device_era"}
+    ]
+
+
+def test_a_same_named_artifact_from_another_module_is_not_corrected(tmp_path):
+    other = {**UBER, "module": "someOtherModule"}
+    output = read_manifest(write_report(tmp_path / "BK1", other))
+    conn = open_database(output)
+    try:
+        read = read_artifact(conn, output, output.artifacts[0], defects_for("iLEAPP", output.tool_version))
+    finally:
+        conn.close()
+    assert read.corrections == [[], []], "outside the registered scope"
+    assert read.event_times[0] == datetime.fromtimestamp(1791009, timezone.utc)
+
+
+@pytest.mark.parametrize(
+    "parser_info",
+    [
+        None,  # absent
+        "iLEAPP 2026.3.0",  # not a mapping
+        {"leapp_name": "iLEAPP"},  # no version
+        {"leapp_name": "iLEAPP", "leapp_version": 2026.3},  # a number would silently match no registered version
+        {"leapp_name": "iLEAPP", "leapp_version": "  "},
+        {"leapp_name": "ALEAPP", "leapp_version": "2026.3.0"},  # another tool
+    ],
+)
+def test_a_report_that_does_not_name_its_ileapp_version_fails_the_stage(tmp_path, parser_info):
     report = write_report(tmp_path / "BK1", SAFARI)
     manifest = json.loads((report / "_lava_data.lava").read_text())
-    del manifest["parser_info"]
+    if parser_info is None:
+        del manifest["parser_info"]
+    else:
+        manifest["parser_info"] = parser_info
     (report / "_lava_data.lava").write_text(json.dumps(manifest))
     with pytest.raises(LavaError, match="which iLEAPP version"):
         read_manifest(report)

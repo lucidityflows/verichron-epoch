@@ -41,7 +41,7 @@ SCHEMA_VERSION = 2
 BOOKKEEPING_PREFIX = "_"
 #: Keys the stage adds to every record's fields beside the row's own headers;
 #: a header with one of these names would be overwritten, so it is refused.
-METADATA_KEYS = ("engine", "source_artifact", "module", "category", "source_path", "corrections")
+METADATA_KEYS = ("engine", "source_artifact", "module", "category", "source_path", "corrections", "time_review")
 #: The tool name iLEAPP records in its manifest, and the registry it is checked against.
 TOOL = "iLEAPP"
 #: The first iPhone went on sale on this day: no device time can be earlier.
@@ -95,6 +95,8 @@ class ArtifactRows:
     corrections: list[list[dict[str, Any]]] = field(default_factory=list)
     #: defect id -> how many values it corrected
     corrected: dict[str, int] = field(default_factory=dict)
+    #: per row, its declared times outside the device era, kept and listed for review
+    review: list[list[dict[str, Any]]] = field(default_factory=list)
     #: the iLEAPP version the corrections were chosen for
     tool_version: str = ""
 
@@ -141,8 +143,13 @@ def read_manifest(report_dir: str | Path) -> LavaOutput:
             f"{manifest_path} records processing_status {manifest.get('processing_status')!r}; "
             "iLEAPP did not finish, so its output is incomplete"
         )
-    parser_info = manifest.get("parser_info") or {}
-    if parser_info.get("leapp_name") != TOOL or not parser_info.get("leapp_version"):
+    parser_info = manifest.get("parser_info")
+    if not (
+        isinstance(parser_info, dict)
+        and parser_info.get("leapp_name") == TOOL
+        and isinstance(parser_info.get("leapp_version"), str)
+        and parser_info["leapp_version"].strip()
+    ):
         # Registered defects are limited by version (R36), so a report that
         # doesn't say which iLEAPP wrote it can't be checked against them.
         raise LavaError(f"{manifest_path} doesn't record which {TOOL} version wrote it (parser_info)")
@@ -246,7 +253,7 @@ def read_artifact(
     # The registered defects that correct a column of this artifact (R36).
     fixes: list[tuple[ToolDefect, int, str]] = []
     for defect in defects:
-        header = defect.column_for(artifact.name)
+        header = defect.column_for(artifact.name, artifact.module)
         if header is None:
             continue
         if header not in headers:
@@ -277,6 +284,7 @@ def read_artifact(
     encoded = 0
     corrections: list[list[dict[str, Any]]] = []
     corrected: dict[str, int] = {}
+    review: list[list[dict[str, Any]]] = []
     # Declared times outside the device era, per column: (count, earliest, latest).
     early: dict[str, tuple[int, datetime, datetime]] = {}
     late: dict[str, tuple[int, datetime, datetime]] = {}
@@ -308,12 +316,21 @@ def read_artifact(
                 "resolution": defect.correction.factor,
             })
         corrections.append(applied)
+        flagged = []
         for index, header in time_columns:
             moment = unix_utc(effective[index])
             if moment is not None and (moment < DEVICE_ERA or moment > run_time):
                 bucket = early if moment < DEVICE_ERA else late
                 n, first, last = bucket.get(header, (0, moment, moment))
                 bucket[header] = (n + 1, min(first, moment), max(last, moment))
+                # On the record too, so the report lists every column, not
+                # only event_time.
+                flagged.append({
+                    "column": header,
+                    "time": moment.isoformat(),
+                    "check": "before_device_era" if moment < DEVICE_ERA else "after_run",
+                })
+        review.append(flagged)
         if time_index is None:
             event_times.append(None)
             continue
@@ -365,6 +382,7 @@ def read_artifact(
         notes=notes,
         corrections=corrections,
         corrected=corrected,
+        review=review,
         tool_version=output.tool_version,
     )
 

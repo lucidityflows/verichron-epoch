@@ -24,9 +24,10 @@ def test_a_defect_applies_only_to_the_versions_it_names():
 
 def test_the_uber_defect_names_its_artifacts_and_columns():
     uber = defect("iLEAPP", "ILEAPP-0001")
-    assert uber.column_for("Uber - Place Search Hits") == "Timestamp"
-    assert uber.column_for("Uber - Cached Locations") == "Last hit"
-    assert uber.column_for("Uber - Places") is None
+    assert uber.column_for("Uber - Place Search Hits", "uberClient") == "Timestamp"
+    assert uber.column_for("Uber - Cached Locations", "uberClient") == "Last hit"
+    assert uber.column_for("Uber - Places", "uberClient") is None
+    assert uber.column_for("Uber - Cached Locations", "otherModule") is None, "another module is out of scope"
 
 
 @pytest.mark.parametrize(

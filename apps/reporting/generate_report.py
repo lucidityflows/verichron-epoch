@@ -380,27 +380,35 @@ def fetch_corrections(conn, evidence_id: str) -> list[dict]:
         return cur.fetchall()
 
 
-def fetch_time_review(conn, evidence_id: str, generated_at: datetime) -> list[dict]:
-    """Per artifact, the event times before the device era or after this
-    report: kept as the tool gave them, listed for review."""
+def fetch_time_review(conn, evidence_id: str) -> list[dict]:
+    """The declared times a stage flagged on this evidence's current facts as
+    outside the device era (`fields.time_review`), per artifact, column and
+    check. Every declared time column is covered, not only event_time."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
-            SELECT fields->>'source_artifact' AS artifact,
-                   count(*) FILTER (WHERE event_time < %(era)s) AS early,
-                   min(event_time) FILTER (WHERE event_time < %(era)s) AS early_first,
-                   max(event_time) FILTER (WHERE event_time < %(era)s) AS early_last,
-                   count(*) FILTER (WHERE event_time > %(now)s) AS late,
-                   min(event_time) FILTER (WHERE event_time > %(now)s) AS late_first,
-                   max(event_time) FILTER (WHERE event_time > %(now)s) AS late_last
-            FROM current_forensic_records
-            WHERE evidence_id = %(evidence)s AND (event_time < %(era)s OR event_time > %(now)s)
-            GROUP BY 1
-            ORDER BY 1
+            SELECT r.fields->>'source_artifact' AS artifact,
+                   t->>'column' AS column_name,
+                   t->>'check' AS check_name,
+                   count(*) AS records,
+                   min((t->>'time')::timestamptz) AS earliest,
+                   max((t->>'time')::timestamptz) AS latest
+            FROM current_forensic_records r
+            CROSS JOIN LATERAL jsonb_array_elements(r.fields->'time_review') t
+            WHERE r.evidence_id = %s AND jsonb_typeof(r.fields->'time_review') = 'array'
+            GROUP BY 1, 2, 3
+            ORDER BY 1, 2, 3
             """,
-            {"evidence": evidence_id, "era": DEVICE_ERA, "now": generated_at},
+            (evidence_id,),
         )
         return cur.fetchall()
+
+
+#: How each time check reads in the report.
+TIME_CHECKS = {
+    "before_device_era": f"before {DEVICE_ERA.date()}, the first iPhone",
+    "after_run": "after the run that read it",
+}
 
 
 def _date_span(first, last) -> str:
@@ -437,23 +445,25 @@ def render_tool_checks_section(corrections: list[dict], review: list[dict]) -> l
         lines += ["No registered tool defect applied to this evidence, so nothing was corrected.", ""]
 
     lines += [
-        f"**Times for review.** An event time before {DEVICE_ERA.date()} (the first iPhone) is not a time a "
-        "device can have recorded; one after this report can be genuine, such as a scheduled event. "
-        "Both are kept as the tool gives them.",
+        f"**Times for review.** A time before {DEVICE_ERA.date()} (the first iPhone) is not one a device can "
+        "have recorded; one after the run that read it can be genuine, such as a scheduled event. Every declared "
+        "time column is checked, and these times are kept as the tool gives them.",
         "",
     ]
     if review:
         lines += [
-            "| Artifact | Before the first iPhone | After this report |",
-            "| :--- | :--- | :--- |",
+            "| Artifact | Column | Check | Records | Times |",
+            "| :--- | :--- | :--- | ---: | :--- |",
         ]
         for r in review:
-            early = f"{r['early']}: {_date_span(r['early_first'], r['early_last'])}" if r["early"] else "none"
-            late = f"{r['late']}: {_date_span(r['late_first'], r['late_last'])}" if r["late"] else "none"
-            lines.append(f"| {_table_cell(r['artifact'] or '(no artifact name)')} | {early} | {late} |")
+            lines.append(
+                f"| {_table_cell(r['artifact'] or '(no artifact name)')} | {_table_cell(r['column_name'])} "
+                f"| {TIME_CHECKS.get(r['check_name'], _table_cell(r['check_name']))} | {r['records']} "
+                f"| {_date_span(r['earliest'], r['latest'])} |"
+            )
         lines.append("")
     else:
-        lines += ["No event time falls outside that range.", ""]
+        lines += ["No checked time falls outside that range.", ""]
     lines += ["---", ""]
     return lines
 
@@ -541,8 +551,7 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     """
     if evidence_id is None:
         evidence_id = fetch_run_evidence(conn, run_id)
-    generated_at = datetime.now(timezone.utc)
-    timestamp = generated_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     stages = fetch_stage_status(conn, run_id)
 
     lines = [
@@ -581,7 +590,7 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     lines += render_coverage_section(fetch_fact_counts(conn, evidence_id), ileapp_outputs)
     lines += render_not_examined_section(ileapp_outputs)
     lines += render_tool_checks_section(
-        fetch_corrections(conn, evidence_id), fetch_time_review(conn, evidence_id, generated_at)
+        fetch_corrections(conn, evidence_id), fetch_time_review(conn, evidence_id)
     )
 
     for source_type, (title, fetch, render) in RENDERERS.items():

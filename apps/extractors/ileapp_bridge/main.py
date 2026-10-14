@@ -33,8 +33,9 @@ SAMPLE_ROWS = 10
 def build_records(read: ArtifactRows) -> list[NormalizedRecord]:
     """One record per row: the row under iLEAPP's original headers, plus where
     it came from. event_time is the artifact's declared time, corrected where
-    a registered tool defect applies, and `corrections` lists any correction
-    (R36). lava.py has already refused headers that would clash with these keys."""
+    a registered tool defect applies; `corrections` lists any correction and
+    `time_review` any declared time outside the device era (R36). lava.py has
+    already refused headers that would clash with these keys."""
     artifact = read.artifact
     metadata = {
         "engine": "iLEAPP",
@@ -47,9 +48,14 @@ def build_records(read: ArtifactRows) -> list[NormalizedRecord]:
         NormalizedRecord(
             source_type=SourceType.ILEAPP_RECORD,
             event_time=when,
-            fields={**metadata, **row, **({"corrections": applied} if applied else {})},
+            fields={
+                **metadata,
+                **row,
+                **({"corrections": applied} if applied else {}),
+                **({"time_review": flagged} if flagged else {}),
+            },
         )
-        for row, when, applied in zip(read.rows, read.event_times, read.corrections)
+        for row, when, applied, flagged in zip(read.rows, read.event_times, read.corrections, read.review)
     ]
 
 

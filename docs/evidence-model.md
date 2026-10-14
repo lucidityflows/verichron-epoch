@@ -139,12 +139,14 @@ counted and shown, never dropped.
 A tool's output is checked, not trusted (R36). Checks run on every ingest; for
 iLEAPP, each artifact's declared times are compared with the device era
 (2007-06-29, the first iPhone) and with the time of the run. A time outside it
-is reported for review, never altered.
+is never altered: it is marked on its record in `fields.time_review` (the
+column, the time and the check), and the report lists every marked column for
+review.
 
 A defect confirmed against the evidence the tool read is registered in
 `packages/contracts/tool_defects/<tool>.json`. An entry names the tool and the
 versions it affects (as the tool reports its own version), the module, the
-artifacts and columns, the defect, the evidence, the correction, the ticket and
+artifacts and columns (a correction applies only where all of them match), the defect, the evidence, the correction, the ticket and
 the upstream status. Entries are never deleted; a fixed release simply falls
 outside an entry's versions.
 

@@ -49,12 +49,16 @@ chosen or parsed by name.
 **iLEAPP's output is checked, not trusted (R36, EPOCH-511).**
 
 - Every declared time before 2007-06-29 (the first iPhone) or after the run is
-  counted in the stage's notes per artifact and column, with its range, and
-  kept as iLEAPP gives it. The report lists these times for review.
+  kept as iLEAPP gives it, counted in the stage's notes per artifact and
+  column, and marked on its record in `fields.time_review` (column, time,
+  check). The report lists every marked column for review, not only
+  `event_time`.
 - A defect registered for this iLEAPP version in
   `packages/contracts/tool_defects/iLEAPP.json` is corrected. The version is
   the one iLEAPP records in its manifest (`parser_info.leapp_version`), so a
-  report that doesn't record it fails the stage. The row keeps iLEAPP's value
+  report that doesn't record it as a non-empty string fails the stage. A
+  defect applies only to the module, artifacts and columns it names. The row
+  keeps iLEAPP's value
   under its header, `event_time` takes the corrected value, and `fields.corrections`
   lists each correction (defect, column, original, corrected, resolution).
   A registered column the artifact lacks fails that artifact. The defects
@@ -75,9 +79,11 @@ chosen or parsed by name.
 - `source_artifact`, `module`, `category`: the artifact as the manifest names it;
 - `source_path`: the input file the artifact was read from, relative to the
   evidence;
-- `corrections`, only on a row a registered tool defect corrected (see above).
+- `corrections`, only on a row a registered tool defect corrected, and
+  `time_review`, only on a row with a declared time outside the device era
+  (see above).
 
-A header equal to one of these six keys fails its artifact rather than being
+A header equal to one of these seven keys fails its artifact rather than being
 overwritten. The shape otherwise varies with the iLEAPP module.
 
 ## Test

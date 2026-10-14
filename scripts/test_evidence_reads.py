@@ -488,11 +488,12 @@ def test_the_report_discloses_tool_corrections_and_times_for_review(db, tmp_path
         return datetime.fromtimestamp(seconds, timezone.utc)
 
     correction = {"defect": "ILEAPP-0001", "column": "Last hit", "original": 1791009, "corrected": 1791009000, "resolution": 1000}
+    review = [{"column": "Last Modification Time", "time": "1976-04-01T00:00:00+00:00", "check": "before_device_era"}]
     seeded = [
         ("Uber - Cached Locations", utc(1791009000), {"Last hit": 1791009, "corrections": [correction]}),
-        ("Calendar Events", utc(197164800), {}),  # 1976-04-01: before the first iPhone
-        ("Calendar Events", utc(4102444800), {}),  # 2100-01-01: after the report
-        ("Safari History", utc(1791140650), {}),  # an ordinary time
+        # An ordinary event time, with a 1976 value in another declared column.
+        ("Calendar Events", utc(1791140650), {"Last Modification Time": 197164800, "time_review": review}),
+        ("Safari History", utc(1791140650), {}),
     ]
     for i, (name, when, extra) in enumerate(seeded):
         table = tmp_path / f"{i}.tsv"
@@ -516,8 +517,8 @@ def test_the_report_discloses_tool_corrections_and_times_for_review(db, tmp_path
     assert "divides Uber's timestamp_ms by 1,000" in rows[0]
     assert rows[0].endswith("| not reported |")
     assert rows[1:] == [
-        "| Calendar Events | 1: 1976-04-01 00:00:00 UTC | 1: 2100-01-01 00:00:00 UTC |",
-    ], "the corrected and the ordinary times are not listed for review"
+        "| Calendar Events | Last Modification Time | before 2007-06-29, the first iPhone | 1 | 1976-04-01 00:00:00 UTC |",
+    ], "every flagged column is listed, not only event_time; ordinary times are not"
 
 
 def test_the_report_says_when_nothing_was_corrected(db, artifact, tmp_path):
@@ -530,7 +531,7 @@ def test_the_report_says_when_nothing_was_corrected(db, artifact, tmp_path):
     generate_report(db._conn, RUN_A, EVIDENCE, str(out))
     section = out.read_text().split("## Tool Checks and Corrections", 1)[1].split("\n---\n", 1)[0]
     assert "No registered tool defect applied to this evidence, so nothing was corrected." in section
-    assert "No event time falls outside that range." in section
+    assert "No checked time falls outside that range." in section
 
 
 def test_an_artifact_name_with_a_pipe_or_line_break_keeps_its_table_row_whole(db, tmp_path):

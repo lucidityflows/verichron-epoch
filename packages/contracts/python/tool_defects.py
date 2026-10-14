@@ -67,8 +67,12 @@ class ToolDefect(_Strict):
     correction: ScaleCorrection
     upstream: Upstream
 
-    def column_for(self, artifact: str) -> str | None:
-        """The column this defect affects in ``artifact``, if any."""
+    def column_for(self, artifact: str, module: str) -> str | None:
+        """The column this defect affects in ``artifact`` from ``module``, if
+        any. Both must match: a same-named artifact from another module is
+        outside the registered scope, and is never corrected."""
+        if module != self.module:
+            return None
         return next((t.column for t in self.targets if t.artifact == artifact), None)
 
 
