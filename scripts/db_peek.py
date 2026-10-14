@@ -25,9 +25,6 @@ import psycopg2.extras
 from runtime_env import load_root_env, resolve_database_url
 
 
-DEFAULT_DB_URL = "postgresql://forensics:forensics_dev_only@localhost:5432/forensics"
-
-
 def most_recent_run_id(cur) -> str | None:
     cur.execute("SELECT run_id FROM pipeline_runs ORDER BY started_at DESC LIMIT 1")
     row = cur.fetchone()
@@ -110,14 +107,19 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     load_root_env()
-    parser.add_argument("--db-url", default=resolve_database_url())
+    parser.add_argument("--db-url", default=None)
     parser.add_argument("--run-id", default=None, help="defaults to the most recent run")
     parser.add_argument(
         "--evidence-id", default=None, help="defaults to the run's pipeline_runs.evidence_id"
     )
     args = parser.parse_args()
 
-    conn = psycopg2.connect(args.db_url)
+    try:
+        db_url = args.db_url if args.db_url is not None else resolve_database_url()
+    except RuntimeError as exc:
+        parser.error(str(exc))
+
+    conn = psycopg2.connect(db_url)
     conn.set_session(readonly=True)
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

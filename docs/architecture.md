@@ -200,6 +200,12 @@ imported from media and recorded (EPOCH-438, EPOCH-439). A Personal build comes
 later from the same core. Lab and Personal are separate builds, not a runtime
 switch ([decisions](decisions.md#product-and-builds)).
 
+## Database configuration
+
+**Built — R28 (EPOCH-424):** database configuration fails closed unless
+`DATABASE_URL` or complete `DB_*` credentials are supplied; see
+[the configuration rules](rules.md#configuration-and-security).
+
 ## Changes already decided
 
 These are settled but not yet built; this page will change when they land.

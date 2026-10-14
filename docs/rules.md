@@ -65,7 +65,7 @@ Numbers are stable: a retired rule keeps its number.
 
 | | Rule |
 |---|---|
-| R28 | One configuration order: `DATABASE_URL`, then `DB_*`, then a dev default only under an explicit dev flag. No credential defaults in packaged code, and no database URL flag |
+| R28 | One configuration order: `DATABASE_URL`, then complete `DB_*` credentials. If neither is configured, fail clearly; there are no credential defaults and no database URL flag |
 | R29 | The orchestrator selects the interpreter and validates the environment before spawning; extractors don't police themselves |
 | R30 | Secrets travel by environment or stdin, never on the command line, and are never logged |
 | R31 | Least privilege: the UI reads through a read-only role; only run state and the ingest door can write |
@@ -93,6 +93,5 @@ Known violations are ticketed and fixed, never waived.
 
 | Rule | Violation | Ticket |
 |---|---|---|
-| R28 | `resolve_database_url()` falls back to a hard-coded dev credential | EPOCH-424 |
 | R29 | Extractors check their own environment (`fatal_if_missing_venv()`), and the orchestrator falls back to `python3` on PATH when `.venv` is missing | EPOCH-456 |
 | R30 | The database URL is passed on the command line (the orchestrator to every stage, `--db-url`). The backup password reaches the decrypt only in `BACKUP_PASSWORD` (EPOCH-489) | EPOCH-423 |

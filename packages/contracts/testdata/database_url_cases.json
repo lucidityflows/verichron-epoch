@@ -1,0 +1,47 @@
+[
+  {
+    "name": "DATABASE_URL takes precedence",
+    "env": {
+      "DATABASE_URL": "postgresql://url-user:url-password@url-host:6543/url-db",
+      "DB_USER": "db-user",
+      "DB_PASSWORD": "db-password",
+      "DB_NAME": "db-name"
+    },
+    "expectedUrl": "postgresql://url-user:url-password@url-host:6543/url-db"
+  },
+  {
+    "name": "DB variables include explicit host and port",
+    "env": {
+      "DB_USER": "epoch-user",
+      "DB_PASSWORD": "epoch-password",
+      "DB_NAME": "epoch-db",
+      "DB_HOST": "db.example.test",
+      "DB_PORT": "6544"
+    },
+    "expectedUrl": "postgresql://epoch-user:epoch-password@db.example.test:6544/epoch-db"
+  },
+  {
+    "name": "empty optional host and port use defaults",
+    "env": {
+      "DB_USER": "epoch-user",
+      "DB_PASSWORD": "epoch-password",
+      "DB_NAME": "epoch-db",
+      "DB_HOST": "",
+      "DB_PORT": ""
+    },
+    "expectedUrl": "postgresql://epoch-user:epoch-password@localhost:5432/epoch-db"
+  },
+  {
+    "name": "missing configuration fails",
+    "env": {},
+    "expectedError": "Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME."
+  },
+  {
+    "name": "partial DB variables fail",
+    "env": {
+      "DB_USER": "epoch-user",
+      "DB_PASSWORD": "epoch-password"
+    },
+    "expectedError": "Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME."
+  }
+]

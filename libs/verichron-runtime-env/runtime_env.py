@@ -77,8 +77,11 @@ def resolve_database_url() -> str:
     user = environ.get("DB_USER")
     password = environ.get("DB_PASSWORD")
     name = environ.get("DB_NAME")
-    host = environ.get("DB_HOST", "localhost")
-    port = environ.get("DB_PORT", "5432")
+    host = environ.get("DB_HOST") or "localhost"
+    port = environ.get("DB_PORT") or "5432"
     if user and password and name:
         return f"postgresql://{user}:{password}@{host}:{port}/{name}"
-    return "postgresql://forensics:forensics_dev_only@localhost:5432/forensics"
+    raise RuntimeError(
+        "Database configuration is required: set DATABASE_URL, or all of "
+        "DB_USER, DB_PASSWORD, and DB_NAME."
+    )

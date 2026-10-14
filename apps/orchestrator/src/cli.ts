@@ -25,6 +25,8 @@ export async function resolvePythonBin(): Promise<string> {
 }
 
 export async function parseCliConfig(): Promise<CliConfig> {
+  loadRootEnv(REPO_ROOT);
+
   // Filter out standalone '--' tokens injected by pnpm script forwarding
   const cleanArgs = process.argv.slice(2).filter((arg) => arg !== '--');
 

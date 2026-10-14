@@ -13,7 +13,7 @@ pick it up. This script is what keeps a long-lived database in sync with
 migrations/ as the schema evolves after first boot.
 
 Usage:
-    python3 packages/etl-db-writer/migrate.py --db-url postgresql://forensics:forensics_dev_only@localhost:5432/forensics
+    python3 packages/etl-db-writer/migrate.py --db-url "$DATABASE_URL"
 
 Tracks applied migrations in a schema_migrations table. Migrations are
 applied in filename order (hence the 0001_, 0002_ prefix convention), each

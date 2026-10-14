@@ -95,8 +95,12 @@ pnpm --filter @verichron/orchestrator investigate -- --workspace ~/verichron-wor
 pnpm --filter @verichron/epoch dev
 ```
 
-The orchestrator reads `DATABASE_URL` or `DB_*` from `.env`. The report is
-written by the `reporting` stage to `reports/<label>/investigation_report.md`.
+The orchestrator reads `DATABASE_URL` or complete `DB_USER`, `DB_PASSWORD`,
+and `DB_NAME` values from `.env` (with optional `DB_HOST` and `DB_PORT`). If
+neither configuration is present, the app, orchestrator, and database
+inspection tool fail before connecting; there is no built-in development
+credential. The report is written by the `reporting` stage to
+`reports/<label>/investigation_report.md`.
 A database created before EPOCH-489 that still holds mvt results is refused by
 migration 0009; recreate it with the command above.
 
