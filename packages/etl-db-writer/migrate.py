@@ -113,6 +113,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _constraint("evidence_derivatives_kind_with_crash_reports"),
         _constraint("evidence_derivatives_kind_with_crash_reports"),
     ),
+    "0012_indicator_sets.sql": (
+        _relation("indicator_file_contents"),
+        _relation("idx_indicators_lookup"),
+    ),
 }
 
 

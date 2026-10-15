@@ -109,9 +109,29 @@ marker. The report states every error under "Not Examined", and the counts
 under "Coverage". A plugin error doesn't fail the stage: it fails the same way
 on every run, so no retry can get past it.
 
-**Indicator sets.** No derivative records an indicator set at the moment:
-indicator checks were removed with their tool (EPOCH-489). Indicator sets return
-as versioned, hashed data the project's own matching reads (EPOCH-490, 491).
+**Indicator sets** (EPOCH-490) are data the project's own matching reads
+(EPOCH-491), not derivatives of any evidence. A set is a list of STIX 2.1
+files. Its identity, the **set hash**, is the SHA-256 of its canonical
+manifest: for each file, its path in the set, the SHA-256 of its bytes, and its
+provenance (source repository, source commit, licence and download date), with
+the index commit it was fetched from. The same files with the same provenance
+are the same set in any order; one changed byte is another set.
+
+`apps/indicator_registry/register.py` loads a set and registers it whole, in
+one transaction: each file's bytes (stored by SHA-256), the set, each file's
+provenance and counts, and one row per indicator value. Registering the same
+set again changes nothing. The registry is append-only, in the writer and in
+the database, so a newer set sits beside the older one and an earlier result
+can still name the set it used.
+
+Every indicator in a file is loaded, revoked, or unsupported for a named
+reason (an operator other than `=` and `IN`, a qualifier, a type no backup
+supplies, and so on), and the three counts are stored with the file. An
+indicator past its `valid_until` is loaded and flagged as expired. A file that
+isn't a valid STIX 2.1 bundle rejects the whole set. Each value is normalized
+by the one function the matcher also applies to facts
+(`indicator_normalize.normalize`), so the two can't drift.
+
 Which facts can supply which indicator types is declared in the
 [indicator field map](indicator-field-map.md) (EPOCH-521).
 

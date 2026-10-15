@@ -35,9 +35,10 @@ analyze → report**. The orchestrator coordinates the last three.
    - repairs malformed SQLite databases;
    - runs iLEAPP over the decrypt.
 
-   Indicator checks are not part of processing at the moment (EPOCH-489);
-   the project's own indicator matching on extracted facts follows
-   (EPOCH-490 to 493).
+   Indicator checks are not part of processing at the moment (EPOCH-489).
+   Indicator sets are registered as data (EPOCH-490, see
+   [evidence-model.md](evidence-model.md#derivatives)); the project's own
+   matching on extracted facts follows (EPOCH-491 to 493).
 
    Each output is a **derivative**: a separate product of the evidence, which
    itself is never altered. Each carries a marker recording what produced it.
@@ -133,7 +134,9 @@ Each concern has exactly one owner (R2).
 | `apps/processor` | Hashing evidence, decrypt, repair, iLEAPP invocation, completion markers | Touch the database |
 | `apps/orchestrator` | Evidence registration, run creation, stage order, run and stage state | Parse evidence |
 | Stages (`apps/extractors/*`, `apps/analysis`, `apps/reporting`) | Turning one derivative's files into facts, or rendering the report | Choose their own identity (R16) or commit transactions (R15) |
-| `packages/etl-db-writer` | Python `ingest()`, the ledger, migrations | Parse anything (R15) |
+| `packages/etl-db-writer` | Python `ingest()`, the ledger, the indicator-set registry writer, migrations | Parse anything (R15) |
+| `packages/indicators` | The STIX 2.1 loader, and the one normalization indicators and facts share | Touch the database |
+| `apps/indicator_registry` | Loading an indicator set and registering it | Download anything |
 | `packages/etl-db-reader` | Named, read-only questions for the app (R24) | Write |
 | `packages/contracts` | Schemas, record types, marker formats, path helpers | Policy (R3) |
 
@@ -176,6 +179,7 @@ manifest replaces that (R18, EPOCH-427).
 | Evidence | `devices`, `evidence_items`, `evidence_locations`, `evidence_derivatives`, `evidence_events` | What the evidence is, where it was seen, what was derived from it, and an append-only custody log |
 | Runs | `pipeline_runs`, `pipeline_stage_status`, view `run_completeness` | Audit of each pipeline invocation; completeness is derived in one place (R23) |
 | Facts | `ingested_files`, `forensic_records`, views `current_forensic_records`, `forensic_records_history` | The ledger of processed source files and the facts they produced |
+| Indicators | `indicator_sets`, `indicator_set_files`, `indicator_file_contents`, `indicators` | Registered indicator sets, their files' bytes and provenance, and one row per indicator value; append-only |
 
 Migrations live in `packages/etl-db-writer/migrations` and are applied by
 `migrate.py` (see [development.md](development.md)).

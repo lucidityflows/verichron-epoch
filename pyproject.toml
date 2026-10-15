@@ -10,18 +10,21 @@ requires-python = "==3.14.*"
 dependencies = [
     "verichron-contracts",
     "verichron-etl-db-writer",
+    "verichron-indicators",
     "verichron-runtime-env",
     "verichron-etl-run",
     "verichron-testing",
     "verichron-crash",
     "verichron-ileapp-bridge",
     "verichron-analysis",
+    "verichron-indicator-registry",
     "verichron-reporting",
     "pytest>=8.0",
     "jsonschema>=4.0",
     "requests>=2.31",
     # The backup decrypt and iLEAPP are not workspace dependencies: each runs
     # from its own pinned environment under tools/ (EPOCH-458, EPOCH-489).
+    "pyyaml>=6",
 ]
 
 [tool.setuptools]
@@ -38,9 +41,11 @@ required-version = ">=0.12.23,<0.13"
 members = [
     "packages/contracts",
     "packages/etl-db-writer",
+    "packages/indicators",
     "libs/*",
     "apps/extractors/*",
     "apps/analysis",
+    "apps/indicator_registry",
     "apps/reporting"
 ]
 # etl-db-reader is a pure TypeScript/Node package (@verichron/db-reader) with no
@@ -55,12 +60,14 @@ exclude = [
 [tool.uv.sources]
 verichron-contracts = { workspace = true }
 verichron-etl-db-writer = { workspace = true }
+verichron-indicators = { workspace = true }
 verichron-runtime-env = { workspace = true }
 verichron-etl-run = { workspace = true }
 verichron-testing = { workspace = true }
 verichron-crash = { workspace = true }
 verichron-ileapp-bridge = { workspace = true }
 verichron-analysis = { workspace = true }
+verichron-indicator-registry = { workspace = true }
 verichron-reporting = { workspace = true }
 
 [tool.pytest.ini_options]

@@ -4,7 +4,8 @@ Which facts can supply which indicator types, so that indicator matching
 (EPOCH-491) knows where to look and can say what it couldn't check. The map is
 declared once, in [`packages/contracts/indicator_field_map.json`](../packages/contracts/indicator_field_map.json),
 and loaded by `indicator_field_map.py`. This page explains it. Established in
-EPOCH-521.
+EPOCH-521. Its `stix_paths` are also how the indicator loader (EPOCH-490) gives
+each STIX object path its type: a path not listed there isn't loaded.
 
 ## How sources were chosen
 
