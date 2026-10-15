@@ -26,6 +26,7 @@ import type { Backup } from '@verichron/contracts';
 import { pipelineApi } from '../api/pipeline';
 import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
 import { analysisShown } from './analysisShown';
+import { analysisSelection, listLabels } from '../../shared/analysisSelection';
 import { devicesApi } from '../api/devices';
 import { ViewLayout } from '../components/layout/ViewLayout';
 
@@ -111,6 +112,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   }, [workspace, prepareStatus, analysisStatus]);
   const preparedByLabel = new Map((preparedInfo?.backups ?? []).map((b) => [b.label, b]));
   const preparedCount = (preparedInfo?.backups ?? []).filter((b) => b.state === 'prepared').length;
+  // What Analyze reads: the selected backups that are prepared (EPOCH-530).
+  const selection = analysisSelection(selectedLabels, preparedInfo?.backups ?? []);
   const analysisWorkspace = lastRunWorkspace ?? preparedInfo?.workspace ?? null;
   // A result from before the latest Prepare doesn't hide Analyze (EPOCH-516).
   const analysisForRun = analysisShown(analysis, prepare, analysisWorkspace);
@@ -235,7 +238,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   };
 
   const handleStartAnalysis = async () => {
-    if (!analysisWorkspace) return;
+    if (!analysisWorkspace || selection.included.length === 0) return;
     // EPOCH-305 retry actionability: clear every piece of state a stale
     // run could have left behind before dispatching a new one, so "Try
     // again" after a crash/cancel/timeout starts from the same clean slate
@@ -245,7 +248,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     setAnalysisStartError(null);
     setAnalysisInterrupted(false);
     try {
-      await pipelineApi.startAnalysis(analysisWorkspace);
+      await pipelineApi.startAnalysis(analysisWorkspace, selection.included);
     } catch (err) {
       setAnalysisStartError(err instanceof Error ? err.message : 'Unknown error');
     }
@@ -559,14 +562,35 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
           {!analysisRunning && !analysisResult && (
             <div className="mt-4">
-              <p className="text-data text-foreground/80 mb-4">
-                Analyze reads the {preparedCount} prepared backup{preparedCount === 1 ? '' : 's'} in the workspace:
-                crash logs and iLEAPP&apos;s records become facts, then the investigation report is written. Indicator
-                checks and AI-assisted analysis are not available yet; the report lists them as not examined.
-              </p>
-              <Button onClick={handleStartAnalysis}>
+              {selection.included.length > 0 ? (
+                <p className="text-data text-foreground/80 mb-4">
+                  {selection.included.length === 1
+                    ? `Analyze reads the selected backup ${selection.included[0]}. Its crash logs and iLEAPP's records become facts, they are`
+                    : `Analyze reads the ${selection.included.length} selected backups: ${listLabels(selection.included)}. Their crash logs and iLEAPP's records become facts, they are`}{' '}
+                  checked against the newest registered indicator set, if one is registered, and the investigation
+                  report is written. AI-assisted analysis is not available yet; the report lists it as not examined.
+                  {selection.included.length > 1 && ' Each backup becomes its own investigation.'}
+                </p>
+              ) : (
+                <p className="text-data text-foreground/80 mb-4">Select a prepared backup above to analyze it.</p>
+              )}
+              {selection.notIncluded.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-label text-muted-foreground mb-1">Not included</h3>
+                  <ul className="list-disc pl-5 space-y-0.5 text-data text-foreground/80">
+                    {selection.notIncluded.map(({ label, reason }) => (
+                      <li key={label}>
+                        <span className="font-mono">{label}</span>: {reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <Button onClick={handleStartAnalysis} disabled={selection.included.length === 0}>
                 <Microscope size="1rem" />
-                Analyze and Create Investigation
+                {selection.included.length > 1
+                  ? `Analyze and Create ${selection.included.length} Investigations`
+                  : 'Analyze and Create Investigation'}
               </Button>
               {analysisStartError && (
                 <div className="flex items-center gap-1.5 text-data text-danger mt-3">
@@ -647,7 +671,13 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       need attention.
                     </p>
                   )}
-                  <Button variant="outline" size="sm" onClick={handleStartAnalysis} className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleStartAnalysis}
+                    disabled={selection.included.length === 0}
+                    className="mt-3"
+                  >
                     <RotateCcw size="0.875rem" />
                     Try Again
                   </Button>

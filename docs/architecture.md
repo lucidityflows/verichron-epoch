@@ -148,6 +148,12 @@ only at process boundaries (a stage is a subprocess) and in the database.
 The processor creates one workspace per batch of backups. Each backup is a
 *label* (its directory name).
 
+A workspace keeps every backup prepared in it until its folders are removed.
+The app's Analyze reads only the backups selected on New Investigation that
+are prepared there, and names every other selected or prepared backup as not
+included (EPOCH-530). The orchestrator's `--workspace` mode, for the command
+line, still analyzes every prepared backup in the workspace.
+
 ```
 <workspace>/
   evidence/<label>/sidecar.json            identity: content_root, file count, source path

@@ -71,12 +71,10 @@ const dbApi = {
   getReport: (runId: string): Promise<ReportResult> => ipcRenderer.invoke('epoch:getReport', runId),
   openReport: (runId: string): Promise<boolean> => ipcRenderer.invoke('epoch:openReport', runId),
 
-  // Stage 3: runs the orchestrator (creates pipeline_runs/stage rows for
-  // everything the processor has decrypted in `workspace`). See main.ts's
-  // epoch:startAnalysis handler for why this doesn't need a list of which
-  // backups succeeded -- orchestrator discovers that itself.
-  startAnalysis: (workspace: string): Promise<{ started: boolean }> =>
-    ipcRenderer.invoke('epoch:startAnalysis', workspace),
+  // Stage 3: runs the orchestrator on the selected backups in `workspace`,
+  // each checked to be prepared there (EPOCH-530).
+  startAnalysis: (workspace: string, labels: string[]): Promise<{ started: boolean }> =>
+    ipcRenderer.invoke('epoch:startAnalysis', workspace, labels),
   // EPOCH-308: retries the orchestrator against a single previously-run
   // backup_source rather than a whole workspace.
   retryRun: (backupSource: string): Promise<{ started: boolean }> => ipcRenderer.invoke('epoch:retryRun', backupSource),

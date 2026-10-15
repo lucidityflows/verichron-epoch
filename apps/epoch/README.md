@@ -34,6 +34,4 @@ Visual design follows [DESIGN.md](DESIGN.md).
 
 | Issue | Ticket |
 |---|---|
-| Device pull hangs (`encryptionToggledByUs`), and a typo in `window.d.ts` | EPOCH-413 |
-| The app isn't typechecked, built or tested in CI | EPOCH-454 |
 | The IPC bridge is hand-written in three places | EPOCH-453 |
