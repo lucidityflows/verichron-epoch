@@ -96,6 +96,14 @@ pnpm --filter @verichron/orchestrator investigate -- --workspace ~/verichron-wor
 pnpm --filter @verichron/epoch dev
 ```
 
+The app's `predev` and `prestart` scripts build the shared packages its main
+process loads from their `dist/` (`@verichron/contracts`,
+`@verichron/etl-db-reader`). Typing `rs` in a running Electron Forge session
+restarts the app without them, so after updating the code, quit and run the
+command again; otherwise the app runs the previous build of those packages
+(EPOCH-518). The orchestrator and processor are started fresh by each
+Analyze and Prepare Evidence, from the source.
+
 The orchestrator reads `DATABASE_URL` or complete `DB_USER`, `DB_PASSWORD`,
 and `DB_NAME` values from `.env` (with optional `DB_HOST` and `DB_PORT`). If
 neither configuration is present, the app, orchestrator, and database

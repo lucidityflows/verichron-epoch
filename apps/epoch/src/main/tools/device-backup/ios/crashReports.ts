@@ -81,8 +81,9 @@ async function countFiles(dir: string): Promise<{ files: number; bytes: number }
 /**
  * Copies the device's crash logs beside the backup in `backupDir`
  * (crashReportsAcquisitionPaths) and records how, once the copy has finished.
- * Never throws: the backup is complete either way, and the outcome goes in the
- * pull record. Refuses a destination that already exists.
+ * Never throws, whatever goes wrong (EPOCH-518): the backup is complete either
+ * way, and the outcome goes in the pull record. Refuses a destination that
+ * already exists.
  */
 export async function copyCrashReports(
   tool: string | undefined,
@@ -90,6 +91,24 @@ export async function copyCrashReports(
   backupDir: string,
   run: RunTool = runTool,
   now: () => Date = () => new Date()
+): Promise<CrashReportCopy> {
+  try {
+    return await copy(tool, udid, backupDir, run, now);
+  } catch (err) {
+    return {
+      outcome: 'failed',
+      tool_version: null,
+      error: `the copy stopped unexpectedly: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+async function copy(
+  tool: string | undefined,
+  udid: string,
+  backupDir: string,
+  run: RunTool,
+  now: () => Date
 ): Promise<CrashReportCopy> {
   if (!tool) return { outcome: 'unavailable', error: 'idevicecrashreport is not available' };
   const version = await crashReportToolVersion(tool, run);
