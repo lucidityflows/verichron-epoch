@@ -49,6 +49,23 @@ def pinned_ileapp_commit() -> str:
     ).stdout.strip()
 
 
+def require_commit(output_dir: Path, commit: str) -> None:
+    """Refuse an output the pinned iLEAPP didn't produce.
+
+    iLEAPP's self-reported version is shared by several commits (2026.3.0 at
+    tag v2026.3.1), so the commit the processor recorded in the output's
+    `.ileapp_ok` marker is what identifies it.
+    """
+    marker_path = output_dir / ".ileapp_ok"
+    if not marker_path.is_file():
+        raise SystemExit(f"{output_dir}: no .ileapp_ok marker, so the iLEAPP that produced it is unknown")
+    tool = json.loads(marker_path.read_text(encoding="utf-8")).get("tool") or {}
+    if tool.get("name") != "iLEAPP" or tool.get("version") != commit:
+        raise SystemExit(
+            f"{output_dir}: produced by {tool.get('name')} {tool.get('version')}, not the pinned iLEAPP {commit}"
+        )
+
+
 def declared_columns(output_dir: Path) -> tuple[str, dict[str, list[str]]]:
     manifest = json.loads((output_dir / "_lava_data.lava").read_text(encoding="utf-8"))
     version = manifest["parser_info"]["leapp_version"]
@@ -68,6 +85,7 @@ def main(argv: list[str]) -> int:
     versions: set[str] = set()
     union: dict[str, list[str]] = {}
     for arg in argv:
+        require_commit(Path(arg), commit)
         version, artifacts = declared_columns(Path(arg))
         versions.add(version)
         for name, columns in artifacts.items():

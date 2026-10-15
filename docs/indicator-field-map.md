@@ -18,7 +18,9 @@ were photo file names and type identifiers.
 Every iLEAPP source names a column the pinned iLEAPP declares. The declared
 columns of the mapped artifacts are recorded in
 `packages/contracts/ileapp_schema/<iLEAPP commit>.json` by
-`scripts/snapshot_ileapp_schema.py`, from real iLEAPP outputs. A test fails if
+`scripts/snapshot_ileapp_schema.py`, from real iLEAPP outputs. It refuses an
+output whose `.ileapp_ok` marker doesn't name the pinned iLEAPP commit, since
+iLEAPP's own version number is shared by several commits. A test fails if
 the map names a column the pinned iLEAPP doesn't declare, or if the snapshot
 belongs to another iLEAPP commit. Only the mapped artifacts are recorded: the
 full list of artifacts in an output says which apps were on a device.
@@ -90,7 +92,7 @@ comparison: no `IN`, no `AND`, no qualifiers, and none revoked.
 | IP address (`ipv4-addr:value`) | 73 | no |
 | Email (`email-addr:value`) | 65 | yes |
 | File path, name (`file:path`, `file:name`) | 49, 15 | no (EPOCH-523) |
-| Android property (`android-property:name`) | 2 | no |
+| Android property (`android-property:name`) | 3 | no |
 | URL (`url:value`) | 2 | yes |
 | Configuration profile (`configuration-profile:id`) | 1 | no |
 
