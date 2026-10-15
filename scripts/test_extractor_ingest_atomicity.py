@@ -123,6 +123,8 @@ def test_every_real_ips_shape_is_ingested_and_other_device_files_are_counted(db,
     (tmp_path / "Analytics-2026-01-02.ca").write_text("{}")
     (tmp_path / "DiagnosticLogs").mkdir()
     (tmp_path / "DiagnosticLogs" / "boot.log").write_text("log")
+    # The processor's completion marker is not a device file (EPOCH-518).
+    (tmp_path / ".crash_reports_ok").write_text("{}")
 
     result = crash_main.run(db, ctx(RUN_ID), str(tmp_path))
 
