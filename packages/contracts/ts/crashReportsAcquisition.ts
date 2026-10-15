@@ -26,6 +26,12 @@ export const CrashReportsAcquisition = z
     /** Copied with -k: the reports were left on the device. Nothing else is accepted. */
     kept_on_device: z.literal(true),
     acquired_at: z.iso.datetime({ offset: true }),
+    /**
+     * When the backup beside it finished (its Status.plist Date). A copy made
+     * later, after a failed one, is labelled with how much later (EPOCH-519):
+     * the device's reports change during the day.
+     */
+    backup_finished_at: z.iso.datetime({ offset: true }),
     files: z.number().int().nonnegative(),
     bytes: z.number().int().nonnegative(),
   })

@@ -11,9 +11,11 @@ import { afterEach, beforeEach, describe, it } from 'vitest';
 import { CrashReportsAcquisition } from '@verichron/contracts';
 
 import { copyCrashReports, crashReportArgs, type RunTool } from './crashReports';
-import { crashReportsSummary } from './iosBackupSource';
+import { crashReportsResult, crashReportsSummary } from './iosBackupSource';
 
 const UDID = '00008140-0000000000000000';
+/** When the backup finished (its Status.plist Date). */
+const FINISHED = '2026-10-15T00:59:30.000Z';
 let tmp: string;
 let backupDir: string;
 
@@ -76,6 +78,7 @@ describe('copyCrashReports', () => {
       '/tools/idevicecrashreport',
       UDID,
       backupDir,
+      FINISHED,
       fakeTool(calls, (dir) => {
         fs.mkdirSync(path.join(dir, 'Retired'));
         fs.writeFileSync(path.join(dir, 'a.ips'), 'aaaa');
@@ -93,6 +96,7 @@ describe('copyCrashReports', () => {
       tool: { name: 'idevicecrashreport', version: '1.4.0' },
       kept_on_device: true,
       acquired_at: '2026-10-15T01:00:00.000Z',
+      backup_finished_at: FINISHED,
       files: 2,
       bytes: 6,
     });
@@ -104,6 +108,7 @@ describe('copyCrashReports', () => {
       '/tools/idevicecrashreport',
       UDID,
       backupDir,
+      FINISHED,
       fakeTool([], () => ({ code: 0, output: 'Done.\n' }))
     );
     assert.deepEqual(result, { outcome: 'copied', tool_version: '1.4.0', files: 0, bytes: 0 });
@@ -114,6 +119,7 @@ describe('copyCrashReports', () => {
       '/tools/idevicecrashreport',
       UDID,
       backupDir,
+      FINISHED,
       fakeTool([], () => ({ code: 0, output: 'Move: a.ips\n' }))
     );
     assert.equal(result.outcome, 'failed');
@@ -126,6 +132,7 @@ describe('copyCrashReports', () => {
       '/tools/idevicecrashreport',
       UDID,
       backupDir,
+      FINISHED,
       fakeTool([], () => ({ code: 1, output: 'ERROR: Could not connect to lockdownd\n' }))
     );
     assert.equal(result.outcome, 'failed');
@@ -136,6 +143,38 @@ describe('copyCrashReports', () => {
     assert.ok(!fs.existsSync(`${backupDir}.crash-reports.json`));
   });
 
+  it('says plainly when the device was locked, and leaves nothing behind, so it can be copied again (EPOCH-519)', async () => {
+    const locked = await copyCrashReports(
+      '/tools/idevicecrashreport',
+      UDID,
+      backupDir,
+      FINISHED,
+      fakeTool([], () => ({
+        code: 255,
+        output: 'ERROR: Could not connect to lockdownd: Password protected (-17)\n',
+      }))
+    );
+    assert.deepEqual(locked, {
+      outcome: 'failed',
+      tool_version: '1.4.0',
+      error: 'the device was locked, so it refused the copy; unlock it and copy the crash logs again',
+      locked: true,
+    });
+    assert.ok(!fs.existsSync(`${backupDir}.crash-reports`), "the failed copy's own folder is gone");
+
+    const again = await copyCrashReports(
+      '/tools/idevicecrashreport',
+      UDID,
+      backupDir,
+      FINISHED,
+      fakeTool([], (dir) => {
+        fs.writeFileSync(path.join(dir, 'a.ips'), 'aaaa');
+        return { code: 0, output: 'Copy: a.ips\n' };
+      })
+    );
+    assert.deepEqual(again, { outcome: 'copied', tool_version: '1.4.0', files: 1, bytes: 4 });
+  });
+
   it('refuses a destination that already exists, and never runs the copy', async () => {
     fs.mkdirSync(`${backupDir}.crash-reports`);
     const calls: string[][] = [];
@@ -143,6 +182,7 @@ describe('copyCrashReports', () => {
       '/tools/idevicecrashreport',
       UDID,
       backupDir,
+      FINISHED,
       fakeTool(calls, () => ({ code: 0, output: '' }))
     );
     assert.equal(result.outcome, 'failed');
@@ -153,7 +193,7 @@ describe('copyCrashReports', () => {
     const throwing: RunTool = async () => {
       throw new TypeError('contracts.crashReportsAcquisitionPaths is not a function');
     };
-    assert.deepEqual(await copyCrashReports('/tools/idevicecrashreport', UDID, backupDir, throwing), {
+    assert.deepEqual(await copyCrashReports('/tools/idevicecrashreport', UDID, backupDir, FINISHED, throwing), {
       outcome: 'failed',
       tool_version: null,
       error: 'the copy stopped unexpectedly: contracts.crashReportsAcquisitionPaths is not a function',
@@ -162,6 +202,7 @@ describe('copyCrashReports', () => {
       '/tools/idevicecrashreport',
       UDID,
       backupDir,
+      FINISHED,
       fakeTool([], () => ({ code: 0, output: '' })),
       () => {
         throw new Error('no clock');
@@ -175,7 +216,7 @@ describe('copyCrashReports', () => {
   });
 
   it('says so when the tool is not available', async () => {
-    assert.deepEqual(await copyCrashReports(undefined, UDID, backupDir), {
+    assert.deepEqual(await copyCrashReports(undefined, UDID, backupDir, FINISHED), {
       outcome: 'unavailable',
       error: 'idevicecrashreport is not available',
     });
@@ -186,7 +227,7 @@ describe('crashReportsSummary', () => {
   it('states the size of a real copy in MB, not as 0.0 GB', () => {
     assert.equal(
       crashReportsSummary({ outcome: 'copied', tool_version: '1.4.0', files: 244, bytes: 7_600_000 }),
-      '244 crash log file(s) copied (7.6 MB); they are still on the device.'
+      '244 crash log file(s) copied (7.6 MB); they are still on the device. You can lock it now.'
     );
   });
 
@@ -197,7 +238,24 @@ describe('crashReportsSummary', () => {
     );
     assert.match(
       crashReportsSummary({ outcome: 'failed', tool_version: '1.4.0', error: 'lockdownd refused' }),
-      /^The crash logs were not copied: lockdownd refused\. The report will say they were not acquired\.$/
+      /^The crash logs were not copied: lockdownd refused\. Copy them again below, or the report will say they were not acquired\.$/
     );
+  });
+});
+
+describe('crashReportsResult', () => {
+  it('gives the panel the outcome, the backup to copy again for, and whether the device was locked', () => {
+    assert.deepEqual(
+      crashReportsResult({ outcome: 'copied', tool_version: '1.4.0', files: 216, bytes: 5_178_439 }, '/p/UDID'),
+      { outcome: 'copied', backupDir: '/p/UDID', files: 216 }
+    );
+    assert.deepEqual(
+      crashReportsResult(
+        { outcome: 'failed', tool_version: '1.4.0', error: 'the device was locked', locked: true },
+        '/p/UDID'
+      ),
+      { outcome: 'failed', backupDir: '/p/UDID', error: 'the device was locked', locked: true }
+    );
+    assert.equal(crashReportsResult(null, '/p/UDID'), undefined);
   });
 });

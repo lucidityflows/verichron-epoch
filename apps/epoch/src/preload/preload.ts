@@ -10,6 +10,7 @@ import type {
 } from '../shared/types/window';
 import type {
   BackupProgress,
+  CrashReportsResult,
   DeviceInfo,
   PullOptions,
   BackupStats,
@@ -123,6 +124,8 @@ const dbApi = {
     ipcRenderer.invoke('epoch:listIncompleteBackups', sourceId, device, destDir),
   deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo): Promise<void> =>
     ipcRenderer.invoke('epoch:deleteIncompleteBackup', sourceId, destDir, device),
+  copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string): Promise<CrashReportsResult> =>
+    ipcRenderer.invoke('epoch:copyDeviceCrashReports', sourceId, device, backupDir),
   onDeviceBackupStats: (callback: (stats: BackupStats) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, stats: BackupStats) => callback(stats);
     ipcRenderer.on('epoch:deviceBackupStats', listener);

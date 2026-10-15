@@ -52,6 +52,19 @@ export interface BackupProgress {
   percent?: number;
   /** Short human-readable status line, safe to show directly in the UI. */
   message: string;
+  /** With `done`: what the crash-log copy did (EPOCH-514, 519). */
+  crashReports?: CrashReportsResult;
+}
+
+/** What copying a backup's crash logs did, as the panel shows it (EPOCH-519). */
+export interface CrashReportsResult {
+  outcome: 'copied' | 'failed' | 'unavailable';
+  /** The backup the crash logs belong to, for copying them again. */
+  backupDir: string;
+  files?: number;
+  error?: string;
+  /** The device refused because it was locked: unlocking it and copying again can succeed. */
+  locked?: boolean;
 }
 
 /** How a running backup is going (EPOCH-466), sent every few seconds. */
@@ -132,6 +145,12 @@ export interface DeviceBackupSource {
   destinationBackup(destDir: string, device: DeviceInfo): Promise<DestinationBackup | null>;
   incompleteBackup(destDir: string, device: DeviceInfo): Promise<IncompleteBackup | null>;
   deleteIncompleteBackup(destDir: string, device: DeviceInfo): Promise<void>;
+  /**
+   * Copies a finished backup's crash logs again after a failed copy
+   * (EPOCH-519): only from the device the backup came from, and never over a
+   * copy that exists.
+   */
+  copyCrashReportsAgain(device: DeviceInfo, backupDir: string): Promise<CrashReportsResult>;
 }
 
 export type ToolAcquisitionAction =

@@ -479,6 +479,7 @@ describe('stages and the completeness predicate', live, () => {
     mkdirSync(crashPath, { recursive: true });
     const params = {
       acquired_at: '2026-10-15T01:00:00.000Z',
+      backup_finished_at: '2026-10-15T00:59:30.000Z',
       files: 230,
       bytes: 7_600_000,
       reports_root: 'c'.repeat(64),
@@ -525,7 +526,13 @@ describe('stages and the completeness predicate', live, () => {
       renderCrashReportsMarker(
         'f'.repeat(64),
         { name: 'idevicecrashreport', version: '1.4.0' },
-        { acquired_at: '2026-10-15T01:00:00.000Z', files: 0, bytes: 0, reports_root: 'c'.repeat(64) }
+        {
+          acquired_at: '2026-10-15T01:00:00.000Z',
+          backup_finished_at: '2026-10-15T00:59:30.000Z',
+          files: 0,
+          bytes: 0,
+          reports_root: 'c'.repeat(64),
+        }
       )
     );
     const result = await run(ws.backupPath);

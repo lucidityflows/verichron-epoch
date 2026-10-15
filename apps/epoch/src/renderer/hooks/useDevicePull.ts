@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import type {
   BackupProgress,
   BackupStats,
+  CrashReportsResult,
   DevicePullState,
   IncompleteBackup,
   DeviceInfo,
@@ -73,6 +74,9 @@ export function useDevicePull() {
   const [incomplete, setIncomplete] = useState<IncompleteBackup[]>([]);
   // The path being deleted, if any.
   const [deletingIncomplete, setDeletingIncomplete] = useState<string | null>(null);
+  // EPOCH-519: crash logs copied again after a failed copy, and whether that is running.
+  const [crashRetry, setCrashRetry] = useState<CrashReportsResult | null>(null);
+  const [copyingCrashReports, setCopyingCrashReports] = useState(false);
   // The folder the finished pull wrote into, inside destDir (EPOCH-504).
   const [pulledDir, setPulledDir] = useState<string | null>(null);
 
@@ -315,6 +319,7 @@ export function useDevicePull() {
     setDeviceAction(null);
     setPullStats(null);
     setPulledDir(null);
+    setCrashRetry(null);
   };
 
   /** Asks for a destination folder; true when it changed. */
@@ -353,6 +358,25 @@ export function useDevicePull() {
     } catch (err) {
       setCancelling(false);
       setPullError(ipcErrorMessage(err));
+    }
+  };
+
+  /** What the pull's crash-log copy did: from its "done" line, or from a copy made again since (EPOCH-519). */
+  const crashReports: CrashReportsResult | null =
+    crashRetry ?? [...pullProgress].reverse().find((p) => p.phase === 'done')?.crashReports ?? null;
+
+  /** Copies the pulled backup's crash logs again after a failed copy (EPOCH-519). */
+  const copyCrashReportsAgain = async () => {
+    if (!sourceId || !selectedDevice || !crashReports || crashReports.outcome === 'copied') return;
+    setCopyingCrashReports(true);
+    try {
+      const result = await devicesApi.copyDeviceCrashReports(sourceId, selectedDevice, crashReports.backupDir);
+      setCrashRetry(result);
+      if (result.outcome === 'copied') toast.show(`${result.files ?? 0} crash log file(s) copied.`, 'success');
+    } catch (err) {
+      setCrashRetry({ ...crashReports, error: ipcErrorMessage(err) });
+    } finally {
+      setCopyingCrashReports(false);
     }
   };
 
@@ -460,6 +484,9 @@ export function useDevicePull() {
     incomplete,
     deleteIncomplete,
     deletingIncomplete,
+    crashReports,
+    copyCrashReportsAgain,
+    copyingCrashReports,
     pulledDir,
     runCompileFromSource,
     handleSelectDestination,

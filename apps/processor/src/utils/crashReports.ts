@@ -67,6 +67,7 @@ export async function prepareCrashReports(opts: {
     path.join(opts.destDir, CRASH_REPORTS_MARKER),
     renderCrashReportsMarker(opts.contentRoot, acquisition.tool, {
       acquired_at: acquisition.acquired_at,
+      backup_finished_at: acquisition.backup_finished_at,
       files: acquisition.files,
       bytes: acquisition.bytes,
       reports_root: source.contentRoot,

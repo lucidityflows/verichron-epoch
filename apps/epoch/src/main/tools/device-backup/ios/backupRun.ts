@@ -99,14 +99,41 @@ export async function snapshotState(plistutil: string, backupDir: string): Promi
   } catch {
     return null;
   }
-  const xml = await new Promise<string>((resolve, reject) =>
-    execFile(plistutil, ['-i', status, '-f', 'xml'], { encoding: 'utf-8' }, (err, stdout) =>
+  const match = (await plistXml(plistutil, status)).match(/<key>SnapshotState<\/key>\s*<string>([^<]*)<\/string>/);
+  if (!match) throw new Error(`Status.plist in ${backupDir} has no SnapshotState.`);
+  return match[1];
+}
+
+/** A plist as XML, whatever form it is stored in, through the toolchain's plistutil. */
+function plistXml(plistutil: string, file: string): Promise<string> {
+  return new Promise<string>((resolve, reject) =>
+    execFile(plistutil, ['-i', file, '-f', 'xml'], { encoding: 'utf-8' }, (err, stdout) =>
       err ? reject(err) : resolve(stdout)
     )
   );
-  const match = xml.match(/<key>SnapshotState<\/key>\s*<string>([^<]*)<\/string>/);
-  if (!match) throw new Error(`Status.plist in ${backupDir} has no SnapshotState.`);
-  return match[1];
+}
+
+/** When the backup finished: its Status.plist `Date`, as an ISO time (EPOCH-519). */
+export async function backupFinishedAt(plistutil: string, backupDir: string): Promise<string> {
+  const xml = await plistXml(plistutil, path.join(backupDir, 'Status.plist'));
+  const match = xml.match(/<key>Date<\/key>\s*<date>([^<]*)<\/date>/);
+  const date = match ? new Date(match[1]) : null;
+  if (!date || Number.isNaN(date.getTime())) throw new Error(`Status.plist in ${backupDir} has no Date.`);
+  return date.toISOString();
+}
+
+/**
+ * The device a backup was made from: Info.plist's `Unique Identifier`, else
+ * `Target Identifier`. `GUID` is an iTunes backup ID, not the device's
+ * (EPOCH-404). Null when neither is there.
+ */
+export async function backupDeviceId(plistutil: string, backupDir: string): Promise<string | null> {
+  const xml = await plistXml(plistutil, path.join(backupDir, 'Info.plist'));
+  for (const key of ['Unique Identifier', 'Target Identifier']) {
+    const match = xml.match(new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`));
+    if (match) return match[1];
+  }
+  return null;
 }
 
 /**

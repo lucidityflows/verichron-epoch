@@ -107,6 +107,7 @@ from a real device's output, with the date, model, iOS version and tool version.
 | Progress bars carry the bytes so far, redrawn with `\r` | `[==   ]   3% (93.4 MB/3.3 GB)` | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-14 |
 | `IsFullBackup` in `Status.plist` is false after a full backup, so it isn't a measure of completeness. The tool was run with `--full` (it sends `ForceFullBackup`) into a folder that didn't exist; idevicebackup2 never writes the key, so the device sets it. Published Finder and iTunes backups also show false | `IsFullBackup` false, `BackupState` new, `Version` 3.3 | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-12 |
 | `idevicecrashreport -k` copies the device's crash reports and leaves them on it: every output line reads `Copy:`, none `Move:`. Without `-k` the tool moves them, deleting them from the device (its man page). Run right after a backup, with the device unlocked, it shows no prompt on the device | 244 files in under a minute: 22 in the root, 221 in `Retired/`, 1 in `DiagnosticLogs/`; 230 `.ips`, 7 `.ca`, 6 `.session`, 1 `.log`. In a pull, after the backup: 216 files (208 `.ips`), no prompt on the device | iPhone17,5 · 26.6.1 · idevicecrashreport 1.4.0 | 2026-10-14, 2026-10-15 |
+| A locked device refuses the crash-log copy; unlocked, the same command copies | `ERROR: Could not connect to lockdownd: Password protected (-17)`, exit 255, nothing copied; unlocked: 242 files, exit 0 | iPhone17,5 · 26.6.1 · idevicecrashreport 1.4.0 | 2026-10-15 |
 
 ### Verified processing of a real backup
 

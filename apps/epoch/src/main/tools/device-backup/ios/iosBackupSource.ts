@@ -2,6 +2,7 @@ import { spawn, execFileSync, type ChildProcess } from 'child_process';
 import type {
   BackupProgress,
   BackupStats,
+  CrashReportsResult,
   DestinationBackup,
   DeviceBackupSource,
   DeviceInfo,
@@ -19,6 +20,8 @@ import { enableBackupEncryption, PASSCODE_TIMEOUT_MS } from './encryption';
 import { failureMessage } from './deviceErrors';
 import { lastLines, StreamLines } from './toolchain/process';
 import {
+  backupDeviceId,
+  backupFinishedAt,
   deviceListed,
   existingBackupState,
   folderSize,
@@ -96,6 +99,8 @@ export class IosBackupSource implements DeviceBackupSource {
   private running: ChildProcess | null = null;
   /** Null when no pull is running; true once the user asked to cancel it. */
   private cancelRequested: boolean | null = null;
+  /** True while crash logs are being copied again (EPOCH-519); a pull waits for it. */
+  private copyingCrashLogs = false;
 
   /**
    * Stops the running backup cleanly: SIGINT, as Ctrl+C would, so
@@ -159,6 +164,48 @@ export class IosBackupSource implements DeviceBackupSource {
       bytes: incomplete.bytes,
       deleted_at: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Copies a finished backup's crash logs again after a failed copy
+   * (EPOCH-519). Refused unless the backup is finished and came from the
+   * connected device, and never while a pull runs; copyCrashReports refuses a
+   * backup that already has a copy. Recorded as its own line in the pull
+   * record, with how long after the backup it was made.
+   */
+  async copyCrashReportsAgain(device: DeviceInfo, backupDir: string): Promise<CrashReportsResult> {
+    if (this.cancelRequested !== null) throw new Error('A backup is running; wait for it to finish.');
+    if (this.copyingCrashLogs) throw new Error('Crash logs are already being copied.');
+    this.copyingCrashLogs = true;
+    try {
+      const plistutil = trustedToolPath('plistutil');
+      if (!plistutil) throw new Error('plistutil is not available -- complete the iPhone tool setup first.');
+      const reason = await incompleteReason(plistutil, backupDir);
+      if (reason) throw new Error(`${backupDir} isn't a finished backup: ${reason}.`);
+      const madeFrom = await backupDeviceId(plistutil, backupDir);
+      if (!madeFrom || madeFrom.toUpperCase() !== device.id.toUpperCase() || path.basename(backupDir) !== device.id) {
+        throw new Error(
+          `${backupDir} wasn't made from ${device.name}; crash logs are copied only from the same device.`
+        );
+      }
+      if (deviceListed(toolBinaryPath().idevice_id, device.id) !== true) {
+        throw new Error(`${device.name} isn't connected. Connect it, unlock it, and try again.`);
+      }
+      const copy = await copyCrashLogs(plistutil, device, backupDir);
+      const finishedAt = await backupFinishedAt(plistutil, backupDir).catch(() => null);
+      const at = new Date();
+      await appendPullRecord(path.dirname(backupDir), {
+        event: 'crash-reports-copied-again',
+        udid: device.id,
+        path: backupDir,
+        at: at.toISOString(),
+        after_backup_s: finishedAt === null ? null : Math.round((at.getTime() - Date.parse(finishedAt)) / 1000),
+        crash_reports: copy,
+      });
+      return crashReportsResult(copy, backupDir)!;
+    } finally {
+      this.copyingCrashLogs = false;
+    }
   }
 
   async checkToolAvailable(): Promise<ToolAvailabilityStatus> {
@@ -268,6 +315,7 @@ export class IosBackupSource implements DeviceBackupSource {
     };
 
     if (this.cancelRequested !== null) throw new Error('A backup is already running.');
+    if (this.copyingCrashLogs) throw new Error('Crash logs are being copied; wait for that to finish.');
     this.cancelRequested = false;
     let recorded = false;
     // True once the device's folder is known not to exist: anything in it
@@ -330,7 +378,7 @@ export class IosBackupSource implements DeviceBackupSource {
       // later ask for the passcode to start one: say so before it starts.
       onProgress({
         phase: 'device-action',
-        message: `Unlock ${device.name} and keep it unlocked until the backup finishes. It will ask for its passcode to start.`,
+        message: `Unlock ${device.name} and keep it unlocked until the backup finishes and its crash logs are copied. It will ask for its passcode to start.`,
       });
       record.received_bytes = await runBackup(
         idevicebackup2,
@@ -358,26 +406,12 @@ export class IosBackupSource implements DeviceBackupSource {
       // An iOS backup holds none of the device's crash logs (EPOCH-447):
       // copy them beside it, leaving them on the device (EPOCH-514). The
       // backup is complete either way; the outcome is recorded and shown.
+      // The device must still be unlocked: a locked one refuses (EPOCH-519).
       onProgress({
-        phase: 'transferring',
-        message: `Copying the crash logs from ${device.name}. They stay on the device.`,
+        phase: 'device-action',
+        message: `Keep ${device.name} unlocked: copying its crash logs. They stay on the device.`,
       });
-      // Guarded here too (EPOCH-518): nothing in this step may turn the
-      // completed backup into a failed pull.
-      try {
-        const crashTool = detectBinary('idevicecrashreport', trustedToolPath('idevicecrashreport'));
-        record.crash_reports = await copyCrashReports(
-          crashTool.available ? crashTool.path : undefined,
-          device.id,
-          backupDir
-        );
-      } catch (err) {
-        record.crash_reports = {
-          outcome: 'failed',
-          tool_version: null,
-          error: `the copy stopped unexpectedly: ${err instanceof Error ? err.message : String(err)}`,
-        };
-      }
+      record.crash_reports = await copyCrashLogs(plistutil, device, backupDir);
       record.outcome = 'completed';
       record.finished_at = new Date().toISOString();
       // The record is written before "done", so a completed pull is never
@@ -396,6 +430,7 @@ export class IosBackupSource implements DeviceBackupSource {
       onProgress({
         phase: 'done',
         message: `Backup complete and verified as finished: ${backupDir}. ${crashReportsSummary(record.crash_reports)}`,
+        crashReports: crashReportsResult(record.crash_reports, backupDir),
       });
       return destDir;
     } catch (err) {
@@ -462,15 +497,51 @@ async function removeOwnLeftover(destDir: string, device: DeviceInfo): Promise<v
   });
 }
 
+/**
+ * Copies a finished backup's crash logs, recording when the backup finished.
+ * Never throws (EPOCH-518): nothing in this step may turn a completed backup
+ * into a failed pull.
+ */
+async function copyCrashLogs(plistutil: string, device: DeviceInfo, backupDir: string): Promise<CrashReportCopy> {
+  try {
+    const crashTool = detectBinary('idevicecrashreport', trustedToolPath('idevicecrashreport'));
+    return await copyCrashReports(
+      crashTool.available ? crashTool.path : undefined,
+      device.id,
+      backupDir,
+      await backupFinishedAt(plistutil, backupDir)
+    );
+  } catch (err) {
+    return {
+      outcome: 'failed',
+      tool_version: null,
+      error: `the copy stopped unexpectedly: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+/** The copy's outcome as the panel shows it, with the backup it belongs to. */
+export function crashReportsResult(copy: CrashReportCopy | null, backupDir: string): CrashReportsResult | undefined {
+  if (!copy) return undefined;
+  return copy.outcome === 'copied'
+    ? { outcome: 'copied', backupDir, files: copy.files }
+    : {
+        outcome: copy.outcome,
+        backupDir,
+        error: copy.error,
+        locked: copy.outcome === 'failed' && copy.locked === true,
+      };
+}
+
 /** What the crash-log copy did, in a sentence for the user. */
 export function crashReportsSummary(copy: CrashReportCopy | null): string {
   if (!copy) return '';
   if (copy.outcome === 'copied') {
     return copy.files === 0
       ? 'The device held no crash logs.'
-      : `${copy.files} crash log file(s) copied (${(copy.bytes / 1e6).toFixed(1)} MB); they are still on the device.`;
+      : `${copy.files} crash log file(s) copied (${(copy.bytes / 1e6).toFixed(1)} MB); they are still on the device. You can lock it now.`;
   }
-  return `The crash logs were not copied: ${copy.error}. The report will say they were not acquired.`;
+  return `The crash logs were not copied: ${copy.error}. Copy them again below, or the report will say they were not acquired.`;
 }
 
 /** Why a pull refuses a destination that already holds something for the device (EPOCH-483). */

@@ -54,6 +54,20 @@ export interface IncompleteBackupDeleted {
   deleted_at: string;
 }
 
+/**
+ * Crash logs copied again for a finished backup after a failed copy
+ * (EPOCH-519). The pull's own line is never rewritten; `after_backup_s` says
+ * how long after the backup finished they were copied.
+ */
+export interface CrashReportsCopiedAgain {
+  event: 'crash-reports-copied-again';
+  udid: string;
+  path: string;
+  at: string;
+  after_backup_s: number | null;
+  crash_reports: CrashReportCopy;
+}
+
 /** A failed pull removed the device folder it had created, which held no backup data (EPOCH-505). */
 export interface FailedPullFolderRemoved {
   event: 'failed-pull-folder-removed';
@@ -74,7 +88,8 @@ export interface FailedPullFolderKept {
 
 export async function appendPullRecord(
   destDir: string,
-  record: PullRecord | IncompleteBackupDeleted | FailedPullFolderRemoved | FailedPullFolderKept
+  record:
+    PullRecord | IncompleteBackupDeleted | FailedPullFolderRemoved | FailedPullFolderKept | CrashReportsCopiedAgain
 ): Promise<void> {
   await fs.appendFile(path.join(destDir, PULL_RECORD_FILE), JSON.stringify(record) + '\n');
 }

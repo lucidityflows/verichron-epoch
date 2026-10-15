@@ -48,9 +48,15 @@ the device separately (EPOCH-514).
   `idevicecrashreport -k`, which copies the reports and leaves them on the
   device, into `<UDID>.crash-reports/` beside the backup, never inside it, so
   the backup's content root is the device's backup alone. Only a finished copy
-  gets `<UDID>.crash-reports.json`: the tool, when, and the file and byte
-  counts. The pull record says what the copy did; a failed copy doesn't fail
-  the completed backup.
+  gets `<UDID>.crash-reports.json`: the tool, when it was copied, when the
+  backup finished, and the file and byte counts. The pull record says what the
+  copy did; a failed copy doesn't fail the completed backup, and removes the
+  folder it created, so it can be copied again.
+- **Copied again after a failed copy** (EPOCH-519), for example when the device
+  locked: only from the device the backup came from, only for a finished
+  backup with no copy yet, and recorded as its own line in the pull record.
+  The device's reports change during the day, so the report states how long
+  after the backup finished they were copied.
 - **Copied by the processor.** It copies them into
   `<workspace>/crash_reports/<label>/`, hashes the copy the way a backup is
   hashed, and writes `.crash_reports_ok` once the copy matches the pull's

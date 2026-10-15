@@ -432,6 +432,7 @@ describe('crash logs (EPOCH-514)', () => {
         tool: { name: 'idevicecrashreport', version: '1.4.0' },
         kept_on_device: true,
         acquired_at: '2026-10-15T01:00:00.000Z',
+        backup_finished_at: '2026-10-15T00:59:30.000Z',
         files,
         bytes,
       })
@@ -466,6 +467,7 @@ describe('crash logs (EPOCH-514)', () => {
     assert.deepEqual(marker.tool, { name: 'idevicecrashreport', version: '1.4.0' });
     assert.equal(marker.params.files, 2);
     assert.equal(marker.params.acquired_at, '2026-10-15T01:00:00.000Z');
+    assert.equal(marker.params.backup_finished_at, '2026-10-15T00:59:30.000Z');
     assert.match(marker.params.reports_root, /^[0-9a-f]{64}$/);
     assert.equal(readFileSync(path.join(copied(), 'Retired', 'b.ips'), 'utf8'), 'bb');
   });

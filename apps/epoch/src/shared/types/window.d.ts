@@ -2,6 +2,7 @@ import type { PipelineRunRow, StageStatusRow, ForensicRecordPage, ForensicRecord
 import type { Backup } from '@verichron/contracts';
 import type {
   BackupProgress,
+  CrashReportsResult,
   DeviceInfo,
   PullOptions,
   BackupStats,
@@ -165,6 +166,7 @@ declare global {
         destDir: string | null
       ) => Promise<IncompleteBackup[]>;
       deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) => Promise<void>;
+      copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string) => Promise<CrashReportsResult>;
       onDeviceBackupStats: (callback: (stats: BackupStats) => void) => () => void;
       runToolAcquisitionSteps: (
         steps: ToolAcquisitionCommand[],
