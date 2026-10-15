@@ -11,7 +11,8 @@
     "libs/testing",
     "apps",
     "apps/extractors",
-    "apps/extractors/ileapp_bridge"
+    "apps/extractors/ileapp_bridge",
+    "apps/extractors/indicator_match"
   ],
   "include": [
     "packages/*",

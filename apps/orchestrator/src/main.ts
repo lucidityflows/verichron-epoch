@@ -51,7 +51,9 @@ async function main() {
     try {
       // Registration and the evidence-keyed resume check happen inside, before
       // any run is created (EPOCH-404).
-      const result = await runPipelineForBackup(client, backupPath, cfg.dbUrl, pythonBin, stages);
+      const result = await runPipelineForBackup(client, backupPath, cfg.dbUrl, pythonBin, stages, {
+        indicatorSetHash: cfg.indicatorSetHash,
+      });
       if (result.skipped) {
         analysisResults.push({ backupPath, status: 'skipped' });
         continue;

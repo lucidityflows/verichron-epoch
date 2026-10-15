@@ -59,7 +59,9 @@ SCHEMA = """
 CREATE TABLE ingested_files (
     ingest_id        INTEGER PRIMARY KEY AUTOINCREMENT,
     evidence_id      TEXT NOT NULL,
-    derivative_id    TEXT NOT NULL,
+    derivative_id    TEXT,
+    -- 0013: a unit's input is a derivative or an indicator set, never both.
+    indicator_set_id TEXT,
     file_hash        TEXT NOT NULL,
     source_type      TEXT NOT NULL,
     parser_version   INTEGER NOT NULL CHECK (parser_version >= 1),
@@ -75,6 +77,7 @@ CREATE TABLE ingested_files (
     completed_at     TEXT,
     UNIQUE (evidence_id, file_hash, source_type, parser_version),
     UNIQUE (ingest_id, evidence_id),
+    CHECK ((derivative_id IS NULL) <> (indicator_set_id IS NULL)),
     CHECK (
         (ingest_complete = 1 AND record_count IS NOT NULL AND completed_at IS NOT NULL)
         OR

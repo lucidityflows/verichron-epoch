@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 import { randomUUID } from 'node:crypto';
 import type { StageSet } from './types.js';
-import { absentInputReason, derivativeFor, type Registration, type RegisteredDerivatives } from './registration.js';
+import { inputsFor, type Registration, type RegisteredDerivatives } from './registration.js';
 
 export type RunState = 'running' | 'incomplete' | 'complete';
 
@@ -11,44 +11,48 @@ export type RunState = 'running' | 'incomplete' | 'complete';
  * state in the run_completeness view is 'complete' (R23, migration 0005; not
  * re-derived here) AND in which every stage enabled now succeeded at the
  * parserVersion its stage.json declares now, reading the derivative it would
- * read now. A stage whose derivative this evidence lacks (crash logs that
- * were never acquired, EPOCH-447) counts when it was skipped for that same
- * absence, matched by its recorded reason: a stage skipped because it was
- * disabled never counts, so enabling it gets a new run. A parserVersion bump (R8), a newly enabled stage, newly acquired
- * crash logs, or a new
- * iLEAPP output (e.g. a new iLEAPP commit, EPOCH-416) therefore gets a new run
- * instead of being skipped as done; unchanged stages dedup in the ledger, so
- * re-running them writes nothing new.
+ * read now. A stage whose input this evidence lacks (crash logs that were
+ * never acquired, EPOCH-447; no indicator set registered, EPOCH-491) counts
+ * when it was skipped for that same absence, matched by its recorded reason: a
+ * stage skipped because it was disabled never counts, so enabling it gets a new
+ * run. A parserVersion bump (R8), a newly enabled stage, newly acquired crash
+ * logs, a new iLEAPP output (e.g. a new iLEAPP commit, EPOCH-416) or another
+ * indicator set therefore gets a new run instead of being skipped as done;
+ * unchanged stages dedup in the ledger, so re-running them writes nothing new.
  */
 export async function hasCompleteRunFor(
   client: Client,
   registration: Pick<Registration, 'evidenceId'> & RegisteredDerivatives,
-  enabled: StageSet['enabled']
+  enabled: StageSet['enabled'],
+  indicatorSet: { setId: string } | null = null
 ): Promise<boolean> {
-  return (await findCompleteRunFor(client, registration, enabled)) !== null;
+  return (await findCompleteRunFor(client, registration, enabled, indicatorSet)) !== null;
 }
 
 /** The complete run hasCompleteRunFor finds, or null: the latest one. */
 export async function findCompleteRunFor(
   client: Client,
   registration: Pick<Registration, 'evidenceId'> & RegisteredDerivatives,
-  enabled: StageSet['enabled']
+  enabled: StageSet['enabled'],
+  indicatorSet: { setId: string } | null = null
 ): Promise<string | null> {
+  const inputs = enabled.map((stage) => inputsFor(stage, registration, indicatorSet));
   const { rows } = await client.query<{ run_id: string }>(
     `SELECT c.run_id FROM run_completeness c
       WHERE c.evidence_id = $1 AND c.derivative_id = $2 AND c.state = 'complete'
         AND NOT EXISTS (
-          SELECT 1 FROM unnest($3::text[], $4::int[], $5::uuid[], $6::text[])
-                     AS want(stage_name, parser_version, derivative_id, absent_reason)
+          SELECT 1 FROM unnest($3::text[], $4::int[], $5::uuid[], $6::uuid[], $7::text[])
+                     AS want(stage_name, parser_version, derivative_id, indicator_set_id, absent_reason)
            WHERE NOT EXISTS (
              SELECT 1 FROM pipeline_stage_status s
               WHERE s.run_id = c.run_id
                 AND s.stage_name = want.stage_name
                 AND (s.status = 'succeeded'
-                     OR (s.status = 'skipped' AND want.derivative_id IS NULL
+                     OR (s.status = 'skipped' AND want.absent_reason IS NOT NULL
                          AND s.error_message = want.absent_reason))
                 AND s.parser_version IS NOT DISTINCT FROM want.parser_version
-                AND s.derivative_id IS NOT DISTINCT FROM want.derivative_id))
+                AND s.derivative_id IS NOT DISTINCT FROM want.derivative_id
+                AND s.indicator_set_id IS NOT DISTINCT FROM want.indicator_set_id))
       ORDER BY c.finished_at DESC
       LIMIT 1`,
     [
@@ -56,8 +60,9 @@ export async function findCompleteRunFor(
       registration.decryptedDerivativeId,
       enabled.map((stage) => stage.name),
       enabled.map((stage) => stage.manifest.parserVersion ?? null),
-      enabled.map((stage) => derivativeFor(stage, registration)),
-      enabled.map((stage) => absentInputReason(stage)),
+      inputs.map((input) => input.derivativeId),
+      inputs.map((input) => input.indicatorSetId),
+      inputs.map((input) => input.absentReason),
     ]
   );
   return rows[0]?.run_id ?? null;
@@ -90,7 +95,8 @@ export async function createRun(
   backupPath: string,
   stages: StageSet,
   provenance: RunProvenance,
-  registration: Pick<Registration, 'evidenceId'> & RegisteredDerivatives
+  registration: Pick<Registration, 'evidenceId'> & RegisteredDerivatives,
+  indicatorSet: { setId: string } | null = null
 ): Promise<string> {
   const runId = randomUUID();
   await client.query(
@@ -107,10 +113,11 @@ export async function createRun(
     ]
   );
   for (const stage of stages.enabled) {
+    const input = inputsFor(stage, registration, indicatorSet);
     await client.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, parser_version, derivative_id)
-       VALUES ($1, $2, 'pending', $3, $4)`,
-      [runId, stage.name, stage.manifest.parserVersion ?? null, derivativeFor(stage, registration)]
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, parser_version, derivative_id, indicator_set_id)
+       VALUES ($1, $2, 'pending', $3, $4, $5)`,
+      [runId, stage.name, stage.manifest.parserVersion ?? null, input.derivativeId, input.indicatorSetId]
     );
   }
   for (const stage of stages.disabled) {

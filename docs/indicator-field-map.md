@@ -36,7 +36,7 @@ values on this backup is still mapped. On such a case, its type is reported as
 | Type | Source | Read as | Values |
 |---|---|---|---:|
 | URL | Safari Browser - History: URL, Redirect Source, Redirect Destination | as stored | 4,518; 509; 510 |
-| URL | Safari Browser - Search Terms: URL, Redirect Source, Redirect Destination | as stored | 587; 0; 0 |
+| URL | Safari Browser - Search Terms: URL | as stored | 587 |
 | URL | Safari Browser - Tabs (BrowserState): URL, User Visible URL | as stored | 199; 199 |
 | URL | Safari Browser - Tabs (SafariTabs): URL | as stored | 25 |
 | URL | Safari Browser - Bookmarks: URL | as stored | 2 |
@@ -66,6 +66,12 @@ values on this backup is still mapped. On such a case, its type is reported as
 
 **Not read:** URLs inside message text (SMS `Message`). Extracting them is its
 own rule, with its own false-positive risk (EPOCH-491).
+
+**Not mapped:** Safari Browser - Search Terms' `Redirect Source` and
+`Redirect Destination`. Despite their names, they hold four-digit numbers, not
+URLs: 103 values across the two reference backups, every one numeric (checked
+2026-10-15, EPOCH-491). They were mapped in EPOCH-521, whose survey counted no
+URLs in them, and were removed when the matcher read them.
 
 ## Types with no source
 

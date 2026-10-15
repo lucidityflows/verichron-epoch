@@ -5,13 +5,8 @@ import * as path from 'node:path';
 import { Client } from 'pg';
 import type { StageDefinition, StageSet, RunConfig } from './types.js';
 import { createRun, findCompleteRunFor, markStage, markRunFailed, type RunProvenance } from './db.js';
-import {
-  absentInputReason,
-  derivativeFor,
-  registerEvidence,
-  RegistrationError,
-  type Registration,
-} from './registration.js';
+import { inputsFor, registerEvidence, RegistrationError, type Registration } from './registration.js';
+import { IndicatorSetError, selectIndicatorSet, type IndicatorSetChoice } from './indicatorSets.js';
 import {
   contractVersion,
   deriveIleappPath,
@@ -55,38 +50,47 @@ const DERIVATIVE_NAMES: Record<DerivativeKind, string> = {
 export type StageOutcome = { status: 'succeeded' | 'failed'; stderr: string } | { status: 'skipped'; reason: string };
 
 /**
- * Runs one stage against the derivative its stage.json says it reads, passing
- * that derivative's id and path. A stage whose derivative wasn't registered
- * (the processor hasn't completed it) fails before it is spawned, unless that
- * derivative is one only some acquisitions produce (absentInputReason).
+ * Runs one stage against the input its stage.json says it reads: a derivative,
+ * whose id and path it passes, or the indicator set the run checks, whose id it
+ * passes (EPOCH-491). A stage whose derivative wasn't registered (the processor
+ * hasn't completed it) fails before it is spawned, unless that input is one
+ * whose absence is a fact (crash logs never acquired, no indicator set
+ * registered); the stage is then skipped with the reason.
  */
 export function runStage(
   stage: StageDefinition,
   config: RunConfig,
   runId: string,
-  registration: Registration
+  registration: Registration,
+  indicatorSet: IndicatorSetChoice | null = null
 ): Promise<StageOutcome> {
-  const paths: Record<DerivativeKind, string | undefined> = {
-    decrypted: config.backupPath,
-    ileapp_output: config.ileappPath,
-    crash_reports: config.crashReportsPath,
-  };
   // Identity comes from here, never from the stage (R16): the evidence, the
-  // derivative this stage reads, and its declared parser version.
-  const derivativeId = derivativeFor(stage, registration);
-  const derivativePath = paths[stage.manifest.reads];
-  const notAcquired = absentInputReason(stage);
-  if (!derivativeId && notAcquired) {
-    return Promise.resolve({ status: 'skipped', reason: notAcquired });
+  // input this stage reads, and its declared parser version.
+  const input = inputsFor(stage, registration, indicatorSet);
+  if (input.absentReason) {
+    return Promise.resolve({ status: 'skipped', reason: input.absentReason });
   }
-  if (!derivativeId || !derivativePath) {
-    return Promise.resolve({
-      status: 'failed',
-      success: false,
-      stderr:
-        `stage "${stage.name}" reads ${DERIVATIVE_NAMES[stage.manifest.reads]}, but none is registered for ` +
-        'this backup; run the processor to complete it',
-    });
+  let inputArgs: string[];
+  const reads = stage.manifest.reads;
+  if (reads === 'indicator_set') {
+    if (!input.indicatorSetId) throw new Error(`stage "${stage.name}" has no indicator set and no reason`);
+    inputArgs = ['--indicator-set-id', input.indicatorSetId];
+  } else {
+    const paths: Record<DerivativeKind, string | undefined> = {
+      decrypted: config.backupPath,
+      ileapp_output: config.ileappPath,
+      crash_reports: config.crashReportsPath,
+    };
+    const derivativePath = paths[reads];
+    if (!input.derivativeId || !derivativePath) {
+      return Promise.resolve({
+        status: 'failed',
+        stderr:
+          `stage "${stage.name}" reads ${DERIVATIVE_NAMES[reads]}, but none is registered for ` +
+          'this backup; run the processor to complete it',
+      });
+    }
+    inputArgs = ['--derivative-id', input.derivativeId, '--derivative-path', derivativePath];
   }
 
   return new Promise((resolve) => {
@@ -97,10 +101,7 @@ export function runStage(
       registration.evidenceId,
       '--backup-path',
       config.backupPath,
-      '--derivative-id',
-      derivativeId,
-      '--derivative-path',
-      derivativePath,
+      ...inputArgs,
     ];
     if (stage.manifest.parserVersion !== undefined)
       extraArgs.push('--parser-version', String(stage.manifest.parserVersion));
@@ -169,6 +170,8 @@ export interface BackupRunResult {
 export interface RunPipelineOptions {
   /** Per-install device-key secret file; tests point this at a temp file. */
   secretPath?: string;
+  /** The indicator set to check, by set hash; the newest registered one when omitted (EPOCH-491). */
+  indicatorSetHash?: string;
 }
 
 export async function runPipelineForBackup(
@@ -202,11 +205,21 @@ export async function runPipelineForBackup(
     throw err;
   }
 
+  // The set this run checks, chosen once so every stage row and the resume
+  // check agree on it (EPOCH-491).
+  let indicatorSet: IndicatorSetChoice | null;
+  try {
+    indicatorSet = await selectIndicatorSet(client, options.indicatorSetHash);
+  } catch (err) {
+    if (err instanceof IndicatorSetError) return { success: false, error: err.message };
+    throw err;
+  }
+
   // Resume is keyed by evidence identity, not by path: the same backup
   // registered from another mount path is the same evidence. It is also
-  // keyed by the stage plan: a bumped parserVersion or a newly enabled stage
-  // is not "already done".
-  const completeRun = await findCompleteRunFor(client, registration, stages.enabled);
+  // keyed by the stage plan and its inputs: a bumped parserVersion, a newly
+  // enabled stage or another indicator set is not "already done".
+  const completeRun = await findCompleteRunFor(client, registration, stages.enabled, indicatorSet);
   if (completeRun) {
     // A run marked complete whose summary export then failed (a full disk)
     // would otherwise never get its file: write it now (EPOCH-409).
@@ -217,7 +230,7 @@ export async function runPipelineForBackup(
     return { success: true, skipped: true, evidenceId: registration.evidenceId };
   }
 
-  const runId = await createRun(client, backupPath, stages, collectProvenance(pythonBin), registration);
+  const runId = await createRun(client, backupPath, stages, collectProvenance(pythonBin), registration, indicatorSet);
   const results: { stage: string; success: boolean }[] = [];
   // Registration located the workspace, so a backup that reached here has one.
   const summaryPath = deriveRunSummaryPath(backupPath, runId);
@@ -230,7 +243,8 @@ export async function runPipelineForBackup(
         stage,
         { backupPath, reportPath, ileappPath, crashReportsPath, dbUrl, pythonBin },
         runId,
-        registration
+        registration,
+        indicatorSet
       );
 
       if (outcome.status === 'skipped') {

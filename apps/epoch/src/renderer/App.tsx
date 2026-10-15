@@ -176,7 +176,7 @@ export const App: React.FC = () => {
               />
             )}
 
-            {section === 'iocs' && <IocsView />}
+            {section === 'iocs' && <IocsView selectedRun={selectedRun} />}
 
             {section === 'reports' && <ReportsView selectedRun={selectedRun} />}
           </div>

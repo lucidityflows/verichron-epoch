@@ -122,9 +122,16 @@ uv run python scripts/fetch_indicator_feeds.py ~/indicator-sets/mvt-2026-10-15
 # Show what the set holds, per file, without touching the database
 uv run python apps/indicator_registry/register.py --check ~/indicator-sets/mvt-2026-10-15
 
-# Register it (again: no change). Any STIX 2.1 file or directory of them works the same way
+# Register it (again: no change). Any STIX 2.1 file or directory of them works the same way;
+# a set fetched by the script is named in its set.json, any other needs --name
 uv run python apps/indicator_registry/register.py ~/indicator-sets/mvt-2026-10-15
 ```
+
+Analyze checks the evidence against the newest registered set. To check
+against another one, give the orchestrator its set hash:
+`investigate -- --workspace <dir> --indicator-set <set hash>`. Registering a
+newer set makes the next Analyze of already-analyzed evidence run again; the
+extractors find their facts already ingested and write nothing new.
 
 Useful tools:
 

@@ -10,7 +10,8 @@ Reads the mvt-indicators index (`indicators.yaml`) at a pinned commit, never at
 a branch, and resolves each listed file's branch to the commit it points to
 now. Each file is downloaded at that commit into
 `<directory>/<owner>/<repo>/<path>`, and `set.json` records the index commit
-and, per file, its repository, commit, licence and download date. Register the
+and, per file, its repository, commit, licence and download date, and names
+the set after the index commit (the report adds the fetch date). Register the
 result with `apps/indicator_registry/register.py`.
 
 The directory must not exist yet: a fetch never writes over an earlier one.
@@ -117,6 +118,7 @@ def main(argv: list[str]) -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
     description = {
+        "name": f"mvt-indicators index {args.index_commit[:12]}",
         "index": {"repository": INDEX_REPOSITORY, "commit": args.index_commit, "path": INDEX_PATH},
         "files": [meta for _, _, meta in fetched],
     }

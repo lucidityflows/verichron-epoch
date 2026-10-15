@@ -1,5 +1,5 @@
 /**
- * Public entry point for `@verichron/db-reader`.
+ * Public entry point for `@verichron/etl-db-reader`.
  *
  * Read-only query helpers for TypeScript consumers. Fact ingestion is handled
  * by the Python writer; run-state writes are owned by the orchestrator.
@@ -23,6 +23,11 @@ export type {
   ForensicRecordQuery,
   ForensicRecordPage,
   RecordSortKey,
+  IndicatorCheckRow,
+  IndicatorCheckSummary,
+  IndicatorTypeSummary,
+  IndicatorSetSourceRow,
+  IndicatorMatchRow,
 } from './dbReader.js';
 export {
   getPipelineRuns,
@@ -30,6 +35,8 @@ export {
   getRunReportLocation,
   getStageStatus,
   getForensicRecords,
+  getIndicatorChecks,
+  MATCH_LIMIT,
   CANONICAL_STAGE_ORDER,
   MAX_RECORDS_PAGE,
 } from './dbReader.js';

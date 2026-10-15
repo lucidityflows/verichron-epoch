@@ -17,6 +17,7 @@ dependencies = [
     "verichron-crash",
     "verichron-ileapp-bridge",
     "verichron-analysis",
+    "verichron-indicator-match",
     "verichron-indicator-registry",
     "verichron-reporting",
     "pytest>=8.0",
@@ -67,6 +68,7 @@ verichron-testing = { workspace = true }
 verichron-crash = { workspace = true }
 verichron-ileapp-bridge = { workspace = true }
 verichron-analysis = { workspace = true }
+verichron-indicator-match = { workspace = true }
 verichron-indicator-registry = { workspace = true }
 verichron-reporting = { workspace = true }
 

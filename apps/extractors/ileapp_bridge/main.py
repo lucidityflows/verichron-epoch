@@ -201,6 +201,8 @@ def main() -> int:
     parser.add_argument("--backup-path", required=True, help="the decrypted backup the output was made from")
     parser.add_argument("--report-path", default=None, help="unused; passed to every stage")
     args = parser.parse_args()
+    if not args.derivative_id or not args.derivative_path:
+        parser.error("this stage reads iLEAPP's output: --derivative-id and --derivative-path are required")
 
     try:
         result = process_output_directory(db_url, context_from_args(args), args.derivative_path)

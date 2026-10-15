@@ -292,6 +292,8 @@ def main():
     # section 2), so this extractor accepts and ignores it.
     parser.add_argument("--report-path", default=None, help="unused; passed to every stage")
     args = parser.parse_args()
+    if not args.derivative_id or not args.derivative_path:
+        parser.error("this stage reads the crash logs: --derivative-id and --derivative-path are required")
 
     try:
         conn = psycopg2.connect(db_url)

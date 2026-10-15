@@ -34,6 +34,7 @@ import {
   readIleappMarker,
   readCrashReportsMarker,
   type DerivativeKind,
+  type StageInput,
   type ToolVersion,
 } from '@verichron/contracts';
 
@@ -65,17 +66,18 @@ export type RegisteredDerivatives = Pick<
 >;
 
 /**
- * Derivatives that only some acquisitions produce, so their absence is a fact
- * about the evidence, not a step left undone (EPOCH-447). A stage reading one
- * the evidence lacks is recorded as skipped with this reason, and the report
- * lists it as not examined; resume accepts such a skip only by this exact
- * reason, never a disabled stage's. Every other missing derivative fails the
- * stage.
+ * Inputs whose absence is a fact, not a step left undone: derivatives that
+ * only some acquisitions produce (EPOCH-447), and an indicator set, which none
+ * may be registered yet (EPOCH-491). A stage whose input is absent is recorded
+ * as skipped with this reason, and the report lists it as not examined; resume
+ * accepts such a skip only by this exact reason, never a disabled stage's.
+ * Every other missing derivative fails the stage.
  */
-const NOT_ACQUIRED: Partial<Record<DerivativeKind, string>> = {
+const NOT_ACQUIRED: Partial<Record<StageInput, string>> = {
   crash_reports:
     "Crash logs were not acquired for this evidence. An iOS backup does not contain the device's crash logs; " +
     'they are copied from the device separately.',
+  indicator_set: 'No indicator set is registered, so indicators were not checked.',
 };
 
 /** The reason a stage is skipped when its input is absent, or null when an absent input fails it. */
@@ -83,14 +85,46 @@ export function absentInputReason(stage: StageDefinition): string | null {
   return NOT_ACQUIRED[stage.manifest.reads] ?? null;
 }
 
-/** The derivative a stage reads, as its stage.json declares; null when that one isn't registered. */
+/**
+ * The derivative a stage reads, as its stage.json declares; null when that one
+ * isn't registered, and for a stage that checks an indicator set, which reads
+ * no derivative (EPOCH-491).
+ */
 export function derivativeFor(stage: StageDefinition, registration: RegisteredDerivatives): string | null {
+  const reads = stage.manifest.reads;
+  if (reads === 'indicator_set') return null;
   const byKind: Record<DerivativeKind, string | null> = {
     decrypted: registration.decryptedDerivativeId,
     ileapp_output: registration.ileappDerivativeId,
     crash_reports: registration.crashReportsDerivativeId,
   };
-  return byKind[stage.manifest.reads];
+  return byKind[reads];
+}
+
+/** What a stage reads in one run: a derivative or an indicator set, and the reason if it's absent. */
+export interface StageInputs {
+  derivativeId: string | null;
+  indicatorSetId: string | null;
+  /** Set only when the input is absent and that absence is a fact (NOT_ACQUIRED): the stage is skipped with it. */
+  absentReason: string | null;
+}
+
+/**
+ * The input a stage reads in this run (EPOCH-491): its derivative, or, for a
+ * stage that reads an indicator set, the set the run checks. One function, so
+ * the run's stage rows and the resume check can't disagree.
+ */
+export function inputsFor(
+  stage: StageDefinition,
+  registration: RegisteredDerivatives,
+  indicatorSet: { setId: string } | null
+): StageInputs {
+  if (stage.manifest.reads === 'indicator_set') {
+    const indicatorSetId = indicatorSet?.setId ?? null;
+    return { derivativeId: null, indicatorSetId, absentReason: indicatorSetId ? null : absentInputReason(stage) };
+  }
+  const derivativeId = derivativeFor(stage, registration);
+  return { derivativeId, indicatorSetId: null, absentReason: derivativeId ? null : absentInputReason(stage) };
 }
 
 /** What made a derivative, as its completion marker records it (EPOCH-406). */

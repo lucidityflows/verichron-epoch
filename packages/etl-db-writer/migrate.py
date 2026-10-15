@@ -117,6 +117,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _relation("indicator_file_contents"),
         _relation("idx_indicators_lookup"),
     ),
+    "0013_indicator_matching.sql": (
+        _column("indicator_sets", "name"),
+        _relation("idx_ingested_files_indicator_set"),
+    ),
 }
 
 

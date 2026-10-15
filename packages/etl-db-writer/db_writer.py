@@ -94,8 +94,11 @@ PAYLOAD_KINDS = ("full", "summary", "none")
 
 @dataclass(frozen=True)
 class IngestContext:
-    """Who an ingest is stamped with: the evidence, the derivative being read,
-    the run doing the reading, and the parser version doing the parsing.
+    """Who an ingest is stamped with: the evidence, the input being read, the
+    run doing the reading, and the parser version doing the parsing.
+
+    The input is exactly one of a derivative of the evidence (every extractor)
+    or a registered indicator set (the indicator-match stage, EPOCH-491).
 
     Built once per extractor process from the orchestrator's CLI arguments
     (`add_context_args` / `context_from_args`) and handed to every `ingest()`
@@ -106,17 +109,23 @@ class IngestContext:
     """
 
     evidence_id: str
-    derivative_id: str
+    derivative_id: str | None
     run_id: str
     parser_version: int
+    indicator_set_id: str | None = None
 
     def __post_init__(self) -> None:
-        for name in ("evidence_id", "derivative_id", "run_id"):
+        for name in ("evidence_id", "run_id"):
             if not getattr(self, name):
                 raise ValueError(
                     f"IngestContext.{name} is required: an ingest cannot happen before "
                     "evidence is registered (EPOCH-404's pre-flight step)"
                 )
+        if bool(self.derivative_id) == bool(self.indicator_set_id):
+            raise ValueError(
+                "IngestContext needs exactly one input: a derivative_id (the derivative read) "
+                "or an indicator_set_id (the set checked, EPOCH-491)"
+            )
         version = self.parser_version
         if not isinstance(version, int) or isinstance(version, bool) or version < 1:
             raise ValueError(f"IngestContext.parser_version must be an integer >= 1, got {version!r}")
@@ -126,14 +135,16 @@ def add_context_args(parser) -> None:
     """The identity flags every extractor accepts from the orchestrator."""
     parser.add_argument("--run-id", required=True, help="pipeline_runs.run_id of this run")
     parser.add_argument("--evidence-id", required=True, help="evidence_items.evidence_id being processed")
-    parser.add_argument("--derivative-id", required=True, help="evidence_derivatives.derivative_id this stage reads")
-    parser.add_argument(
-        "--parser-version", required=True, type=int, help="this stage's parserVersion from its stage.json"
-    )
+    # A stage reads one input: a derivative (its id and directory), or a
+    # registered indicator set (its id). IngestContext refuses neither or both.
+    parser.add_argument("--derivative-id", help="evidence_derivatives.derivative_id this stage reads")
     parser.add_argument(
         "--derivative-path",
-        required=True,
         help="where that derivative is: the directory the stage reads (the 'reads' kind in its stage.json)",
+    )
+    parser.add_argument("--indicator-set-id", help="indicator_sets.set_id this stage checks (EPOCH-491)")
+    parser.add_argument(
+        "--parser-version", required=True, type=int, help="this stage's parserVersion from its stage.json"
     )
 
 
@@ -143,6 +154,7 @@ def context_from_args(args) -> IngestContext:
         derivative_id=args.derivative_id,
         run_id=args.run_id,
         parser_version=args.parser_version,
+        indicator_set_id=args.indicator_set_id,
     )
 
 
@@ -278,7 +290,7 @@ def ingest(
     both deciding to write.
     """
     if not isinstance(ctx, IngestContext):
-        raise TypeError("ingest() needs an IngestContext (evidence_id, derivative_id, run_id, parser_version)")
+        raise TypeError("ingest() needs an IngestContext (evidence_id, its input, run_id, parser_version)")
     parser_version = ctx.parser_version
     if payload_kind not in PAYLOAD_KINDS:
         raise ValueError(f"payload_kind must be one of {PAYLOAD_KINDS}, got {payload_kind!r}")
@@ -323,12 +335,14 @@ def ingest(
             cur.execute(
                 """
                 INSERT INTO ingested_files
-                    (evidence_id, derivative_id, file_hash, source_type, parser_version,
+                    (evidence_id, derivative_id, indicator_set_id, file_hash, source_type, parser_version,
                      file_path, file_name, payload_kind, raw_payload, produced_by_runs)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, ARRAY[%s::uuid])
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, ARRAY[%s::uuid])
                 ON CONFLICT (evidence_id, file_hash, source_type, parser_version) DO UPDATE SET
                     derivative_id = CASE WHEN ingested_files.ingest_complete
                                          THEN ingested_files.derivative_id ELSE EXCLUDED.derivative_id END,
+                    indicator_set_id = CASE WHEN ingested_files.ingest_complete
+                                         THEN ingested_files.indicator_set_id ELSE EXCLUDED.indicator_set_id END,
                     file_path     = CASE WHEN ingested_files.ingest_complete
                                          THEN ingested_files.file_path     ELSE EXCLUDED.file_path     END,
                     file_name     = CASE WHEN ingested_files.ingest_complete
@@ -344,6 +358,7 @@ def ingest(
                 (
                     ctx.evidence_id,
                     ctx.derivative_id,
+                    ctx.indicator_set_id,
                     file_hash,
                     source_type,
                     parser_version,

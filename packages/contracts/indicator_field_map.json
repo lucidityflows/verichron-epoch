@@ -22,8 +22,6 @@
         { "source_type": "ileapp_record", "artifact": "Safari Browser - History", "column": "Redirect Source" },
         { "source_type": "ileapp_record", "artifact": "Safari Browser - History", "column": "Redirect Destination" },
         { "source_type": "ileapp_record", "artifact": "Safari Browser - Search Terms", "column": "URL" },
-        { "source_type": "ileapp_record", "artifact": "Safari Browser - Search Terms", "column": "Redirect Source" },
-        { "source_type": "ileapp_record", "artifact": "Safari Browser - Search Terms", "column": "Redirect Destination" },
         { "source_type": "ileapp_record", "artifact": "Safari Browser - Tabs (BrowserState)", "column": "URL" },
         { "source_type": "ileapp_record", "artifact": "Safari Browser - Tabs (BrowserState)", "column": "User Visible URL" },
         { "source_type": "ileapp_record", "artifact": "Safari Browser - Tabs (SafariTabs)", "column": "URL" },

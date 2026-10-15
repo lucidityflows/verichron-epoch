@@ -17,7 +17,7 @@ The stage's name is its directory name.
 | `entrypoint` | File to run, relative to the stage directory |
 | `runtime` | `python` (run with the repo's `.venv` interpreter) or `node` |
 | `order` | Run position; unique among enabled stages |
-| `reads` | The derivative the stage reads: `decrypted` (the decrypted backup) or `ileapp_output` (iLEAPP's report). Each is produced by the processor |
+| `reads` | What the stage reads: a derivative, `decrypted` (the decrypted backup), `ileapp_output` (iLEAPP's report), both produced by the processor, or `crash_reports` (the device's crash logs); or `indicator_set`, a registered indicator set the stage checks the evidence's facts against (EPOCH-491) |
 | `parserVersion` | Integer, bumped whenever what the stage writes changes; omit if it writes no facts |
 | `enabled` | `false` records the stage as `skipped` instead of running it. Disabling a stage is a team decision, never a shortcut |
 
@@ -31,7 +31,8 @@ The orchestrator registers the evidence before the run and passes every stage:
 | Argument | Value |
 |---|---|
 | `--run-id`, `--evidence-id` | This run and the evidence it processes |
-| `--derivative-id`, `--derivative-path` | The derivative this stage reads (`reads` in `stage.json`): its id, and the directory to read. A stage whose derivative isn't registered for the backup fails before it is spawned |
+| `--derivative-id`, `--derivative-path` | The derivative this stage reads (`reads` in `stage.json`): its id, and the directory to read. A stage whose derivative isn't registered for the backup fails before it is spawned, unless its absence is a fact (crash logs never acquired): it is then skipped with the reason |
+| `--indicator-set-id` | Instead of a derivative, for a stage that reads `indicator_set`: the registered set to check, the newest unless the orchestrator was given one. With none registered, the stage is skipped with the reason. Its facts are filed under the set |
 | `--parser-version` | From `stage.json`, when declared |
 | `--backup-path` | Where the decrypted backup is |
 | `--report-path` | The folder the report stage writes the investigation report to (`<workspace>/reports/<label>/`). Passed to every stage; only the report stage uses it |

@@ -127,11 +127,15 @@ def _unquote(literal: str) -> str:
     return re.sub(r"\\(.)", r"\1", literal[1:-1])
 
 
-def load_set(path: Path, *, as_of: datetime) -> LoadedSet:
-    """Load the set at `path`. `as_of` decides which indicators had expired."""
+def load_set(path: Path, *, as_of: datetime, name: str | None = None) -> LoadedSet:
+    """Load the set at `path`. `as_of` decides which indicators had expired.
+    The set's name is `name`, or else the one its `set.json` gives."""
     if as_of.tzinfo is None:
         raise ValueError("as_of must be timezone-aware")
-    index, described = _describe(path)
+    described_name, index, described = _describe(path)
+    set_name = name if name is not None else described_name
+    if set_name is None or not set_name.strip():
+        raise LoadError(f"{path} has no name; give it one (--name)")
     reports: list[FileReport] = []
     indicators: list[Indicator] = []
     contents: dict[str, bytes] = {}
@@ -145,6 +149,7 @@ def load_set(path: Path, *, as_of: datetime) -> LoadedSet:
         reports.append(report)
         indicators.extend(file_indicators)
     return LoadedSet(
+        name=set_name.strip(),
         manifest=SetManifest(index=index, files=tuple(files)),
         loaded_at=as_of,
         reports=tuple(reports),
@@ -156,12 +161,12 @@ def load_set(path: Path, *, as_of: datetime) -> LoadedSet:
 _PLACEHOLDER_SHA256 = "0" * 64
 
 
-def _describe(path: Path) -> tuple[IndexSource | None, list[tuple[SetFile, Path]]]:
+def _describe(path: Path) -> tuple[str | None, IndexSource | None, list[tuple[SetFile, Path]]]:
     """The set's files, with what is known of their provenance. SHA-256 is filled in once read."""
     if path.is_symlink():
         raise LoadError(f"{path} is a symbolic link; give the set itself")
     if path.is_file():
-        return None, [(SetFile(path=path.name, sha256=_PLACEHOLDER_SHA256), path)]
+        return None, None, [(SetFile(path=path.name, sha256=_PLACEHOLDER_SHA256), path)]
     if not path.is_dir():
         raise LoadError(f"{path} is neither a STIX file nor a directory of them")
 
@@ -179,11 +184,14 @@ def _describe(path: Path) -> tuple[IndexSource | None, list[tuple[SetFile, Path]
             raise LoadError(f"{path} holds files that aren't STIX ({', '.join(others)}); a set holds only STIX files")
         if not on_disk:
             raise LoadError(f"{path} holds no STIX files")
-        return None, [(SetFile(path=name, sha256=_PLACEHOLDER_SHA256), item) for name, item in on_disk.items()]
+        return None, None, [(SetFile(path=name, sha256=_PLACEHOLDER_SHA256), item) for name, item in on_disk.items()]
 
     try:
         data = json.loads(description.read_bytes())
         index = IndexSource.model_validate(data["index"]) if data.get("index") is not None else None
+        set_name = data.get("name")
+        if set_name is not None and not isinstance(set_name, str):
+            raise TypeError("name must be a string")
         listed = [SetFile.model_validate({**entry, "sha256": _PLACEHOLDER_SHA256}) for entry in data["files"]]
     except (ValueError, KeyError, TypeError) as e:
         raise LoadError(f"{description} is not a valid set description: {e}") from None
@@ -191,7 +199,7 @@ def _describe(path: Path) -> tuple[IndexSource | None, list[tuple[SetFile, Path]
     if names != set(on_disk):
         missing, extra = sorted(names - set(on_disk)), sorted(set(on_disk) - names)
         raise LoadError(f"{description} doesn't match the directory: missing {missing}, not listed {extra}")
-    return index, [(f, on_disk[f.path]) for f in listed]
+    return set_name, index, [(f, on_disk[f.path]) for f in listed]
 
 
 def _load_file(name: str, content: bytes, as_of: datetime) -> tuple[FileReport, list[Indicator]]:
@@ -238,6 +246,9 @@ def _load_file(name: str, content: bytes, as_of: datetime) -> tuple[FileReport, 
         if not isinstance(pattern, str) or not isinstance(pattern_type, str):
             raise LoadError(f"{name}: {obj['id']} has no pattern and pattern type")
         valid_from, valid_until = _timestamp(name, obj, "valid_from"), _timestamp(name, obj, "valid_until")
+        modified = _timestamp(name, obj, "modified")
+        if modified is None:
+            raise LoadError(f"{name}: {obj['id']} has no modified time, which STIX 2.1 requires")
         if obj.get("revoked") is True:
             revoked += 1
             continue
@@ -270,6 +281,7 @@ def _load_file(name: str, content: bytes, as_of: datetime) -> tuple[FileReport, 
                     campaigns=tuple(sorted(campaigns.get(obj["id"], ()))),
                     valid_from=valid_from,
                     valid_until=valid_until,
+                    modified=modified,
                     expired=is_expired,
                 )
             )

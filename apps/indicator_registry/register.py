@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Register an indicator set (EPOCH-490).
 
-    uv run python apps/indicator_registry/register.py <STIX file or directory>
-    uv run python apps/indicator_registry/register.py --check <STIX file or directory>
+    uv run python apps/indicator_registry/register.py [--name <name>] <STIX file or directory>
+    uv run python apps/indicator_registry/register.py --check [--name <name>] <STIX file or directory>
 
 One path for every set: the public feeds fetched by
 `scripts/fetch_indicator_feeds.py`, an in-house set, or an examiner's own
@@ -60,18 +60,19 @@ def describe(loaded: LoadedSet) -> str:
     lines.append(f"unsupported by reason: {dict(sorted(unsupported.items()))}")
     lines.append(f"values by type: {dict(sorted(values.items()))}")
     lines.append(f"relationships that don't resolve in their file: {totals['unresolved']}")
-    lines.append(f"set hash: {loaded.manifest.set_hash}")
+    lines.append(f"set: {loaded.name}, hash {loaded.manifest.set_hash}")
     return "\n".join(lines)
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Load a STIX 2.1 indicator set and register it.")
     parser.add_argument("path", type=Path, help="a STIX 2.1 file, or a directory of them")
+    parser.add_argument("--name", help="what to call the set; required unless its set.json names it")
     parser.add_argument("--check", action="store_true", help="load and print the counts; don't register")
     args = parser.parse_args(argv)
 
     try:
-        loaded = load_set(args.path, as_of=datetime.now(UTC))
+        loaded = load_set(args.path, as_of=datetime.now(UTC), name=args.name)
     except LoadError as e:
         print(f"[indicator-registry] not loaded: {e}", file=sys.stderr)
         return 1

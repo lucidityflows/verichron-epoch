@@ -114,7 +114,8 @@ it('has a database in CI', { skip: !process.env.CI }, () => {
 beforeEach(async () => {
   if (!DSN) return;
   await db.query(`TRUNCATE forensic_records, ingested_files, pipeline_stage_status, pipeline_runs,
-                  evidence_events, evidence_derivatives, evidence_locations, evidence_items, devices CASCADE`);
+                  evidence_events, evidence_derivatives, evidence_locations, evidence_items, devices,
+                  indicators, indicator_set_files, indicator_sets, indicator_file_contents CASCADE`);
 });
 
 // ---------------------------------------------------------------------------
@@ -213,6 +214,18 @@ function argsOf(stage: StageDefinition): Record<string, string> {
 const NO_STAGES: StageSet = { enabled: [], disabled: [] };
 const run = (backupPath: string, stages: StageSet = NO_STAGES) =>
   runPipelineForBackup(db, backupPath, DSN ?? '', 'python3', stages, { secretPath });
+
+/** A registered indicator set, as the registry stores one (EPOCH-490); `registeredAt` orders "newest". */
+async function registerSet(name: string, registeredAt: string): Promise<{ setId: string; setHash: string }> {
+  const manifest = `${JSON.stringify({ format: 1, files: [], name })}\n`;
+  const setHash = createHash('sha256').update(manifest).digest('hex');
+  const { rows } = await db.query<{ set_id: string }>(
+    `INSERT INTO indicator_sets (set_hash, name, manifest, loaded_at, registered_at, indicator_count)
+     VALUES ($1, $2, $3, $4, $4, 0) RETURNING set_id`,
+    [setHash, name, manifest, registeredAt]
+  );
+  return { setId: rows[0].set_id, setHash };
+}
 
 async function count(table: string): Promise<number> {
   const { rows } = await db.query<{ n: string }>(`SELECT count(*) AS n FROM ${table}`);
@@ -562,6 +575,64 @@ describe('stages and the completeness predicate', live, () => {
 
     const again = await run(ws.backupPath, { enabled: [crash], disabled: [] });
     assert.equal(again.skipped, true, 'still no crash logs, so the complete run stands');
+  });
+
+  it('a stage checking an indicator set is skipped with the reason until one is registered, then checks the newest; a newer set gets a new run (EPOCH-491)', async () => {
+    const ws = makeWorkspace('indicator-sets');
+    const matcher = recordingStage('matcher', 500, { reads: 'indicator_set', parserVersion: 1 });
+    const stages = { enabled: [matcher], disabled: [] };
+
+    const none = await run(ws.backupPath, stages);
+    assert.equal(none.success, true, JSON.stringify(none));
+    assert.ok(!existsSync(path.join(matcher.dir, 'argv.json')), 'with no set, the stage is never spawned');
+    const skipped = await db.query(
+      `SELECT status, error_message, indicator_set_id FROM pipeline_stage_status WHERE run_id = $1`,
+      [none.runId]
+    );
+    assert.equal(skipped.rows[0].status, 'skipped');
+    assert.match(skipped.rows[0].error_message, /No indicator set is registered/);
+    assert.equal(skipped.rows[0].indicator_set_id, null);
+    assert.equal((await run(ws.backupPath, stages)).skipped, true, 'still no set, so the complete run stands');
+
+    const older = await registerSet('older', '2026-10-01T00:00:00Z');
+    const first = await run(ws.backupPath, stages);
+    assert.notEqual(first.skipped, true, 'a set registered since gets a new run');
+    assert.equal(argsOf(matcher)['--indicator-set-id'], older.setId);
+    assert.equal(argsOf(matcher)['--derivative-id'], undefined, 'it reads no derivative');
+    const row = await db.query(`SELECT indicator_set_id, derivative_id FROM pipeline_stage_status WHERE run_id = $1`, [
+      first.runId,
+    ]);
+    assert.deepEqual(row.rows[0], { indicator_set_id: older.setId, derivative_id: null });
+    assert.equal((await run(ws.backupPath, stages)).skipped, true, 'the same set: already done');
+
+    const newer = await registerSet('newer', '2026-10-15T00:00:00Z');
+    const second = await run(ws.backupPath, stages);
+    assert.notEqual(second.skipped, true, 'a newer set gets a new run');
+    assert.equal(argsOf(matcher)['--indicator-set-id'], newer.setId);
+  });
+
+  it('--indicator-set chooses a set by its hash, and an unknown hash fails before any run (EPOCH-491)', async () => {
+    const ws = makeWorkspace('indicator-set-by-hash');
+    const matcher = recordingStage('matcher', 500, { reads: 'indicator_set', parserVersion: 1 });
+    const stages = { enabled: [matcher], disabled: [] };
+    const older = await registerSet('older', '2026-10-01T00:00:00Z');
+    await registerSet('newer', '2026-10-15T00:00:00Z');
+
+    const chosen = await runPipelineForBackup(db, ws.backupPath, DSN ?? '', 'python3', stages, {
+      secretPath,
+      indicatorSetHash: older.setHash,
+    });
+    assert.equal(chosen.success, true, JSON.stringify(chosen));
+    assert.equal(argsOf(matcher)['--indicator-set-id'], older.setId);
+
+    const runs = await count('pipeline_runs');
+    const unknown = await runPipelineForBackup(db, ws.backupPath, DSN ?? '', 'python3', stages, {
+      secretPath,
+      indicatorSetHash: 'f'.repeat(64),
+    });
+    assert.equal(unknown.success, false);
+    assert.match(unknown.error ?? '', /no indicator set with hash/);
+    assert.equal(await count('pipeline_runs'), runs, 'no run was created');
   });
 
   it("a disabled stage's skip never stands in for an absent input: enabling it gets a new run", async () => {

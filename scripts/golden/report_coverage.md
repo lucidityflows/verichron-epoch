@@ -3,6 +3,7 @@
 ## Provenance
 ## Coverage
 ## Not Examined
+## Indicator Matches
 ## Tool Checks and Corrections
 ## Crash Reports
 ## iLEAPP Records by Artifact

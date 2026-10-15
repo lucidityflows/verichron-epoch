@@ -11,6 +11,7 @@ members = [
     "verichron-etl-db-writer",
     "verichron-etl-run",
     "verichron-ileapp-bridge",
+    "verichron-indicator-match",
     "verichron-indicator-registry",
     "verichron-indicators",
     "verichron-reporting",
@@ -539,6 +540,7 @@ dependencies = [
     { name = "verichron-etl-db-writer" },
     { name = "verichron-etl-run" },
     { name = "verichron-ileapp-bridge" },
+    { name = "verichron-indicator-match" },
     { name = "verichron-indicator-registry" },
     { name = "verichron-indicators" },
     { name = "verichron-reporting" },
@@ -564,6 +566,7 @@ requires-dist = [
     { name = "verichron-etl-db-writer", editable = "packages/etl-db-writer" },
     { name = "verichron-etl-run", editable = "libs/etl-run" },
     { name = "verichron-ileapp-bridge", editable = "apps/extractors/ileapp_bridge" },
+    { name = "verichron-indicator-match", editable = "apps/extractors/indicator_match" },
     { name = "verichron-indicator-registry", editable = "apps/indicator_registry" },
     { name = "verichron-indicators", editable = "packages/indicators" },
     { name = "verichron-reporting", editable = "apps/reporting" },
@@ -615,6 +618,29 @@ requires-dist = [
     { name = "verichron-contracts", editable = "packages/contracts" },
     { name = "verichron-etl-db-writer", editable = "packages/etl-db-writer" },
     { name = "verichron-etl-run", editable = "libs/etl-run" },
+    { name = "verichron-runtime-env", editable = "libs/verichron-runtime-env" },
+]
+
+[[package]]
+name = "verichron-indicator-match"
+version = "0.1.0"
+source = { editable = "apps/extractors/indicator_match" }
+dependencies = [
+    { name = "psycopg2-binary" },
+    { name = "verichron-contracts" },
+    { name = "verichron-etl-db-writer" },
+    { name = "verichron-etl-run" },
+    { name = "verichron-indicators" },
+    { name = "verichron-runtime-env" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "psycopg2-binary", specifier = ">=2.9" },
+    { name = "verichron-contracts", editable = "packages/contracts" },
+    { name = "verichron-etl-db-writer", editable = "packages/etl-db-writer" },
+    { name = "verichron-etl-run", editable = "libs/etl-run" },
+    { name = "verichron-indicators", editable = "packages/indicators" },
     { name = "verichron-runtime-env", editable = "libs/verichron-runtime-env" },
 ]
 

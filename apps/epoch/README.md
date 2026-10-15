@@ -36,5 +36,4 @@ Visual design follows [DESIGN.md](DESIGN.md).
 |---|---|
 | Device pull hangs (`encryptionToggledByUs`), and a typo in `window.d.ts` | EPOCH-413 |
 | The app isn't typechecked, built or tested in CI | EPOCH-454 |
-| `prestart`/`predev` build a package named `@verichron/db-reader`, which doesn't exist (the reader is `@verichron/etl-db-reader`), so the reader isn't rebuilt before start | EPOCH-454 |
 | The IPC bridge is hand-written in three places | EPOCH-453 |
