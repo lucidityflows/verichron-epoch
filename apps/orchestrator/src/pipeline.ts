@@ -15,6 +15,7 @@ import {
 import {
   contractVersion,
   deriveIleappPath,
+  deriveCrashReportsPath,
   deriveReportPath,
   deriveRunSummaryPath,
   type DerivativeKind,
@@ -68,8 +69,7 @@ export function runStage(
   const paths: Record<DerivativeKind, string | undefined> = {
     decrypted: config.backupPath,
     ileapp_output: config.ileappPath,
-    // Nothing acquires crash logs yet (EPOCH-514).
-    crash_reports: undefined,
+    crash_reports: config.crashReportsPath,
   };
   // Identity comes from here, never from the stage (R16): the evidence, the
   // derivative this stage reads, and its declared parser version.
@@ -188,11 +188,13 @@ export async function runPipelineForBackup(
 
   const reportPath = deriveReportPath(backupPath);
   const ileappPath = deriveIleappPath(backupPath);
+  const crashReportsPath = deriveCrashReportsPath(backupPath);
   let registration: Registration;
   try {
     registration = await registerEvidence(client, {
       backupPath,
       ileappPath,
+      crashReportsPath,
       secretPath: options.secretPath,
     });
   } catch (err) {
@@ -226,7 +228,7 @@ export async function runPipelineForBackup(
       await markStage(client, runId, stage.name, 'running');
       const outcome = await runStage(
         stage,
-        { backupPath, reportPath, ileappPath, dbUrl, pythonBin },
+        { backupPath, reportPath, ileappPath, crashReportsPath, dbUrl, pythonBin },
         runId,
         registration
       );

@@ -18,6 +18,11 @@ export function deriveReportPath(backupSource: string): string | undefined {
   return siblingOfDecrypted(backupSource, 'reports');
 }
 
+/** Where the processor copies the device's crash logs acquired with a backup (EPOCH-514). */
+export function deriveCrashReportsPath(backupSource: string): string | undefined {
+  return siblingOfDecrypted(backupSource, 'crash_reports');
+}
+
 /** Where the processor writes iLEAPP's output for a decrypt (EPOCH-416). */
 export function deriveIleappPath(backupSource: string): string | undefined {
   return siblingOfDecrypted(backupSource, 'ileapp');

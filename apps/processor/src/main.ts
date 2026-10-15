@@ -25,6 +25,7 @@ import { ileappInputType, ileappToolVersion, readModuleOutcomes, runIleapp } fro
 import { decryptBackup, decryptToolVersion, isWrongPasswordError, type DecryptTool } from './utils/decrypt.js';
 import { hashTree } from './utils/manifest.js';
 import { repairDecrypted } from './utils/repair.js';
+import { prepareCrashReports } from './utils/crashReports.js';
 import { promptPassword } from './utils/prompt.js';
 import { writeSummary } from './utils/summary.js';
 
@@ -74,7 +75,7 @@ async function run(cfg: Config): Promise<void> {
   const ileappTool = await ileappToolVersion(cfg.ileappDir);
   console.log(`[processor] iLEAPP ${ileappTool.version.slice(0, 12)} (${cfg.ileappDir})`);
 
-  const dirs = ['decrypted', 'ileapp', 'logs'];
+  const dirs = ['decrypted', 'ileapp', 'crash_reports', 'logs'];
   for (const d of dirs) {
     await fsp.mkdir(path.join(cfg.workspace, d), { recursive: true });
   }
@@ -141,10 +142,11 @@ async function runBackups(
         // of this backup, or with no provenance: remove it all so no stale
         // file can survive into the new decrypt.
         console.log(
-          '  [decrypt] the backup changed since its last decrypt; clearing the stale decrypt and iLEAPP output'
+          '  [decrypt] the backup changed since its last decrypt; clearing the stale decrypt, iLEAPP output and crash logs'
         );
         await fsp.rm(decDir, { recursive: true, force: true });
         await fsp.rm(ileDir, { recursive: true, force: true });
+        await fsp.rm(path.join(cfg.workspace, 'crash_reports', name), { recursive: true, force: true });
       }
       // Withdraw every marker that vouches for this decrypt BEFORE touching
       // it. A decrypt that dies part-way (e.g. --force-decrypt over an
@@ -338,6 +340,23 @@ async function runBackups(
         console.error(`  [ileapp] error: ${err instanceof Error ? err.message : err}`);
         failedBackups.add(name);
       }
+    }
+
+    // The device's crash logs, if the pull acquired them beside this backup
+    // (EPOCH-514). An iOS backup holds none itself (EPOCH-447).
+    try {
+      const crash = await prepareCrashReports({
+        backupPath: src,
+        destDir: path.join(cfg.workspace, 'crash_reports', name),
+        contentRoot,
+        force: cfg.force,
+      });
+      if (crash.status === 'none') console.log(`  [crash]   ${crash.message}`);
+      else if (crash.status === 'reused') console.log(`  [crash]   already copied (${crash.files} file(s)), skipping`);
+      else console.log(`  [crash]   copied ${crash.files} file(s) -> crash_reports/${name}`);
+    } catch (err) {
+      console.error(`  [crash] error: ${err instanceof Error ? err.message : err}`);
+      failedBackups.add(name);
     }
     console.log();
   }

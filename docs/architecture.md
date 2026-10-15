@@ -106,6 +106,7 @@ from a real device's output, with the date, model, iOS version and tool version.
 | On Debian, pulling the cable of the only connected device stops usbmuxd (its packaged udev rule: "Exit usbmuxd when the last device is removed"), so `idevice_id -l` fails rather than listing no devices. The app counts that as not listed | `ERROR: Unable to retrieve device list!`, exit 255; `usbmuxd.service` inactive | iPhone17,5 · 26.6.1 · idevice_id 1.4.0 · Debian 13 | 2026-10-14 |
 | Progress bars carry the bytes so far, redrawn with `\r` | `[==   ]   3% (93.4 MB/3.3 GB)` | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-14 |
 | `IsFullBackup` in `Status.plist` is false after a full backup, so it isn't a measure of completeness. The tool was run with `--full` (it sends `ForceFullBackup`) into a folder that didn't exist; idevicebackup2 never writes the key, so the device sets it. Published Finder and iTunes backups also show false | `IsFullBackup` false, `BackupState` new, `Version` 3.3 | iPhone17,5 · 26.6.1 · 1.4.0 | 2026-10-12 |
+| `idevicecrashreport -k` copies the device's crash reports and leaves them on it: every output line reads `Copy:`, none `Move:`. Without `-k` the tool moves them, deleting them from the device (its man page) | 244 files in under a minute: 22 in the root, 221 in `Retired/`, 1 in `DiagnosticLogs/`; 230 `.ips`, 7 `.ca`, 6 `.session`, 1 `.log`. Whether the device showed a prompt was not observed | iPhone17,5 · 26.6.1 · idevicecrashreport 1.4.0 | 2026-10-14 |
 
 ### Verified processing of a real backup
 
@@ -190,9 +191,11 @@ The contract is in
 | `ileapp_bridge` | 20 | iLEAPP output | `ileapp_record` |
 | `reporting` | 1000 | the database | the investigation report |
 
-An iOS backup holds none of the device's crash logs, and nothing acquires them
-yet (EPOCH-514, 515), so the orchestrator records `crash` as skipped, with
-that reason, and the report lists it under Not Examined (EPOCH-447).
+An iOS backup holds none of the device's crash logs (EPOCH-447). An iPhone pull
+copies them beside the backup with `idevicecrashreport -k` (EPOCH-514), and the
+processor copies them into `crash_reports/<label>/`. Evidence without them, such
+as a backup imported from elsewhere, has `crash` recorded as skipped, with that
+reason, and the report lists it under Not Examined.
 
 The AI stage (`apps/analysis`, `llm_flagged_anomaly` leads) has no `stage.json`
 until EPOCH-442 gives it the project's own facts to read.

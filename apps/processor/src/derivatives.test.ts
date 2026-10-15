@@ -23,7 +23,12 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { readDecryptMarker, readIleappMarker } from '@verichron/contracts';
+import {
+  crashReportsAcquisitionPaths,
+  readCrashReportsMarker,
+  readDecryptMarker,
+  readIleappMarker,
+} from '@verichron/contracts';
 
 let tmp: string;
 let source: string;
@@ -414,5 +419,69 @@ describe('iLEAPP output (EPOCH-416)', () => {
 
     await runCli();
     assert.ok(readIleappMarker(ileapp()), 'a clean re-run restores it');
+  });
+});
+
+describe('crash logs (EPOCH-514)', () => {
+  const pulled = () => crashReportsAcquisitionPaths(path.join(source, 'BK1'));
+  const copied = () => path.join(workspace, 'crash_reports', 'BK1');
+  const writeAcquisition = (files: number, bytes: number) =>
+    writeFileSync(
+      pulled().record,
+      JSON.stringify({
+        tool: { name: 'idevicecrashreport', version: '1.4.0' },
+        kept_on_device: true,
+        acquired_at: '2026-10-15T01:00:00.000Z',
+        files,
+        bytes,
+      })
+    );
+  after(() => {
+    rmSync(pulled().dir, { recursive: true, force: true });
+    rmSync(pulled().record, { force: true });
+  });
+
+  it('says so when the pull acquired none', async () => {
+    const out = await runCli();
+    assert.match(out, /\[crash\]   no crash logs were acquired with this backup/);
+    assert.equal(readCrashReportsMarker(copied()), null);
+  });
+
+  it('does not use a copy the pull never finished recording', async () => {
+    mkdirSync(path.join(pulled().dir, 'Retired'), { recursive: true });
+    writeFileSync(path.join(pulled().dir, 'a.ips'), 'aaaa');
+    writeFileSync(path.join(pulled().dir, 'Retired', 'b.ips'), 'bb');
+    const out = await runCli();
+    assert.match(out, /has no acquisition record \(the copy didn't finish\), so it is not used/);
+    assert.equal(readCrashReportsMarker(copied()), null);
+  });
+
+  it('copies them into crash_reports/<label>/ and records their content root and the evidence they came with', async () => {
+    writeAcquisition(2, 6);
+    const out = await runCli();
+    assert.match(out, /\[crash\]   copied 2 file\(s\) -> crash_reports\/BK1/);
+    const marker = readCrashReportsMarker(copied())!;
+    assert.ok(marker, 'marker written');
+    assert.equal(marker.content_root, readDecryptMarker(decrypted())!.content_root);
+    assert.deepEqual(marker.tool, { name: 'idevicecrashreport', version: '1.4.0' });
+    assert.equal(marker.params.files, 2);
+    assert.equal(marker.params.acquired_at, '2026-10-15T01:00:00.000Z');
+    assert.match(marker.params.reports_root, /^[0-9a-f]{64}$/);
+    assert.equal(readFileSync(path.join(copied(), 'Retired', 'b.ips'), 'utf8'), 'bb');
+  });
+
+  it('reuses an unchanged copy', async () => {
+    const before = readCrashReportsMarker(copied());
+    const out = await runCli();
+    assert.match(out, /\[crash\]   already copied \(2 file\(s\)\), skipping/);
+    assert.deepEqual(readCrashReportsMarker(copied()), before);
+  });
+
+  it('refuses crash logs that changed after the pull, and that backup needs attention', async () => {
+    writeFileSync(path.join(pulled().dir, 'added-later.ips'), 'x');
+    const out = await runCli();
+    assert.match(out, /\[crash\] error: .* holds 3 file\(s\), 7 bytes, but the pull copied 2 file\(s\), 6 bytes/);
+    assert.match(out, /completed with \d+ backup\(s\) that need attention/);
+    rmSync(path.join(pulled().dir, 'added-later.ips'));
   });
 });

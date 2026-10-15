@@ -30,6 +30,7 @@ import {
   type OutputEvent,
 } from './backupRun';
 import { appendPullRecord, type PullRecord } from './pullRecord';
+import { copyCrashReports, type CrashReportCopy } from './crashReports';
 
 /**
  * NOTE (EPOCH-103 review): the password captured here (used as
@@ -252,6 +253,7 @@ export class IosBackupSource implements DeviceBackupSource {
       device_listed: null,
       outcome: 'failed',
       error: null,
+      crash_reports: null,
     };
 
     const fail = (message: string): never => {
@@ -353,6 +355,19 @@ export class IosBackupSource implements DeviceBackupSource {
       if (reason) {
         fail(`idevicebackup2 reported success, but the backup in ${backupDir} isn't complete: ${reason}.`);
       }
+      // An iOS backup holds none of the device's crash logs (EPOCH-447):
+      // copy them beside it, leaving them on the device (EPOCH-514). The
+      // backup is complete either way; the outcome is recorded and shown.
+      onProgress({
+        phase: 'transferring',
+        message: `Copying the crash logs from ${device.name}. They stay on the device.`,
+      });
+      const crashTool = detectBinary('idevicecrashreport', trustedToolPath('idevicecrashreport'));
+      record.crash_reports = await copyCrashReports(
+        crashTool.available ? crashTool.path : undefined,
+        device.id,
+        backupDir
+      );
       record.outcome = 'completed';
       record.finished_at = new Date().toISOString();
       // The record is written before "done", so a completed pull is never
@@ -368,7 +383,10 @@ export class IosBackupSource implements DeviceBackupSource {
         );
       }
       recorded = true;
-      onProgress({ phase: 'done', message: `Backup complete and verified as finished: ${backupDir}` });
+      onProgress({
+        phase: 'done',
+        message: `Backup complete and verified as finished: ${backupDir}. ${crashReportsSummary(record.crash_reports)}`,
+      });
       return destDir;
     } catch (err) {
       if (this.cancelRequested) record.outcome = 'cancelled';
@@ -432,6 +450,17 @@ async function removeOwnLeftover(destDir: string, device: DeviceInfo): Promise<v
     bytes,
     removed_at: new Date().toISOString(),
   });
+}
+
+/** What the crash-log copy did, in a sentence for the user. */
+export function crashReportsSummary(copy: CrashReportCopy | null): string {
+  if (!copy) return '';
+  if (copy.outcome === 'copied') {
+    return copy.files === 0
+      ? 'The device held no crash logs.'
+      : `${copy.files} crash log file(s) copied (${formatGB(copy.bytes)}); they are still on the device.`;
+  }
+  return `The crash logs were not copied: ${copy.error}. The report will say they were not acquired.`;
 }
 
 /** Why a pull refuses a destination that already holds something for the device (EPOCH-483). */
