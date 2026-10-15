@@ -11,8 +11,10 @@
 
 DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM pipeline_stage_status) THEN
-        RAISE EXCEPTION 'pipeline_stage_status holds runs from before EPOCH-414, which have no stage order; '
+    -- Runs as well as stage rows: a run interrupted after its own row and
+    -- before its stage rows has no stage rows, and must be refused too.
+    IF EXISTS (SELECT 1 FROM pipeline_runs) OR EXISTS (SELECT 1 FROM pipeline_stage_status) THEN
+        RAISE EXCEPTION 'the database holds runs from before EPOCH-414, which have no stage order; '
             'recreate the development database and import again';
     END IF;
 END
