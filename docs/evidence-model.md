@@ -112,6 +112,8 @@ on every run, so no retry can get past it.
 **Indicator sets.** No derivative records an indicator set at the moment:
 indicator checks were removed with their tool (EPOCH-489). Indicator sets return
 as versioned, hashed data the project's own matching reads (EPOCH-490, 491).
+Which facts can supply which indicator types is declared in the
+[indicator field map](indicator-field-map.md) (EPOCH-521).
 
 ## Runs
 
