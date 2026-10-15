@@ -59,3 +59,29 @@ def test_a_later_copy_says_how_much_later_it_was_made():
     assert copied_after_backup(crash_reports(1, "2026-10-15T00:58:00.000Z")["params"]) == (
         "2 min after the backup finished"
     )
+
+
+def test_a_derivative_from_before_the_current_marker_format_is_refused_by_name():
+    """EPOCH-531: crash logs registered before EPOCH-519 have no
+    backup_finished_at. The report says which derivative and what's missing,
+    never a bare KeyError."""
+    import pytest
+    from reporting.generate_report import ReportInputError, check_params
+
+    old = crash_reports(3)
+    del old["params"]["backup_finished_at"]
+    old["derivative_id"] = "d" * 8
+    with pytest.raises(ReportInputError) as raised:
+        check_params([old])
+    message = str(raised.value)
+    assert "crash_reports derivative dddddddd (/ws/crash_reports/BK1)" in message
+    assert "has no backup_finished_at" in message
+    assert "Prepare this evidence again" in message
+
+
+def test_a_complete_derivative_passes_unchanged():
+    from reporting.generate_report import check_params
+
+    current = {**crash_reports(3), "derivative_id": "d"}
+    assert check_params([current]) == [current]
+    assert check_params([{"kind": "some_future_kind", "params": {}, "derivative_id": "x", "path": "/x"}]) != []

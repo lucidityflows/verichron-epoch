@@ -119,6 +119,34 @@ def render_stage_preface(stages: list[dict], run_id: str, generated: str) -> lis
 # --- provenance (EPOCH-406) ---------------------------------------------
 
 
+#: The recorded parameters the report reads from each kind of derivative.
+#: A derivative registered before one of them existed (crash logs before
+#: EPOCH-519 recorded `backup_finished_at`) is refused with a clear message,
+#: never rendered from a guess (EPOCH-531). Development data is disposable.
+REPORTED_PARAMS = {
+    "decrypted": ("repair",),
+    "ileapp_output": ("input_type", "modules"),
+    "crash_reports": ("acquired_at", "backup_finished_at", "files"),
+}
+
+
+class ReportInputError(Exception):
+    """A derivative's recorded parameters lack something the report reads."""
+
+
+def check_params(derivatives: list[dict]) -> list[dict]:
+    """The derivatives as given, once each has every parameter the report reads."""
+    for d in derivatives:
+        missing = [key for key in REPORTED_PARAMS.get(d["kind"], ()) if key not in (d["params"] or {})]
+        if missing:
+            raise ReportInputError(
+                f"the {d['kind']} derivative {d['derivative_id']} ({d['path']}) has no "
+                f"{', '.join(missing)} in its recorded parameters: it was registered before the current marker "
+                "format. Prepare this evidence again, then analyze it."
+            )
+    return derivatives
+
+
 def fetch_run_derivatives(conn, run_id: str) -> list[dict]:
     """The derivatives this run read: its decrypt, and whatever each stage
     read (pipeline_stage_status.derivative_id), with the provenance each was
@@ -137,7 +165,7 @@ def fetch_run_derivatives(conn, run_id: str) -> list[dict]:
             """,
             (run_id, run_id),
         )
-        return cur.fetchall()
+        return check_params(cur.fetchall())
 
 
 def fetch_fact_derivatives(conn, evidence_id: str) -> list[dict]:
@@ -158,7 +186,7 @@ def fetch_fact_derivatives(conn, evidence_id: str) -> list[dict]:
             """,
             (evidence_id,),
         )
-        return cur.fetchall()
+        return check_params(cur.fetchall())
 
 
 def copied_after_backup(params: dict) -> str:
@@ -343,9 +371,17 @@ def render_crash_section(records: list[dict]) -> list[str]:
 
 
 def fetch_ileapp_summary(conn, evidence_id: str) -> list[dict]:
-    """One row per iLEAPP artifact: its record count and its time span. iLEAPP
-    output runs to 100k+ rows with different columns per artifact, so the
-    report summarizes them and never lists rows."""
+    """One row per iLEAPP artifact: its record count, its time span, and the
+    count iLEAPP itself reported for it (EPOCH-500). iLEAPP output runs to
+    100k+ rows with different columns per artifact, so the report summarizes
+    them and never lists rows.
+
+    iLEAPP's count is the one the bridge checked the artifact's table against
+    and stored with the artifact's ingest unit (`raw_payload.record_count`),
+    read here from the database, never from the workspace (R7, R18). An
+    artifact iLEAPP reported records for but that has no facts gets a row too,
+    so it can't vanish, and so does one with no count recorded; one iLEAPP
+    reported empty gets none."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -361,7 +397,38 @@ def fetch_ileapp_summary(conn, evidence_id: str) -> list[dict]:
             """,
             (evidence_id,),
         )
-        return cur.fetchall()
+        rows = cur.fetchall()
+        # The current ileapp_record units, as current_forensic_records chooses
+        # them (latest completed parser version per file hash, R8).
+        cur.execute(
+            """
+            SELECT i.raw_payload->>'artifact' AS artifact,
+                   sum((i.raw_payload->>'record_count')::bigint) AS reported,
+                   bool_and(i.raw_payload ? 'record_count') AS all_recorded
+            FROM ingested_files i
+            WHERE i.evidence_id = %s AND i.source_type = 'ileapp_record' AND i.ingest_complete
+              AND NOT EXISTS (
+                SELECT 1 FROM ingested_files newer
+                WHERE newer.evidence_id = i.evidence_id AND newer.file_hash = i.file_hash
+                  AND newer.source_type = i.source_type AND newer.parser_version > i.parser_version
+                  AND newer.ingest_complete)
+            GROUP BY i.raw_payload->>'artifact'
+            """,
+            (evidence_id,),
+        )
+        reported = {r["artifact"]: (r["reported"] if r["all_recorded"] else None) for r in cur.fetchall()}
+    for row in rows:
+        row["reported"] = reported.get(row["artifact"])
+    seen = {row["artifact"] for row in rows}
+    for artifact, count in sorted(reported.items(), key=lambda item: str(item[0])):
+        # A named artifact with no facts gets a row unless iLEAPP reported it
+        # empty: with records reported, or with no count to check, it must not
+        # vanish. A unit naming no artifact can't be given a row.
+        if artifact is not None and artifact not in seen and count != 0:
+            rows.append(
+                {"artifact": artifact, "records": 0, "timed": 0, "earliest": None, "latest": None, "reported": count}
+            )
+    return rows
 
 
 def _table_cell(text: str) -> str:
@@ -375,20 +442,46 @@ def _utc(value) -> str:
 
 
 def render_ileapp_section(rows: list[dict]) -> list[str]:
+    """Each artifact's facts beside the count iLEAPP itself reported
+    (EPOCH-500): a difference means records were lost or duplicated between
+    iLEAPP's output and the database, so it is flagged, never assumed away."""
+    differ = [r for r in rows if r["reported"] is not None and r["reported"] != r["records"]]
+    unrecorded = [r for r in rows if r["reported"] is None]
+    checked = len(rows) - len(unrecorded)
+    if differ:
+        check = (
+            f"**{len(differ)} artifact(s) differ from iLEAPP's own count**, flagged below: records were lost or "
+            "duplicated between iLEAPP's output and the facts."
+        )
+    elif unrecorded:
+        # Never claim a match for an artifact that couldn't be checked (R36).
+        check = f"The {checked} checked artifact(s) match the count iLEAPP reported for each."
+    else:
+        check = "Every artifact's records match the count iLEAPP reported for it."
+    if unrecorded:
+        check += f" {len(unrecorded)} artifact(s) have no count from iLEAPP recorded, so they could not be checked."
     lines = [
         f"{sum(r['records'] for r in rows)} record(s) from {len(rows)} iLEAPP artifact(s), most records first. "
         "The rows themselves are in Forensic Records, filtered to `ileapp_record` and the artifact.",
         "",
-        "| Artifact | Records | With event time | Earliest | Latest |",
-        "| :--- | ---: | ---: | :--- | :--- |",
+        check,
+        "",
+        "| Artifact | Records | iLEAPP reported | With event time | Earliest | Latest |",
+        "| :--- | ---: | ---: | ---: | :--- | :--- |",
     ]
     for r in rows:
         artifact = _table_cell(r["artifact"]) if r["artifact"] else "(no artifact name)"
+        if r["reported"] is None:
+            reported = "not recorded"
+        elif r["reported"] != r["records"]:
+            reported = f"**{r['reported']} (differs)**"
+        else:
+            reported = str(r["reported"])
         if r["timed"] == 0:
             span = "no timeline position | "
         else:
             span = f"{_utc(r['earliest'])} | {_utc(r['latest'])}"
-        lines.append(f"| {artifact} | {r['records']} | {r['timed']} | {span} |")
+        lines.append(f"| {artifact} | {r['records']} | {reported} | {r['timed']} | {span} |")
     lines.append("")
     return lines
 

@@ -505,7 +505,11 @@ def test_the_report_summarizes_ileapp_records_by_artifact(db, tmp_path):
     for name, times in artifacts.items():
         table = tmp_path / f"{name}.tsv"
         table.write_text(name)
-        with ingest(db, ctx(RUN_A), table, source_type="ileapp_record", payload_kind="full") as unit:
+        # The bridge stores iLEAPP's own count with each artifact's unit (EPOCH-500).
+        payload = {"artifact": name, "record_count": len(times)}
+        with ingest(
+            db, ctx(RUN_A), table, source_type="ileapp_record", payload_kind="full", raw_payload=payload
+        ) as unit:
             unit.write(
                 [
                     NormalizedRecord(
@@ -525,10 +529,11 @@ def test_the_report_summarizes_ileapp_records_by_artifact(db, tmp_path):
         line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| Artifact", "| :"))
     ]
     assert rows == [
-        "| Installed Apps | 4 | 0 | no timeline position |  |",
-        "| Safari History | 3 | 3 | 2026-10-01 12:00:00 UTC | 2026-10-03 12:00:00 UTC |",
-        "| Location Data | 2 | 1 | 2026-10-05 12:00:00 UTC | 2026-10-05 12:00:00 UTC |",
+        "| Installed Apps | 4 | 4 | 0 | no timeline position |  |",
+        "| Safari History | 3 | 3 | 3 | 2026-10-01 12:00:00 UTC | 2026-10-03 12:00:00 UTC |",
+        "| Location Data | 2 | 2 | 1 | 2026-10-05 12:00:00 UTC | 2026-10-05 12:00:00 UTC |",
     ]
+    assert "Every artifact's records match the count iLEAPP reported for it." in section
     assert "9 record(s) from 3 iLEAPP artifact(s)" in section
     assert "ROW-CONTENT" not in report, "the report summarizes iLEAPP records and never lists their rows"
 
@@ -631,7 +636,7 @@ def test_an_artifact_name_with_a_pipe_or_line_break_keeps_its_table_row_whole(db
     rows = [
         line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| Artifact", "| :"))
     ]
-    assert rows == ["| Calls \\| FaceTime log | 1 | 0 | no timeline position |  |"]
+    assert rows == ["| Calls \\| FaceTime log | 1 | not recorded | 0 | no timeline position |  |"]
 
 
 def test_a_report_without_ileapp_facts_has_no_ileapp_section(db, tmp_path):
