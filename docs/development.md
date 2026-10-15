@@ -117,6 +117,27 @@ migration 0009; recreate it with the command above.
 A database with runs from before EPOCH-414 is refused the same way by migration 0014,
 which adds each stage's order.
 
+## Forensic data and the repository
+
+Keep backups, decrypted data, extractor output, crash logs, SQLite databases,
+and generated reports outside the repository. The pre-commit hook checks staged
+files, and `python-tests.yml` checks every tracked file so `--no-verify` does
+not bypass CI enforcement. Both use `scripts/check_no_forensic_output.py`; a
+refusal names the file and the output class or rule that matched. Files over
+50 MiB are refused as well. To run the tracked-file check manually:
+`uv run python scripts/check_no_forensic_output.py --tracked`.
+
+The only declared forensic-looking fixture path is
+`apps/extractors/crash/fixtures/`, which contains recorded crash-report samples
+used by extractor tests. Add an exception only for a deliberate test fixture
+and document its path and reason in the guard's allowlist; keep it small, and
+never put real evidence there.
+
+If real forensic data is committed, stop sharing the repository and notify its
+maintainer immediately. Removing the file from the latest commit does not
+remove it from history; assess exposure and credentials, then coordinate a
+history rewrite and any required credential rotation.
+
 ### Indicator sets
 
 ```bash

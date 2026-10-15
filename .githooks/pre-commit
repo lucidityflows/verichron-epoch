@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+exec uv run --no-sync python "$repo_root/scripts/check_no_forensic_output.py" --staged

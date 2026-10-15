@@ -16,6 +16,7 @@ from pathlib import Path
 import db_writer
 import pytest
 from db_writer import IngestContext, compute_file_hash
+from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
 from stored_value import decode_value
 from testing.pg_real import BACKENDS, open_db
@@ -39,6 +40,13 @@ CTX = IngestContext(evidence_id=EVIDENCE_ID, derivative_id=DERIVATIVE_ID, run_id
 INPUT = "/ws/decrypted/BK1"
 #: The version the recorded output reports; ILEAPP-0001 is registered for it.
 TOOL_VERSION = "2026.3.0"
+
+
+def test_main_uses_the_shared_etl_run_result_type():
+    import ileapp_bridge.main as bridge_main
+
+    assert bridge_main.ETLRunResult is ETLRunResult
+
 
 VISIT = 1791140650  # 2026-10-04T...Z
 SAFARI = {

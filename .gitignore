@@ -137,7 +137,11 @@ desktop.ini
 # processor workspaces, iLEAPP output, and generated reports and
 # summaries. EPOCH-460 adds a pre-commit and CI guard behind these rules.
 /backups/
+/decrypted/
 /ileapp_raw_output/
+/mvt-workspace/
+/reports/
+/results/
 investigation_report.md
 analysis-summary.json
 summary.json
