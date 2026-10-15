@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, it } from 'vitest';
+import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 
 import type { ToolSetupEvent } from '../../../../../shared/types/tools';
 import { buildToolchain, download, type Download } from './build';
@@ -296,21 +296,45 @@ describe('building the libraries', () => {
   it('times out a stalled download, reports it as a download failure, and cleans up partials (EPOCH-468)', async () => {
     const { run } = machine(ALL_TOOLS, builds());
     const ctx = context(run, { components });
-    const stalledDownload: Download = async (_url, dest, timeoutMs = 20) => {
-      const signal = AbortSignal.timeout(timeoutMs);
-      await new Promise((_, reject) => {
-        signal.addEventListener('abort', () =>
-          reject(signal.reason ?? new Error('The operation was aborted due to timeout'))
-        );
-      });
-      fs.writeFileSync(dest, 'data');
+    let signal: AbortSignal | null | undefined;
+    let partialContents: string | undefined;
+    const cancel = vi.fn();
+    const fetchStub = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
+      signal = options?.signal;
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('partial archive'));
+            // Leave the body open: only the production download's timeout can stop it.
+          },
+          cancel,
+        })
+      );
+    });
+    const stalledDownload: Download = async (url, dest) => {
+      try {
+        await download(url, dest, 200);
+      } catch (err) {
+        // Inspect the file before buildToolchain removes the failed download.
+        partialContents = fs.readFileSync(dest, 'utf8');
+        throw err;
+      }
     };
-    const result = await buildToolchain(ctx, () => undefined, stalledDownload);
-    assert.equal(result.success, false);
-    assert.equal(result.failure?.stepId, 'libplist');
-    assert.equal(result.failure?.label, 'Download libplist 1.0.0');
-    assert.match(result.failure!.hint!, /A download failed/);
-    assert.deepEqual(fs.readdirSync(path.join(ctx.buildDir, 'downloads')), []);
+    try {
+      const result = await buildToolchain(ctx, () => undefined, stalledDownload);
+      assert.equal(signal?.aborted, true);
+      assert.equal(signal?.reason.name, 'TimeoutError');
+      assert.equal(cancel.mock.calls.length, 1, 'the stalled response body was cancelled');
+      assert.equal(partialContents, 'partial archive', 'partial bytes reached the destination before the timeout');
+      assert.equal(result.success, false);
+      assert.equal(result.failure?.stepId, 'libplist');
+      assert.equal(result.failure?.label, 'Download libplist 1.0.0');
+      assert.match(result.failure!.tail.join('\n'), /aborted/i);
+      assert.match(result.failure!.hint!, /A download failed/);
+      assert.deepEqual(fs.readdirSync(path.join(ctx.buildDir, 'downloads')), []);
+    } finally {
+      fetchStub.mockRestore();
+    }
   });
 
   it('fails verification when idevicebackup2 does not report the pinned version', async () => {
