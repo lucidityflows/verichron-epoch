@@ -55,11 +55,11 @@ values on this backup is still mapped. On such a case, its type is reported as
 | Bundle ID | Files App - Files stored in iCloud Drive: Application Bundle ID | as stored | 127 |
 | Bundle ID | Personalization Portrait - Locations: Bundle ID | as stored | 1,000 |
 | Bundle ID | Account Data: Bundle ID | as stored | 15 |
-| Email | SMS: Account Login, Account, Chat Contact ID | email addresses only | 1,872; 110; 92 |
-| Email | Apple Recents: Contact Address, Sending Address | email addresses only | 15; 9 |
-| Email | InteractionC - Contacts: Identifier | email addresses only | 1,276 |
-| Email | Account Data: Username | email addresses only | 9 |
-| Email | Calendar List: Account Email, Owner Email | email addresses only | 3; 3 |
+| Email | SMS: Account Login, Account, Chat Contact ID | email addresses only, compared ignoring case | 1,872; 110; 92 |
+| Email | Apple Recents: Contact Address, Sending Address | email addresses only, compared ignoring case | 15; 9 |
+| Email | InteractionC - Contacts: Identifier | email addresses only, compared ignoring case | 1,276 |
+| Email | Account Data: Username | email addresses only, compared ignoring case | 9 |
+| Email | Calendar List: Account Email, Owner Email | email addresses only, compared ignoring case | 3; 3 |
 
 **Not read:** URLs inside message text (SMS `Message`). Extracting them is its
 own rule, with its own false-positive risk (EPOCH-491).
