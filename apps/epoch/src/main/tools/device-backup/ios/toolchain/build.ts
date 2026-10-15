@@ -23,6 +23,13 @@ export const DEFAULT_DOWNLOAD_TIMEOUT_MS = 60_000;
 /** Saves `url` to `dest`. Rejects on any HTTP, network or timeout failure (EPOCH-468). */
 export type Download = (url: string, dest: string, timeoutMs?: number) => Promise<void>;
 
+/**
+ * Saves the response body to `dest`, overwriting an existing file. `timeoutMs`
+ * limits the request and body transfer together, in milliseconds (default 60,000).
+ * Rejects on an invalid timeout, HTTP failure or missing body, network error,
+ * timeout, or file write error. A failed transfer can leave a partial file;
+ * cleanup is the caller's responsibility.
+ */
 export const download: Download = async (url, dest, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS) => {
   const signal = AbortSignal.timeout(timeoutMs);
   const response = await fetch(url, { signal });
@@ -54,10 +61,17 @@ class StepFailure extends Error {
  * Builds the pinned libraries into the tools folder (EPOCH-465). For each
  * component: download the release (kept if its SHA-256 already matches),
  * verify it, extract it fresh, then configure, make and make install. Each
- * finished component is recorded, so a retry after a failure resumes from
- * the component that failed; a build with nothing to resume starts from an
- * empty tools folder. Last, `idevicebackup2 --version` must run, and only
- * then is the manifest written that marks the libraries installed.
+ * finished component is recorded. A retry resumes only while all recorded
+ * components have matching pkg-config entries; otherwise it starts from an
+ * empty tools folder, retaining cached downloads. Last, `idevicebackup2 --version`
+ * must succeed and its output contain the last component's pinned version;
+ * only then is the manifest written that marks the libraries installed.
+ *
+ * Reports progress through `emit`. Returns a failure result for unmet system
+ * requirements, download errors, checksum mismatches, failed build commands,
+ * or failed version verification. Failed downloads and checksum mismatches
+ * remove the partial archive. Other errors, including filesystem errors and
+ * errors thrown by `emit`, reject the promise.
  */
 export async function buildToolchain(
   ctx: SetupContext,

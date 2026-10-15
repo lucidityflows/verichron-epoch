@@ -203,6 +203,11 @@ async function serviceRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): P
   ];
 }
 
+/**
+ * Lists the pinned libraries, using `installed` as every entry's readiness.
+ * Otherwise, labels recorded progress as built only if every recorded component
+ * has a matching pkg-config entry; one missing entry invalidates all progress.
+ */
 function libraryRequirements(ctx: SetupContext, installed: boolean): ToolSetupRequirement[] {
   const progress = readProgress(ctx.buildDir, ctx.components);
   const done = progress.every((c) => componentInstalled(ctx.prefix, c.name))
@@ -271,6 +276,14 @@ function installPlan(
   };
 }
 
+/**
+ * Probes Linux or macOS prerequisites and returns an installation plan without
+ * installing anything; other platforms return an unsupported status.
+ * `installed` reflects a manifest matching the pins. `canResume` requires an
+ * incomplete installation with recorded progress and matching pkg-config entries
+ * for every recorded component; it does not require system prerequisites to pass.
+ * Errors thrown by context callbacks or caused by malformed stored state propagate.
+ */
 export async function checkRequirements(ctx: SetupContext): Promise<ToolSetupStatus> {
   if (ctx.platform !== 'linux' && ctx.platform !== 'darwin') {
     return {

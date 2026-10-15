@@ -78,8 +78,10 @@ export function writeProgress(buildDir: string, done: BuiltComponent[]): void {
 }
 
 /**
- * Confirms that a component's install artifacts exist in the install prefix
- * (EPOCH-468), such as ${prefix}/lib/pkgconfig/<name>*.pc.
+ * Checks for a pkg-config entry in `prefix/lib/pkgconfig` named
+ * `<componentName>.pc` or beginning with `<componentName>-` and ending in `.pc`
+ * (EPOCH-468). Returns false if the directory is missing or cannot be read.
+ * Does not inspect entry contents, versions, or other installed artifacts.
  */
 export function componentInstalled(prefix: string, componentName: string): boolean {
   const pkgDir = path.join(prefix, 'lib', 'pkgconfig');
