@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -73,6 +74,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("out", type=Path, help="a directory that doesn't exist yet")
     parser.add_argument("--index-commit", default=PINNED_INDEX_COMMIT, help="the index commit to read")
     args = parser.parse_args(argv)
+    if not re.fullmatch(r"[0-9a-f]{40}", args.index_commit):
+        raise SystemExit(f"--index-commit must be a full 40-character commit, not {args.index_commit!r}")
     if args.out.exists():
         raise SystemExit(f"{args.out} exists; a fetch writes only into a new directory")
 

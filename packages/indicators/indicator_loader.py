@@ -205,13 +205,15 @@ def _load_file(name: str, content: bytes, as_of: datetime) -> tuple[FileReport, 
     for obj in objects:
         if not isinstance(obj, dict) or not isinstance(obj.get("type"), str) or not isinstance(obj.get("id"), str):
             raise LoadError(f"{name} holds an object without a type and an ID")
+    # Any repeated ID, not only an indicator's: two malware objects under one
+    # ID would otherwise leave one name, and so one campaign, silently unused.
+    ids = Counter(obj["id"] for obj in objects)
+    repeated = sorted(i for i, n in ids.items() if n > 1)
+    if repeated:
+        raise LoadError(f"{name} repeats object IDs: {repeated[:3]}")
     by_id = {obj["id"]: obj for obj in objects}
 
     indicator_objects = [obj for obj in objects if obj["type"] == "indicator"]
-    ids = Counter(obj["id"] for obj in indicator_objects)
-    repeated = sorted(i for i, n in ids.items() if n > 1)
-    if repeated:
-        raise LoadError(f"{name} repeats indicator IDs: {repeated[:3]}")
 
     campaigns: dict[str, set[str]] = {}
     unresolved = 0

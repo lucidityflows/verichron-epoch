@@ -31,6 +31,7 @@ from indicator_normalize import SUPPORTED_TYPES, normalize
         ("url", "http://Bücher.de/x", "http://xn--bcher-kva.de/x"),
         ("url", "http://[2001:DB8::0001]:80/", "http://[2001:db8::1]/"),
         ("url", "http://User:Pw@Example.com/", "http://User:Pw@example.com/"),
+        ("url", "http://a%41:%7e@x.example/", "http://aA:~@x.example/"),
         # IP addresses.
         ("ip", "103.43.17.99", "103.43.17.99"),  # feed
         ("ip", "2001:0DB8:0000:0000:0000:0000:0000:0001", "2001:db8::1"),

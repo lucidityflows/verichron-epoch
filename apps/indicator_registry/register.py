@@ -88,6 +88,9 @@ def main(argv: list[str]) -> int:
         return 1
     try:
         registered = register_set(conn, loaded)
+    except psycopg2.Error as e:
+        print(f"[indicator-registry] not registered: {redact_password(str(e), db_url)}", file=sys.stderr)
+        return 1
     finally:
         conn.close()
     state = "already registered; nothing changed" if registered.already_registered else "registered"

@@ -204,8 +204,23 @@ def test_a_relationship_outside_the_file_is_counted(tmp_path: Path) -> None:
         json.dumps(bundle({**indicator(1, "[domain-name:value = 'a.example']"), "spec_version": "2.0"})),
         json.dumps(bundle({**indicator(1, "[domain-name:value = 'a.example']"), "valid_until": "soon"})),
         json.dumps(bundle(indicator(1, "[domain-name:value = 'a.example']"), indicator(1, "[url:value = 'u']"))),
+        json.dumps(
+            bundle(
+                indicator(1, "[domain-name:value = 'a.example']"),
+                {"type": "malware", "spec_version": "2.1", "id": MALWARE, "name": "Other", "is_family": False},
+            )
+        ),
     ],
-    ids=["not-json", "not-a-bundle", "object-without-id", "bad-pattern", "stix-2.0", "bad-time", "repeated-id"],
+    ids=[
+        "not-json",
+        "not-a-bundle",
+        "object-without-id",
+        "bad-pattern",
+        "stix-2.0",
+        "bad-time",
+        "repeated-indicator-id",
+        "repeated-malware-id",
+    ],
 )
 def test_a_malformed_file_rejects_the_whole_set(tmp_path: Path, content: str) -> None:
     write(tmp_path / "set" / "good.stix2", bundle(indicator(1, "[domain-name:value = 'a.example']")))

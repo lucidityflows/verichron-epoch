@@ -76,7 +76,7 @@ def normalize_url(value: str) -> str:
     if port is not None and port != _DEFAULT_PORTS.get(scheme):
         netloc = f"{host}:{port}"
     if parts.username is not None or parts.password is not None:
-        userinfo = parts.netloc.rpartition("@")[0]
+        userinfo = _normalize_percent(parts.netloc.rpartition("@")[0])
         netloc = f"{userinfo}@{netloc}"
     normalized = SplitResult(scheme, netloc, _normalize_percent(parts.path), _normalize_percent(parts.query), "")
     return urlunsplit(normalized)
