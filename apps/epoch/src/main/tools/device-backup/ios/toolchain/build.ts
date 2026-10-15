@@ -6,18 +6,30 @@ import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import type { ToolSetupEvent, ToolSetupResult, ToolSetupStep } from '../../../../../shared/types/tools';
 import { hintFor } from './hints';
-import { PROGRESS_FILE, readProgress, writeManifest, writeProgress, type BuiltComponent } from './manifest';
+import {
+  PROGRESS_FILE,
+  componentInstalled,
+  readProgress,
+  writeManifest,
+  writeProgress,
+  type BuiltComponent,
+} from './manifest';
 import { archiveName, sourceDirName, type PinnedComponent } from './pins';
 import { lastLines } from './process';
 import { brewPrefixOf, checkRequirements, toolchainEnv, type SetupContext } from './requirements';
 
-/** Saves `url` to `dest`. Rejects on any HTTP or network failure. */
-export type Download = (url: string, dest: string) => Promise<void>;
+export const DEFAULT_DOWNLOAD_TIMEOUT_MS = 60_000;
 
-export const download: Download = async (url, dest) => {
-  const response = await fetch(url);
+/** Saves `url` to `dest`. Rejects on any HTTP, network or timeout failure (EPOCH-468). */
+export type Download = (url: string, dest: string, timeoutMs?: number) => Promise<void>;
+
+export const download: Download = async (url, dest, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS) => {
+  const signal = AbortSignal.timeout(timeoutMs);
+  const response = await fetch(url, { signal });
   if (!response.ok || !response.body) throw new Error(`HTTP ${response.status} downloading ${url}`);
-  await pipeline(Readable.fromWeb(response.body as import('stream/web').ReadableStream), fs.createWriteStream(dest));
+  await pipeline(Readable.fromWeb(response.body as import('stream/web').ReadableStream), fs.createWriteStream(dest), {
+    signal,
+  });
 };
 
 export async function sha256Of(file: string): Promise<string> {
@@ -71,6 +83,9 @@ export async function buildToolchain(
   const sources = path.join(ctx.buildDir, 'src');
 
   let done = readProgress(ctx.buildDir, ctx.components);
+  if (done.some((d) => !componentInstalled(ctx.prefix, d.name))) {
+    done = [];
+  }
   if (done.length === 0) {
     // A fresh build: nothing half-installed or left over may remain. Verified
     // downloads are kept; their hashes are checked again before use.
@@ -96,8 +111,13 @@ export async function buildToolchain(
     for (const component of ctx.components) {
       current = component.name;
       if (done.some((d) => d.name === component.name)) {
-        emit({ type: 'step', id: component.name, status: 'skipped', detail: 'Built in an earlier attempt' });
-        continue;
+        if (!componentInstalled(ctx.prefix, component.name)) {
+          done = [];
+          fs.rmSync(ctx.prefix, { recursive: true, force: true });
+        } else {
+          emit({ type: 'step', id: component.name, status: 'skipped', detail: 'Built in an earlier attempt' });
+          continue;
+        }
       }
       const phase = (detail: string) => emit({ type: 'step', id: component.name, status: 'running', detail });
       const runPhase = async (verb: string, command: string, args: string[], cwd: string) => {

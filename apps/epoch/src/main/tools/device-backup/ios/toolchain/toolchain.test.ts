@@ -12,7 +12,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import type { ToolSetupEvent } from '../../../../../shared/types/tools';
-import { buildToolchain, type Download } from './build';
+import { buildToolchain, download, type Download } from './build';
 import { adminPromptHint, hintFor } from './hints';
 import { installSystemRequirements } from './install';
 import { MANIFEST_FILE, PROGRESS_FILE, readManifest } from './manifest';
@@ -100,7 +100,7 @@ const downloads =
   };
 
 /** Build commands: tar creates the source directory; configure and make succeed unless `fail` says otherwise. */
-function builds(fail?: (call: Call) => string | undefined, version = '1.0.0') {
+function builds(fail?: (call: Call) => string | undefined, version = '1.0.0', prefix?: string) {
   return (call: Call): { code: number; output: string } | undefined => {
     if (call.command === 'tar') {
       const archive = path.basename(call.args[1]).replace('.tar.bz2', '');
@@ -109,7 +109,15 @@ function builds(fail?: (call: Call) => string | undefined, version = '1.0.0') {
     }
     if (call.command === './configure' || call.command === 'make') {
       const failure = fail?.(call);
-      return failure ? { code: 1, output: failure } : { code: 0, output: 'ok\n' };
+      if (failure) return { code: 1, output: failure };
+      if (call.command === 'make' && call.args[0] === 'install') {
+        const targetPrefix = prefix ?? path.join(root, 'prefix');
+        const pkgDir = path.join(targetPrefix, 'lib', 'pkgconfig');
+        fs.mkdirSync(pkgDir, { recursive: true });
+        const name = path.basename(call.cwd ?? '').replace(/-[\d.]+$/, '');
+        if (name) fs.writeFileSync(path.join(pkgDir, `${name}.pc`), `Name: ${name}\nVersion: 1.0.0\n`);
+      }
+      return { code: 0, output: 'ok\n' };
     }
     if (call.command.endsWith(path.join('bin', 'idevicebackup2'))) {
       return { code: 0, output: `idevicebackup2 ${version}\n` };
@@ -254,6 +262,57 @@ describe('building the libraries', () => {
     assert.ok(readManifest(ctx.prefix));
   });
 
+  it('rebuilds the missing components when resuming after the install prefix was deleted (EPOCH-468)', async () => {
+    let configureGlueFails = true;
+    const { run } = machine(
+      ALL_TOOLS,
+      builds((call) =>
+        configureGlueFails && call.command === './configure' && call.cwd!.endsWith('libimobiledevice-glue-1.0.0')
+          ? "Package 'libcurl' not found"
+          : undefined
+      )
+    );
+    const ctx = context(run, { components });
+    const first = await buildToolchain(ctx, () => undefined, downloads());
+    assert.equal(first.success, false);
+    assert.equal(first.failure?.stepId, 'libimobiledevice-glue');
+    assert.equal((await checkRequirements(ctx)).canResume, true);
+
+    // Delete the install prefix while keeping progress.json intact in buildDir
+    fs.rmSync(ctx.prefix, { recursive: true, force: true });
+    assert.equal((await checkRequirements(ctx)).canResume, false, 'cannot resume when install artifacts are gone');
+
+    configureGlueFails = false;
+    const events: ToolSetupEvent[] = [];
+    const second = await buildToolchain(ctx, (e) => events.push(e), downloads());
+    assert.equal(second.success, true);
+    assert.ok(
+      !events.some((e) => e.type === 'step' && e.id === 'libplist' && e.status === 'skipped'),
+      'libplist was rebuilt because its install artifacts were gone'
+    );
+    assert.ok(readManifest(ctx.prefix));
+  });
+
+  it('times out a stalled download, reports it as a download failure, and cleans up partials (EPOCH-468)', async () => {
+    const { run } = machine(ALL_TOOLS, builds());
+    const ctx = context(run, { components });
+    const stalledDownload: Download = async (_url, dest, timeoutMs = 20) => {
+      const signal = AbortSignal.timeout(timeoutMs);
+      await new Promise((_, reject) => {
+        signal.addEventListener('abort', () =>
+          reject(signal.reason ?? new Error('The operation was aborted due to timeout'))
+        );
+      });
+      fs.writeFileSync(dest, 'data');
+    };
+    const result = await buildToolchain(ctx, () => undefined, stalledDownload);
+    assert.equal(result.success, false);
+    assert.equal(result.failure?.stepId, 'libplist');
+    assert.equal(result.failure?.label, 'Download libplist 1.0.0');
+    assert.match(result.failure!.hint!, /A download failed/);
+    assert.deepEqual(fs.readdirSync(path.join(ctx.buildDir, 'downloads')), []);
+  });
+
   it('fails verification when idevicebackup2 does not report the pinned version', async () => {
     const { run } = machine(ALL_TOOLS, builds(undefined, '9.9.9'));
     const ctx = context(run, { components });
@@ -284,6 +343,11 @@ describe('failure hints', () => {
 
   it('says nothing rather than guess', () =>
     assert.equal(hintFor(['make[2]: *** [Makefile:400: all] Error 2']), undefined));
+
+  it('explains download timeout aborts (EPOCH-468)', () => {
+    assert.match(hintFor(['The operation was aborted due to timeout'])!, /A download failed/);
+    assert.match(hintFor(['The operation was aborted'])!, /A download failed/);
+  });
 
   it('reads pkexec exit codes', () => {
     assert.equal(adminPromptHint(126), 'The administrator request was cancelled.');

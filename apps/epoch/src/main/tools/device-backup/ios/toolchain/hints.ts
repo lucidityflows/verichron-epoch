@@ -48,7 +48,7 @@ const RULES: Array<{ test: RegExp; hint: (match: RegExpMatchArray) => string }> 
       "A download didn't match its expected checksum, so it wasn't used. Try again; if it repeats, the download source has changed.",
   },
   {
-    test: /fetch failed|ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN|HTTP \d{3}/,
+    test: /fetch failed|ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN|HTTP \d{3}|operation was aborted/i,
     hint: () => "A download failed. Check this computer's internet connection, then try again.",
   },
   {

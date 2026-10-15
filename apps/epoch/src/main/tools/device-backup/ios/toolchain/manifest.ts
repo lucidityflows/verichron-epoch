@@ -76,3 +76,20 @@ export function readProgress(buildDir: string, pins: readonly PinnedComponent[] 
 export function writeProgress(buildDir: string, done: BuiltComponent[]): void {
   fs.writeFileSync(path.join(buildDir, PROGRESS_FILE), JSON.stringify(done, null, 2) + '\n');
 }
+
+/**
+ * Confirms that a component's install artifacts exist in the install prefix
+ * (EPOCH-468), such as ${prefix}/lib/pkgconfig/<name>*.pc.
+ */
+export function componentInstalled(prefix: string, componentName: string): boolean {
+  const pkgDir = path.join(prefix, 'lib', 'pkgconfig');
+  if (!fs.existsSync(pkgDir)) return false;
+  try {
+    const entries = fs.readdirSync(pkgDir);
+    return entries.some(
+      (file) => file.endsWith('.pc') && (file === `${componentName}.pc` || file.startsWith(`${componentName}-`))
+    );
+  } catch {
+    return false;
+  }
+}
