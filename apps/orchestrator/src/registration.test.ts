@@ -649,6 +649,28 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(rows[0].derivative_id, firstOutput);
   });
 
+  it('a repeated decrypt with the same repair outcome is the same derivative; only when originals were preserved changes (EPOCH-517)', async () => {
+    const ws = makeWorkspace('re-decrypted');
+    const first = await run(ws.backupPath);
+    const later: DecryptParams = {
+      repair: {
+        ...(REPAIRED.repair as Extract<DecryptParams['repair'], { status: 'ran' }>),
+        preserved_originals: ['HomeDomain/Library/sms.db.corrupt-2026-10-15T00-24-33-652Z'],
+      },
+    };
+    writeFileSync(path.join(ws.backupPath, DECRYPT_MARKER), decryptMarker(ws.contentRoot, later));
+    const second = await run(ws.backupPath);
+    assert.equal(second.skipped, true, 'the same decrypt and iLEAPP output: the complete run stands');
+    const { rows } = await db.query(`SELECT kind, params FROM evidence_derivatives ORDER BY kind`);
+    assert.deepEqual(
+      rows.map((r) => r.kind),
+      ['decrypted', 'ileapp_output'],
+      'no second decrypt, and no second iLEAPP output under it'
+    );
+    assert.deepEqual(rows[0].params, later, 'the row names the preserved originals that exist now');
+    assert.equal(second.evidenceId, first.evidenceId);
+  });
+
   it('a decrypt with a different repair outcome is a new derivative, never an update in place', async () => {
     const ws = makeWorkspace('re-repaired');
     await run(ws.backupPath);

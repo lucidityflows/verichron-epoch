@@ -159,11 +159,36 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** The time the repair appends to a preserved original's name (`<db>.corrupt-<ISO time, : and . as ->`). */
+const PRESERVED_AT = /\.corrupt-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/;
+
+/**
+ * The part of a derivative's params that is its identity (EPOCH-517). A
+ * repaired decrypt's preserved originals count as the databases they came
+ * from, not as their timestamped names: when a copy was set aside shaped
+ * nothing, so a repeated decrypt with the same repair outcome is the same
+ * derivative. Everything else counts as recorded.
+ */
+export function identityParams(params: unknown): unknown {
+  const decrypt = DecryptParams.safeParse(params);
+  if (!decrypt.success || decrypt.data.repair.status !== 'ran') return params;
+  const { repair } = decrypt.data;
+  return {
+    repair: {
+      ...repair,
+      preserved_originals: repair.preserved_originals.map((p) => p.replace(PRESERVED_AT, '')).sort(),
+    },
+  };
+}
+
 /**
  * Part of a derivative's identity: sha256 over the canonical JSON of
- * {tool, params}. Two passes that differ in tool version, repair outcome or
- * input type get different keys, so they are different derivatives.
+ * {tool, identityParams(params)}. Two passes that differ in tool version,
+ * repair outcome or input type get different keys, so they are different
+ * derivatives; two that differ only in when originals were preserved don't.
  */
 export function provenanceKey(tool: ToolVersion, params: unknown): string {
-  return createHash('sha256').update(canonicalJson({ tool, params })).digest('hex');
+  return createHash('sha256')
+    .update(canonicalJson({ tool, params: identityParams(params) }))
+    .digest('hex');
 }

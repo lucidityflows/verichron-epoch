@@ -364,9 +364,11 @@ async function appendEvent(
  * A derivative's identity is (evidence, kind, parent, provenance), not its
  * path (migration 0007). A pass made by a different tool version, with a
  * different repair outcome or with a different iLEAPP input type is a new
- * derivative; a row's tool and params are never rewritten. The path is its
- * last-known location and is the one thing updated here, so a moved
- * workspace keeps its derivative (and its completed runs).
+ * derivative; a row's tool is never rewritten. The path is its last-known
+ * location, so a moved workspace keeps its derivative (and its completed
+ * runs). A repeated pass with the same identity refreshes the row's params,
+ * whose preserved originals' timestamped names are the current files'
+ * (EPOCH-517); its provenance key is the same by definition.
  */
 async function upsertDerivative(
   client: Client,
@@ -381,7 +383,8 @@ async function upsertDerivative(
   const { rows } = await client.query<{ derivative_id: string; inserted: boolean }>(
     `INSERT INTO evidence_derivatives (evidence_id, kind, path, parent_derivative_id, tool, params, provenance_key)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (evidence_id, kind, parent_derivative_id, provenance_key) DO UPDATE SET path = EXCLUDED.path
+     ON CONFLICT (evidence_id, kind, parent_derivative_id, provenance_key)
+       DO UPDATE SET path = EXCLUDED.path, params = EXCLUDED.params
      RETURNING derivative_id, (xmax = 0) AS inserted`,
     [evidenceId, kind, derivativePath, parentId, provenance.tool, provenance.params, key]
   );
