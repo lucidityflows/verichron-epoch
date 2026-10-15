@@ -113,6 +113,19 @@ credential. The report is written by the `reporting` stage to
 A database created before EPOCH-489 that still holds mvt results is refused by
 migration 0009; recreate it with the command above.
 
+### Indicator sets
+
+```bash
+# Fetch the public feeds at pinned commits (connected machine only), into a new directory
+uv run python scripts/fetch_indicator_feeds.py ~/indicator-sets/mvt-2026-10-15
+
+# Show what the set holds, per file, without touching the database
+uv run python apps/indicator_registry/register.py --check ~/indicator-sets/mvt-2026-10-15
+
+# Register it (again: no change). Any STIX 2.1 file or directory of them works the same way
+uv run python apps/indicator_registry/register.py ~/indicator-sets/mvt-2026-10-15
+```
+
 Useful tools:
 
 | Command | What it does |

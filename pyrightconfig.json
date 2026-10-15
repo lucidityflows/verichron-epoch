@@ -5,6 +5,7 @@
   "typeCheckingMode": "basic",
   "extraPaths": [
     "packages/etl-db-writer",
+    "packages/indicators",
     "libs/etl-run",
     "libs/verichron-runtime-env",
     "libs/testing",
