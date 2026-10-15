@@ -75,6 +75,11 @@ describe('analysisTargets', () => {
     assert.throws(() => analysisTargets(ws, []), /Select at least one prepared backup/);
   });
 
+  it('refuses a label that is not a string, before using it (CodeRabbit on PR #104)', () => {
+    assert.throws(() => analysisTargets(ws, ['NEW', 42]), /must be named by its folder name/);
+    assert.throws(() => analysisTargets(ws, [{ label: 'NEW' }]), /must be named by its folder name/);
+  });
+
   it('refuses a name that is not a plain folder name', () => {
     assert.throws(() => analysisTargets(ws, ['../NEW']), /not a backup name/);
     assert.throws(() => analysisTargets(ws, ['..']), /not a backup name/);

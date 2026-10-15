@@ -115,16 +115,24 @@ export async function createRun(
   for (const stage of stages.enabled) {
     const input = inputsFor(stage, registration, indicatorSet);
     await client.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, parser_version, derivative_id, indicator_set_id)
-       VALUES ($1, $2, 'pending', $3, $4, $5)`,
-      [runId, stage.name, stage.manifest.parserVersion ?? null, input.derivativeId, input.indicatorSetId]
+      `INSERT INTO pipeline_stage_status
+         (run_id, stage_name, stage_order, status, parser_version, derivative_id, indicator_set_id)
+       VALUES ($1, $2, $3, 'pending', $4, $5, $6)`,
+      [
+        runId,
+        stage.name,
+        stage.manifest.order,
+        stage.manifest.parserVersion ?? null,
+        input.derivativeId,
+        input.indicatorSetId,
+      ]
     );
   }
   for (const stage of stages.disabled) {
     await client.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, error_message, parser_version)
-       VALUES ($1, $2, 'skipped', 'stage disabled in its stage.json', $3)`,
-      [runId, stage.name, stage.manifest.parserVersion ?? null]
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, error_message, parser_version)
+       VALUES ($1, $2, $3, 'skipped', 'stage disabled in its stage.json', $4)`,
+      [runId, stage.name, stage.manifest.order, stage.manifest.parserVersion ?? null]
     );
   }
   return runId;

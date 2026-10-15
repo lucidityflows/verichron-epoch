@@ -114,6 +114,8 @@ credential. The report is written by the `reporting` stage to
 `reports/<label>/investigation_report.md`.
 A database created before EPOCH-489 that still holds mvt results is refused by
 migration 0009; recreate it with the command above.
+A database with runs from before EPOCH-414 is refused the same way by migration 0014,
+which adds each stage's order.
 
 ### Indicator sets
 

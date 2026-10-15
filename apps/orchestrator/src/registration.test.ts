@@ -41,7 +41,8 @@ import {
   type DecryptParams,
 } from '@verichron/contracts';
 
-import { getRunState, hasCompleteRunFor } from './db.js';
+import { createRun, getRunState, hasCompleteRunFor } from './db.js';
+import { discoverStages } from './discovery.js';
 import { runPipelineForBackup } from './pipeline.js';
 import { readRunSummary } from './runSummary.js';
 import { deviceKey, loadDeviceSecret, readPlistStrings, registerEvidence, RegistrationError } from './registration.js';
@@ -633,6 +634,58 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(unknown.success, false);
     assert.match(unknown.error ?? '', /no indicator set with hash/);
     assert.equal(await count('pipeline_runs'), runs, 'no run was created');
+  });
+
+  it("records each stage's declared order, so a run's stages read back in stage.json order, disabled ones in place (EPOCH-414)", async () => {
+    const ws = makeWorkspace('stage-order');
+    const registration = await registerEvidence(db, {
+      backupPath: ws.backupPath,
+      ileappPath: ws.ileappPath,
+      secretPath,
+    });
+    const provenance = { contractVersion: 'test', toolVersions: {} };
+
+    // The real stages, as discovery finds them.
+    const discovered = await discoverStages();
+    const realRun = await createRun(db, ws.backupPath, discovered, provenance, registration);
+    const real = await db.query<{ stage_name: string; stage_order: number }>(
+      `SELECT stage_name, stage_order FROM pipeline_stage_status WHERE run_id = $1 ORDER BY stage_order, stage_name`,
+      [realRun]
+    );
+    assert.deepEqual(
+      real.rows.map((r) => [r.stage_name, r.stage_order]),
+      [...discovered.enabled, ...discovered.disabled]
+        .map((s) => [s.name, s.manifest.order])
+        .sort((a, b) => Number(a[1]) - Number(b[1]))
+    );
+    assert.deepEqual(
+      real.rows.map((r) => r.stage_name),
+      ['crash', 'ileapp_bridge', 'indicator_match', 'reporting']
+    );
+
+    // A disabled stage keeps its declared place, recorded as skipped.
+    const first = recordingStage('first', 10);
+    const off = recordingStage('off', 15, { enabled: false });
+    const last = recordingStage('last', 20);
+    const mixedRun = await createRun(
+      db,
+      ws.backupPath,
+      { enabled: [last, first], disabled: [off] },
+      provenance,
+      registration
+    );
+    const mixed = await db.query<{ stage_name: string; status: string }>(
+      `SELECT stage_name, status FROM pipeline_stage_status WHERE run_id = $1 ORDER BY stage_order, stage_name`,
+      [mixedRun]
+    );
+    assert.deepEqual(
+      mixed.rows.map((r) => [r.stage_name, r.status]),
+      [
+        ['first', 'pending'],
+        ['off', 'skipped'],
+        ['last', 'pending'],
+      ]
+    );
   });
 
   it("a disabled stage's skip never stands in for an absent input: enabling it gets a new run", async () => {

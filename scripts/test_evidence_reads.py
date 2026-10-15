@@ -266,8 +266,8 @@ def test_the_report_says_what_produced_each_derivative_the_run_read(db, tmp_path
             (EVIDENCE, DERIVATIVE, RUN_A),
         )
         cur.execute(
-            "INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id) "
-            "VALUES (%s, 'ileapp_bridge', 'succeeded', %s)",
+            "INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, derivative_id) "
+            "VALUES (%s, 'ileapp_bridge', 20, 'succeeded', %s)",
             (RUN_A, output),
         )
     db.commit()
@@ -347,8 +347,8 @@ def test_the_report_lists_each_skipped_stage_and_its_reason_as_not_examined(db, 
     )
     with db.cursor() as cur:
         cur.execute(
-            "INSERT INTO pipeline_stage_status (run_id, stage_name, status, error_message) VALUES "
-            "(%s, 'crash', 'skipped', %s), (%s, 'stub', 'skipped', 'stage disabled in its stage.json')",
+            "INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, error_message) VALUES "
+            "(%s, 'crash', 10, 'skipped', %s), (%s, 'stub', 30, 'skipped', 'stage disabled in its stage.json')",
             (RUN_A, reason, RUN_A),
         )
     db.commit()
@@ -369,8 +369,9 @@ def test_the_report_leaves_out_its_own_stage_which_is_still_running(db, tmp_path
 
     with db.cursor() as cur:
         cur.execute(
-            "INSERT INTO pipeline_stage_status (run_id, stage_name, status) VALUES "
-            "(%s, 'crash', 'succeeded'), (%s, 'ileapp_bridge', 'succeeded'), (%s, 'reporting', 'running')",
+            "INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status) VALUES "
+            "(%s, 'crash', 10, 'succeeded'), (%s, 'ileapp_bridge', 20, 'succeeded'), "
+            "(%s, 'reporting', 1000, 'running')",
             (RUN_A, RUN_A, RUN_A),
         )
     db.commit()
@@ -417,8 +418,8 @@ def test_the_report_names_every_ileapp_plugin_that_errored_and_counts_the_rest(d
             ),
         )
         cur.execute(
-            "INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id) "
-            "VALUES (%s, 'ileapp_bridge', 'succeeded', %s)",
+            "INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, derivative_id) "
+            "VALUES (%s, 'ileapp_bridge', 20, 'succeeded', %s)",
             (RUN_A, output),
         )
     db.commit()

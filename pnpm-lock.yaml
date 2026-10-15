@@ -220,6 +220,9 @@ importers:
       '@verichron/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       pg:
         specifier: ^8.23.0
         version: 8.23.0

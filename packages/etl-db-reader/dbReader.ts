@@ -11,10 +11,10 @@
  * here:
  *   - pipeline_runs has no `created_at` column -- only `started_at` /
  *     `finished_at`. getPipelineRuns now orders by `started_at`.
- *   - The table is `pipeline_stage_status`, not `stage_runs`, its FK column
- *     is `run_id` not `pipeline_run_id`, and there is no `stage_order`
- *     column at all -- see CANONICAL_STAGE_ORDER below for how ordering is
- *     done instead.
+ *   - The table is `pipeline_stage_status`, not `stage_runs`, and its FK
+ *     column is `run_id` not `pipeline_run_id`. A run's stages are ordered
+ *     by `stage_order`, which the orchestrator records from each stage.json
+ *     (migration 0014, EPOCH-414).
  *
  * EPOCH-403: facts are read by EVIDENCE, never by run (R7). Since migration
  * 0003, forensic_records has no run_id at all; a run is an audit event and
@@ -57,6 +57,8 @@ export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skip
 export interface StageStatusRow {
   run_id: string;
   stage_name: string;
+  /** The stage's declared order, from its stage.json (EPOCH-414). */
+  stage_order: number;
   status: StageStatus;
   error_message: string | null;
   /** What the stage printed while succeeding: its notes (EPOCH-420); null if nothing. */
@@ -178,29 +180,15 @@ export async function getRunReportLocation(client: Db, runId: string): Promise<s
 }
 
 /**
- * Canonical pipeline stage sequence, per the CREATE TABLE comment in
- * 0001_init.sql. The schema has no stage_order column -- stage sequence is
- * currently only encoded here, in application code. If this list drifts
- * from the orchestrator's actual stage sequence, or a stage is added on one
- * side and not the other, this is the file to update; there is nowhere else
- * it's defined. A `stage_order SMALLINT` column on pipeline_stage_status
- * would make this schema-enforced instead of convention-enforced -- worth
- * revisiting if this list needs to change more than once.
- */
-export const CANONICAL_STAGE_ORDER = ['crash', 'safari', 'sms', 'network', 'gcloud', 'report'] as const;
-
-/**
- * Stage-level status rows for one pipeline run, sorted into canonical
- * pipeline order rather than execution order -- so a report view always
- * shows all configured stages in the same sequence regardless of which
- * ones have actually started yet. Stages not present in
- * CANONICAL_STAGE_ORDER sort after all known stages, in the order Postgres
- * returned them, rather than being dropped -- an unrecognized stage_name is
- * a signal this list is stale, not a reason to hide the row.
+ * Stage-level status rows for one pipeline run, in pipeline order rather
+ * than execution order: by each stage's declared `order`, which the
+ * orchestrator records from its stage.json (`stage_order`, EPOCH-414), so a
+ * view shows every stage in the same sequence whether or not it has started.
+ * The order has one owner (R2); no list of stage names lives here.
  */
 export async function getStageStatus(client: Db, runId: string): Promise<StageStatusRow[]> {
   const result = await client.query<StageStatusRow>(
-    `SELECT s.run_id, s.stage_name, s.status, s.error_message, s.warnings, s.started_at, s.finished_at,
+    `SELECT s.run_id, s.stage_name, s.stage_order, s.status, s.error_message, s.warnings, s.started_at, s.finished_at,
             s.parser_version, s.derivative_id, d.kind AS derivative_kind, d.tool AS derivative_tool,
             u.units, u.records
        FROM pipeline_stage_status s
@@ -212,17 +200,11 @@ export async function getStageStatus(client: Db, runId: string): Promise<StageSt
             AND s.run_id = ANY (f.produced_by_runs)
             AND f.ingest_complete
        ) u
-      WHERE s.run_id = $1`,
+      WHERE s.run_id = $1
+      ORDER BY s.stage_order, s.stage_name`,
     [runId]
   );
-
-  return result.rows.sort((a, b) => {
-    const orderA = CANONICAL_STAGE_ORDER.indexOf(a.stage_name as (typeof CANONICAL_STAGE_ORDER)[number]);
-    const orderB = CANONICAL_STAGE_ORDER.indexOf(b.stage_name as (typeof CANONICAL_STAGE_ORDER)[number]);
-    const rankA = orderA === -1 ? CANONICAL_STAGE_ORDER.length : orderA;
-    const rankB = orderB === -1 ? CANONICAL_STAGE_ORDER.length : orderB;
-    return rankA - rankB;
-  });
+  return result.rows;
 }
 
 /** Sort keys a caller may ask for (R24: named, allowlisted; never raw SQL). */
