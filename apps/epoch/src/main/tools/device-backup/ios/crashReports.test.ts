@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, it } from 'vitest';
 import { CrashReportsAcquisition } from '@verichron/contracts';
 
 import { copyCrashReports, crashReportArgs, type RunTool } from './crashReports';
+import { crashReportsSummary } from './iosBackupSource';
 
 const UDID = '00008140-0000000000000000';
 let tmp: string;
@@ -153,5 +154,25 @@ describe('copyCrashReports', () => {
       outcome: 'unavailable',
       error: 'idevicecrashreport is not available',
     });
+  });
+});
+
+describe('crashReportsSummary', () => {
+  it('states the size of a real copy in MB, not as 0.0 GB', () => {
+    assert.equal(
+      crashReportsSummary({ outcome: 'copied', tool_version: '1.4.0', files: 244, bytes: 7_600_000 }),
+      '244 crash log file(s) copied (7.6 MB); they are still on the device.'
+    );
+  });
+
+  it('says when the device held none, and when the copy failed', () => {
+    assert.equal(
+      crashReportsSummary({ outcome: 'copied', tool_version: '1.4.0', files: 0, bytes: 0 }),
+      'The device held no crash logs.'
+    );
+    assert.match(
+      crashReportsSummary({ outcome: 'failed', tool_version: '1.4.0', error: 'lockdownd refused' }),
+      /^The crash logs were not copied: lockdownd refused\. The report will say they were not acquired\.$/
+    );
   });
 });

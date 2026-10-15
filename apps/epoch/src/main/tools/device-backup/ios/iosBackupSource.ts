@@ -458,7 +458,7 @@ export function crashReportsSummary(copy: CrashReportCopy | null): string {
   if (copy.outcome === 'copied') {
     return copy.files === 0
       ? 'The device held no crash logs.'
-      : `${copy.files} crash log file(s) copied (${formatGB(copy.bytes)}); they are still on the device.`;
+      : `${copy.files} crash log file(s) copied (${(copy.bytes / 1e6).toFixed(1)} MB); they are still on the device.`;
   }
   return `The crash logs were not copied: ${copy.error}. The report will say they were not acquired.`;
 }
