@@ -30,6 +30,7 @@ Read [docs/architecture.md](docs/architecture.md) for the full picture.
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | The components, how data flows, and where each piece lives |
 | [docs/evidence-model.md](docs/evidence-model.md) | How evidence, derivatives, runs and facts are identified and related |
+| [docs/indicator-field-map.md](docs/indicator-field-map.md) | Which facts can supply which indicator types, and which types no backup supplies |
 | [docs/rules.md](docs/rules.md) | The architecture rules (R1–R35) every change must respect |
 | [docs/decisions.md](docs/decisions.md) | Settled decisions and why they were made |
 | [docs/development.md](docs/development.md) | Setting up, running the pipeline, testing, CI |

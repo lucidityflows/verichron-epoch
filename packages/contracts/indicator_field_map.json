@@ -1,0 +1,91 @@
+{
+  "description": "Which facts can supply which indicator types (EPOCH-521). The matcher (EPOCH-491) reads facts only through this map. Sources were chosen by what each column holds, from iLEAPP's declared columns and a value survey of the reference backups (2026-10-15), never by value shape alone: shape matched call durations as IP addresses and photo file names as domains.",
+  "stix_paths": {
+    "domain-name:value": "domain",
+    "url:value": "url",
+    "process:name": "process_name",
+    "app:id": "bundle_id",
+    "email-addr:value": "email",
+    "ipv4-addr:value": "ip",
+    "file:hashes.sha256": "file_hash",
+    "file:path": "file_path",
+    "file:name": "file_name",
+    "app:cert.sha1": "app_certificate",
+    "app:cert.sha256": "app_certificate",
+    "android-property:name": "android_property",
+    "configuration-profile:id": "configuration_profile"
+  },
+  "types": {
+    "url": {
+      "sources": [
+        { "source_type": "ileapp_record", "artifact": "Safari Browser - History", "column": "URL" },
+        { "source_type": "ileapp_record", "artifact": "Safari Browser - History", "column": "Redirect Source" },
+        { "source_type": "ileapp_record", "artifact": "Safari Browser - History", "column": "Redirect Destination" },
+        { "source_type": "ileapp_record", "artifact": "Safari Browser - Search Terms", "column": "URL" },
+        { "source_type": "ileapp_record", "artifact": "Safari Browser - Search Terms", "column": "Redirect Source" },
+        { "source_type": "ileapp_record", "artifact": "Safari Browser - Search Terms", "column": "Redirect Destination" },
+        { "source_type": "ileapp_record", "artifact": "Safari Browser - Tabs (BrowserState)", "column": "URL" },
+        { "source_type": "ileapp_record", "artifact": "Safari Browser - Tabs (BrowserState)", "column": "User Visible URL" },
+        { "source_type": "ileapp_record", "artifact": "Safari Browser - Tabs (SafariTabs)", "column": "URL" },
+        { "source_type": "ileapp_record", "artifact": "Safari Browser - Bookmarks", "column": "URL" },
+        { "source_type": "ileapp_record", "artifact": "iOS Screens", "column": "URL" }
+      ]
+    },
+    "domain": {
+      "note": "Every URL source above supplies its host, and cookies supply theirs (a leading dot marks a cookie that also applies to subdomains, and is removed).",
+      "from_url_sources": true,
+      "sources": [
+        { "source_type": "ileapp_record", "artifact": "Cookies - Binary Cookies", "column": "Host", "extract": "cookie_host" }
+      ]
+    },
+    "process_name": {
+      "sources": [
+        { "source_type": "crash_report", "column": "process_name" },
+        { "source_type": "ileapp_record", "artifact": "Data Usage", "column": "Process Name" }
+      ]
+    },
+    "bundle_id": {
+      "sources": [
+        { "source_type": "crash_report", "column": "bundle_id" },
+        { "source_type": "ileapp_record", "artifact": "iTunes Backup - Installed Applications", "column": "Bundle ID" },
+        { "source_type": "ileapp_record", "artifact": "Application State", "column": "Bundle ID" },
+        { "source_type": "ileapp_record", "artifact": "Application Snapshot", "column": "Bundle ID" },
+        { "source_type": "ileapp_record", "artifact": "Application Permissions", "column": "Bundle ID" },
+        { "source_type": "ileapp_record", "artifact": "App Usage Events (AMDSQLiteDB)", "column": "Bundle ID" },
+        { "source_type": "ileapp_record", "artifact": "Data Usage", "column": "Bundle Name" },
+        { "source_type": "ileapp_record", "artifact": "InteractionC - Contacts", "column": "Bundle ID" },
+        { "source_type": "ileapp_record", "artifact": "interactionC Call History - Group Call", "column": "Application Bundle ID" },
+        { "source_type": "ileapp_record", "artifact": "Files App - iCloud Application List", "column": "Application Bundle ID" },
+        { "source_type": "ileapp_record", "artifact": "Files App - Files stored in iCloud Drive", "column": "Application Bundle ID" },
+        { "source_type": "ileapp_record", "artifact": "Personalization Portrait - Locations", "column": "Bundle ID" },
+        { "source_type": "ileapp_record", "artifact": "Account Data", "column": "Bundle ID" }
+      ]
+    },
+    "email": {
+      "note": "These columns hold handles that are email addresses or phone numbers; only values that are email addresses are read.",
+      "sources": [
+        { "source_type": "ileapp_record", "artifact": "SMS", "column": "Account Login", "extract": "email_only" },
+        { "source_type": "ileapp_record", "artifact": "SMS", "column": "Account", "extract": "email_only" },
+        { "source_type": "ileapp_record", "artifact": "SMS", "column": "Chat Contact ID", "extract": "email_only" },
+        { "source_type": "ileapp_record", "artifact": "Apple Recents", "column": "Contact Address", "extract": "email_only" },
+        { "source_type": "ileapp_record", "artifact": "Apple Recents", "column": "Sending Address", "extract": "email_only" },
+        { "source_type": "ileapp_record", "artifact": "InteractionC - Contacts", "column": "Identifier", "extract": "email_only" },
+        { "source_type": "ileapp_record", "artifact": "Account Data", "column": "Username", "extract": "email_only" },
+        { "source_type": "ileapp_record", "artifact": "Calendar List", "column": "Account Email", "extract": "email_only" },
+        { "source_type": "ileapp_record", "artifact": "Calendar List", "column": "Owner Email", "extract": "email_only" }
+      ]
+    }
+  },
+  "no_source": {
+    "ip": "No fact holds an IP address: an iOS backup keeps no network connection log. Values shaped like IP addresses in the reference backups were call durations.",
+    "file_hash": "File hashes are in the evidence manifest, which is not a fact (EPOCH-523).",
+    "file_path": "File paths are in the decrypt's Manifest.db, which is not a fact (EPOCH-523).",
+    "file_name": "File names are in the decrypt's Manifest.db, which is not a fact (EPOCH-523).",
+    "app_certificate": "App signing certificates are Android indicators; an iOS backup holds none.",
+    "android_property": "Android system properties; an iOS backup holds none.",
+    "configuration_profile": "The pinned iLEAPP has no plugin that lists installed configuration profiles."
+  },
+  "not_read": {
+    "free_text": "URLs inside message text (SMS 'Message') are not read: extracting them is its own rule with its own false-positive risk (EPOCH-491)."
+  }
+}
