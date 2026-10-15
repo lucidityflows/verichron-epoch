@@ -169,6 +169,11 @@ def describe_derivative(d: dict) -> list[str]:
             f"- **iLEAPP output** (`{d['path']}`): produced by iLEAPP {tool['version'][:12]}, "
             f"read as `{params['input_type']}`"
         ]
+    if d["kind"] == "crash_reports":
+        return [
+            f"- **Crash logs** (`{d['path']}`): copied from the device by {tool['name']} {tool['version']} "
+            f"on {params['acquired_at']}, and left on the device; {params['files']} file(s)"
+        ]
     repair = params["repair"]
     if repair["status"] == "skipped":
         repair_note = f"repair skipped ({repair['reason']})"
@@ -513,11 +518,15 @@ def fetch_fact_counts(conn, evidence_id: str) -> list[dict]:
         return cur.fetchall()
 
 
-def render_coverage_section(counts: list[dict], ileapp_outputs: list[dict]) -> list[str]:
+def render_coverage_section(
+    counts: list[dict], ileapp_outputs: list[dict], crash_reports: list[dict] | None = None
+) -> list[str]:
     """What the report shows of the evidence's facts, and what it doesn't, so
     "not shown" can never read as "not found". Also what iLEAPP's modules did
     on the output this run read (EPOCH-457): an artifact type with no files in
-    the backup is absent, not missed."""
+    the backup is absent, not missed; and how many crash logs were copied from
+    the device (EPOCH-514), so none copied reads as none held, not none looked
+    for."""
     lines = [
         "## Coverage",
         "",
@@ -543,7 +552,14 @@ def render_coverage_section(counts: list[dict], ileapp_outputs: list[dict]) -> l
             f"{len(m['no_files_found'])} found no files in the backup, and {len(m['errors'])} errored "
             "(see Not Examined)."
         )
-    if ileapp_outputs:
+    for d in crash_reports or []:
+        p = d["params"]
+        lines.append(
+            f"Crash logs (`{d['path']}`): {p['files']} file(s) copied from the device on {p['acquired_at']}."
+            if p["files"]
+            else f"Crash logs (`{d['path']}`): the device held none when they were copied on {p['acquired_at']}."
+        )
+    if ileapp_outputs or crash_reports:
         lines.append("")
     lines += ["---", ""]
     return lines
@@ -603,7 +619,11 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
         print(f"[reporting] wrote {output_path} (no evidence registered for run {run_id})")
         return
 
-    lines += render_coverage_section(fetch_fact_counts(conn, evidence_id), ileapp_outputs)
+    lines += render_coverage_section(
+        fetch_fact_counts(conn, evidence_id),
+        ileapp_outputs,
+        [d for d in inputs if d["kind"] == "crash_reports"],
+    )
     lines += render_not_examined_section(ileapp_outputs, stages)
     lines += render_tool_checks_section(fetch_corrections(conn, evidence_id), fetch_time_review(conn, evidence_id))
 

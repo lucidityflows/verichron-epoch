@@ -42,9 +42,26 @@ to the decrypt (R7).
 
 The device's **crash logs** (`crash_reports`) are a third kind. An iOS backup
 holds none of them (verified on a real backup, EPOCH-447): they are copied from
-the device separately. Nothing produces this derivative yet; the iPhone pull
-will (EPOCH-514), and so will full-filesystem extractions (EPOCH-515). A stage
-that reads a derivative the evidence lacks normally fails; for crash logs, whose
+the device separately (EPOCH-514).
+
+- **Acquired by the pull.** After a completed backup, the pull runs
+  `idevicecrashreport -k`, which copies the reports and leaves them on the
+  device, into `<UDID>.crash-reports/` beside the backup, never inside it, so
+  the backup's content root is the device's backup alone. Only a finished copy
+  gets `<UDID>.crash-reports.json`: the tool, when, and the file and byte
+  counts. The pull record says what the copy did; a failed copy doesn't fail
+  the completed backup.
+- **Copied by the processor.** It copies them into
+  `<workspace>/crash_reports/<label>/`, hashes the copy the way a backup is
+  hashed, and writes `.crash_reports_ok` once the copy matches the pull's
+  folder. A folder without the pull's record, or one that changed after the
+  pull, is not used.
+- **Registered with the backup's evidence, with no parent.** They were acquired
+  in the same pull, not derived from the backup. Their identity is the tool and
+  their content root; when they were copied is recorded but is not part of it.
+
+Full-filesystem extractions will provide them too (EPOCH-515). A stage that
+reads a derivative the evidence lacks normally fails; for crash logs, whose
 absence is a fact about how the evidence was acquired, the stage is recorded as
 skipped with that reason, and the report lists it under Not Examined.
 
@@ -59,10 +76,14 @@ A derivative's identity is **(evidence, kind, parent, provenance)**:
   - iLEAPP's output records the iLEAPP commit (the submodule's, because
     iLEAPP's self-reported version does not match its release tag) and how
     iLEAPP read the decrypt (`itunes` or `fs`);
-- `provenance_key` is the sha256 of that provenance in canonical form;
+- `provenance_key` is the sha256 of that provenance in canonical form, with
+  each preserved original counted as the database it came from: when a copy
+  was set aside shaped nothing, so a repeated decrypt with the same repair
+  outcome is the same derivative (EPOCH-517);
 - a different tool version, repair outcome or iLEAPP commit is
-  therefore a **new derivative**. A derivative's provenance is never rewritten; only its path, its
-  last-known location, is updated.
+  therefore a **new derivative**. A derivative's identity is never rewritten.
+  Its path, its last-known location, is updated, and a repeated pass refreshes
+  the preserved originals' names to the files that exist now.
 
 **Completion markers.** The processor writes `.decrypted_ok` and `.ileapp_ok`
 only once a derivative is finished. A decrypt is finished only when every file

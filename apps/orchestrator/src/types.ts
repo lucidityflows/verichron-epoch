@@ -28,6 +28,8 @@ export interface RunConfig {
   /** <workspace>/reports/<label>: where the report stage writes (EPOCH-489). */
   reportPath?: string;
   ileappPath?: string;
+  /** <workspace>/crash_reports/<label>: the device's crash logs (EPOCH-514). */
+  crashReportsPath?: string;
   dbUrl: string;
   pythonBin: string;
 }

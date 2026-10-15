@@ -34,6 +34,8 @@ import {
   DECRYPT_MARKER,
   deriveRunSummaryPath,
   ILEAPP_MARKER,
+  CRASH_REPORTS_MARKER,
+  renderCrashReportsMarker,
   renderDecryptMarker,
   renderIleappMarker,
   type DecryptParams,
@@ -471,6 +473,67 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(await getRunState(db, result.runId!), 'complete');
   });
 
+  it('crash logs the pull acquired are registered with the evidence and passed to the stage reading them (EPOCH-514)', async () => {
+    const ws = makeWorkspace('with-crash-logs');
+    const crashPath = path.join(ws.workspace, 'crash_reports', 'BK1');
+    mkdirSync(crashPath, { recursive: true });
+    const params = {
+      acquired_at: '2026-10-15T01:00:00.000Z',
+      files: 230,
+      bytes: 7_600_000,
+      reports_root: 'c'.repeat(64),
+    };
+    writeFileSync(
+      path.join(crashPath, CRASH_REPORTS_MARKER),
+      renderCrashReportsMarker(ws.contentRoot, { name: 'idevicecrashreport', version: '1.4.0' }, params)
+    );
+    const crash = recordingStage('crash-logs-reader', 10, { reads: 'crash_reports', parserVersion: 2 });
+    const result = await run(ws.backupPath, { enabled: [crash], disabled: [] });
+    assert.equal(result.success, true, JSON.stringify(result));
+
+    const { rows } = await db.query(
+      `SELECT derivative_id, parent_derivative_id, tool, params, path FROM evidence_derivatives
+        WHERE evidence_id = $1 AND kind = 'crash_reports'`,
+      [result.evidenceId]
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].parent_derivative_id, null, 'acquired with the backup, not made from it');
+    assert.deepEqual(rows[0].tool, { name: 'idevicecrashreport', version: '1.4.0' });
+    assert.deepEqual(rows[0].params, params);
+    assert.equal(argsOf(crash)['--derivative-id'], rows[0].derivative_id);
+    assert.equal(argsOf(crash)['--derivative-path'], crashPath);
+
+    // Copied again later: the same reports are the same derivative.
+    writeFileSync(
+      path.join(crashPath, CRASH_REPORTS_MARKER),
+      renderCrashReportsMarker(
+        ws.contentRoot,
+        { name: 'idevicecrashreport', version: '1.4.0' },
+        { ...params, acquired_at: '2026-10-16T09:00:00.000Z' }
+      )
+    );
+    const again = await run(ws.backupPath, { enabled: [crash], disabled: [] });
+    assert.equal(again.skipped, true, 'the same crash logs: the complete run stands');
+  });
+
+  it('crash logs whose marker names other evidence are refused before any run', async () => {
+    const ws = makeWorkspace('foreign-crash-logs');
+    const crashPath = path.join(ws.workspace, 'crash_reports', 'BK1');
+    mkdirSync(crashPath, { recursive: true });
+    writeFileSync(
+      path.join(crashPath, CRASH_REPORTS_MARKER),
+      renderCrashReportsMarker(
+        'f'.repeat(64),
+        { name: 'idevicecrashreport', version: '1.4.0' },
+        { acquired_at: '2026-10-15T01:00:00.000Z', files: 0, bytes: 0, reports_root: 'c'.repeat(64) }
+      )
+    );
+    const result = await run(ws.backupPath);
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /the crash-log copy at .* was made from content root ffffffffffff/);
+    assert.equal(await count('pipeline_runs'), 0);
+  });
+
   it('a stage reading crash logs this evidence lacks is skipped with the reason, never run, and the run is complete (EPOCH-447)', async () => {
     const ws = makeWorkspace('no-crash-logs');
     const crash = recordingStage('crash-reader', 10, { reads: 'crash_reports', parserVersion: 1 });
@@ -647,6 +710,28 @@ describe('stages and the completeness predicate', live, () => {
       'the old output keeps its own row and provenance'
     );
     assert.equal(rows[0].derivative_id, firstOutput);
+  });
+
+  it('a repeated decrypt with the same repair outcome is the same derivative; only when originals were preserved changes (EPOCH-517)', async () => {
+    const ws = makeWorkspace('re-decrypted');
+    const first = await run(ws.backupPath);
+    const later: DecryptParams = {
+      repair: {
+        ...(REPAIRED.repair as Extract<DecryptParams['repair'], { status: 'ran' }>),
+        preserved_originals: ['HomeDomain/Library/sms.db.corrupt-2026-10-15T00-24-33-652Z'],
+      },
+    };
+    writeFileSync(path.join(ws.backupPath, DECRYPT_MARKER), decryptMarker(ws.contentRoot, later));
+    const second = await run(ws.backupPath);
+    assert.equal(second.skipped, true, 'the same decrypt and iLEAPP output: the complete run stands');
+    const { rows } = await db.query(`SELECT kind, params FROM evidence_derivatives ORDER BY kind`);
+    assert.deepEqual(
+      rows.map((r) => r.kind),
+      ['decrypted', 'ileapp_output'],
+      'no second decrypt, and no second iLEAPP output under it'
+    );
+    assert.deepEqual(rows[0].params, later, 'the row names the preserved originals that exist now');
+    assert.equal(second.evidenceId, first.evidenceId);
   });
 
   it('a decrypt with a different repair outcome is a new derivative, never an update in place', async () => {

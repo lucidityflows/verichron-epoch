@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import type { CrashReportCopy } from './crashReports';
 
 /**
  * One line per device pull, appended to PULL_RECORD_FILE beside the backups
@@ -38,6 +39,11 @@ export interface PullRecord {
   outcome: 'completed' | 'failed' | 'cancelled';
   /** Why the pull failed or stopped, as shown to the user; null when it completed. */
   error: string | null;
+  /**
+   * The copy of the device's crash logs, made after a completed backup with
+   * idevicecrashreport -k (EPOCH-514); null when the backup didn't complete.
+   */
+  crash_reports: CrashReportCopy | null;
 }
 
 export interface IncompleteBackupDeleted {

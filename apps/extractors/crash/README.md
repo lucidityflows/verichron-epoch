@@ -8,11 +8,12 @@ derivative). It follows the
 **Source (EPOCH-447).** An iOS backup holds none of the device's crash logs:
 on the real reference backup, `Manifest.db` listed no file under
 `DiagnosticReports` or `CrashReporter`. Crash logs are copied from the device
-separately: EPOCH-514 adds this to the iPhone pull, and EPOCH-515 reads them
-from full-filesystem extractions. Until one of those has produced crash logs
-for the evidence, the orchestrator records this stage as skipped, with that
-reason, and the report lists it under Not Examined. The stage never searches a
-backup for crash logs.
+separately: an iPhone pull copies them with `idevicecrashreport -k`, and the
+processor copies them into `crash_reports/<label>/` (EPOCH-514; see
+[docs/evidence-model.md](../../../docs/evidence-model.md#derivatives)).
+EPOCH-515 will read them from full-filesystem extractions. Evidence without
+them has this stage recorded as skipped, with that reason, and the report lists
+it under Not Examined. The stage never searches a backup for crash logs.
 
 ## Parsing
 

@@ -32,6 +32,7 @@ import {
   provenanceKey,
   readDecryptMarker,
   readIleappMarker,
+  readCrashReportsMarker,
   type DerivativeKind,
   type ToolVersion,
 } from '@verichron/contracts';
@@ -53,8 +54,8 @@ export interface Registration {
   decryptedDerivativeId: string;
   /** iLEAPP's output for that decrypt, when complete (EPOCH-416). */
   ileappDerivativeId: string | null;
-  /** The device's crash logs. An iOS backup holds none, and nothing acquires
-   * them yet (EPOCH-514), so this is null for now (EPOCH-447). */
+  /** The device's crash logs, when the pull acquired them with this backup
+   * (EPOCH-514); an iOS backup holds none itself (EPOCH-447). */
   crashReportsDerivativeId: string | null;
 }
 
@@ -103,6 +104,8 @@ export interface RegistrationInput {
   backupPath: string;
   /** <workspace>/ileapp/<label>, if derivable. */
   ileappPath?: string;
+  /** <workspace>/crash_reports/<label>, if derivable (EPOCH-514). */
+  crashReportsPath?: string;
   /** Recorded on locations and events; defaults to this machine's hostname. */
   host?: string;
   /** Per-install HMAC secret file; defaults to defaultSecretPath(). */
@@ -291,8 +294,9 @@ function verifySidecar(workspace: string, label: string): VerifiedSidecar {
 function verifyDerivatives(
   decryptedPath: string,
   ileappPath: string | undefined,
+  crashReportsPath: string | undefined,
   contentRoot: string
-): { decrypt: Provenance; ileapp: MadeFromDecrypt | null } {
+): { decrypt: Provenance; ileapp: MadeFromDecrypt | null; crashReports: MadeFromDecrypt | null } {
   const decrypt = readDecryptMarker(decryptedPath);
   if (decrypt?.content_root !== contentRoot) {
     throw new RegistrationError(
@@ -307,6 +311,9 @@ function verifyDerivatives(
   return {
     decrypt: { tool: decrypt.tool, params: decrypt.params },
     ileapp: madeFromDecrypt("iLEAPP's output", ileappPath, readIleappMarker, contentRoot),
+    // Not made from the decrypt but acquired with the backup, in the same
+    // pull; checked the same way: its marker must name this evidence.
+    crashReports: madeFromDecrypt('the crash-log copy', crashReportsPath, readCrashReportsMarker, contentRoot),
   };
 }
 
@@ -364,9 +371,11 @@ async function appendEvent(
  * A derivative's identity is (evidence, kind, parent, provenance), not its
  * path (migration 0007). A pass made by a different tool version, with a
  * different repair outcome or with a different iLEAPP input type is a new
- * derivative; a row's tool and params are never rewritten. The path is its
- * last-known location and is the one thing updated here, so a moved
- * workspace keeps its derivative (and its completed runs).
+ * derivative; a row's tool is never rewritten. The path is its last-known
+ * location, so a moved workspace keeps its derivative (and its completed
+ * runs). A repeated pass with the same identity refreshes the row's params,
+ * whose preserved originals' timestamped names are the current files'
+ * (EPOCH-517); its provenance key is the same by definition.
  */
 async function upsertDerivative(
   client: Client,
@@ -381,7 +390,8 @@ async function upsertDerivative(
   const { rows } = await client.query<{ derivative_id: string; inserted: boolean }>(
     `INSERT INTO evidence_derivatives (evidence_id, kind, path, parent_derivative_id, tool, params, provenance_key)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (evidence_id, kind, parent_derivative_id, provenance_key) DO UPDATE SET path = EXCLUDED.path
+     ON CONFLICT (evidence_id, kind, parent_derivative_id, provenance_key)
+       DO UPDATE SET path = EXCLUDED.path, params = EXCLUDED.params
      RETURNING derivative_id, (xmax = 0) AS inserted`,
     [evidenceId, kind, derivativePath, parentId, provenance.tool, provenance.params, key]
   );
@@ -409,7 +419,7 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
   const device = readDevice([path.resolve(input.backupPath), sidecar.sourcePath]);
   const key = deviceKey(device.udid, loadDeviceSecret(input.secretPath));
   const decryptedPath = path.resolve(input.backupPath);
-  const derivatives = verifyDerivatives(decryptedPath, input.ileappPath, sidecar.contentRoot);
+  const derivatives = verifyDerivatives(decryptedPath, input.ileappPath, input.crashReportsPath, sidecar.contentRoot);
 
   await client.query('BEGIN');
   try {
@@ -489,9 +499,22 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
           derivatives.ileapp.provenance
         )
       : null;
+    // The device's crash logs belong to the same evidence, with no parent:
+    // they were acquired in the same pull, not derived from the backup.
+    const crashReportsDerivativeId = derivatives.crashReports
+      ? await upsertDerivative(
+          client,
+          evidenceId,
+          'crash_reports',
+          derivatives.crashReports.path,
+          null,
+          host,
+          derivatives.crashReports.provenance
+        )
+      : null;
 
     await client.query('COMMIT');
-    return { evidenceId, deviceId, decryptedDerivativeId, ileappDerivativeId, crashReportsDerivativeId: null };
+    return { evidenceId, deviceId, decryptedDerivativeId, ileappDerivativeId, crashReportsDerivativeId };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;

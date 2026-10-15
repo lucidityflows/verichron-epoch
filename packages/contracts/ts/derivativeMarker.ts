@@ -22,12 +22,14 @@ import { z } from 'zod';
  */
 export const DECRYPT_MARKER = '.decrypted_ok';
 export const ILEAPP_MARKER = '.ileapp_ok';
+export const CRASH_REPORTS_MARKER = '.crash_reports_ok';
 
 /**
  * The derivative kinds evidence_derivatives.kind allows (migration 0011).
  * `crash_reports` is the device's crash logs, copied from the device
- * separately because an iOS backup doesn't contain them (EPOCH-447); nothing
- * produces it until EPOCH-514, so a stage reading it is recorded as skipped.
+ * separately because an iOS backup doesn't contain them (EPOCH-447): an
+ * iPhone pull copies them (EPOCH-514); without them, a stage reading this
+ * kind is recorded as skipped.
  */
 export const DerivativeKind = z.enum(['decrypted', 'ileapp_output', 'crash_reports']);
 export type DerivativeKind = z.infer<typeof DerivativeKind>;
@@ -102,6 +104,23 @@ export const IleappParams = z
   .strict();
 export type IleappParams = z.infer<typeof IleappParams>;
 
+/**
+ * The device's crash logs, as the processor copied them into the workspace
+ * (EPOCH-514): when they were copied from the device, how many files and
+ * bytes, and `reports_root`, the content root of the copy (R6), hashed the
+ * way a backup is. `acquired_at` is not part of the identity
+ * (identityParams): the same reports copied twice are the same derivative.
+ */
+export const CrashReportsParams = z
+  .object({
+    acquired_at: z.iso.datetime({ offset: true }),
+    files: z.number().int().nonnegative(),
+    bytes: z.number().int().nonnegative(),
+    reports_root: ContentRoot,
+  })
+  .strict();
+export type CrashReportsParams = z.infer<typeof CrashReportsParams>;
+
 const markerOf = <P extends z.ZodTypeAny>(params: P) =>
   z
     .object({
@@ -116,6 +135,8 @@ export const DecryptMarker = markerOf(DecryptParams);
 export type DecryptMarker = z.infer<typeof DecryptMarker>;
 export const IleappMarker = markerOf(IleappParams);
 export type IleappMarker = z.infer<typeof IleappMarker>;
+export const CrashReportsMarker = markerOf(CrashReportsParams);
+export type CrashReportsMarker = z.infer<typeof CrashReportsMarker>;
 
 function readMarker<S extends z.ZodTypeAny>(schema: S, dir: string, marker: string): z.infer<S> | null {
   const file = path.join(dir, marker);
@@ -142,6 +163,15 @@ export function renderIleappMarker(contentRoot: string, tool: ToolVersion, param
   return render(IleappMarker, contentRoot, tool, params);
 }
 
+/** The crash logs' provenance, or null if the marker is missing or not in this format. */
+export const readCrashReportsMarker = (dir: string): CrashReportsMarker | null =>
+  readMarker(CrashReportsMarker, dir, CRASH_REPORTS_MARKER);
+
+/** `contentRoot` is the evidence the crash logs were acquired with: the backup of the same pull. */
+export function renderCrashReportsMarker(contentRoot: string, tool: ToolVersion, params: CrashReportsParams): string {
+  return render(CrashReportsMarker, contentRoot, tool, params);
+}
+
 function render<S extends z.ZodTypeAny>(schema: S, contentRoot: string, tool: ToolVersion, params: unknown): string {
   const marker = { content_root: contentRoot, completed_at: new Date().toISOString(), tool, params };
   return JSON.stringify(schema.parse(marker)) + '\n';
@@ -159,11 +189,42 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** The time the repair appends to a preserved original's name (`<db>.corrupt-<ISO time, : and . as ->`). */
+const PRESERVED_AT = /\.corrupt-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/;
+
+/**
+ * The part of a derivative's params that is its identity (EPOCH-517). A
+ * repaired decrypt's preserved originals count as the databases they came
+ * from, not as their timestamped names: when a copy was set aside shaped
+ * nothing, so a repeated decrypt with the same repair outcome is the same
+ * derivative. Likewise crash logs count by their content, not by when they
+ * were copied (EPOCH-514). Everything else counts as recorded.
+ */
+export function identityParams(params: unknown): unknown {
+  const crash = CrashReportsParams.safeParse(params);
+  if (crash.success) {
+    const { acquired_at: _acquiredAt, ...identity } = crash.data;
+    return identity;
+  }
+  const decrypt = DecryptParams.safeParse(params);
+  if (!decrypt.success || decrypt.data.repair.status !== 'ran') return params;
+  const { repair } = decrypt.data;
+  return {
+    repair: {
+      ...repair,
+      preserved_originals: repair.preserved_originals.map((p) => p.replace(PRESERVED_AT, '')).sort(),
+    },
+  };
+}
+
 /**
  * Part of a derivative's identity: sha256 over the canonical JSON of
- * {tool, params}. Two passes that differ in tool version, repair outcome or
- * input type get different keys, so they are different derivatives.
+ * {tool, identityParams(params)}. Two passes that differ in tool version,
+ * repair outcome or input type get different keys, so they are different
+ * derivatives; two that differ only in when originals were preserved don't.
  */
 export function provenanceKey(tool: ToolVersion, params: unknown): string {
-  return createHash('sha256').update(canonicalJson({ tool, params })).digest('hex');
+  return createHash('sha256')
+    .update(canonicalJson({ tool, params: identityParams(params) }))
+    .digest('hex');
 }

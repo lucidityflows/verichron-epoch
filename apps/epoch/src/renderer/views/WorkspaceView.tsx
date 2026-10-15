@@ -25,6 +25,7 @@ import { StepList, type Step } from '../components/ui/StepList';
 import type { Backup } from '@verichron/contracts';
 import { pipelineApi } from '../api/pipeline';
 import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
+import { analysisShown } from './analysisShown';
 import { devicesApi } from '../api/devices';
 import { ViewLayout } from '../components/layout/ViewLayout';
 
@@ -111,7 +112,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const preparedByLabel = new Map((preparedInfo?.backups ?? []).map((b) => [b.label, b]));
   const preparedCount = (preparedInfo?.backups ?? []).filter((b) => b.state === 'prepared').length;
   const analysisWorkspace = lastRunWorkspace ?? preparedInfo?.workspace ?? null;
-  const analysisForRun = analysis?.kind === 'workspace' && analysis.target === analysisWorkspace;
+  // A result from before the latest Prepare doesn't hide Analyze (EPOCH-516).
+  const analysisForRun = analysisShown(analysis, prepare, analysisWorkspace);
   const analysisRunning = analysisForRun && analysis?.status === 'running';
   const analysisLog = analysisForRun ? analysisLogAll : [];
   const analysisResult: PipelineFinishedResult | null = analysisRunning

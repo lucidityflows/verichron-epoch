@@ -145,6 +145,7 @@ describe('appendPullRecord', () => {
       device_listed: null,
       outcome: 'completed',
       error: null,
+      crash_reports: { outcome: 'copied', tool_version: '1.4.0', files: 244, bytes: 7_600_000 },
     };
     await appendPullRecord(tmp, record);
     await appendPullRecord(tmp, { ...record, backup_encryption: 'already-on' });
