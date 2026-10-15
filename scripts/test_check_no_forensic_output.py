@@ -52,9 +52,7 @@ def test_refuses_files_over_the_size_limit():
 
 
 def test_staged_check_reads_the_staged_blob_not_working_tree(tmp_path, monkeypatch, capsys):
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=tmp_path, check=True)
-    subprocess.run(["git", "config", "user.name", "Forensic guard test"], cwd=tmp_path, check=True)
+    _init_repo(tmp_path)
 
     candidate = tmp_path / "renamed.bin"
     candidate.write_bytes(b"SQLite format 3\x00staged database")
@@ -66,3 +64,22 @@ def test_staged_check_reads_the_staged_blob_not_working_tree(tmp_path, monkeypat
 
     assert check_no_forensic_output.main() == 1
     assert "refused: renamed.bin: SQLite database" in capsys.readouterr().err
+
+
+def test_tracked_check_detects_a_committed_backup_marker(tmp_path, monkeypatch, capsys):
+    _init_repo(tmp_path)
+    (tmp_path / "Manifest.plist").write_bytes(b"synthetic test data")
+    subprocess.run(["git", "add", "Manifest.plist"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "add synthetic backup marker"], cwd=tmp_path, check=True)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["check_no_forensic_output.py", "--tracked"])
+
+    assert check_no_forensic_output.main() == 1
+    assert "refused: Manifest.plist: iOS backup structure" in capsys.readouterr().err
+
+
+def _init_repo(path):
+    subprocess.run(["git", "init", "-q", str(path)], check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.name", "Forensic guard test"], cwd=path, check=True)
