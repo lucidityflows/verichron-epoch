@@ -149,6 +149,31 @@ describe('copyCrashReports', () => {
     assert.deepEqual(calls, [['--version']], 'only the version was asked');
   });
 
+  it('never throws: an unexpected error is a failed copy, so the completed backup stands (EPOCH-518)', async () => {
+    const throwing: RunTool = async () => {
+      throw new TypeError('contracts.crashReportsAcquisitionPaths is not a function');
+    };
+    assert.deepEqual(await copyCrashReports('/tools/idevicecrashreport', UDID, backupDir, throwing), {
+      outcome: 'failed',
+      tool_version: null,
+      error: 'the copy stopped unexpectedly: contracts.crashReportsAcquisitionPaths is not a function',
+    });
+    const clockBroken = await copyCrashReports(
+      '/tools/idevicecrashreport',
+      UDID,
+      backupDir,
+      fakeTool([], () => ({ code: 0, output: '' })),
+      () => {
+        throw new Error('no clock');
+      }
+    );
+    assert.deepEqual(clockBroken, {
+      outcome: 'failed',
+      tool_version: null,
+      error: 'the copy stopped unexpectedly: no clock',
+    });
+  });
+
   it('says so when the tool is not available', async () => {
     assert.deepEqual(await copyCrashReports(undefined, UDID, backupDir), {
       outcome: 'unavailable',

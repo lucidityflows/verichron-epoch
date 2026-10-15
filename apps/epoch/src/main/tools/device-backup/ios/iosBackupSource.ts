@@ -362,12 +362,22 @@ export class IosBackupSource implements DeviceBackupSource {
         phase: 'transferring',
         message: `Copying the crash logs from ${device.name}. They stay on the device.`,
       });
-      const crashTool = detectBinary('idevicecrashreport', trustedToolPath('idevicecrashreport'));
-      record.crash_reports = await copyCrashReports(
-        crashTool.available ? crashTool.path : undefined,
-        device.id,
-        backupDir
-      );
+      // Guarded here too (EPOCH-518): nothing in this step may turn the
+      // completed backup into a failed pull.
+      try {
+        const crashTool = detectBinary('idevicecrashreport', trustedToolPath('idevicecrashreport'));
+        record.crash_reports = await copyCrashReports(
+          crashTool.available ? crashTool.path : undefined,
+          device.id,
+          backupDir
+        );
+      } catch (err) {
+        record.crash_reports = {
+          outcome: 'failed',
+          tool_version: null,
+          error: `the copy stopped unexpectedly: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
       record.outcome = 'completed';
       record.finished_at = new Date().toISOString();
       // The record is written before "done", so a completed pull is never

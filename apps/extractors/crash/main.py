@@ -228,7 +228,11 @@ def run(conn, ctx: IngestContext, crash_reports_path: str) -> ETLRunResult:
     non-atomic pattern `ingest()` exists to close off (see db_writer.py's
     module docstring).
     """
-    files = sorted(p for p in Path(crash_reports_path).rglob("*") if p.is_file())
+    root = Path(crash_reports_path)
+    # The processor's completion marker (CRASH_REPORTS_MARKER in the contracts)
+    # is not a device file (EPOCH-518).
+    marker = root / ".crash_reports_ok"
+    files = sorted(p for p in root.rglob("*") if p.is_file() and p != marker)
     ips_files = [p for p in files if p.suffix == ".ips"]
     result = ETLRunResult()
     # The device's other diagnostic files (.ca analytics, .session, .log)
