@@ -33,7 +33,7 @@ import {
   type OutputEvent,
 } from './backupRun';
 import { appendPullRecord, type PullRecord } from './pullRecord';
-import { copyCrashReports, type CrashReportCopy } from './crashReports';
+import { copyCrashReports, discardCrashReportsCopy, type CrashReportCopy } from './crashReports';
 
 /**
  * NOTE (EPOCH-103 review): the password captured here (used as
@@ -194,14 +194,36 @@ export class IosBackupSource implements DeviceBackupSource {
       const copy = await copyCrashLogs(plistutil, device, backupDir);
       const finishedAt = await backupFinishedAt(plistutil, backupDir).catch(() => null);
       const at = new Date();
-      await appendPullRecord(path.dirname(backupDir), {
-        event: 'crash-reports-copied-again',
-        udid: device.id,
-        path: backupDir,
-        at: at.toISOString(),
-        after_backup_s: finishedAt === null ? null : Math.round((at.getTime() - Date.parse(finishedAt)) / 1000),
-        crash_reports: copy,
-      });
+      try {
+        await appendPullRecord(path.dirname(backupDir), {
+          event: 'crash-reports-copied-again',
+          udid: device.id,
+          path: backupDir,
+          at: at.toISOString(),
+          after_backup_s: finishedAt === null ? null : Math.round((at.getTime() - Date.parse(finishedAt)) / 1000),
+          crash_reports: copy,
+        });
+      } catch (err) {
+        // Every copy made again has its own pull-record line: one the record
+        // can't account for is removed, so it can be made again (EPOCH-519).
+        const reason = err instanceof Error ? err.message : String(err);
+        if (copy.outcome !== 'copied')
+          throw new Error(`The pull record couldn't be written: ${reason}`, { cause: err });
+        try {
+          await discardCrashReportsCopy(backupDir);
+        } catch (removal) {
+          throw new Error(
+            `The crash logs were copied, but neither the pull record (${reason}) nor the removal of the unrecorded copy ` +
+              `(${removal instanceof Error ? removal.message : String(removal)}) succeeded.`,
+            { cause: err }
+          );
+        }
+        throw new Error(
+          `The crash logs were copied, but the pull record couldn't be written (${reason}), so the copy was removed. ` +
+            'Copy them again.',
+          { cause: err }
+        );
+      }
       return crashReportsResult(copy, backupDir)!;
     } finally {
       this.copyingCrashLogs = false;

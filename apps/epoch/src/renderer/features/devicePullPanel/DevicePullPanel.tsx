@@ -659,7 +659,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
               {crashReports && crashReports.outcome === 'failed' && (
                 <div
                   role="alert"
-                  className="flex items-center gap-4 bg-flag/10 border border-flag/30 rounded-lg p-4 mb-4"
+                  className="flex items-center gap-4 bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-lg p-4 mb-4"
                 >
                   <div className="p-2 rounded-full bg-flag/20 text-flag shrink-0">
                     <Smartphone size="1.25rem" />

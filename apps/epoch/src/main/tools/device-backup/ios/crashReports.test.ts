@@ -10,7 +10,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 import { CrashReportsAcquisition } from '@verichron/contracts';
 
-import { copyCrashReports, crashReportArgs, type RunTool } from './crashReports';
+import { copyCrashReports, crashReportArgs, discardCrashReportsCopy, type RunTool } from './crashReports';
 import { crashReportsResult, crashReportsSummary } from './iosBackupSource';
 
 const UDID = '00008140-0000000000000000';
@@ -257,5 +257,29 @@ describe('crashReportsResult', () => {
       { outcome: 'failed', backupDir: '/p/UDID', error: 'the device was locked', locked: true }
     );
     assert.equal(crashReportsResult(null, '/p/UDID'), undefined);
+  });
+});
+
+describe('discardCrashReportsCopy', () => {
+  it('removes a copy and its record, so the copy can be made again (EPOCH-519)', async () => {
+    fs.mkdirSync(path.join(`${backupDir}.crash-reports`, 'Retired'), { recursive: true });
+    fs.writeFileSync(path.join(`${backupDir}.crash-reports`, 'Retired', 'a.ips'), 'a');
+    fs.writeFileSync(`${backupDir}.crash-reports.json`, '{}');
+    await discardCrashReportsCopy(backupDir);
+    assert.ok(!fs.existsSync(`${backupDir}.crash-reports`));
+    assert.ok(!fs.existsSync(`${backupDir}.crash-reports.json`));
+    assert.ok(fs.existsSync(backupDir), 'the backup itself is untouched');
+
+    const again = await copyCrashReports(
+      '/tools/idevicecrashreport',
+      UDID,
+      backupDir,
+      FINISHED,
+      fakeTool([], (dir) => {
+        fs.writeFileSync(path.join(dir, 'a.ips'), 'a');
+        return { code: 0, output: 'Copy: a.ips\n' };
+      })
+    );
+    assert.equal(again.outcome, 'copied');
   });
 });

@@ -195,3 +195,16 @@ async function copy(
   }
   return { outcome: 'copied', tool_version: version, ...counted };
 }
+
+/**
+ * Removes a crash-log copy and its record (EPOCH-519): used when a copy made
+ * again couldn't be entered in the pull record, so no copy exists that the
+ * record doesn't account for, and the copy can be made again. The device keeps
+ * its reports (-k), so nothing is lost.
+ */
+export async function discardCrashReportsCopy(backupDir: string): Promise<void> {
+  const { dir, record } = crashReportsAcquisitionPaths(backupDir);
+  // The record first: without it, the folder is never used.
+  await fs.rm(record, { force: true });
+  await fs.rm(dir, { recursive: true, force: true });
+}
