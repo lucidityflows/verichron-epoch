@@ -380,7 +380,8 @@ def fetch_ileapp_summary(conn, evidence_id: str) -> list[dict]:
     and stored with the artifact's ingest unit (`raw_payload.record_count`),
     read here from the database, never from the workspace (R7, R18). An
     artifact iLEAPP reported records for but that has no facts gets a row too,
-    so it can't vanish; one iLEAPP reported empty gets none."""
+    so it can't vanish, and so does one with no count recorded; one iLEAPP
+    reported empty gets none."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -420,7 +421,10 @@ def fetch_ileapp_summary(conn, evidence_id: str) -> list[dict]:
         row["reported"] = reported.get(row["artifact"])
     seen = {row["artifact"] for row in rows}
     for artifact, count in sorted(reported.items(), key=lambda item: str(item[0])):
-        if artifact not in seen and count:
+        # A named artifact with no facts gets a row unless iLEAPP reported it
+        # empty: with records reported, or with no count to check, it must not
+        # vanish. A unit naming no artifact can't be given a row.
+        if artifact is not None and artifact not in seen and count != 0:
             rows.append(
                 {"artifact": artifact, "records": 0, "timed": 0, "earliest": None, "latest": None, "reported": count}
             )
@@ -443,11 +447,15 @@ def render_ileapp_section(rows: list[dict]) -> list[str]:
     iLEAPP's output and the database, so it is flagged, never assumed away."""
     differ = [r for r in rows if r["reported"] is not None and r["reported"] != r["records"]]
     unrecorded = [r for r in rows if r["reported"] is None]
+    checked = len(rows) - len(unrecorded)
     if differ:
         check = (
             f"**{len(differ)} artifact(s) differ from iLEAPP's own count**, flagged below: records were lost or "
             "duplicated between iLEAPP's output and the facts."
         )
+    elif unrecorded:
+        # Never claim a match for an artifact that couldn't be checked (R36).
+        check = f"The {checked} checked artifact(s) match the count iLEAPP reported for each."
     else:
         check = "Every artifact's records match the count iLEAPP reported for it."
     if unrecorded:

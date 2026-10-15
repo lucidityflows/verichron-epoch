@@ -61,6 +61,7 @@ def test_each_artifact_is_checked_against_ileapps_own_count(db) -> None:
     artifact(db, "Vanished", 0, {"artifact": "Vanished", "record_count": 4})
     artifact(db, "Empty", 0, {"artifact": "Empty", "record_count": 0})
     artifact(db, "Unrecorded", 1, {"artifact": "Unrecorded"})
+    artifact(db, "Unrecorded and empty", 0, {"artifact": "Unrecorded and empty"})
 
     rows = {r["artifact"]: r for r in summary(db)}
     assert (rows["Matches"]["records"], rows["Matches"]["reported"]) == (3, 3)
@@ -68,10 +69,11 @@ def test_each_artifact_is_checked_against_ileapps_own_count(db) -> None:
     assert (rows["Vanished"]["records"], rows["Vanished"]["reported"]) == (0, 4), "reported but no facts: listed"
     assert "Empty" not in rows, "an artifact iLEAPP reported empty has no row"
     assert rows["Unrecorded"]["reported"] is None, "no count recorded is never assumed to match"
+    assert rows["Unrecorded and empty"]["records"] == 0, "no facts and no count: still listed, so it can't vanish"
 
     text = "\n".join(render_ileapp_section(list(rows.values())))
     assert "**2 artifact(s) differ from iLEAPP's own count**" in text
-    assert "1 artifact(s) have no count from iLEAPP recorded, so they could not be checked." in text
+    assert "2 artifact(s) have no count from iLEAPP recorded, so they could not be checked." in text
     assert "| Matches | 3 | 3 |" in text
     assert "| Short | 2 | **3 (differs)** |" in text
     assert "| Vanished | 0 | **4 (differs)** |" in text
@@ -110,3 +112,14 @@ def test_an_outdated_derivative_fails_the_report_with_a_clear_message(db, tmp_pa
     db.commit()
     with pytest.raises(ReportInputError, match="has no backup_finished_at in its recorded parameters"):
         generate_report(db._conn, RUN, EVIDENCE, str(tmp_path / "report.md"))
+
+
+def test_unchecked_artifacts_are_never_counted_as_matching(db) -> None:
+    from reporting.generate_report import render_ileapp_section
+
+    artifact(db, "A", 2, {"artifact": "A", "record_count": 2})
+    artifact(db, "B", 1, {"artifact": "B"})
+    text = "\n".join(render_ileapp_section(summary(db)))
+    assert "Every artifact's records match" not in text
+    assert "The 1 checked artifact(s) match the count iLEAPP reported for each." in text
+    assert "1 artifact(s) have no count from iLEAPP recorded, so they could not be checked." in text
