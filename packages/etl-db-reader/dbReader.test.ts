@@ -26,6 +26,7 @@ import {
   getRunEvidence,
   getRunReportLocation,
   getStageStatus,
+  getIndicatorChecks,
   type ForensicRecordQuery,
   type ForensicRecordRow,
   type RecordSortKey,
@@ -413,5 +414,86 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
     assert.equal(crash.error_message, null, 'warnings are never stored as an error');
     const skipped = stages.find((s) => s.stage_name === 'llm')!;
     assert.deepEqual([skipped.derivative_kind, skipped.units, skipped.records], [null, 0, 0]);
+  });
+});
+
+describe('getIndicatorChecks', live, () => {
+  const CHECK_RUN = '55555555-5555-5555-5555-555555555555';
+  const SKIPPED_RUN = '66666666-6666-6666-6666-666666666666';
+
+  it("reads each run's check of the evidence, newest first, with its set, sources and matches (EPOCH-493)", async () => {
+    const manifest = '{"files":[]}\n';
+    const { rows: sets } = await db.query<{ set_id: string }>(
+      `INSERT INTO indicator_sets (set_hash, name, manifest, loaded_at, indicator_count)
+       VALUES (encode(sha256(convert_to($1, 'UTF8')), 'hex'), 'test set', $1, now(), 1) RETURNING set_id`,
+      [manifest]
+    );
+    const setId = sets[0].set_id;
+    await db.query(
+      `INSERT INTO indicator_file_contents (sha256, content, byte_count)
+       VALUES (encode(sha256('x'::bytea), 'hex'), 'x'::bytea, 1)`
+    );
+    await db.query(
+      `INSERT INTO indicator_set_files (set_id, path, sha256, source_repository, licence, redistributable, downloaded_on, report)
+       VALUES ($1, 'a.stix2', encode(sha256('x'::bytea), 'hex'), 'owner/repo', 'MIT', true, '2026-10-15', '{}')`,
+      [setId]
+    );
+    await db.query(
+      `INSERT INTO indicators (set_id, file_path, stix_id, stix_path, indicator_type, value, normalized_value,
+                               campaigns, modified, expired)
+       VALUES ($1, 'a.stix2', 'indicator--1', 'domain-name:value', 'domain', 'evil.example', 'evil.example',
+               ARRAY['Test'], '2026-10-09T00:00:00Z', false)`,
+      [setId]
+    );
+    for (const [run, status, set, finished, reason] of [
+      [CHECK_RUN, 'succeeded', setId, '2026-10-15T10:00:00Z', null],
+      [SKIPPED_RUN, 'skipped', null, '2026-10-14T10:00:00Z', 'No indicator set is registered.'],
+    ]) {
+      await db.query(
+        `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
+         VALUES ($1, 'test', 'test', '{}', $2, $2)`,
+        [run, OTHER]
+      );
+      await db.query(
+        `INSERT INTO pipeline_stage_status (run_id, stage_name, status, indicator_set_id, finished_at, error_message)
+         VALUES ($1, 'indicator_match', $2, $3, $4, $5)`,
+        [run, status, set, finished, reason]
+      );
+    }
+    const summary = { matches: 1, types: { domain: { indicators: 1, status: 'checked' } } };
+    const { rows: units } = await db.query<{ ingest_id: string }>(
+      `INSERT INTO ingested_files
+         (evidence_id, indicator_set_id, file_hash, source_type, parser_version, file_path, file_name,
+          payload_kind, raw_payload, produced_by_runs, ingest_complete, record_count, completed_at)
+       VALUES ($1, $2, repeat('9', 64), 'indicator_match', 1, 'indicator_set/x', 'x', 'summary', $3,
+               ARRAY[$4::uuid], true, 1, now())
+       RETURNING ingest_id`,
+      [OTHER, setId, summary, CHECK_RUN]
+    );
+    await db.query(
+      `INSERT INTO forensic_records (ingest_id, evidence_id, source_type, event_time, fields)
+       VALUES ($1, $2, 'indicator_match', '2026-03-01T12:00:00Z', '{"match_mode": "exact"}')`,
+      [units[0].ingest_id, OTHER]
+    );
+
+    const checks = await getIndicatorChecks(db, OTHER);
+    assert.deepEqual(
+      checks.map((c) => [c.run_id, c.status]),
+      [
+        [CHECK_RUN, 'succeeded'],
+        [SKIPPED_RUN, 'skipped'],
+      ]
+    );
+    const [check, skipped] = checks;
+    assert.equal(check.set_name, 'test set');
+    assert.equal(new Date(check.newest_indicator!).toISOString(), '2026-10-09T00:00:00.000Z');
+    assert.equal(check.matches, 1);
+    assert.deepEqual(check.summary, summary);
+    assert.equal(check.sources.length, 1);
+    assert.equal(check.sources[0].licence, 'MIT');
+    assert.equal(check.match_rows.length, 1);
+    assert.equal(skipped.summary, null);
+    assert.deepEqual(skipped.match_rows, []);
+    assert.deepEqual(await getIndicatorChecks(db, EVIDENCE), [], 'another evidence item has no checks');
   });
 });

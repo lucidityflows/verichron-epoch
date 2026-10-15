@@ -26,10 +26,12 @@ export { crashReportsAcquisitionPaths, CrashReportsAcquisition } from './ts/cras
 export { deriveEvidencePath } from './ts/deriveEvidencePath.js';
 export { EvidenceSidecar } from './ts/evidenceSidecar.js';
 export { contractVersion, CONTRACT_SCHEMAS } from './ts/contractVersion.js';
+export { indicatorResultsConfig, type IndicatorResultsConfig } from './ts/indicatorResults.js';
 export {
   DECRYPT_MARKER,
   ILEAPP_MARKER,
   DerivativeKind,
+  StageInput,
   ToolVersion,
   RepairProvenance,
   DecryptParams,

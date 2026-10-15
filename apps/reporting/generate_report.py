@@ -12,9 +12,10 @@ Three things this file must always do, per the "fix, don't punish" principle:
      which domains are present, which failed, which were never run.
   2. Before any findings, say what the report shows of the evidence's facts
      and what it leaves out (the Coverage section, EPOCH-448), then what was
-     NOT examined: today, indicator checks and AI-assisted analysis, which
-     have had no producer since EPOCH-489 and return with EPOCH-490 to 493
-     and EPOCH-442.
+     NOT examined: every skipped stage and errored iLEAPP plugin, and
+     AI-assisted analysis, which has had no producer since EPOCH-489 and
+     returns with EPOCH-442. Indicator checks have their own section, which
+     says which set was checked and what it couldn't check (EPOCH-493).
   3. Never let a missing/failed domain silently disappear from the report.
      A failed stage gets a visible "not available" note, not omission.
   4. State what was checked and corrected in the tools' output (R36,
@@ -29,6 +30,7 @@ from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
+from indicator_set import results_config, stale_after_days
 from runtime_env import redact_password, require_database_url
 from tool_defects import defect as registered_defect
 
@@ -278,9 +280,8 @@ def render_not_examined_section(ileapp_outputs: list[dict], stages: list[dict]) 
                 f"{e['file_count']} file(s)): {_table_cell(reason)}"
             )
     return lines + [
-        "- **Indicators of compromise:** no indicator check was run. Indicator matching is being "
-        "rebuilt on the project's own facts and is not available yet. No match is reported "
-        "because nothing was checked, not because the device was found clean.",
+        "- **Indicators of compromise:** what was checked, against which set, and what wasn't, is "
+        "in Indicator Matches.",
         "- **AI-assisted analysis:** not run. It returns as a separate, labelled section of leads "
         "for the examiner to confirm or dismiss.",
         "",
@@ -522,6 +523,232 @@ RENDERERS = {
 }
 
 
+# --- indicator matches (EPOCH-491, EPOCH-493) -------------------------------
+
+INDICATOR_SECTION = "Indicator Matches"
+INDICATOR_STAGE = "indicator_match"
+#: Always stated, whatever the result; shared with the app (indicator_results.json).
+INDICATOR_LIMIT = results_config()["limit"]
+NOTHING_CHECKED = results_config()["nothing_checked"]
+
+#: Where each fact type is shown. Indicator matches have their own section,
+#: which is per check rather than per fact type (EPOCH-493).
+SECTION_TITLES = {**{k: v[0] for k, v in RENDERERS.items()}, "indicator_match": INDICATOR_SECTION}
+TYPE_LABELS = {
+    "domain": "Domain",
+    "url": "URL",
+    "ip": "IP address",
+    "process_name": "Process name",
+    "bundle_id": "Bundle ID",
+    "email": "Email address",
+    "file_hash": "File hash (SHA-256)",
+    "file_path": "File path",
+    "file_name": "File name",
+}
+#: Why the loader didn't load an indicator (indicator_set.UnsupportedReason), in words.
+NOT_LOADED = {
+    "indicator_type": "of types no iOS backup holds (app certificates, Android properties, configuration profiles)",
+    "operator": "using operators other than = and IN",
+    "comparison_and": "combining comparisons with AND",
+    "observation_and": "combining observations with AND",
+    "observation_or": "combining observations with OR",
+    "followedby": "using FOLLOWEDBY",
+    "qualifier": "using time qualifiers",
+    "object_path": "on object paths no backup supplies",
+    "pattern_type": "whose patterns aren't STIX",
+    "value": "whose values couldn't be normalized",
+    "revoked": "revoked by their publisher",
+}
+
+
+def fetch_indicator_checks(conn, evidence_id: str) -> list[dict]:
+    """Every run's indicator check of this evidence, newest first, with its
+    set, result, sources and matches. Read through the views the app reads
+    too (migration 0013, R27)."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT run_id, status, error_message, finished_at, indicator_set_id, set_name, set_hash,
+                   set_registered_at AS registered_at, newest_indicator, ingest_id, matches, summary
+            FROM indicator_checks
+            WHERE evidence_id = %s
+            ORDER BY finished_at DESC NULLS FIRST, run_id
+            """,
+            (evidence_id,),
+        )
+        checks = cur.fetchall()
+        for check in checks:
+            check["unit"] = (
+                {"ingest_id": check["ingest_id"], "record_count": check["matches"], "raw_payload": check["summary"]}
+                if check["ingest_id"] is not None
+                else None
+            )
+            check["sources"] = []
+            check["matches"] = []
+            if check["indicator_set_id"] is None:
+                continue
+            cur.execute(
+                """
+                SELECT source_repository, source_commit, licence, redistributable, files, downloaded_on
+                FROM indicator_set_sources WHERE set_id = %s
+                ORDER BY source_repository NULLS LAST, source_commit, licence
+                """,
+                (check["indicator_set_id"],),
+            )
+            check["sources"] = cur.fetchall()
+            if check["unit"] is not None:
+                cur.execute(
+                    "SELECT event_time, fields FROM forensic_records WHERE ingest_id = %s ORDER BY event_time, id",
+                    (check["unit"]["ingest_id"],),
+                )
+                check["matches"] = cur.fetchall()
+    return checks
+
+
+def _day(value) -> str:
+    return value.astimezone(UTC).strftime("%Y-%m-%d")
+
+
+def _set_line(check: dict, stale_days: int) -> str:
+    """The set, when it was fetched or registered, and how old its newest indicator was when checked."""
+    downloaded = [s["downloaded_on"] for s in check["sources"] if s["downloaded_on"] is not None]
+    when = f"fetched {max(downloaded).isoformat()}" if downloaded else f"registered {_day(check['registered_at'])}"
+    line = f"Set: {_table_cell(check['set_name'])}, {when} (`{check['set_hash'][:12]}`)."
+    newest = check.get("newest_indicator")
+    if newest is None:
+        return line + " It holds no indicator this check could load."
+    age = (check["finished_at"].astimezone(UTC).date() - newest.astimezone(UTC).date()).days
+    line += f" Newest indicator {_day(newest)}: {age} day(s) old when checked."
+    if age > stale_days:
+        line += f" Older than {stale_days} days when checked: indicators published since are not in it."
+    return line
+
+
+def _sources_lines(check: dict) -> list[str]:
+    """Sources and licences, generated from the set's manifest, never typed by hand."""
+    lines = ["Sources and licences:", ""]
+    for s in check["sources"]:
+        where = (
+            f"`{_table_cell(s['source_repository'])}` @ `{(s['source_commit'] or '')[:12]}`"
+            if s["source_repository"]
+            else "local files"
+        )
+        if s["licence"] == "unknown":
+            licence = "licence unknown: loaded locally; not redistributable"
+        else:
+            licence = s["licence"] + ("" if s["redistributable"] else "; not redistributable")
+        lines.append(f"- {where}, {licence}: {s['files']} file(s)")
+    return lines + [""]
+
+
+def _in_order(types: dict) -> list[tuple[str, dict]]:
+    """Types in one fixed order: the database doesn't keep a JSON object's key order."""
+    order = list(TYPE_LABELS)
+    return sorted(types.items(), key=lambda item: (order.index(item[0]) if item[0] in order else len(order), item[0]))
+
+
+def _check_body(check: dict, stale_days: int) -> list[str]:
+    status = check["status"]
+    if status == "skipped":
+        reason = check["error_message"] or "the orchestrator recorded no reason."
+        return [f"{_table_cell(reason)} {NOTHING_CHECKED}", ""]
+    if status != "succeeded":
+        detail = f": {_table_cell(check['error_message']).rstrip('.')}." if check["error_message"] else "."
+        return [f"The check did not complete ({status}){detail} {NOTHING_CHECKED}", ""]
+    unit = check["unit"]
+    if unit is None:
+        return [f"The check finished but its result is not recorded. {NOTHING_CHECKED}", ""]
+    payload = unit["raw_payload"]
+    found = unit["record_count"]
+    lines = [_set_line(check, stale_days), ""]
+    lines += [f"{found} match(es) against this set." if found else "No match against this set.", ""]
+
+    checked = {t: e for t, e in _in_order(payload["types"]) if e["status"] == "checked"}
+    if checked:
+        lines += ["| Type | In the set | Facts checked | From |", "| :--- | ---: | ---: | :--- |"]
+        for indicator_type, entry in checked.items():
+            sources = [s for s in entry["sources"] if s["values"]]
+            listed = "; ".join(f"{_table_cell(s['source'])} ({s['values']:,})" for s in sources)
+            lines.append(
+                f"| {TYPE_LABELS.get(indicator_type, indicator_type)} | {entry['indicators']:,} | "
+                f"{entry['values_checked']:,} | {len(sources)} source(s): {listed} |"
+            )
+        lines.append("")
+
+    lines += ["Not checked:", ""]
+    for indicator_type, entry in _in_order(payload["types"]):
+        label = TYPE_LABELS.get(indicator_type, indicator_type)
+        if entry["status"] == "no_source":
+            lines.append(
+                f"- **{label}** ({entry['indicators']:,}): no source in any backup. {_table_cell(entry['reason'])}"
+            )
+        elif entry["status"] == "no_facts":
+            lines.append(f"- **{label}** ({entry['indicators']:,}): no facts in this case: {entry['reason']}.")
+    not_loaded = payload.get("not_loaded") or {}
+    if not_loaded:
+        detail = "; ".join(f"{NOT_LOADED.get(reason, reason)}: {n:,}" for reason, n in sorted(not_loaded.items()))
+        lines.append(
+            f"- **Not loaded from the set:** {sum(not_loaded.values()):,} indicators. {detail[0].upper()}{detail[1:]}."
+        )
+    for reason in (payload.get("not_read") or {}).values():
+        lines.append(f"- **Not read:** {_table_cell(reason)}")
+    for error in payload.get("ileapp_plugin_errors") or []:
+        lines.append(
+            f"- **iLEAPP plugin errored:** `{_table_cell(str(error['artifact']))}` "
+            f"({_table_cell(str(error['module']))}); its records weren't checked."
+        )
+    lines.append("")
+
+    if check["matches"]:
+        lines += [
+            "| Time (UTC) | Type | Value | Campaign | Match | Fact | File |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+        ]
+        for m in check["matches"]:
+            i, f = m["fields"]["indicator"], m["fields"]["fact"]
+            mode = m["fields"]["match_mode"]
+            if i["expired"]:
+                mode += f", expired {(i['valid_until'] or '')[:10]}"
+            lines.append(
+                f"| {_utc(m['event_time']) if m['event_time'] else 'no time recorded'} "
+                f"| {TYPE_LABELS.get(i['type'], i['type'])} | `{_table_cell(i['value'])}` "
+                f"| {_table_cell(', '.join(i['campaigns']) or 'not named')} | {mode} "
+                f"| {_table_cell(f['source'])} (record {f['record_id']}) | `{_table_cell(i['source_file'])}` |"
+            )
+        lines.append("")
+    return lines + _sources_lines(check)
+
+
+def render_indicator_section(checks: list[dict], run_id: str, stale_days: int) -> list[str]:
+    """This run's indicator check, then every earlier check of the same
+    evidence, each with its own set and date and never merged (EPOCH-493).
+    Each states what wasn't checked, so "no match" never reads as a clean
+    result; no verdict word appears anywhere."""
+    lines = [f"## {INDICATOR_SECTION}", "", INDICATOR_LIMIT, ""]
+    this_run = [c for c in checks if str(c["run_id"]) == str(run_id)]
+    earlier = [c for c in checks if str(c["run_id"]) != str(run_id)]
+    if this_run:
+        check = this_run[0]
+        when = f" ({_utc(check['finished_at'])})" if check["finished_at"] else ""
+        lines += [f"### This run's check{when}", ""]
+        lines += _check_body(check, stale_days)
+    else:
+        lines += ["### This run's check", "", f"This run did not check indicators. {NOTHING_CHECKED}", ""]
+    if earlier:
+        lines += ["### Earlier checks of this evidence", ""]
+        for check in earlier:
+            when = _day(check["finished_at"]) if check["finished_at"] else "not finished"
+            if check["status"] == "succeeded" and check["unit"] is not None:
+                found = check["unit"]["record_count"]
+                result = f"{found} match(es)" if found else "no match"
+                lines.append(f"- {when} · {_table_cell(check['set_name'])} (`{check['set_hash'][:12]}`) · {result}")
+            else:
+                reason = check["error_message"] or check["status"]
+                lines.append(f"- {when} · not checked: {_table_cell(reason)}")
+        lines.append("")
+    return lines + ["---", ""]
+
+
 # --- coverage (EPOCH-448) --------------------------------------------------
 
 
@@ -561,10 +788,8 @@ def render_coverage_section(
     else:
         lines += ["| Fact type | Records | Shown in |", "| :--- | ---: | :--- |"]
         for row in counts:
-            section = RENDERERS.get(row["source_type"])
-            shown = (
-                f"{section[0]} section" if section else "**not shown in this report**; view them in Forensic Records"
-            )
+            section = SECTION_TITLES.get(row["source_type"])
+            shown = f"{section} section" if section else "**not shown in this report**; view them in Forensic Records"
             lines.append(f"| `{row['source_type']}` | {row['records']} | {shown} |")
         lines.append(f"| **All facts** | {sum(row['records'] for row in counts)} | |")
         lines.append("")
@@ -650,6 +875,7 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
         [d for d in inputs if d["kind"] == "crash_reports"],
     )
     lines += render_not_examined_section(ileapp_outputs, stages)
+    lines += render_indicator_section(fetch_indicator_checks(conn, evidence_id), run_id, stale_after_days())
     lines += render_tool_checks_section(fetch_corrections(conn, evidence_id), fetch_time_review(conn, evidence_id))
 
     for title, fetch, render in RENDERERS.values():

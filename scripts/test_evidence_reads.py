@@ -314,19 +314,23 @@ def test_the_report_says_what_produced_each_derivative_the_run_read(db, tmp_path
     ) in sources
 
 
-def test_the_report_says_indicator_checks_and_ai_analysis_were_not_run(db, tmp_path):
-    """EPOCH-489: until indicator matching returns, nothing checks indicators; the
-    report says so, so no reader takes "no match" for a clean device."""
+def test_the_report_says_when_indicators_were_not_checked_and_ai_analysis_was_not_run(db, tmp_path):
+    """EPOCH-489, 493: a run that checked no indicators says so in Indicator
+    Matches, with the fixed sentence that indicators find only what is already
+    known, so no reader takes "no match" for a verdict on the device."""
     if not isinstance(db, PgReal):
         pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
-    from reporting.generate_report import generate_report
+    from reporting.generate_report import INDICATOR_LIMIT, NOTHING_CHECKED, generate_report
 
     out = tmp_path / "report.md"
     generate_report(db._conn, RUN_A, EVIDENCE, str(out))
-    section = out.read_text().split("## Not Examined", 1)[1].split("---", 1)[0]
-    assert "**Indicators of compromise:** no indicator check was run" in section
-    assert "not because the device was found clean" in section
-    assert "**AI-assisted analysis:** not run" in section
+    report = out.read_text()
+    not_examined = report.split("## Not Examined", 1)[1].split("---", 1)[0]
+    assert "**Indicators of compromise:** what was checked, against which set, and what wasn't" in not_examined
+    assert "**AI-assisted analysis:** not run" in not_examined
+    indicators = report.split("## Indicator Matches", 1)[1].split("---", 1)[0]
+    assert INDICATOR_LIMIT in indicators
+    assert f"This run did not check indicators. {NOTHING_CHECKED}" in indicators
 
 
 def test_the_report_lists_each_skipped_stage_and_its_reason_as_not_examined(db, tmp_path):

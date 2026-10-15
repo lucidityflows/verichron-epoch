@@ -9,7 +9,7 @@ import { loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
 
 export function printUsage() {
   console.error(
-    `Usage:\n  pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace-dir> [--summary-path <file>]`
+    `Usage:\n  pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace-dir> [--summary-path <file>] [--indicator-set <set hash>]`
   );
 }
 
@@ -77,11 +77,14 @@ export async function parseCliConfig(): Promise<CliConfig> {
     options: {
       workspace: { type: 'string' },
       'summary-path': { type: 'string' },
+      // The indicator set to check, by set hash; the newest registered set when omitted (EPOCH-491).
+      'indicator-set': { type: 'string' },
     },
     allowPositionals: true,
   });
   const dbUrl = resolveDatabaseUrl();
   const summaryPath = values['summary-path'];
+  const indicatorSetHash = values['indicator-set'];
 
   if (values.workspace) {
     const decryptedDir = path.join(values.workspace, 'decrypted');
@@ -103,12 +106,12 @@ export async function parseCliConfig(): Promise<CliConfig> {
       if (markerExists) backupPaths.push(dir);
     }
     backupPaths.sort();
-    return { backupPaths, dbUrl, summaryPath };
+    return { backupPaths, dbUrl, summaryPath, indicatorSetHash };
   }
 
   if (positionals.length === 0) {
     printUsage();
     process.exit(1);
   }
-  return { backupPaths: positionals, dbUrl, summaryPath };
+  return { backupPaths: positionals, dbUrl, summaryPath, indicatorSetHash };
 }

@@ -1,7 +1,7 @@
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DerivativeKind } from '@verichron/contracts';
+import { StageInput } from '@verichron/contracts';
 import { StageDefinition, StageManifest, StageSet } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,7 +22,7 @@ export function isStageManifest(value: unknown): value is StageManifest {
     typeof v.entrypoint === 'string' &&
     (v.runtime === 'python' || v.runtime === 'node') &&
     typeof v.order === 'number' &&
-    DerivativeKind.safeParse(v.reads).success &&
+    StageInput.safeParse(v.reads).success &&
     (v.parserVersion === undefined ||
       (typeof v.parserVersion === 'number' && Number.isInteger(v.parserVersion) && v.parserVersion >= 1)) &&
     typeof v.enabled === 'boolean'
@@ -49,7 +49,7 @@ async function loadStageFromDir(dir: string, name: string): Promise<StageDefinit
     throw new Error(
       `[orchestrator] ${manifestPath} does not match stage-manifest.schema.json ` +
         `(no other keys; need entrypoint: string, runtime: "python"|"node", order: number, ` +
-        `reads: ${DerivativeKind.options.map((k) => `"${k}"`).join('|')}, enabled: boolean, ` +
+        `reads: ${StageInput.options.map((k) => `"${k}"`).join('|')}, enabled: boolean, ` +
         `optional parserVersion: integer >= 1).`
     );
   }

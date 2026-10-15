@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import date, datetime
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -39,6 +40,28 @@ UnsupportedReason = Literal[
     "indicator_type",  # a known type the loader doesn't support
     "value",  # a value that isn't a string, or can't be normalized
 ]
+
+#: How results are presented (EPOCH-493), shared with the app.
+RESULTS_PATH = Path(__file__).resolve().parent.parent / "indicator_results.json"
+
+
+def results_config() -> dict:
+    """The shared presentation of indicator results: the stale threshold and
+    the two fixed sentences every result states."""
+    config = json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
+    days = config["stale_after_days"]
+    if not isinstance(days, int) or isinstance(days, bool) or days < 1:
+        raise ValueError(f"{RESULTS_PATH.name}: stale_after_days must be a positive integer, not {days!r}")
+    for key in ("limit", "nothing_checked"):
+        if not isinstance(config.get(key), str) or not config[key].strip():
+            raise ValueError(f"{RESULTS_PATH.name}: {key} must be a sentence")
+    return config
+
+
+def stale_after_days() -> int:
+    """A set is stale when its newest indicator was older than this when checked."""
+    return results_config()["stale_after_days"]
+
 
 SHA256 = r"^[0-9a-f]{64}$"
 GIT_COMMIT = r"^[0-9a-f]{40}$"
@@ -122,6 +145,8 @@ class Indicator(_Strict):
     campaigns: tuple[str, ...]
     valid_from: datetime | None
     valid_until: datetime | None
+    #: The object's STIX `modified` time; the newest one dates the set (D5).
+    modified: datetime
     #: Past `valid_until` when the set was loaded. Loaded anyway: older evidence
     #: can still hold it, and a match says the indicator had expired.
     expired: bool
@@ -154,6 +179,9 @@ class FileReport(_Strict):
 
 
 class LoadedSet(_Strict):
+    #: What the examiner calls the set. A label, not part of its identity: the
+    #: same files under another name are the same set.
+    name: str = Field(min_length=1)
     manifest: SetManifest
     #: When the loader read the files; `Indicator.expired` is relative to it.
     loaded_at: datetime
@@ -164,6 +192,8 @@ class LoadedSet(_Strict):
 
     @model_validator(mode="after")
     def _consistent(self) -> LoadedSet:
+        if not self.name.strip():
+            raise ValueError("a set's name can't be blank")
         files = {f.path for f in self.manifest.files}
         if {r.path for r in self.reports} != files:
             raise ValueError("every file of the set has exactly one report")

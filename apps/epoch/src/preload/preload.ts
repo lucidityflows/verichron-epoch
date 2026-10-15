@@ -67,6 +67,7 @@ const dbApi = {
   getStageStatus: (runId: string) => ipcRenderer.invoke('epoch:getStageStatus', runId),
   getForensicRecords: (runId: string, query?: ForensicRecordQuery) =>
     ipcRenderer.invoke('epoch:getForensicRecords', runId, query),
+  getIndicatorResults: (runId: string) => ipcRenderer.invoke('epoch:getIndicatorResults', runId),
   getReport: (runId: string): Promise<ReportResult> => ipcRenderer.invoke('epoch:getReport', runId),
   openReport: (runId: string): Promise<boolean> => ipcRenderer.invoke('epoch:openReport', runId),
 

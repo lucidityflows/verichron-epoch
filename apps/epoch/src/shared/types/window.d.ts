@@ -1,5 +1,11 @@
-import type { PipelineRunRow, StageStatusRow, ForensicRecordPage, ForensicRecordQuery } from '@verichron/db-reader';
-import type { Backup } from '@verichron/contracts';
+import type { Backup, IndicatorResultsConfig } from '@verichron/contracts';
+import type {
+  ForensicRecordPage,
+  ForensicRecordQuery,
+  IndicatorCheckRow,
+  PipelineRunRow,
+  StageStatusRow,
+} from '@verichron/etl-db-reader';
 import type {
   BackupProgress,
   CrashReportsResult,
@@ -24,6 +30,14 @@ export type ReportResult =
   | { status: 'no-report-path' };
 
 /** A backup the workspace records as prepared (EPOCH-497), from its markers. */
+/** Every indicator check of a run's evidence (EPOCH-493). */
+export interface IndicatorResults extends IndicatorResultsConfig {
+  /** False when the run has no registered evidence, so nothing was read. */
+  evidenceRegistered: boolean;
+  /** Newest first; each run's check is shown on its own, never merged. */
+  checks: IndicatorCheckRow[];
+}
+
 export interface PreparedBackup {
   label: string;
   /** `prepared`: decrypt and iLEAPP output both complete; `partial`: only the decrypt. */
@@ -132,6 +146,7 @@ declare global {
       getPipelineRuns: () => Promise<PipelineRunRow[]>;
       getStageStatus: (runId: string) => Promise<StageStatusRow[]>;
       getForensicRecords: (runId: string, query?: ForensicRecordQuery) => Promise<ForensicRecordPage>;
+      getIndicatorResults: (runId: string) => Promise<IndicatorResults>;
       getReport: (runId: string) => Promise<ReportResult>;
       openReport: (runId: string) => Promise<boolean>;
       // Stage 3 (orchestrator) -- see main.ts's epoch:startAnalysis handler.

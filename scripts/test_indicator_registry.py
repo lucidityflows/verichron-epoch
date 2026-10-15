@@ -55,13 +55,14 @@ def stix_set(directory: Path, *domains: str) -> LoadedSet:
             "id": f"indicator--00000000-0000-4000-8000-{n:012d}",
             "pattern": f"[domain-name:value = '{domain}']",
             "pattern_type": "stix",
+            "modified": "2026-01-01T00:00:00Z",
             "valid_from": "2026-01-01T00:00:00Z",
         }
         for n, domain in enumerate(domains)
     ]
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "a.stix2").write_text(json.dumps({"type": "bundle", "id": "bundle--x", "objects": objects}))
-    return load_set(directory, as_of=AS_OF)
+    return load_set(directory, as_of=AS_OF, name="test set")
 
 
 def count(conn, table: str) -> int:
@@ -136,7 +137,8 @@ def test_the_database_checks_bytes_and_manifest_against_their_hashes(conn) -> No
     conn.rollback()
     with conn.cursor() as cur, pytest.raises(psycopg2.errors.CheckViolation):
         cur.execute(
-            "INSERT INTO indicator_sets (set_hash, manifest, loaded_at, indicator_count) VALUES (%s, '{}', now(), 0)",
+            "INSERT INTO indicator_sets (set_hash, name, manifest, loaded_at, indicator_count) "
+            "VALUES (%s, 'x', '{}', now(), 0)",
             ("0" * 64,),
         )
     conn.rollback()

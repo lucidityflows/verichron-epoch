@@ -56,12 +56,18 @@ def register_set(conn, loaded: LoadedSet) -> Registered:
             )
             cur.execute(
                 """
-                INSERT INTO indicator_sets (set_hash, manifest, loaded_at, indicator_count)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO indicator_sets (set_hash, name, manifest, loaded_at, indicator_count)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (set_hash) DO NOTHING
                 RETURNING set_id
                 """,
-                (set_hash, manifest.canonical_json().decode("utf-8"), loaded.loaded_at, len(loaded.indicators)),
+                (
+                    set_hash,
+                    loaded.name,
+                    manifest.canonical_json().decode("utf-8"),
+                    loaded.loaded_at,
+                    len(loaded.indicators),
+                ),
             )
             row = cur.fetchone()
         if row is None:
@@ -104,7 +110,7 @@ def register_set(conn, loaded: LoadedSet) -> Registered:
                 """
                 INSERT INTO indicators
                     (set_id, file_path, stix_id, stix_path, indicator_type, value, normalized_value,
-                     campaigns, valid_from, valid_until, expired)
+                     campaigns, valid_from, valid_until, modified, expired)
                 VALUES %s
                 """,
                 [
@@ -119,6 +125,7 @@ def register_set(conn, loaded: LoadedSet) -> Registered:
                         list(i.campaigns),
                         i.valid_from,
                         i.valid_until,
+                        i.modified,
                         i.expired,
                     )
                     for i in loaded.indicators

@@ -35,10 +35,9 @@ analyze → report**. The orchestrator coordinates the last three.
    - repairs malformed SQLite databases;
    - runs iLEAPP over the decrypt.
 
-   Indicator checks are not part of processing at the moment (EPOCH-489).
-   Indicator sets are registered as data (EPOCH-490, see
-   [evidence-model.md](evidence-model.md#derivatives)); the project's own
-   matching on extracted facts follows (EPOCH-491 to 493).
+   Indicator checks are not part of processing: they run on the extracted
+   facts, as the `indicator_match` stage, against a registered indicator set
+   (EPOCH-490, 491; see [evidence-model.md](evidence-model.md#derivatives)).
 
    Each output is a **derivative**: a separate product of the evidence, which
    itself is never altered. Each carries a marker recording what produced it.
@@ -130,7 +129,7 @@ Each concern has exactly one owner (R2).
 
 | Component | Owns | Does not |
 |---|---|---|
-| `apps/epoch` | Device pull, starting runs, showing runs, records and reports, and saying that indicator checks are not available yet | Decide run state or write facts |
+| `apps/epoch` | Device pull, starting runs, showing runs, records, indicator checks and reports | Decide run state or write facts |
 | `apps/processor` | Hashing evidence, decrypt, repair, iLEAPP invocation, completion markers | Touch the database |
 | `apps/orchestrator` | Evidence registration, run creation, stage order, run and stage state | Parse evidence |
 | Stages (`apps/extractors/*`, `apps/analysis`, `apps/reporting`) | Turning one derivative's files into facts, or rendering the report | Choose their own identity (R16) or commit transactions (R15) |
@@ -179,7 +178,7 @@ manifest replaces that (R18, EPOCH-427).
 | Evidence | `devices`, `evidence_items`, `evidence_locations`, `evidence_derivatives`, `evidence_events` | What the evidence is, where it was seen, what was derived from it, and an append-only custody log |
 | Runs | `pipeline_runs`, `pipeline_stage_status`, view `run_completeness` | Audit of each pipeline invocation; completeness is derived in one place (R23) |
 | Facts | `ingested_files`, `forensic_records`, views `current_forensic_records`, `forensic_records_history` | The ledger of processed source files and the facts they produced |
-| Indicators | `indicator_sets`, `indicator_set_files`, `indicator_file_contents`, `indicators` | Registered indicator sets, their files' bytes and provenance, and one row per indicator value; append-only |
+| Indicators | `indicator_sets`, `indicator_set_files`, `indicator_file_contents`, `indicators`, views `indicator_checks`, `indicator_set_sources` | Registered indicator sets, their files' bytes and provenance, and one row per indicator value (append-only); each run's check and each set's sources, as the report and the app read them (R27) |
 
 Migrations live in `packages/etl-db-writer/migrations` and are applied by
 `migrate.py` (see [development.md](development.md)).
@@ -194,6 +193,7 @@ The contract is in
 |---|---|---|---|
 | `crash` | 10 | the device's crash logs (`crash_reports`) | `crash_report` |
 | `ileapp_bridge` | 20 | iLEAPP output | `ileapp_record` |
+| `indicator_match` | 500 | a registered indicator set, and the evidence's current facts | `indicator_match` |
 | `reporting` | 1000 | the database | the investigation report |
 
 An iOS backup holds none of the device's crash logs (EPOCH-447). An iPhone pull
@@ -201,6 +201,11 @@ copies them beside the backup with `idevicecrashreport -k` (EPOCH-514), and the
 processor copies them into `crash_reports/<label>/`. Evidence without them, such
 as a backup imported from elsewhere, has `crash` recorded as skipped, with that
 reason, and the report lists it under Not Examined.
+
+`indicator_match` checks the newest registered indicator set, or the one given
+to the orchestrator with `--indicator-set <set hash>`. With no set registered it
+is recorded as skipped, with that reason, and the report and the app say that
+nothing was checked.
 
 The AI stage (`apps/analysis`, `llm_flagged_anomaly` leads) has no `stage.json`
 until EPOCH-442 gives it the project's own facts to read.

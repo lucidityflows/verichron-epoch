@@ -1,0 +1,6 @@
+{
+  "description": "How indicator results are presented, in the report and the app (EPOCH-493). One file both read, so the two can't disagree. A set is marked stale when its newest indicator was more than stale_after_days old at the time of the check. The sentences were approved by the project owner (2026-10-15); no verdict word may appear in them.",
+  "stale_after_days": 90,
+  "limit": "Indicators find only what is already known. No match does not show that a device is uncompromised.",
+  "nothing_checked": "No match is reported because nothing was checked."
+}

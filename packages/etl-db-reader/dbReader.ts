@@ -84,7 +84,8 @@ export interface ForensicRecordRow {
   id: string;
   ingest_id: string;
   evidence_id: string;
-  derivative_id: string;
+  /** Null for an indicator match, which is filed under the set it checked (migration 0013). */
+  derivative_id: string | null;
   file_hash: string;
   parser_version: number;
   incident_id: string | null;
@@ -408,4 +409,113 @@ export async function getForensicRecords(
   const nextCursor = fetched.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
   const rows = pageRows.map(({ total: _total, sort_value: _cursorOnly, ...row }) => row as ForensicRecordRow);
   return { rows, total, nextCursor };
+}
+
+// --- indicator checks (EPOCH-491, EPOCH-493) --------------------------------
+
+/** One type's line in a check's summary, as the indicator_match stage wrote it. */
+export interface IndicatorTypeSummary {
+  indicators: number;
+  status: 'checked' | 'no_facts' | 'no_source';
+  reason?: string;
+  values_checked?: number;
+  matches?: number;
+  sources?: { source: string; values: number; unreadable: number; not_email: number }[];
+}
+
+export interface IndicatorCheckSummary {
+  set: { set_id: string; set_hash: string; name: string };
+  matches: number;
+  types: Record<string, IndicatorTypeSummary>;
+  not_loaded: Record<string, number>;
+  not_read: Record<string, string>;
+  ileapp_plugin_errors: { module: string | null; artifact: string | null }[];
+}
+
+export interface IndicatorSetSourceRow {
+  source_repository: string | null;
+  source_commit: string | null;
+  licence: string;
+  redistributable: boolean;
+  /** count(*): BIGINT, a string from the driver (R26). */
+  files: string;
+  downloaded_on: string | null;
+}
+
+export interface IndicatorMatchRow {
+  event_time: string | null;
+  fields: {
+    indicator: {
+      type: string;
+      value: string;
+      campaigns: string[];
+      expired: boolean;
+      valid_until: string | null;
+      source_file: string;
+    };
+    match_mode: string;
+    fact: { source: string; record_id: number };
+  };
+}
+
+/** One run's indicator check of the evidence, from the indicator_checks view (R27). */
+export interface IndicatorCheckRow {
+  run_id: string;
+  status: StageStatus;
+  error_message: string | null;
+  finished_at: string | null;
+  indicator_set_id: string | null;
+  set_name: string | null;
+  set_hash: string | null;
+  set_registered_at: string | null;
+  newest_indicator: string | null;
+  /** The completed unit's record count; null when the check produced no unit. */
+  matches: number | null;
+  summary: IndicatorCheckSummary | null;
+  sources: IndicatorSetSourceRow[];
+  /** The first MATCH_LIMIT matches; `matches` is the true total (R25). */
+  match_rows: IndicatorMatchRow[];
+}
+
+/** Matches returned per check; the check's `matches` says how many there are in all. */
+export const MATCH_LIMIT = 500;
+
+/**
+ * Every run's indicator check of one evidence item, newest first, each with
+ * its set's sources and its first MATCH_LIMIT matches. The same views the
+ * report reads (migration 0013), so the two can't disagree (R27).
+ */
+export async function getIndicatorChecks(client: Db, evidenceId: string): Promise<IndicatorCheckRow[]> {
+  const checks = await client.query<Omit<IndicatorCheckRow, 'sources' | 'match_rows'> & { ingest_id: string | null }>(
+    `SELECT run_id, status, error_message, finished_at, indicator_set_id, set_name, set_hash,
+            set_registered_at, newest_indicator, ingest_id, matches, summary
+       FROM indicator_checks
+      WHERE evidence_id = $1
+      ORDER BY finished_at DESC NULLS FIRST, run_id`,
+    [evidenceId]
+  );
+  const out: IndicatorCheckRow[] = [];
+  for (const { ingest_id, ...check } of checks.rows) {
+    const sources = check.indicator_set_id
+      ? (
+          await client.query<IndicatorSetSourceRow>(
+            `SELECT source_repository, source_commit, licence, redistributable, files, downloaded_on
+               FROM indicator_set_sources WHERE set_id = $1
+              ORDER BY source_repository NULLS LAST, source_commit, licence`,
+            [check.indicator_set_id]
+          )
+        ).rows
+      : [];
+    const matchRows = ingest_id
+      ? (
+          await client.query<IndicatorMatchRow>(
+            `SELECT event_time, fields FROM forensic_records
+              WHERE ingest_id = $1 ORDER BY event_time, id LIMIT $2`,
+            [ingest_id, MATCH_LIMIT]
+          )
+        ).rows
+      : [];
+    out.push({ ...check, sources, match_rows: matchRows });
+  }
+  return out;
 }

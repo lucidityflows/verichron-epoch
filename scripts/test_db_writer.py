@@ -522,8 +522,12 @@ def test_ingest_requires_a_complete_context():
     """No evidence, no ingest: a call before registration cannot happen."""
     with pytest.raises(ValueError, match="evidence_id"):
         IngestContext(evidence_id="", derivative_id=DERIVATIVE_A, run_id=RUN_ID, parser_version=1)
-    with pytest.raises(ValueError, match="derivative_id"):
+    with pytest.raises(ValueError, match="exactly one input"):
         IngestContext(evidence_id=EVIDENCE_A, derivative_id="", run_id=RUN_ID, parser_version=1)
+    with pytest.raises(ValueError, match="exactly one input"):
+        IngestContext(
+            evidence_id=EVIDENCE_A, derivative_id=DERIVATIVE_A, run_id=RUN_ID, parser_version=1, indicator_set_id="s"
+        )
 
 
 def test_ingest_rejects_a_bare_run_id_where_the_context_belongs(db, artifact):

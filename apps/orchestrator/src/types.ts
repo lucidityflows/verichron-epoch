@@ -1,11 +1,11 @@
-import type { DerivativeKind } from '@verichron/contracts';
+import type { StageInput } from '@verichron/contracts';
 
 export interface StageManifest {
   entrypoint: string;
   runtime: 'python' | 'node';
   order: number;
-  /** The derivative this stage reads; the orchestrator passes its id and path (EPOCH-416). */
-  reads: DerivativeKind;
+  /** The derivative this stage reads, whose id and path the orchestrator passes (EPOCH-416), or the indicator set it checks (EPOCH-491). */
+  reads: StageInput;
   /** Declared by every stage that writes facts; passed as --parser-version (EPOCH-404). */
   parserVersion?: number;
   enabled: boolean;
@@ -40,4 +40,6 @@ export interface CliConfig {
   /** Where this call writes its result for the caller (EPOCH-409); none when
    * omitted. Each caller passes its own, so no call overwrites another's. */
   summaryPath?: string;
+  /** The indicator set to check, by its set hash; the newest registered set when omitted (EPOCH-491). */
+  indicatorSetHash?: string;
 }

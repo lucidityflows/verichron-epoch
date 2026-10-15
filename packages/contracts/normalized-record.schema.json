@@ -24,6 +24,7 @@
         "gcloud_log",
         "syslog_line",
         "ileapp_record",
+        "indicator_match",
         "llm_flagged_anomaly"
       ]
     },

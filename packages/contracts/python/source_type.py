@@ -35,6 +35,7 @@ class SourceType(StrEnum):
     GCLOUD_LOG = "gcloud_log"
     SYSLOG_LINE = "syslog_line"
     ILEAPP_RECORD = "ileapp_record"
+    INDICATOR_MATCH = "indicator_match"
     LLM_FLAGGED_ANOMALY = "llm_flagged_anomaly"
     # END SOURCE_TYPE
 

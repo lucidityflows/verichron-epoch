@@ -34,6 +34,14 @@ export const CRASH_REPORTS_MARKER = '.crash_reports_ok';
 export const DerivativeKind = z.enum(['decrypted', 'ileapp_output', 'crash_reports']);
 export type DerivativeKind = z.infer<typeof DerivativeKind>;
 
+/**
+ * What a stage reads (its stage.json `reads`): one of the evidence's
+ * derivatives, or a registered indicator set, which the indicator-match stage
+ * checks the evidence's facts against (EPOCH-491).
+ */
+export const StageInput = z.enum([...DerivativeKind.options, 'indicator_set']);
+export type StageInput = z.infer<typeof StageInput>;
+
 const ContentRoot = z.string().regex(/^[0-9a-f]{64}$/);
 const Count = z.number().int().nonnegative();
 

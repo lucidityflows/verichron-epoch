@@ -62,7 +62,7 @@ def write(path: Path, data: Any) -> Path:
 
 
 def load_one(tmp_path: Path, *objects: dict[str, Any]) -> LoadedSet:
-    return load_set(write(tmp_path / "set.stix2", bundle(*objects)), as_of=AS_OF)
+    return load_set(write(tmp_path / "set.stix2", bundle(*objects)), as_of=AS_OF, name="test set")
 
 
 #: One indicator per supported type, with the value the loader keeps.
@@ -190,7 +190,7 @@ def test_a_relationship_outside_the_file_is_counted(tmp_path: Path) -> None:
             "target_ref": MALWARE,
         }
     )
-    loaded = load_set(write(tmp_path / "a.stix2", data), as_of=AS_OF)
+    loaded = load_set(write(tmp_path / "a.stix2", data), as_of=AS_OF, name="test set")
     assert loaded.reports[0].unresolved_relationships == 1
 
 
@@ -210,6 +210,9 @@ def test_a_relationship_outside_the_file_is_counted(tmp_path: Path) -> None:
                 {"type": "malware", "spec_version": "2.1", "id": MALWARE, "name": "Other", "is_family": False},
             )
         ),
+        json.dumps(
+            bundle({k: v for k, v in indicator(1, "[domain-name:value = 'a.example']").items() if k != "modified"})
+        ),
     ],
     ids=[
         "not-json",
@@ -220,20 +223,21 @@ def test_a_relationship_outside_the_file_is_counted(tmp_path: Path) -> None:
         "bad-time",
         "repeated-indicator-id",
         "repeated-malware-id",
+        "no-modified-time",
     ],
 )
 def test_a_malformed_file_rejects_the_whole_set(tmp_path: Path, content: str) -> None:
     write(tmp_path / "set" / "good.stix2", bundle(indicator(1, "[domain-name:value = 'a.example']")))
     write(tmp_path / "set" / "bad.stix2", content)
     with pytest.raises(LoadError):
-        load_set(tmp_path / "set", as_of=AS_OF)
+        load_set(tmp_path / "set", as_of=AS_OF, name="test set")
 
 
 def test_a_directory_holds_only_stix_files(tmp_path: Path) -> None:
     write(tmp_path / "set" / "a.stix2", bundle(indicator(1, "[domain-name:value = 'a.example']")))
     write(tmp_path / "set" / "README.md", "notes")
     with pytest.raises(LoadError, match="README.md"):
-        load_set(tmp_path / "set", as_of=AS_OF)
+        load_set(tmp_path / "set", as_of=AS_OF, name="test set")
 
 
 def test_set_json_gives_provenance_and_must_match_the_directory(tmp_path: Path) -> None:
@@ -247,15 +251,16 @@ def test_set_json_gives_provenance_and_must_match_the_directory(tmp_path: Path) 
         "downloaded_on": "2026-10-15",
     }
     index = {"repository": "owner/index", "commit": "b" * 40, "path": "indicators.yaml"}
-    write(root / "set.json", {"index": index, "files": [entry]})
+    write(root / "set.json", {"name": "Owner feed", "index": index, "files": [entry]})
     loaded = load_set(root, as_of=AS_OF)
+    assert loaded.name == "Owner feed"
     (f,) = loaded.manifest.files
     assert (f.source_commit, f.licence, f.redistributable) == ("a" * 40, "CC-BY-4.0", True)
     assert loaded.manifest.index is not None and loaded.manifest.index.commit == "b" * 40
 
     write(root / "owner/repo/b.stix2", bundle(indicator(2, "[domain-name:value = 'b.example']")))
     with pytest.raises(LoadError, match="not listed"):
-        load_set(root, as_of=AS_OF)
+        load_set(root, as_of=AS_OF, name="test set")
 
 
 def test_files_without_provenance_have_an_unknown_licence(tmp_path: Path) -> None:
@@ -271,12 +276,25 @@ def test_the_set_hash_does_not_depend_on_where_or_in_which_order_files_are_read(
     write(tmp_path / "one" / "b.stix2", b)
     write(tmp_path / "two" / "b.stix2", b)
     write(tmp_path / "two" / "a.stix2", a)
-    first = load_set(tmp_path / "one", as_of=AS_OF)
-    second = load_set(tmp_path / "two", as_of=datetime(2030, 1, 1, tzinfo=UTC))
+    first = load_set(tmp_path / "one", as_of=AS_OF, name="test set")
+    second = load_set(tmp_path / "two", as_of=datetime(2030, 1, 1, tzinfo=UTC), name="test set")
     assert first.manifest.set_hash == second.manifest.set_hash
 
 
 def test_as_of_must_be_timezone_aware(tmp_path: Path) -> None:
     path = write(tmp_path / "a.stix2", bundle(indicator(1, "[domain-name:value = 'a.example']")))
     with pytest.raises(ValueError, match="timezone"):
-        load_set(path, as_of=datetime(2026, 1, 1))
+        load_set(path, as_of=datetime(2026, 1, 1), name="test set")
+
+
+def test_a_set_has_a_name(tmp_path: Path) -> None:
+    path = write(tmp_path / "a.stix2", bundle(indicator(1, "[domain-name:value = 'a.example']")))
+    with pytest.raises(LoadError, match="name"):
+        load_set(path, as_of=AS_OF)
+    with pytest.raises(LoadError, match="name"):
+        load_set(path, as_of=AS_OF, name="  ")
+
+
+def test_each_indicator_keeps_its_modified_time(tmp_path: Path) -> None:
+    loaded = load_one(tmp_path, indicator(1, "[domain-name:value = 'a.example']", modified="2026-05-02T03:04:05.000Z"))
+    assert loaded.indicators[0].modified == datetime(2026, 5, 2, 3, 4, 5, tzinfo=UTC)

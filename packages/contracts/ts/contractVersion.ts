@@ -19,7 +19,7 @@ export const CONTRACT_SCHEMAS = [
 /** The package root, found by walking up from this file: it runs from ts/ under
  * tsx and from dist/ts/ once built, so a fixed relative path would be wrong in
  * one of the two. */
-function packageRoot(): string {
+export function packageRoot(): string {
   // This package compiles to CommonJS, so __dirname (not import.meta) is available.
   let dir = __dirname;
   for (;;) {

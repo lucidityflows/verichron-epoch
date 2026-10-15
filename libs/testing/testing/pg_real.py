@@ -54,6 +54,11 @@ TEST_DATABASE_URL_ENV = "TEST_DATABASE_URL"
 #: need. TRUNCATE does not fire evidence_events' row-level UPDATE/DELETE
 #: trigger, so the append-only rule doesn't block test cleanup.
 _TABLES = (
+    # The indicator registry (EPOCH-490): a match unit references its set.
+    "indicators",
+    "indicator_set_files",
+    "indicator_sets",
+    "indicator_file_contents",
     "forensic_records",
     "ingested_files",
     "pipeline_stage_status",
