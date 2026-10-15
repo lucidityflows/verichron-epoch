@@ -1,31 +1,55 @@
 import * as fsp from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { StageInput } from '@verichron/contracts';
+import { Ajv, type ErrorObject } from 'ajv';
 import { StageDefinition, StageManifest, StageSet } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const REPO_ROOT = path.resolve(__dirname, '../../..');
-const EXTRACTORS_DIR = path.join(REPO_ROOT, 'apps', 'extractors');
-const REPORTING_DIR = path.join(REPO_ROOT, 'apps', 'reporting');
 
-/** Every key stage-manifest.schema.json allows; it sets additionalProperties: false. */
-const MANIFEST_KEYS = new Set(['$schema', 'entrypoint', 'runtime', 'order', 'reads', 'parserVersion', 'enabled']);
+/** Where discovery looks for stages: every directory under `extractors`, and `reporting`. */
+export interface StageRoots {
+  extractorsDir: string;
+  reportingDir: string;
+}
 
-export function isStageManifest(value: unknown): value is StageManifest {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return (
-    Object.keys(v).every((key) => MANIFEST_KEYS.has(key)) &&
-    typeof v.entrypoint === 'string' &&
-    (v.runtime === 'python' || v.runtime === 'node') &&
-    typeof v.order === 'number' &&
-    StageInput.safeParse(v.reads).success &&
-    (v.parserVersion === undefined ||
-      (typeof v.parserVersion === 'number' && Number.isInteger(v.parserVersion) && v.parserVersion >= 1)) &&
-    typeof v.enabled === 'boolean'
+const REPO_ROOTS: StageRoots = {
+  extractorsDir: path.join(REPO_ROOT, 'apps', 'extractors'),
+  reportingDir: path.join(REPO_ROOT, 'apps', 'reporting'),
+};
+
+/**
+ * The one definition of a valid stage.json is the schema itself (EPOCH-444):
+ * compiled once, so a new field is added in one place and a misspelled one is
+ * refused (the schema sets additionalProperties: false).
+ */
+const SCHEMA_PATH = path.join(REPO_ROOT, 'packages', 'contracts', 'stage-manifest.schema.json');
+const validate = new Ajv({ allErrors: true }).compile<StageManifest>(JSON.parse(readFileSync(SCHEMA_PATH, 'utf8')));
+
+/** Each failing field, as the schema validator reports it. */
+function describeErrors(errors: ErrorObject[]): string {
+  return errors
+    .map((e) => {
+      const where = e.instancePath ? e.instancePath.slice(1) : '(top level)';
+      if (e.keyword === 'additionalProperties') {
+        return `"${(e.params as { additionalProperty: string }).additionalProperty}" is not a stage.json field`;
+      }
+      if (e.keyword === 'enum') {
+        return `${where} ${e.message}: ${(e.params as { allowedValues: unknown[] }).allowedValues.join(', ')}`;
+      }
+      return `${where} ${e.message}`;
+    })
+    .join('; ');
+}
+
+/** The manifest, once it matches stage-manifest.schema.json; otherwise an error naming the file and each field. */
+export function validateManifest(value: unknown, manifestPath: string): StageManifest {
+  if (validate(value)) return value;
+  throw new Error(
+    `[orchestrator] ${manifestPath} does not match stage-manifest.schema.json: ${describeErrors(validate.errors ?? [])}`
   );
 }
 
@@ -45,37 +69,31 @@ async function loadStageFromDir(dir: string, name: string): Promise<StageDefinit
   } catch (err) {
     throw new Error(`[orchestrator] ${manifestPath} is not valid JSON: ${(err as Error).message}`);
   }
-  if (!isStageManifest(parsed)) {
-    throw new Error(
-      `[orchestrator] ${manifestPath} does not match stage-manifest.schema.json ` +
-        `(no other keys; need entrypoint: string, runtime: "python"|"node", order: number, ` +
-        `reads: ${StageInput.options.map((k) => `"${k}"`).join('|')}, enabled: boolean, ` +
-        `optional parserVersion: integer >= 1).`
-    );
-  }
+  const manifest = validateManifest(parsed, manifestPath);
 
-  const entrypointPath = path.join(dir, parsed.entrypoint);
+  const entrypointPath = path.join(dir, manifest.entrypoint);
   const entrypointExists = await fsp
     .access(entrypointPath)
     .then(() => true)
     .catch(() => false);
   if (!entrypointExists) {
     throw new Error(
-      `[orchestrator] ${manifestPath} declares entrypoint "${parsed.entrypoint}" but ${entrypointPath} does not exist.`
+      `[orchestrator] ${manifestPath} declares entrypoint "${manifest.entrypoint}" but ${entrypointPath} does not exist.`
     );
   }
 
-  return { name, dir, manifest: parsed };
+  return { name, dir, manifest };
 }
 
-export async function discoverStages(): Promise<StageSet> {
-  const extractorEntries = await fsp.readdir(EXTRACTORS_DIR, { withFileTypes: true });
+export async function discoverStages(roots: StageRoots = REPO_ROOTS): Promise<StageSet> {
+  const { extractorsDir, reportingDir } = roots;
+  const extractorEntries = await fsp.readdir(extractorsDir, { withFileTypes: true });
   const candidateDirs = extractorEntries
     .filter((e) => e.isDirectory())
-    .map((e) => ({ dir: path.join(EXTRACTORS_DIR, e.name), name: e.name }));
+    .map((e) => ({ dir: path.join(extractorsDir, e.name), name: e.name }));
   // apps/analysis (the AI stage) is not a stage until EPOCH-442 re-points it
   // at the project's own facts; its only input was removed (EPOCH-489).
-  candidateDirs.push({ dir: REPORTING_DIR, name: path.basename(REPORTING_DIR) });
+  candidateDirs.push({ dir: reportingDir, name: path.basename(reportingDir) });
 
   const loaded = await Promise.all(candidateDirs.map((c) => loadStageFromDir(c.dir, c.name)));
   const found = loaded.filter((s): s is StageDefinition => s !== null);
@@ -94,8 +112,8 @@ export async function discoverStages(): Promise<StageSet> {
     }
   }
 
-  const reportStage = stages.find((s) => s.dir === REPORTING_DIR);
-  const maxExtractorOrder = Math.max(0, ...stages.filter((s) => s.dir !== REPORTING_DIR).map((s) => s.manifest.order));
+  const reportStage = stages.find((s) => s.dir === reportingDir);
+  const maxExtractorOrder = Math.max(0, ...stages.filter((s) => s.dir !== reportingDir).map((s) => s.manifest.order));
   if (reportStage && reportStage.manifest.order <= maxExtractorOrder) {
     throw new Error(
       `[orchestrator] apps/reporting/stage.json declares order ${reportStage.manifest.order}, ` +

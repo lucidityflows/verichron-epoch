@@ -360,19 +360,19 @@ describe('getRunReportLocation', live, () => {
 describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', live, () => {
   before(async () => {
     await db.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id, parser_version, started_at, finished_at, warnings)
-       VALUES ($1, 'crash', 'succeeded', $2, 1, now() - interval '2 minutes', now() - interval '1 minute', '[crash]   a.ips: already ingested; nothing new was written'),
-              ($1, 'ileapp_bridge', 'failed', $2, 3, now() - interval '1 minute', now(), NULL),
-              ($1, 'llm', 'skipped', NULL, NULL, NULL, NULL, NULL),
-              ($1, 'reporting', 'running', NULL, NULL, now(), NULL, NULL),
-              ($1, 'later', 'pending', NULL, NULL, NULL, NULL, NULL)`,
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, derivative_id, parser_version, started_at, finished_at, warnings)
+       VALUES ($1, 'crash', 10, 'succeeded', $2, 1, now() - interval '2 minutes', now() - interval '1 minute', '[crash]   a.ips: already ingested; nothing new was written'),
+              ($1, 'ileapp_bridge', 20, 'failed', $2, 3, now() - interval '1 minute', now(), NULL),
+              ($1, 'llm', 80, 'skipped', NULL, NULL, NULL, NULL, NULL),
+              ($1, 'reporting', 1000, 'running', NULL, NULL, now(), NULL, NULL),
+              ($1, 'later', 1100, 'pending', NULL, NULL, NULL, NULL, NULL)`,
       [RUN, EVIDENCE]
     );
     // More stages, so each status has its own count (pending 5, running 4,
     // failed 3, skipped 2, succeeded 1): a swapped status filter shows.
     await db.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status)
-       SELECT $1, status || '_' || n, status::text
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status)
+       SELECT $1, status || '_' || n, 2000, status::text
          FROM (VALUES ('pending', 4), ('running', 3), ('failed', 2), ('skipped', 1)) AS extra(status, more),
               generate_series(1, more) AS n`,
       [RUN]
@@ -397,6 +397,12 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
     assert.deepEqual(run.stage_counts, { pending: 5, running: 4, failed: 3, skipped: 2, succeeded: 1 });
     assert.equal(run.state, 'running', 'the verdict comes from run_completeness, not the counts');
     assert.equal(run.stages_with_warnings, 1, 'EPOCH-420: the succeeded crash stage left warnings');
+  });
+
+  it("returns a run's stages in their declared order, never a hard-coded list (EPOCH-414)", async () => {
+    const names = (await getStageStatus(db, RUN)).map((s) => s.stage_name);
+    assert.deepEqual(names.slice(0, 5), ['crash', 'ileapp_bridge', 'llm', 'reporting', 'later']);
+    assert.deepEqual(names.slice(5), [...names.slice(5)].sort(), 'equal orders fall back to the stage name');
   });
 
   it('gives each stage what it read and the complete units this run labelled for it', async () => {
@@ -455,8 +461,8 @@ describe('getIndicatorChecks', live, () => {
         [run, OTHER]
       );
       await db.query(
-        `INSERT INTO pipeline_stage_status (run_id, stage_name, status, indicator_set_id, finished_at, error_message)
-         VALUES ($1, 'indicator_match', $2, $3, $4, $5)`,
+        `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, indicator_set_id, finished_at, error_message)
+         VALUES ($1, 'indicator_match', 500, $2, $3, $4, $5)`,
         [run, status, set, finished, reason]
       );
     }

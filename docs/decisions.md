@@ -71,6 +71,8 @@ never silently deleted.
 
 | Decision | Why | Where |
 |---|---|---|
+| A stage's order has one owner, its `stage.json`: the orchestrator records it on each stage row (`pipeline_stage_status.stage_order`, migration 0014), disabled stages included, and readers order a run's stages by it in SQL. The reader's hard-coded `CANONICAL_STAGE_ORDER` is gone | It had drifted from the real stages (only `crash` matched), so the app showed stages in arbitrary order (R2). Rows from before 0014 have no order and aren't backfilled: the migration refuses a database with runs (the owner's decision, 2026-10-15) | EPOCH-414 |
+| Discovery validates each `stage.json` against `stage-manifest.schema.json` itself (ajv 8, MIT), replacing a hand-written copy of it. A manifest that doesn't match refuses the whole run, naming the file and each failing field, including a misspelled one (the schema sets `additionalProperties: false`) | A second definition had to be kept in step by hand for every new field. A stage silently left out of a forensic run is worse than a run that won't start | EPOCH-444 |
 | Completeness is one database view, `run_completeness`; `skipped` never makes a run incomplete. No component re-derives it | R23 | EPOCH-404 |
 | Every rerun creates a new run; finished runs are never reopened | Runs stay append-only | EPOCH-408 |
 | Each run exports its own summary from the database to `runs/<label>/<run_id>.json`; one orchestrator call's result goes to a file its caller names (`--summary-path`), never a shared workspace file | A single workspace-root `analysis-summary.json` was overwritten by every call, so a rerun of one backup erased the others' results. Merging into one file was rejected: it needs locking and adds the second writer R23 rules out | EPOCH-409 |

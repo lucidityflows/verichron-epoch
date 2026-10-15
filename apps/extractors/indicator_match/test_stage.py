@@ -196,9 +196,10 @@ def test_the_report_reads_each_runs_check_from_the_database(db, tmp_path: Path) 
     with db.cursor() as cur:
         cur.execute("UPDATE pipeline_runs SET evidence_id = %s WHERE run_id IN (%s, %s)", (EVIDENCE, RUN, RUN_2))
         cur.execute(
-            "INSERT INTO pipeline_stage_status (run_id, stage_name, status, indicator_set_id, finished_at) "
-            "VALUES (%s, 'indicator_match', 'succeeded', %s, '2026-10-15T10:00:00Z'), "
-            "(%s, 'indicator_match', 'skipped', NULL, '2026-10-14T10:00:00Z')",
+            "INSERT INTO pipeline_stage_status "
+            "(run_id, stage_name, stage_order, status, indicator_set_id, finished_at) "
+            "VALUES (%s, 'indicator_match', 500, 'succeeded', %s, '2026-10-15T10:00:00Z'), "
+            "(%s, 'indicator_match', 500, 'skipped', NULL, '2026-10-14T10:00:00Z')",
             (RUN, set_id, RUN_2),
         )
         cur.execute(

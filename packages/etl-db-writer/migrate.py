@@ -121,6 +121,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _column("indicator_sets", "name"),
         _relation("idx_ingested_files_indicator_set"),
     ),
+    "0014_stage_order.sql": (
+        _column("pipeline_stage_status", "stage_order"),
+        _column("pipeline_stage_status", "stage_order"),
+    ),
 }
 
 

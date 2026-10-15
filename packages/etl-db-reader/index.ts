@@ -37,6 +37,5 @@ export {
   getForensicRecords,
   getIndicatorChecks,
   MATCH_LIMIT,
-  CANONICAL_STAGE_ORDER,
   MAX_RECORDS_PAGE,
 } from './dbReader.js';

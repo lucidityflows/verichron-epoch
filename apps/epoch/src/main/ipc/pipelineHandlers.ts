@@ -381,7 +381,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
 
   // Analyze reads the backups the examiner selected, each checked to be
   // prepared in this workspace, never every prepared backup there (EPOCH-530).
-  ipcMain.handle('epoch:startAnalysis', async (_event, workspace: string, labels: string[]) => {
+  ipcMain.handle('epoch:startAnalysis', async (_event, workspace: string, labels: unknown) => {
     if (runningOrchestratorProcess) {
       throw new Error('The orchestrator is already running -- wait for analysis to finish before starting another.');
     }

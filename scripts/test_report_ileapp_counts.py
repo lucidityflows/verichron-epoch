@@ -105,8 +105,8 @@ def test_an_outdated_derivative_fails_the_report_with_a_clear_message(db, tmp_pa
         )
         derivative = cur.fetchone()[0]
         cur.execute(
-            "INSERT INTO pipeline_stage_status (run_id, stage_name, status, derivative_id) "
-            "VALUES (%s, 'crash', 'succeeded', %s)",
+            "INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, derivative_id) "
+            "VALUES (%s, 'crash', 10, 'succeeded', %s)",
             (RUN, derivative),
         )
     db.commit()
