@@ -167,7 +167,11 @@ describe('copyCrashReports', () => {
         throw new Error('no clock');
       }
     );
-    assert.equal(clockBroken.outcome, 'failed');
+    assert.deepEqual(clockBroken, {
+      outcome: 'failed',
+      tool_version: null,
+      error: 'the copy stopped unexpectedly: no clock',
+    });
   });
 
   it('says so when the tool is not available', async () => {
