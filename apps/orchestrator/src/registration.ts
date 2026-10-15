@@ -53,15 +53,41 @@ export interface Registration {
   decryptedDerivativeId: string;
   /** iLEAPP's output for that decrypt, when complete (EPOCH-416). */
   ileappDerivativeId: string | null;
+  /** The device's crash logs. An iOS backup holds none, and nothing acquires
+   * them yet (EPOCH-514), so this is null for now (EPOCH-447). */
+  crashReportsDerivativeId: string | null;
 }
 
-export type RegisteredDerivatives = Pick<Registration, 'decryptedDerivativeId' | 'ileappDerivativeId'>;
+export type RegisteredDerivatives = Pick<
+  Registration,
+  'decryptedDerivativeId' | 'ileappDerivativeId' | 'crashReportsDerivativeId'
+>;
+
+/**
+ * Derivatives that only some acquisitions produce, so their absence is a fact
+ * about the evidence, not a step left undone (EPOCH-447). A stage reading one
+ * the evidence lacks is recorded as skipped with this reason, and the report
+ * lists it as not examined; resume accepts such a skip only by this exact
+ * reason, never a disabled stage's. Every other missing derivative fails the
+ * stage.
+ */
+const NOT_ACQUIRED: Partial<Record<DerivativeKind, string>> = {
+  crash_reports:
+    "Crash logs were not acquired for this evidence. An iOS backup does not contain the device's crash logs; " +
+    'they are copied from the device separately.',
+};
+
+/** The reason a stage is skipped when its input is absent, or null when an absent input fails it. */
+export function absentInputReason(stage: StageDefinition): string | null {
+  return NOT_ACQUIRED[stage.manifest.reads] ?? null;
+}
 
 /** The derivative a stage reads, as its stage.json declares; null when that one isn't registered. */
 export function derivativeFor(stage: StageDefinition, registration: RegisteredDerivatives): string | null {
   const byKind: Record<DerivativeKind, string | null> = {
     decrypted: registration.decryptedDerivativeId,
     ileapp_output: registration.ileappDerivativeId,
+    crash_reports: registration.crashReportsDerivativeId,
   };
   return byKind[stage.manifest.reads];
 }
@@ -465,7 +491,7 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
       : null;
 
     await client.query('COMMIT');
-    return { evidenceId, deviceId, decryptedDerivativeId, ileappDerivativeId };
+    return { evidenceId, deviceId, decryptedDerivativeId, ileappDerivativeId, crashReportsDerivativeId: null };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;

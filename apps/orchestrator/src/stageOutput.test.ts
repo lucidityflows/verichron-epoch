@@ -36,10 +36,10 @@ it('keeps a UTF-8 character that arrives split across two chunks', async () => {
         deviceId: 'device-1',
         decryptedDerivativeId: 'derivative-1',
         ileappDerivativeId: null,
+        crashReportsDerivativeId: null,
       }
     );
-    assert.equal(result.success, true);
-    assert.equal(result.stderr, 'a—b');
+    assert.deepEqual(result, { status: 'succeeded', stderr: 'a—b' });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

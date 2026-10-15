@@ -223,11 +223,17 @@ def render_provenance_section(inputs: list[dict], fact_sources: list[dict] | Non
 # --- what was not examined (EPOCH-489) ------------------------------------
 
 
-def render_not_examined_section(ileapp_outputs: list[dict]) -> list[str]:
+def render_not_examined_section(ileapp_outputs: list[dict], stages: list[dict]) -> list[str]:
     """Checks this report cannot speak to, stated so their absence is never
-    read as a clean result: including every iLEAPP plugin that errored on the
-    output this run read (EPOCH-457), whose artifact is therefore missing."""
+    read as a clean result: every stage this run skipped, with the reason the
+    orchestrator recorded (a disabled stage, or crash logs that were never
+    acquired, EPOCH-447), and every iLEAPP plugin that errored on the output
+    this run read (EPOCH-457), whose artifact is therefore missing."""
     lines = ["## Not Examined", ""]
+    for s in stages:
+        if s["status"] == "skipped":
+            reason = s["error_message"] or "the orchestrator recorded no reason"
+            lines.append(f"- **The `{s['stage_name']}` stage did not run:** {_table_cell(reason)}")
     for d in ileapp_outputs:
         errors = d["params"]["modules"]["errors"]
         if not errors:
@@ -598,7 +604,7 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
         return
 
     lines += render_coverage_section(fetch_fact_counts(conn, evidence_id), ileapp_outputs)
-    lines += render_not_examined_section(ileapp_outputs)
+    lines += render_not_examined_section(ileapp_outputs, stages)
     lines += render_tool_checks_section(fetch_corrections(conn, evidence_id), fetch_time_review(conn, evidence_id))
 
     for title, fetch, render in RENDERERS.values():

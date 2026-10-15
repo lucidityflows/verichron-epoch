@@ -2,8 +2,10 @@
 """
 extractors/crash/main.py
 
-Crash-report extractor. Parses iOS .ips crash/telemetry files out of a
-decrypted backup and writes them into the shared forensic_records table.
+Crash-report extractor. Parses iOS .ips crash/telemetry files from the
+device's crash logs (the crash_reports derivative) and writes them into the
+shared forensic_records table. An iOS backup holds no crash logs (EPOCH-447),
+so the orchestrator never runs this stage on a backup alone.
 
 This is a port of the original deep_ips_report.py, split per the contract:
   - PARSING logic (parse_ips_file, extract_rich_telemetry) moves here,
@@ -22,7 +24,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime
+from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,46 +34,55 @@ from db_writer import IngestContext, add_context_args, context_from_args, ingest
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
 from runtime_env import redact_password, require_database_url
+from stored_value import stored_value
 
-# --- parsing (ported from deep_ips_report.py, unchanged logic) -------------
+# --- parsing ----------------------------------------------------------------
+
+# Every .ips file on the reference device (230 of them, EPOCH-447) starts with
+# a JSON metadata line: bug_type, timestamp, os_version, incident_id. What
+# follows varies by bug type: a JSON document for most, but text reports
+# (`Date/Time: ...`, `Message Group: ...`), further JSON lines, or binary for
+# others. The metadata line is required; the body is kept exactly, whatever
+# its format.
 
 
 def parse_ips_file(file_path: Path) -> tuple[dict | None, str | None]:
-    """
-    Parses modern iOS .ips files containing two-tier JSON (a metadata line
-    followed by a payload block) or a single JSON block.
-    """
+    """The file as stored: its metadata, its body's format (`json`, `text` or
+    `binary`) and its body, kept exactly (binary and text holding NUL are
+    encoded, never altered: stored_value). Returns an error instead for a file
+    with no JSON metadata line."""
     try:
-        with open(file_path, encoding="utf-8", errors="ignore") as f:
-            lines = f.readlines()
-
-        if not lines:
-            return None, "Empty file"
-
-        metadata = {}
-        try:
-            metadata = json.loads(lines[0].strip())
-        except json.JSONDecodeError:
-            pass
-
-        payload_text = "".join(lines[1:]) if len(lines) > 1 else lines[0]
-        payload = {}
-        try:
-            payload = json.loads(payload_text)
-        except json.JSONDecodeError:
-            try:
-                payload = json.loads("".join(lines))
-            except json.JSONDecodeError as err:
-                return None, f"JSON Decode Error: {err}"
-
-        return {"metadata": metadata, "payload": payload}, None
-    except Exception as e:
+        raw = file_path.read_bytes()
+    except OSError as e:
         return None, str(e)
+    if not raw:
+        return None, "Empty file"
+
+    head, _, body = raw.partition(b"\n")
+    try:
+        # Strict: an undecodable byte in the metadata fails the file, which
+        # stays retryable, instead of being dropped silently.
+        metadata = json.loads(head.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        return None, f"no JSON metadata line: {e}"
+    if not isinstance(metadata, dict):
+        return None, "no JSON metadata line: the first line is not a JSON object"
+
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return {"metadata": metadata, "body_format": "binary", "body": stored_value(body)}, None
+    try:
+        return {"metadata": metadata, "body_format": "json", "body": json.loads(text)}, None
+    except json.JSONDecodeError:
+        return {"metadata": metadata, "body_format": "text", "body": stored_value(text)}, None
 
 
 def extract_rich_telemetry(data: dict) -> dict:
     meta = data.get("metadata", {}) or {}
-    payload = data.get("payload", {})
+    # Only a JSON body has fields to read; a text or binary body is kept in
+    # the payload, and the record comes from the metadata line.
+    payload = data.get("body") if data.get("body_format") == "json" else {}
 
     # Defensive check: if payload is a list, extract the first element if
     # it's a dict, or default to empty. Same tolerance the original had —
@@ -89,10 +101,15 @@ def extract_rich_telemetry(data: dict) -> dict:
     return {
         "incident_id": meta.get("incident_id") or payload.get("incident_id"),
         "bug_type": meta.get("bug_type") or payload.get("bugType"),
-        "os_version": payload.get("osVersion"),
+        "body_format": data.get("body_format"),
+        # The record's time (EPOCH-447): the metadata line's timestamp, which
+        # every file has. Where a JSON body also has captureTime or date, the
+        # two agreed to within a second on every real file; that is kept too.
+        "timestamp": meta.get("timestamp"),
+        "body_time": payload.get("captureTime") or payload.get("date"),
+        "os_version": payload.get("osVersion") or meta.get("os_version"),
         "hardware_model": payload.get("modelCode") or payload.get("hardwareModel"),
         "cpu_type": payload.get("codeType") or payload.get("cpuType"),
-        "crash_time": payload.get("captureTime") or payload.get("date"),
         "process_name": meta.get("name") or payload.get("procName"),
         "bundle_id": meta.get("bundleID") or payload.get("bundleID"),
         "bundle_version": meta.get("build_version") or payload.get("version"),
@@ -115,10 +132,10 @@ def extract_rich_telemetry(data: dict) -> dict:
 
 # --- new: normalization + timestamp parsing ---------------------------------
 
-# iOS captureTime/date strings look like "2024-01-15 10:23:45.00 -0800" —
-# tolerate a couple of variants rather than assuming one exact format, and
-# fall back to a null event_time (still a valid, storable record) rather
-# than failing the whole file over an unparseable timestamp.
+# The metadata timestamp looks like "2026-10-01 12:00:00.00 -0700" on every
+# real file (EPOCH-447). A couple of variants are tolerated; anything else
+# leaves event_time null (still a valid, storable record, counted as untimed)
+# rather than failing the file or guessing a time (R11).
 _CRASH_TIME_FORMATS = [
     "%Y-%m-%d %H:%M:%S.%f %z",
     "%Y-%m-%d %H:%M:%S %z",
@@ -132,7 +149,8 @@ def parse_crash_time(raw: Any) -> datetime | None:
         return None
     for fmt in _CRASH_TIME_FORMATS:
         try:
-            return datetime.strptime(raw.strip(), fmt)
+            # Stored in UTC (R11); the report's own offset is in the payload.
+            return datetime.strptime(raw.strip(), fmt).astimezone(UTC)
         except ValueError:
             continue
     return None
@@ -155,13 +173,16 @@ def telemetry_to_record(telemetry: dict) -> NormalizedRecord:
     return NormalizedRecord(
         incident_id=telemetry.get("incident_id"),
         source_type=SourceType.CRASH_REPORT,
-        event_time=parse_crash_time(telemetry.get("crash_time")),
+        event_time=parse_crash_time(telemetry.get("timestamp")),
         bug_type=telemetry.get("bug_type"),
         process_name=telemetry.get("process_name"),
         pid=pid,
         bundle_id=telemetry.get("bundle_id"),
         fields={
             "filename": telemetry.get("filename"),
+            "body_format": telemetry.get("body_format"),
+            "time_source": "metadata timestamp",
+            "body_time": telemetry.get("body_time"),
             "os_version": telemetry.get("os_version"),
             "hardware_model": telemetry.get("hardware_model"),
             "cpu_type": telemetry.get("cpu_type"),
@@ -186,7 +207,7 @@ def telemetry_to_record(telemetry: dict) -> NormalizedRecord:
 # --- main --------------------------------------------------------------
 
 
-def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
+def run(conn, ctx: IngestContext, crash_reports_path: str) -> ETLRunResult:
     """
     Partial-failure choice (per EXTRACTOR_CONTRACT.md #5): a malformed or
     unparseable .ips file is skipped and logged, everything else still
@@ -207,8 +228,16 @@ def run(conn, ctx: IngestContext, backup_path: str) -> ETLRunResult:
     non-atomic pattern `ingest()` exists to close off (see db_writer.py's
     module docstring).
     """
-    ips_files = list(Path(backup_path).rglob("*.ips"))
+    files = sorted(p for p in Path(crash_reports_path).rglob("*") if p.is_file())
+    ips_files = [p for p in files if p.suffix == ".ips"]
     result = ETLRunResult()
+    # The device's other diagnostic files (.ca analytics, .session, .log)
+    # aren't crash reports this stage reads; they are counted, not dropped
+    # silently.
+    other = Counter(p.suffix or "(no extension)" for p in files if p.suffix != ".ips")
+    if other:
+        kinds = ", ".join(f"{n} {ext}" for ext, n in sorted(other.items()))
+        result.note(f"{sum(other.values())} file(s) not read, not .ips crash reports: {kinds}")
 
     for file_path in ips_files:
         try:
@@ -251,7 +280,9 @@ def main():
     db_url = require_database_url()
     parser = argparse.ArgumentParser()
     add_context_args(parser)
-    parser.add_argument("--backup-path", required=True)
+    # The backup's path is passed to every stage; this one reads the crash
+    # logs at --derivative-path instead.
+    parser.add_argument("--backup-path", required=True, help="unused; passed to every stage")
     # Unused here: only the report stage writes to the report folder. The
     # orchestrator passes --report-path to every stage (EXTRACTOR_CONTRACT.md
     # section 2), so this extractor accepts and ignores it.
@@ -265,7 +296,7 @@ def main():
         sys.exit(1)
 
     try:
-        result = run(conn, context_from_args(args), args.backup_path)
+        result = run(conn, context_from_args(args), args.derivative_path)
     except Exception as e:
         print(f"[crash] unhandled error: {e}", file=sys.stderr)
         sys.exit(1)

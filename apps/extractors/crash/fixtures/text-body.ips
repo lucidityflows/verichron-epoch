@@ -1,0 +1,26 @@
+{"duration_ms":"17407811","share_with_app_devs":1,"roots_installed":0,"bug_type":"145","os_version":"iPhone OS 26.6.1 (23G83)","slice_uuid":"00000000-0000-0000-0000-000000000000","is_first_party":0,"incident_id":"00000000-0000-0000-0000-000000000000","timestamp":"2026-01-02 03:04:05.11 -0700","app_name":"mediaplaybackd","name":"mediaplaybackd"}
+Date/Time:        2026-01-02 03:04:05.111 -0700
+End time:         2026-01-02 03:04:05.111 -0700
+OS Version:       iPhone OS 26.6.1 (Build 23G83)
+Architecture:     arm64e
+Report Version:   72
+Incident Identifier: 00000000-0000-0000-0000-000000000000
+Share With Devs:  Yes
+
+Data Source:      Microstackshots
+Shared Cache:     00000000-0000-0000-0000-000000000000 slid base address 0x199c88000, slide 0x19c88000
+
+Command:          mediaplaybackd
+Path:             /usr/libexec/mediaplaybackd
+Resource Coalition: "com.apple.mediaplaybackd"(468)
+On Behalf Of:     101 samples UNKNOWN [13942] (101 samples originated by dasd [83])
+Architecture:     arm64e
+Parent:           launchd [1]
+PID:              289
+
+Event:            disk writes
+Action taken:     none
+Writes:           1073.75 MB of file backed memory dirtied over 17408 seconds (61.68 KB per second average), exceeding limit of 12.43 KB per second over 86400 seconds
+Writes limit:     1073.74 MB
+Limit duration:   86400s
+Writes caused:    1073.75 MB

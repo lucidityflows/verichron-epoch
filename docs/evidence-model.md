@@ -40,6 +40,14 @@ and, made from it with the decrypt as its parent, **iLEAPP's output**
 derivative they were read from, so iLEAPP records belong to iLEAPP's output, not
 to the decrypt (R7).
 
+The device's **crash logs** (`crash_reports`) are a third kind. An iOS backup
+holds none of them (verified on a real backup, EPOCH-447): they are copied from
+the device separately. Nothing produces this derivative yet; the iPhone pull
+will (EPOCH-514), and so will full-filesystem extractions (EPOCH-515). A stage
+that reads a derivative the evidence lacks normally fails; for crash logs, whose
+absence is a fact about how the evidence was acquired, the stage is recorded as
+skipped with that reason, and the report lists it under Not Examined.
+
 A derivative's identity is **(evidence, kind, parent, provenance)**:
 
 - **provenance** is the tool that made it and the parameters that shaped it, for
@@ -119,7 +127,10 @@ Every fact enters through one door, `ingest()` in `db_writer.py` (R13).
   (decode to bytes) and `utf8-hex` for text holding NUL (decode the bytes as
   UTF-8). JSON has no infinity either, so an infinite number is kept as
   `{"$encoded": "float", "value": "Infinity" | "-Infinity"}` (EPOCH-418).
-  Any other value is stored as it is. The stage's notes count the values it
+  Any other value is stored as it is. The convention has one implementation,
+  `stored_value` in `packages/contracts/python/`, which every stage uses (the
+  iLEAPP bridge for column values, the crash stage for a report body that
+  isn't UTF-8 text). The stage's notes count the values it
   encoded.
 
 Reads go through two views (R27):

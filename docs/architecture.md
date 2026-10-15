@@ -186,9 +186,13 @@ The contract is in
 
 | Stage | Order | Reads | Writes |
 |---|---|---|---|
-| `crash` | 10 | decrypted backup | `crash_report` |
+| `crash` | 10 | the device's crash logs (`crash_reports`) | `crash_report` |
 | `ileapp_bridge` | 20 | iLEAPP output | `ileapp_record` |
 | `reporting` | 1000 | the database | the investigation report |
+
+An iOS backup holds none of the device's crash logs, and nothing acquires them
+yet (EPOCH-514, 515), so the orchestrator records `crash` as skipped, with
+that reason, and the report lists it under Not Examined (EPOCH-447).
 
 The AI stage (`apps/analysis`, `llm_flagged_anomaly` leads) has no `stage.json`
 until EPOCH-442 gives it the project's own facts to read.

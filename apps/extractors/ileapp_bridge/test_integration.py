@@ -17,6 +17,7 @@ import db_writer
 import pytest
 from db_writer import IngestContext, compute_file_hash
 from normalized_record import NormalizedRecord, SourceType
+from stored_value import decode_value
 from testing.pg_real import BACKENDS, open_db
 from tool_defects import defects_for
 
@@ -24,7 +25,6 @@ from ileapp_bridge.lava import (
     ArtifactError,
     LavaError,
     check_tables,
-    decode_value,
     open_database,
     read_artifact,
     read_manifest,

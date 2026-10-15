@@ -26,8 +26,8 @@
     },
     "reads": {
       "type": "string",
-      "enum": ["decrypted", "ileapp_output"],
-      "description": "The derivative this stage reads (EPOCH-416): the decrypted backup or iLEAPP's output, each produced by the processor. The orchestrator passes its id as --derivative-id and its directory as --derivative-path, and fails the stage before spawning it if that derivative isn't registered for the backup. Its facts are filed under that derivative (R7)."
+      "enum": ["decrypted", "ileapp_output", "crash_reports"],
+      "description": "The derivative this stage reads (EPOCH-416): the decrypted backup or iLEAPP's output, each produced by the processor, or the device's crash logs, copied from the device separately (EPOCH-447, 514). The orchestrator passes its id as --derivative-id and its directory as --derivative-path. If the decrypt or iLEAPP's output isn't registered for the backup, the stage fails before it is spawned. Crash logs are acquired only by an iPhone pull, so without them the stage is recorded as skipped, with the reason, and the report lists it as not examined. Its facts are filed under that derivative (R7)."
     },
     "parserVersion": {
       "type": "integer",
