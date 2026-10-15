@@ -164,6 +164,7 @@ never silently deleted.
 
 | Decision | Why | Where |
 |---|---|---|
+| Analyze reads only the backups selected on New Investigation that are prepared, passing their `decrypted/<label>` paths to the orchestrator; each is checked to be prepared in the workspace when Analyze starts, and any that isn't refuses the whole Analyze. The screen names the backups it will read and every other selected or prepared backup as not included. The orchestrator's `--workspace` mode stays for the command line | On 2026-10-15 a clean re-import created three investigations: the new backup, plus two prepared the day before that had stayed in the workspace after their source backups were deleted. Evidence the examiner didn't choose must never become an investigation | EPOCH-530 |
 | Run rows expand independently as inline accordions; side-by-side compare is deferred | Compare needs its own query shape and design | EPOCH-410 |
 | The store keeps `selectedRunId` separate from `expandedRunIds` | Open rows and the run a view acts on are different things | EPOCH-410 |
 | Finished runs' stages are fetched once; running runs' stages are refetched | A finished run is immutable | EPOCH-410 |

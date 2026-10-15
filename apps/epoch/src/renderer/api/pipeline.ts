@@ -17,7 +17,7 @@ export const pipelineApi = {
   getPrepareState: () => window.epoch.getPrepareState(),
   onPrepareState: (callback: (state: PrepareState) => void) => window.epoch.onPrepareState(callback),
 
-  startAnalysis: (workspace: string) => window.epoch.startAnalysis(workspace),
+  startAnalysis: (workspace: string, labels: string[]) => window.epoch.startAnalysis(workspace, labels),
   cancelAnalysis: () => window.epoch.cancelAnalysis(),
   getAnalysisRunStatus: (workspace: string) => window.epoch.getAnalysisRunStatus(workspace),
   onOrchestratorLog: (callback: (entry: PipelineLogEntry) => void) => window.epoch.onOrchestratorLog(callback),

@@ -8,6 +8,7 @@ import type { Pool } from 'pg';
 import { discoverBackups, type Backup } from '@verichron/contracts';
 import type { PipelineFinishedResult, AnalysisRunStatus, PipelineLogEntry } from '../../shared/types/window';
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
+import { analysisTargets, orchestratorArgs } from './analysisTargets';
 import { defaultWorkspace, readPreparedBackups } from './preparedBackups';
 
 interface StartPipelineOptions {
@@ -378,7 +379,9 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   ipcMain.handle('epoch:getPrepareState', () => prepareSession.snapshot());
   ipcMain.handle('epoch:getAnalysisState', () => analysisSession.snapshot());
 
-  ipcMain.handle('epoch:startAnalysis', async (_event, workspace: string) => {
+  // Analyze reads the backups the examiner selected, each checked to be
+  // prepared in this workspace, never every prepared backup there (EPOCH-530).
+  ipcMain.handle('epoch:startAnalysis', async (_event, workspace: string, labels: string[]) => {
     if (runningOrchestratorProcess) {
       throw new Error('The orchestrator is already running -- wait for analysis to finish before starting another.');
     }
@@ -386,22 +389,13 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       throw new Error('An analysis workspace is required.');
     }
     const trimmedWorkspace = workspace.trim();
+    const backupPaths = analysisTargets(trimmedWorkspace, Array.isArray(labels) ? labels : []);
     const summaryPath = newSummaryPath();
 
-    const child = spawn(
-      'pnpm',
-      [
-        '--filter',
-        '@verichron/orchestrator',
-        'investigate',
-        '--',
-        '--workspace',
-        trimmedWorkspace,
-        '--summary-path',
-        summaryPath,
-      ],
-      { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] }
-    );
+    const child = spawn('pnpm', orchestratorArgs(backupPaths, summaryPath), {
+      cwd: repoRoot,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     runningOrchestratorProcess = child;
     runningOrchestratorWorkspace = trimmedWorkspace;
     orchestratorTerminationReason = null;

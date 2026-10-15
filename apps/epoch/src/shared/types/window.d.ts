@@ -152,7 +152,7 @@ declare global {
       // Stage 3 (orchestrator) -- see main.ts's epoch:startAnalysis handler.
       // Reuses PipelineLogEntry/PipelineFinishedResult since the shape is identical;
       // no need for a second pair of structurally-equal types.
-      startAnalysis: (workspace: string) => Promise<{ started: boolean }>;
+      startAnalysis: (workspace: string, labels: string[]) => Promise<{ started: boolean }>;
       // EPOCH-308
       retryRun: (backupSource: string) => Promise<{ started: boolean }>;
       // EPOCH-305

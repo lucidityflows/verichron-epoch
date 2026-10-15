@@ -89,8 +89,10 @@ docker compose -f infra/docker-compose.yml down -v && docker compose -f infra/do
 # 1. Prepare backups: hash, decrypt (prompts for the password), repair, iLEAPP
 pnpm --filter @verichron/processor dev -- --source /path/to/backups --workspace ~/verichron-workspace
 
-# 2. Register the evidence and run every stage, for every decrypted backup in the workspace
+# 2. Register the evidence and run every stage: for every prepared backup in the workspace,
+#    or for the backups named (the app's Analyze names the selected ones, EPOCH-530)
 pnpm --filter @verichron/orchestrator investigate -- --workspace ~/verichron-workspace
+pnpm --filter @verichron/orchestrator investigate -- ~/verichron-workspace/decrypted/<label>
 
 # 3. Or drive both from the desktop app
 pnpm --filter @verichron/epoch dev
