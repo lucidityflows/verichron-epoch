@@ -148,6 +148,9 @@ echo "  done  tools/ileapp/.venv"
 pnpm install --frozen-lockfile
 echo "  done  node_modules"
 
+git config core.hooksPath .githooks
+echo "  done  git hooks (.githooks)"
+
 cat <<EOF
 
 [setup] complete. Next:

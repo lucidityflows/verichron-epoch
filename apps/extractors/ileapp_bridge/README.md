@@ -46,6 +46,10 @@ untimed; a value that isn't Unix seconds gives `event_time = null`, keeps its
 raw value in `fields`, and is counted in the stage's notes (R11). No column is
 chosen or parsed by name.
 
+**Warnings (EPOCH-420).** The stage writes notes to stderr. When it succeeds,
+the orchestrator stores that stderr in the stage's `warnings`; if the stage
+fails, stderr is stored as its error message instead.
+
 **iLEAPP's output is checked, not trusted (R36, EPOCH-511).**
 
 - Every declared time before 2007-06-29 (the first iPhone) or after the run is
@@ -95,6 +99,5 @@ uv run pytest apps/extractors/ileapp_bridge
 
 **Known issues:**
 
-| Issue | Ticket |
-|---|---|
-| NUL characters and NaN values break inserts; an artifact's rows are held in memory | EPOCH-418 |
+No open issues are listed here. The previously reported NUL/NaN handling and
+bounded-memory ingestion are implemented in `lava.py` and `main.py` (EPOCH-418).
