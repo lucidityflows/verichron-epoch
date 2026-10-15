@@ -119,6 +119,17 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     }
   );
 
+  // EPOCH-519: crash logs copied again for a finished backup after a failed copy.
+  ipcMain.handle(
+    'epoch:copyDeviceCrashReports',
+    async (_event, sourceId: string, device: DeviceInfo, backupDir: string) => {
+      if (pull.running()) throw new Error('A device backup is running; wait for it to finish.');
+      const source = getDeviceBackupSource(sourceId);
+      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+      return source.copyCrashReportsAgain(device, backupDir);
+    }
+  );
+
   ipcMain.handle(
     'epoch:pullDeviceBackup',
     async (_event, sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) => {

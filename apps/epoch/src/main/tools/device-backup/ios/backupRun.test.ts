@@ -9,6 +9,8 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import {
+  backupDeviceId,
+  backupFinishedAt,
   deviceListed,
   existingBackupState,
   folderSize,
@@ -282,5 +284,27 @@ describe('deviceListed (EPOCH-507)', () => {
   it("can't tell when the tool fails any other way, or isn't there", () => {
     assert.equal(deviceListed(fakeIdeviceId('', 'something else\n', 1), 'UDID-1'), null);
     assert.equal(deviceListed(undefined, 'UDID-1'), null);
+  });
+});
+
+describe('backupFinishedAt and backupDeviceId (EPOCH-519)', () => {
+  it("reads when the backup finished from Status.plist's Date, as idevicebackup2 writes it", async () => {
+    const xml = `<plist version="1.0"><dict><key>Date</key><date>2026-10-15T02:10:33Z</date></dict></plist>`;
+    assert.equal(await backupFinishedAt(fakePlistutil(xml), tmp), '2026-10-15T02:10:33.000Z');
+    await assert.rejects(backupFinishedAt(fakePlistutil('<plist><dict/></plist>'), tmp), /no Date/);
+  });
+
+  it('reads the device from Unique Identifier or Target Identifier, never GUID', async () => {
+    const info = (keys: string) => `<plist version="1.0"><dict>${keys}</dict></plist>`;
+    const guid = '<key>GUID</key><string>BEC0B99CF1B5021D6FFB92208BC12583</string>';
+    assert.equal(
+      await backupDeviceId(fakePlistutil(info(`${guid}<key>Unique Identifier</key><string>UDID-1</string>`)), tmp),
+      'UDID-1'
+    );
+    assert.equal(
+      await backupDeviceId(fakePlistutil(info(`${guid}<key>Target Identifier</key><string>UDID-2</string>`)), tmp),
+      'UDID-2'
+    );
+    assert.equal(await backupDeviceId(fakePlistutil(info(guid)), tmp), null);
   });
 });

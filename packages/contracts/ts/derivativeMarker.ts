@@ -108,12 +108,14 @@ export type IleappParams = z.infer<typeof IleappParams>;
  * The device's crash logs, as the processor copied them into the workspace
  * (EPOCH-514): when they were copied from the device, how many files and
  * bytes, and `reports_root`, the content root of the copy (R6), hashed the
- * way a backup is. `acquired_at` is not part of the identity
- * (identityParams): the same reports copied twice are the same derivative.
+ * way a backup is. Neither time is part of the identity (identityParams):
+ * the same reports copied twice are the same derivative.
  */
 export const CrashReportsParams = z
   .object({
     acquired_at: z.iso.datetime({ offset: true }),
+    /** When the backup acquired with them finished (EPOCH-519). */
+    backup_finished_at: z.iso.datetime({ offset: true }),
     files: z.number().int().nonnegative(),
     bytes: z.number().int().nonnegative(),
     reports_root: ContentRoot,
@@ -203,7 +205,7 @@ const PRESERVED_AT = /\.corrupt-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/;
 export function identityParams(params: unknown): unknown {
   const crash = CrashReportsParams.safeParse(params);
   if (crash.success) {
-    const { acquired_at: _acquiredAt, ...identity } = crash.data;
+    const { acquired_at: _acquiredAt, backup_finished_at: _backupFinishedAt, ...identity } = crash.data;
     return identity;
   }
   const decrypt = DecryptParams.safeParse(params);

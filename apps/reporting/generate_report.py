@@ -159,6 +159,28 @@ def fetch_fact_derivatives(conn, evidence_id: str) -> list[dict]:
         return cur.fetchall()
 
 
+def copied_after_backup(params: dict) -> str:
+    """How long after its backup finished a crash-log copy was made (EPOCH-519):
+    a copy made later, after a failed one, describes the device at a later time."""
+    seconds = int(
+        (
+            datetime.fromisoformat(params["acquired_at"]) - datetime.fromisoformat(params["backup_finished_at"])
+        ).total_seconds()
+    )
+    if seconds < 0:
+        return "before the backup finished"
+    if seconds < 90:
+        return f"{seconds} s after the backup finished"
+    minutes = seconds // 60
+    if minutes < 90:
+        return f"{minutes} min after the backup finished"
+    hours, minutes = divmod(minutes, 60)
+    if hours < 48:
+        return f"{hours} h {minutes} min after the backup finished"
+    days, hours = divmod(hours, 24)
+    return f"{days} d {hours} h after the backup finished"
+
+
 def describe_derivative(d: dict) -> list[str]:
     """One line of what produced a derivative, plus any repair failures."""
     tool = d["tool"]
@@ -172,7 +194,8 @@ def describe_derivative(d: dict) -> list[str]:
     if d["kind"] == "crash_reports":
         return [
             f"- **Crash logs** (`{d['path']}`): copied from the device by {tool['name']} {tool['version']} "
-            f"on {params['acquired_at']}, and left on the device; {params['files']} file(s)"
+            f"on {params['acquired_at']}, {copied_after_backup(params)}, and left on the device; "
+            f"{params['files']} file(s)"
         ]
     repair = params["repair"]
     if repair["status"] == "skipped":
@@ -555,9 +578,11 @@ def render_coverage_section(
     for d in crash_reports or []:
         p = d["params"]
         lines.append(
-            f"Crash logs (`{d['path']}`): {p['files']} file(s) copied from the device on {p['acquired_at']}."
+            f"Crash logs (`{d['path']}`): {p['files']} file(s) copied from the device on {p['acquired_at']}, "
+            f"{copied_after_backup(p)}."
             if p["files"]
-            else f"Crash logs (`{d['path']}`): the device held none when they were copied on {p['acquired_at']}."
+            else f"Crash logs (`{d['path']}`): the device held none when they were copied on {p['acquired_at']}, "
+            f"{copied_after_backup(p)}."
         )
     if ileapp_outputs or crash_reports:
         lines.append("")

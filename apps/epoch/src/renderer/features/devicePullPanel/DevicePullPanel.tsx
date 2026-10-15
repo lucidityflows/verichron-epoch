@@ -73,6 +73,9 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
     incomplete,
     deleteIncomplete,
     deletingIncomplete,
+    crashReports,
+    copyCrashReportsAgain,
+    copyingCrashReports,
     pulledDir,
     runCompileFromSource,
     setupStatus,
@@ -638,7 +641,40 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                 <dd className="font-mono text-foreground truncate" title={pulledDir ?? destDir}>
                   {pulledDir ?? destDir}
                 </dd>
+                {crashReports && (
+                  <>
+                    <dt className="text-muted-foreground">Crash logs</dt>
+                    <dd className="text-foreground">
+                      {crashReports.outcome === 'copied'
+                        ? crashReports.files
+                          ? `${crashReports.files} file(s) copied; they are still on the device`
+                          : 'The device held none'
+                        : `Not copied: ${crashReports.error}`}
+                    </dd>
+                  </>
+                )}
               </dl>
+              {/* EPOCH-519: a failed copy can be made again now, while the
+               * device is connected, so the logs stay close in time to the backup. */}
+              {crashReports && crashReports.outcome === 'failed' && (
+                <div
+                  role="alert"
+                  className="flex items-center gap-4 bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-lg p-4 mb-4"
+                >
+                  <div className="p-2 rounded-full bg-flag/20 text-flag shrink-0">
+                    <Smartphone size="1.25rem" />
+                  </div>
+                  <p className="flex-1 min-w-0 text-data text-foreground">
+                    Look at {selectedDevice?.name ?? 'the iPhone'}: {crashReports.locked ? 'it was locked. ' : ''}Unlock
+                    it, keep it connected, then copy its crash logs again. Without them, the report says crash logs were
+                    not acquired.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={copyCrashReportsAgain} loading={copyingCrashReports}>
+                    <RefreshCw size="0.875rem" />
+                    Copy Crash Logs Again
+                  </Button>
+                </div>
+              )}
               <Button onClick={() => onBackupPulled(destDir)}>
                 Continue to Prepare Evidence
                 <ArrowRight size="1rem" />

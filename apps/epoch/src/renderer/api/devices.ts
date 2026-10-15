@@ -27,6 +27,8 @@ export const devicesApi = {
     window.epoch.listIncompleteBackups(sourceId, device, destDir),
   deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) =>
     window.epoch.deleteIncompleteBackup(sourceId, destDir, device),
+  copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string) =>
+    window.epoch.copyDeviceCrashReports(sourceId, device, backupDir),
   onDeviceBackupStats: (callback: (stats: BackupStats) => void) => window.epoch.onDeviceBackupStats(callback),
   runToolAcquisitionSteps: (steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> =>
     window.epoch.runToolAcquisitionSteps(steps, installPrefix),

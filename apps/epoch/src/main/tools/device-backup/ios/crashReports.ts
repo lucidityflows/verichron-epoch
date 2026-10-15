@@ -26,7 +26,13 @@ export const CRASH_REPORT_TIMEOUT_MS = 10 * 60_000;
 /** What the copy did, for the pull record and the user. */
 export type CrashReportCopy =
   | { outcome: 'copied'; tool_version: string; files: number; bytes: number }
-  | { outcome: 'failed'; tool_version: string | null; error: string }
+  | {
+      outcome: 'failed';
+      tool_version: string | null;
+      error: string;
+      /** The device refused because it was locked (EPOCH-519): unlocking it and copying again can succeed. */
+      locked?: boolean;
+    }
   | { outcome: 'unavailable'; error: string };
 
 export interface ToolRun {
@@ -89,11 +95,13 @@ export async function copyCrashReports(
   tool: string | undefined,
   udid: string,
   backupDir: string,
+  /** When the backup finished (its Status.plist Date), recorded with the copy (EPOCH-519). */
+  backupFinishedAt: string,
   run: RunTool = runTool,
   now: () => Date = () => new Date()
 ): Promise<CrashReportCopy> {
   try {
-    return await copy(tool, udid, backupDir, run, now);
+    return await copy(tool, udid, backupDir, backupFinishedAt, run, now);
   } catch (err) {
     return {
       outcome: 'failed',
@@ -103,10 +111,14 @@ export async function copyCrashReports(
   }
 }
 
+/** What lockdownd says when the device is locked (verified 2026-10-15, iOS 26.6.1). */
+const LOCKED = /Password protected \(-17\)/;
+
 async function copy(
   tool: string | undefined,
   udid: string,
   backupDir: string,
+  backupFinishedAt: string,
   run: RunTool,
   now: () => Date
 ): Promise<CrashReportCopy> {
@@ -130,15 +142,38 @@ async function copy(
   } catch (err) {
     return failed(`couldn't create ${dir}: ${err instanceof Error ? err.message : String(err)}`);
   }
+  // A copy that doesn't finish removes the folder it created, which holds no
+  // record and is never used, so it can be copied again (EPOCH-519).
+  const abandon = async (copyFailure: CrashReportCopy & { outcome: 'failed' }): Promise<CrashReportCopy> => {
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+      return copyFailure;
+    } catch (err) {
+      return {
+        ...copyFailure,
+        error: `${copyFailure.error}; its unfinished folder ${dir} couldn't be removed: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  };
+  const failedHere = (error: string) => abandon({ outcome: 'failed', tool_version: version, error });
 
   const acquiredAt = now().toISOString();
   const result = await run(tool, crashReportArgs(udid, dir), CRASH_REPORT_TIMEOUT_MS);
   const tail = lastLines(result.output, 5).join(' / ');
-  if (result.timedOut) return failed(`idevicecrashreport stopped after ${CRASH_REPORT_TIMEOUT_MS / 60_000} minutes`);
-  if (result.code !== 0) return failed(`idevicecrashreport exited with ${result.code ?? 'an error'}: ${tail}`);
+  if (result.timedOut)
+    return failedHere(`idevicecrashreport stopped after ${CRASH_REPORT_TIMEOUT_MS / 60_000} minutes`);
+  if (result.code !== 0 && LOCKED.test(result.output)) {
+    return abandon({
+      outcome: 'failed',
+      tool_version: version,
+      error: 'the device was locked, so it refused the copy; unlock it and copy the crash logs again',
+      locked: true,
+    });
+  }
+  if (result.code !== 0) return failedHere(`idevicecrashreport exited with ${result.code ?? 'an error'}: ${tail}`);
   // -k copies; a "Move:" line would mean a report left the device.
   if (/^Move: /m.test(result.output)) {
-    return failed('idevicecrashreport reported moving a report off the device instead of copying it');
+    return failedHere('idevicecrashreport reported moving a report off the device instead of copying it');
   }
 
   let counted: { files: number; bytes: number };
@@ -148,12 +183,28 @@ async function copy(
       tool: { name: 'idevicecrashreport', version },
       kept_on_device: true,
       acquired_at: acquiredAt,
+      backup_finished_at: backupFinishedAt,
       ...counted,
     });
     // Written last, and only for a finished copy: without it the folder is not used.
     await fs.writeFile(record, JSON.stringify(acquisition, null, 2) + '\n', { flag: 'wx' });
   } catch (err) {
-    return failed(`the copy finished, but couldn't be recorded: ${err instanceof Error ? err.message : String(err)}`);
+    return failedHere(
+      `the copy finished, but couldn't be recorded: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
   return { outcome: 'copied', tool_version: version, ...counted };
+}
+
+/**
+ * Removes a crash-log copy and its record (EPOCH-519): used when a copy made
+ * again couldn't be entered in the pull record, so no copy exists that the
+ * record doesn't account for, and the copy can be made again. The device keeps
+ * its reports (-k), so nothing is lost.
+ */
+export async function discardCrashReportsCopy(backupDir: string): Promise<void> {
+  const { dir, record } = crashReportsAcquisitionPaths(backupDir);
+  // The record first: without it, the folder is never used.
+  await fs.rm(record, { force: true });
+  await fs.rm(dir, { recursive: true, force: true });
 }
