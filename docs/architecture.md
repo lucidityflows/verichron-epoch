@@ -123,6 +123,15 @@ tool versions. The reference backup is the 77,217,764,077-byte pull above.
 | iLEAPP copies every file it reads into its output's `data/` folder, in either input mode (`FileSeekerItunes` and `FileSeekerDir` both copy), so its output is close to a third copy of the backup: 71 GB in all, 70 GB of it `data/` | `_lava_artifacts.db` 101 MB, `_HTML` 259 MB, `_TSV Exports` 194 MB | iLEAPP 24ba13da | 2026-10-13 |
 | The full run in the app, Prepare Evidence then Analyze, completes. Hashing finished at 12:31 (11,227 files); the decrypt and repair finished by 12:52, including the wait for the password (repair: 634 databases checked, 59 repaired, 0 not fully recovered, 59 originals kept); iLEAPP ran 12:52 to 13:05 (878 of 879 modules). Analyze then took 77 s: `crash` 0.6 s (no crash reports found), `ileapp_bridge` 76.6 s (114 artifact tables, 46,434 records, every unit complete), `reporting` 0.3 s; the run's state is `complete` | Decrypted copy 72 GiB, iLEAPP output 71 GiB. The CPU was held at about 600 MHz by firmware clock modulation until about 12:45, then ran at 2.2–2.4 GHz | `iphone_backup_decrypt` 0.10.0, sqlite3 3.46.1, iLEAPP 24ba13da (EPOCH-489) | 2026-10-13 |
 
+Before decrypting, Prepare Evidence checks free space on the workspace
+filesystem. The reference run used a 77,217,764,077-byte backup and produced a
+77,185,142,589-byte decrypted tree after repair, plus about 71 GB of iLEAPP
+output. The estimate reserves one backup-sized decrypted copy plus iLEAPP
+output scaled by the measured ratio (71 GB / 77,217,764,077 bytes). `fs.statfs`
+provides available bytes; a shortfall or `ENOSPC` fails the backup with the
+workspace and capacity figures, without marking the failed derivative complete
+(EPOCH-496).
+
 ## Components
 
 Each concern has exactly one owner (R2).

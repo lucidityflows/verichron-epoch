@@ -15,6 +15,12 @@ layout and the role this plays are described in
 [docs/architecture.md](../../docs/architecture.md), and the identity and markers
 in [docs/evidence-model.md](../../docs/evidence-model.md).
 
+Before decrypting a backup, the processor checks free space on the workspace
+filesystem against a backup-sized decrypted copy plus an iLEAPP margin scaled
+from the measured reference run. A shortfall refuses the backup before
+decrypt; an `ENOSPC` during a step fails that backup with the workspace and
+capacity figures. Failed derivatives are not marked complete.
+
 ## Run
 
 ```bash
