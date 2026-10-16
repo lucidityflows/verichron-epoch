@@ -19,13 +19,10 @@ describe('workspace space checks (EPOCH-496)', () => {
 
   it('refuses a backup before its processing starts and reports required and available space', async () => {
     let processingStarted = false;
-    await assert.rejects(
-      async () => {
-        await requireWorkspaceSpace('/workspace', 100, async () => 100n);
-        processingStarted = true;
-      },
-      /Prepare Evidence needs an estimated .* free in \/workspace, but only 0\.0 GB is available/
-    );
+    await assert.rejects(async () => {
+      await requireWorkspaceSpace('/workspace', 100, async () => 100n);
+      processingStarted = true;
+    }, /Prepare Evidence needs an estimated .* free in \/workspace, but only 0\.0 GB is available/);
     assert.equal(processingStarted, false);
   });
 
