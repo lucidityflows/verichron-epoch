@@ -28,6 +28,13 @@ import { repairDecrypted } from './utils/repair.js';
 import { prepareCrashReports } from './utils/crashReports.js';
 import { promptPassword } from './utils/prompt.js';
 import { writeSummary } from './utils/summary.js';
+import {
+  explainNoSpace,
+  estimatedIleappBytes,
+  isNoSpaceError,
+  requireWorkspaceBytes,
+  requireWorkspaceSpace,
+} from './utils/workspaceSpace.js';
 
 /** Recorded in each evidence sidecar. ../package.json resolves from both src/ (tsx) and dist/. */
 const TOOL_VERSION: string = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -121,7 +128,12 @@ async function runBackups(
     try {
       ({ contentRoot, totalBytes: backupBytes } = await hashBackup(cfg, name, src));
     } catch (err) {
-      console.error(`  [hash] error: ${err instanceof Error ? err.message : err}`);
+      const message = isNoSpaceError(err)
+        ? await explainNoSpace(cfg.workspace)
+        : err instanceof Error
+          ? err.message
+          : String(err);
+      console.error(`  [hash] error: ${message}`);
       failedBackups.add(name);
       continue;
     }
@@ -134,9 +146,28 @@ async function runBackups(
     // now: its marker records the content_root it came from (EPOCH-404).
     const previousDecrypt = readDecryptMarker(decDir);
     const decryptIsCurrent = previousDecrypt?.content_root === contentRoot;
+    const previousIleapp = readIleappMarker(ileDir);
+    const ileappIsCurrent =
+      previousIleapp?.content_root === contentRoot && previousIleapp.tool.version === tools.ileapp.version;
     if (!cfg.forceDecrypt && decryptIsCurrent) {
       console.log('  [decrypt] already done, skipping');
+      if (cfg.force || !ileappIsCurrent) {
+        try {
+          await requireWorkspaceBytes(cfg.workspace, estimatedIleappBytes(backupBytes));
+        } catch (err) {
+          console.error(`  [ileapp] error: ${err instanceof Error ? err.message : err}`);
+          failedBackups.add(name);
+          continue;
+        }
+      }
     } else {
+      try {
+        await requireWorkspaceSpace(cfg.workspace, backupBytes);
+      } catch (err) {
+        console.error(`  [decrypt] error: ${err instanceof Error ? err.message : err}`);
+        failedBackups.add(name);
+        continue;
+      }
       if (!decryptIsCurrent && (await pathExists(decDir))) {
         // A decrypt (and everything built on it) from a different version
         // of this backup, or with no provenance: remove it all so no stale
@@ -207,7 +238,11 @@ async function runBackups(
           if (cfg.samePass) haveCached = false;
 
           const wrongPassword = isWrongPasswordError(err);
-          const message = err instanceof Error ? err.message : String(err);
+          const message = isNoSpaceError(err)
+            ? await explainNoSpace(cfg.workspace, backupBytes)
+            : err instanceof Error
+              ? err.message
+              : String(err);
 
           if (wrongPassword && attempt < MAX_PASSWORD_ATTEMPTS) {
             continue; // loop re-prompts on the next iteration
@@ -237,7 +272,13 @@ async function runBackups(
         // The decrypt can't be attributed to a root, so it gets no marker;
         // this backup is failed and the rest still run, as with the first hash.
         console.error(
-          `  [decrypt] error: could not re-check the backup after decrypting: ${err instanceof Error ? err.message : err}`
+          `  [decrypt] error: could not re-check the backup after decrypting: ${
+            isNoSpaceError(err)
+              ? await explainNoSpace(cfg.workspace, backupBytes)
+              : err instanceof Error
+                ? err.message
+                : String(err)
+          }`
         );
         failedBackups.add(name);
         continue;
@@ -267,7 +308,12 @@ async function runBackups(
         repair = await repairDecrypted(cfg, decDir);
       } catch (err) {
         // No marker: registration refuses a decrypt whose repair never finished.
-        console.error(`  [repair] error: ${err instanceof Error ? err.message : err}`);
+        const message = isNoSpaceError(err)
+          ? await explainNoSpace(cfg.workspace, backupBytes)
+          : err instanceof Error
+            ? err.message
+            : String(err);
+        console.error(`  [repair] error: ${message}`);
         failedBackups.add(name);
         continue;
       }
@@ -287,13 +333,19 @@ async function runBackups(
         }
         repairFailuresByBackup.set(name, repair.failed_files);
       }
-      await writeFileAtomic(decMarker, renderDecryptMarker(contentRoot, tools.decrypt, { repair }));
+      try {
+        await writeFileAtomic(decMarker, renderDecryptMarker(contentRoot, tools.decrypt, { repair }));
+      } catch (err) {
+        if (!isNoSpaceError(err)) throw err;
+        console.error(`  [repair] error: ${await explainNoSpace(cfg.workspace, backupBytes)}`);
+        failedBackups.add(name);
+        continue;
+      }
     }
 
     // iLEAPP's output is current only if made from this backup's decrypt by
     // this iLEAPP commit (EPOCH-416). Otherwise it is removed and made again:
     // iLEAPP writes a fresh report folder and never updates one in place.
-    const previousIleapp = readIleappMarker(ileDir);
     const ileappStaleBecause = !previousIleapp
       ? null
       : previousIleapp.content_root !== contentRoot
@@ -337,7 +389,12 @@ async function runBackups(
             `${modules.no_files_found.length} found no files, ${modules.errors.length} errored)`
         );
       } catch (err) {
-        console.error(`  [ileapp] error: ${err instanceof Error ? err.message : err}`);
+        const message = isNoSpaceError(err)
+          ? await explainNoSpace(cfg.workspace, backupBytes)
+          : err instanceof Error
+            ? err.message
+            : String(err);
+        console.error(`  [ileapp] error: ${message}`);
         failedBackups.add(name);
       }
     }
@@ -355,7 +412,12 @@ async function runBackups(
       else if (crash.status === 'reused') console.log(`  [crash]   already copied (${crash.files} file(s)), skipping`);
       else console.log(`  [crash]   copied ${crash.files} file(s) -> crash_reports/${name}`);
     } catch (err) {
-      console.error(`  [crash] error: ${err instanceof Error ? err.message : err}`);
+      const message = isNoSpaceError(err)
+        ? await explainNoSpace(cfg.workspace, backupBytes)
+        : err instanceof Error
+          ? err.message
+          : String(err);
+      console.error(`  [crash] error: ${message}`);
       failedBackups.add(name);
     }
     console.log();

@@ -38,7 +38,7 @@ jobs:
           --health-retries 5
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       # Node, pnpm and uv at the versions pinned in mise.toml (EPOCH-458).
       - name: Install toolchain
