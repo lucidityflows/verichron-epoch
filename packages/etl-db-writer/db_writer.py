@@ -1,49 +1,49 @@
 """
 extractors/db_writer.py
- 
+
 Shared Postgres write helpers every Python extractor imports. This is the
 concrete thing that makes the extractor contract's idempotency and
 validation requirements load-bearing instead of aspirational — an
 extractor author doesn't hand-write ingest/write SQL and hope it matches
 the contract, they call these functions.
- 
+
 Owns exactly what the two shared tables need:
   - ingest()      -> a transaction that covers the ingested_files row AND the
                      forensic_records rows for one file, or neither. Units are
                      evidence-scoped (EPOCH-402): see IngestContext.
   - write_record() / write_records() -> validated insert into forensic_records
- 
+
 Deliberately does NOT own:
   - source-format parsing (each extractor's own code)
   - the `fields` sub-shape (each extractor owns and documents its own, per
     EXTRACTOR_CONTRACT.md #4)
- 
+
 Why `ingest()` is a context manager and not the old `ingest_file()`
 -------------------------------------------------------------------
 The previous API was two independent calls, each of which committed:
- 
+
     file_hash, already = ingest_file(conn, ...)   # committed here
     if already: return
     records = parse(...)                          # <-- anything failing here
     write_records(conn, run_id, file_hash, records)   # committed here
- 
+
 and dedup was keyed on the ledger row merely existing:
- 
+
     SELECT 1 FROM ingested_files WHERE file_hash = %s
     if found: skip this file entirely
- 
+
 Those two facts combine into permanent silent data loss. If anything went
 wrong between the two commits, the ledger claimed the file was ingested while
 none of its records existed, and every later run skipped it — reporting
 success — forever. In a chain-of-custody tool, evidence disappeared and
 nothing said so.
- 
-That was not a rare interruption case. All three extractors hit it on their
+
+That was not a rare interruption case. Every extractor hit it on its
 ordinary error paths: crash/main.py `continue`s when parse_ips_file fails,
-mvt_iocs `return`s when alerts.json won't parse, ileapp_bridge `return`s when
+ileapp_bridge `return`s when
 every record in an artifact fails to normalize — each after ingest_file() had
 already committed the ledger row.
- 
+
 The fix is structural rather than a rule to follow. `ingest()` owns the
 transaction: the ledger row, the raw payload, the records, and the completion
 flag all commit together or roll back together. There is no exposed call that
@@ -52,36 +52,32 @@ sequence by accident. `write_record`/`write_records` no longer commit at all
 (they are also used inside a unit), which is what the caller-owns-the-boundary
 change asks for and incidentally stops `write_record` from paying a commit per
 row.
- 
-A future TypeScript extractor uses packages-ts/etl-db-writer/dbWriter.ts, which
-mirrors this file's semantics with a callback in place of the context
-manager. It used to live under packages-ts/orchestrator/src/ alongside a
-now-deleted, never-imported IngestionOrchestrator class; moving it kept the
-one real thing in that directory and dropped the dead one, rather than
-implying the orchestrator itself depends on it (it never did — see
-main-orchestrator/main.ts, which writes nothing to Postgres directly and
-only spawns the Python extractors that do).
+
+This Python module is the sole fact writer. A future TypeScript stage that
+needs to write facts requires a separately ticketed writer implementation.
 """
- 
+
 from __future__ import annotations
- 
+
 import hashlib
+import re
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator
- 
+from typing import Any
+
 import psycopg2
 import psycopg2.extras
- 
+
 # Resolve packages-py directory
 _EXTRACTORS_DIR = Path(__file__).resolve().parent
 _PACKAGES_PY = _EXTRACTORS_DIR.parent
 sys.path.insert(0, str(_PACKAGES_PY / "contracts" / "python"))
 from normalized_record import NormalizedRecord  # noqa: E402
- 
- 
+
+
 def compute_file_hash(path: str | Path) -> str:
     """sha256 of file contents — the idempotency key for ingested_files.
     Streamed in chunks so this doesn't load a large SMS attachment or
@@ -91,46 +87,75 @@ def compute_file_hash(path: str | Path) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
- 
- 
+
+
 PAYLOAD_KINDS = ("full", "summary", "none")
 
 
 @dataclass(frozen=True)
 class IngestContext:
-    """Who an ingest is stamped with: the evidence, the derivative being read,
-    and the run doing the reading.
+    """Who an ingest is stamped with: the evidence, the input being read, the
+    run doing the reading, and the parser version doing the parsing.
+
+    The input is exactly one of a derivative of the evidence (every extractor)
+    or a registered indicator set (the indicator-match stage, EPOCH-491).
 
     Built once per extractor process from the orchestrator's CLI arguments
     (`add_context_args` / `context_from_args`) and handed to every `ingest()`
-    call. Extractor code never constructs these IDs itself, so it cannot
-    misattribute what it cannot label (R16).
+    call. Extractor code never constructs these values itself, so it cannot
+    misattribute what it cannot label (R16). The parser version comes from
+    the stage's stage.json, through the orchestrator (EPOCH-404), so there is
+    one source for it rather than a constant in each extractor (R2).
     """
 
     evidence_id: str
-    derivative_id: str
+    derivative_id: str | None
     run_id: str
+    parser_version: int
+    indicator_set_id: str | None = None
 
     def __post_init__(self) -> None:
-        for name in ("evidence_id", "derivative_id", "run_id"):
+        for name in ("evidence_id", "run_id"):
             if not getattr(self, name):
                 raise ValueError(
                     f"IngestContext.{name} is required: an ingest cannot happen before "
                     "evidence is registered (EPOCH-404's pre-flight step)"
                 )
+        if bool(self.derivative_id) == bool(self.indicator_set_id):
+            raise ValueError(
+                "IngestContext needs exactly one input: a derivative_id (the derivative read) "
+                "or an indicator_set_id (the set checked, EPOCH-491)"
+            )
+        version = self.parser_version
+        if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+            raise ValueError(f"IngestContext.parser_version must be an integer >= 1, got {version!r}")
 
 
 def add_context_args(parser) -> None:
     """The identity flags every extractor accepts from the orchestrator."""
     parser.add_argument("--run-id", required=True, help="pipeline_runs.run_id of this run")
     parser.add_argument("--evidence-id", required=True, help="evidence_items.evidence_id being processed")
+    # A stage reads one input: a derivative (its id and directory), or a
+    # registered indicator set (its id). IngestContext refuses neither or both.
+    parser.add_argument("--derivative-id", help="evidence_derivatives.derivative_id this stage reads")
     parser.add_argument(
-        "--derivative-id", required=True, help="evidence_derivatives.derivative_id this stage reads"
+        "--derivative-path",
+        help="where that derivative is: the directory the stage reads (the 'reads' kind in its stage.json)",
+    )
+    parser.add_argument("--indicator-set-id", help="indicator_sets.set_id this stage checks (EPOCH-491)")
+    parser.add_argument(
+        "--parser-version", required=True, type=int, help="this stage's parserVersion from its stage.json"
     )
 
 
 def context_from_args(args) -> IngestContext:
-    return IngestContext(evidence_id=args.evidence_id, derivative_id=args.derivative_id, run_id=args.run_id)
+    return IngestContext(
+        evidence_id=args.evidence_id,
+        derivative_id=args.derivative_id,
+        run_id=args.run_id,
+        parser_version=args.parser_version,
+        indicator_set_id=args.indicator_set_id,
+    )
 
 
 class IngestUnit:
@@ -177,8 +202,8 @@ class IngestUnit:
     def set_raw_payload(self, payload: dict[str, Any]) -> None:
         """Attach the parsed payload to the ledger row.
 
-        Extractors that can only build the payload after parsing (crash,
-        mvt_iocs) used to insert `{}`, commit, parse, then UPDATE and commit
+        Extractors that can only build the payload after parsing (crash)
+        used to insert `{}`, commit, parse, then UPDATE and commit
         again — a second window in which the ledger was wrong. Inside a unit
         this is just part of the same transaction.
         """
@@ -222,17 +247,16 @@ def ingest(
     file_path: str | Path,
     *,
     source_type: str,
-    parser_version: int,
     payload_kind: str,
     raw_payload: dict[str, Any] | None = None,
+    content_hash: str | None = None,
 ) -> Iterator[IngestUnit]:
     """
     Atomic ingest of one file: ledger row + records + completion flag, or nothing.
 
     Usage::
 
-        with ingest(conn, ctx, path, source_type=..., parser_version=PARSER_VERSION,
-                    payload_kind="full") as unit:
+        with ingest(conn, ctx, path, source_type=..., payload_kind="full") as unit:
             if unit.already_ingested:
                 pass            # dedup — this evidence's file is already complete
             else:
@@ -241,6 +265,11 @@ def ingest(
     A unit is identified by (evidence_id, file_hash, source_type,
     parser_version) (R6, R8): the same bytes under two evidence items are two
     units, and a parser_version bump is a new unit beside the old one.
+
+    `file_hash` is the file's sha256, unless the unit is one part of a file:
+    then the caller passes `content_hash`, a sha256 over that part's content,
+    and names the part in `file_path` (e.g. `_lava_artifacts.db#safarihistory`
+    for one iLEAPP artifact table, EPOCH-461).
 
     Guarantees:
 
@@ -261,14 +290,15 @@ def ingest(
     both deciding to write.
     """
     if not isinstance(ctx, IngestContext):
-        raise TypeError("ingest() needs an IngestContext (evidence_id, derivative_id, run_id)")
-    if not isinstance(parser_version, int) or isinstance(parser_version, bool) or parser_version < 1:
-        raise ValueError(f"parser_version must be an integer >= 1, got {parser_version!r}")
+        raise TypeError("ingest() needs an IngestContext (evidence_id, its input, run_id, parser_version)")
+    parser_version = ctx.parser_version
     if payload_kind not in PAYLOAD_KINDS:
         raise ValueError(f"payload_kind must be one of {PAYLOAD_KINDS}, got {payload_kind!r}")
 
     file_path = Path(file_path)
-    file_hash = compute_file_hash(file_path)
+    if content_hash is not None and not re.fullmatch(r"[0-9a-f]{64}", content_hash):
+        raise ValueError(f"content_hash must be a sha256 hex digest, got {content_hash!r}")
+    file_hash = content_hash or compute_file_hash(file_path)
     unit_key = (ctx.evidence_id, file_hash, source_type, parser_version)
 
     try:
@@ -305,12 +335,14 @@ def ingest(
             cur.execute(
                 """
                 INSERT INTO ingested_files
-                    (evidence_id, derivative_id, file_hash, source_type, parser_version,
+                    (evidence_id, derivative_id, indicator_set_id, file_hash, source_type, parser_version,
                      file_path, file_name, payload_kind, raw_payload, produced_by_runs)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, ARRAY[%s::uuid])
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, ARRAY[%s::uuid])
                 ON CONFLICT (evidence_id, file_hash, source_type, parser_version) DO UPDATE SET
                     derivative_id = CASE WHEN ingested_files.ingest_complete
                                          THEN ingested_files.derivative_id ELSE EXCLUDED.derivative_id END,
+                    indicator_set_id = CASE WHEN ingested_files.ingest_complete
+                                         THEN ingested_files.indicator_set_id ELSE EXCLUDED.indicator_set_id END,
                     file_path     = CASE WHEN ingested_files.ingest_complete
                                          THEN ingested_files.file_path     ELSE EXCLUDED.file_path     END,
                     file_name     = CASE WHEN ingested_files.ingest_complete
@@ -326,6 +358,7 @@ def ingest(
                 (
                     ctx.evidence_id,
                     ctx.derivative_id,
+                    ctx.indicator_set_id,
                     file_hash,
                     source_type,
                     parser_version,
@@ -450,8 +483,10 @@ def write_records(conn, ingest_id: int, evidence_id: str, records: list[Normaliz
     return len(records)
 
 
-def incomplete_ingests(conn) -> list[tuple[str, str]]:
-    """Ledger rows that were started and never finished: (file_hash, file_path).
+def incomplete_ingests(conn, evidence_id: str) -> list[tuple[str, str]]:
+    """One evidence item's ledger rows that were started and never finished:
+    (file_hash, file_path). Scoped to the evidence, so a stage reports its own
+    stranded units, not another case's (EPOCH-418).
 
     Expected to be empty in a healthy database. Non-empty means a hard kill
     mid-unit. The next run retries them; this exists so an operator can see
@@ -462,8 +497,9 @@ def incomplete_ingests(conn) -> list[tuple[str, str]]:
             """
             SELECT file_hash, file_path
             FROM ingested_files
-            WHERE NOT ingest_complete
+            WHERE NOT ingest_complete AND evidence_id = %s
             ORDER BY ingested_at, ingest_id
-            """
+            """,
+            (evidence_id,),
         )
         return [(row[0], row[1]) for row in cur.fetchall()]

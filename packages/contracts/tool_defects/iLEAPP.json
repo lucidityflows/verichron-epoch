@@ -1,0 +1,21 @@
+{
+  "tool": "iLEAPP",
+  "defects": [
+    {
+      "id": "ILEAPP-0001",
+      "found": "2026-10-14",
+      "ticket": "EPOCH-510",
+      "versions": ["2026.3.0"],
+      "module": "uberClient",
+      "targets": [
+        { "artifact": "Uber - Place Search Hits", "column": "Timestamp" },
+        { "artifact": "Uber - Cached Locations", "column": "Last hit" }
+      ],
+      "defect": "The plugin divides Uber's timestamp_ms by 1,000 before converting it, although its converter already normalizes milliseconds. Where the column holds Unix seconds, the time lands on 1970-01-20 to 1970-01-23.",
+      "evidence": "Reference backup (iPhone17,5, iOS 26.6.1; iLEAPP v2026.3.1, which reports itself as 2026.3.0): every timestamp_ms value in Uber's database.db tables hits and place has 10 digits, and the sibling artifacts Uber - Places and Uber - UR Message Locations date the same activity 2026-10-03. Code: scripts/artifacts/uberClient.py lines 410 and 447; scripts/ilapfuncs.py line 1456.",
+      "correction": { "kind": "scale", "factor": 1000, "applies_below": 100000000 },
+      "applied_from": { "stage": "ileapp_bridge", "parser_version": 5 },
+      "upstream": { "status": "not reported", "reference": null }
+    }
+  ]
+}

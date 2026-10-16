@@ -11,9 +11,9 @@ produce a complete written record or contribute nothing. One bad item is
 isolated and logged, not silently swallowed and not allowed to abort the
 rest of the run.
 
-Extractors with more than one independently-failable input (e.g.
-extractors/mvt_iocs/ processing alerts.json and timeline.csv separately,
-per EXTRACTOR_CONTRACT.md #5's multi-input rule) build one ETLRunResult
+Extractors with more than one independently-failable input (two files
+processed separately, per EXTRACTOR_CONTRACT.md #5's multi-input rule)
+build one ETLRunResult
 per input and combine them with merge() before deciding the stage's exit
 code — one missing/malformed input still doesn't block the other.
 
@@ -33,12 +33,13 @@ from typing import IO
 class ETLRunResult:
     """Accumulates per-item outcomes across one extractor stage run.
 
-    `succeeded`/`failed` count whatever unit the extractor treats as its
-    natural item of partial failure — files for crash, records for
-    mvt_iocs/ileapp_bridge. An extractor that writes many rows per item
-    should call ok() once per item, not once per row, so the printed
-    summary answers "how many things did I process" rather than "how many
-    rows exist," which is what a reader actually wants after a run.
+    `failed` counts failed items: files for crash, artifact tables for
+    ileapp_bridge. `succeeded` counts the records this run wrote
+    (EXTRACTOR_CONTRACT.md §5, EPOCH-421): every stage calls ok(n) with the
+    records a newly ingested unit wrote, so crash's one record per file adds
+    one and an empty iLEAPP table adds zero. A unit the ledger already holds
+    complete writes nothing: it adds zero, and the stage notes it as already
+    ingested, so a resumed run never reads as having lost anything.
 
     `failures` stores structured `(item_label, reason)` pairs rather than
     pre-joined strings. `fail()` renders `BaseException` arguments as
@@ -52,7 +53,7 @@ class ETLRunResult:
     failures: list[tuple[str, str]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
-    def ok(self, count: int = 1) -> "ETLRunResult":
+    def ok(self, count: int = 1) -> ETLRunResult:
         """Record `count` items that completed successfully.
 
         Rejects a negative count rather than silently letting `succeeded`
@@ -63,7 +64,7 @@ class ETLRunResult:
         self.succeeded += count
         return self
 
-    def fail(self, item_label: str, error: BaseException | str) -> "ETLRunResult":
+    def fail(self, item_label: str, error: BaseException | str) -> ETLRunResult:
         """Record one failed item. `item_label` should identify the
         specific item (filename, alert index, table name) so the printed
         error is actionable without re-running with more logging.
@@ -75,16 +76,16 @@ class ETLRunResult:
         self.failures.append((item_label, reason))
         return self
 
-    def note(self, message: str) -> "ETLRunResult":
+    def note(self, message: str) -> ETLRunResult:
         """Record an informational message that should be surfaced but
-        must NOT affect exit_code — e.g. an optional input file (like
-        mvt_iocs's alerts.json) simply wasn't present for this backup.
+        must NOT affect exit_code — e.g. an optional input file simply
+        wasn't present for this backup.
         Distinct from fail(): a note is expected-and-handled, not a
         partial failure of the stage."""
         self.notes.append(message)
         return self
 
-    def merge(self, other: "ETLRunResult") -> "ETLRunResult":
+    def merge(self, other: ETLRunResult) -> ETLRunResult:
         """Combines two independently-tracked runs into one for a single
         exit-code decision. Used when a stage processes more than one
         input file/source independently (EXTRACTOR_CONTRACT.md #5).
@@ -93,9 +94,7 @@ class ETLRunResult:
         `other` is mutated.
         """
         if not isinstance(other, ETLRunResult):
-            raise TypeError(
-                f"ETLRunResult.merge() expects another ETLRunResult, got {type(other).__name__}"
-            )
+            raise TypeError(f"ETLRunResult.merge() expects another ETLRunResult, got {type(other).__name__}")
         return ETLRunResult(
             succeeded=self.succeeded + other.succeeded,
             failed=self.failed + other.failed,
@@ -118,12 +117,12 @@ class ETLRunResult:
     # individually — a malformed 250k-row timeline.csv can fail every row.
     _MAX_ITEMIZED_FAILURES = 20
 
-    def print_summary(self, tag: str, stream: "IO[str] | None" = None) -> None:
+    def print_summary(self, tag: str, stream: IO[str] | None = None) -> None:
         """Prints the run summary and, if anything needs attention, the
         detail behind it.
 
         `tag` is the extractor's bracketed log prefix (e.g. "crash",
-        "mvt_iocs").
+        "ileapp_bridge").
 
         By default the one-line summary goes to stdout and everything
         else (notes, itemized failures) goes to stderr.

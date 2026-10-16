@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
+import { Database, FileQuestion, Filter, MousePointerClick } from 'lucide-react';
 import type { ForensicRecordRow } from '@verichron/etl-db-reader';
 import { Badge } from '../components/ui/Badge';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
+import { ViewLayout } from '../components/layout/ViewLayout';
+import { EmptyState } from '../components/ui/EmptyState';
 
 interface RecordsViewProps {
   selectedRun: boolean;
@@ -87,29 +90,37 @@ export function RecordsView({
   const columns = useMemo(buildColumns, []);
 
   return (
-    <div className="flex-1 overflow-auto p-8">
-      <h2 className="font-display text-display text-accent mb-6">Forensic Records</h2>
-
+    <ViewLayout section="records" title="Forensic Records" className="overflow-hidden">
       {selectedRun && loadedCount < totalCount && (
         // A capped list must say so (R25). Filters below apply only to the
         // loaded rows until the server-side grid lands (EPOCH-411).
-        <p className="text-data text-muted-foreground mb-4">
-          Showing the first {loadedCount.toLocaleString()} of {totalCount.toLocaleString()} records for this
-          evidence. Filters apply to the loaded records only.
+        <p className="text-data text-muted-foreground mb-4 shrink-0">
+          Showing the first {loadedCount.toLocaleString()} of {totalCount.toLocaleString()} records for this evidence.
+          Filters apply to the loaded records only.
         </p>
       )}
 
       {!selectedRun ? (
-        <p className="text-muted-foreground text-data">Select an investigation first.</p>
+        <EmptyState
+          icon={MousePointerClick}
+          title="No investigation selected"
+          detail="Select an investigation in Investigations to see its forensic records."
+        />
       ) : !evidenceRegistered ? (
-        <p className="text-muted-foreground text-data">
-          This investigation's evidence isn't registered yet, so its facts haven't been read. This is not the same as finding nothing.
-        </p>
+        <EmptyState
+          icon={FileQuestion}
+          title="Evidence not registered"
+          detail="This investigation's evidence isn't registered yet, so its facts haven't been read. This is not the same as finding nothing."
+        />
       ) : records.length === 0 && !sourceTypeFilter ? (
-        <p className="text-muted-foreground text-data">No records for this run.</p>
+        <EmptyState
+          icon={Database}
+          title="No records"
+          detail="No forensic records were found for this investigation."
+        />
       ) : (
         <>
-          <div className="flex gap-2 mb-5">
+          <div className="flex gap-2 mb-5 shrink-0">
             <button
               onClick={() => onFilterChange(null)}
               className={`px-4 py-2 rounded-md text-label font-mono transition-all ${
@@ -142,8 +153,8 @@ export function RecordsView({
             expandedId={expandedId}
             onRowClick={(row) => setExpandedId(expandedId === String(row.id) ? null : String(row.id))}
             estimateRowHeight={44}
-            className="h-[calc(100vh-20rem)] rounded-lg shadow-elevation-1"
-            emptyState={<p className="text-muted-foreground text-data">No records match this filter.</p>}
+            className="flex-1 min-h-0 rounded-lg shadow-elevation-1"
+            emptyState={<EmptyState icon={Filter} title="No records match this filter" />}
             renderExpanded={(row) => (
               <pre className="text-data font-mono text-muted-foreground whitespace-pre-wrap break-all">
                 {JSON.stringify(row.fields, null, 2)}
@@ -152,6 +163,6 @@ export function RecordsView({
           />
         </>
       )}
-    </div>
+    </ViewLayout>
   );
 }

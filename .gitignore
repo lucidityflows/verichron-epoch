@@ -5,7 +5,6 @@
 node_modules/
 jspm_packages/
 web_modules/
-ileapp_raw_output/
 scripts/fixtures/
 
 
@@ -131,3 +130,25 @@ desktop.ini
 
 # JetBrains (PyCharm, WebStorm, etc.)
 .idea/
+# ==========================================
+# Generated forensic output and stray files
+# ==========================================
+# Never committed: backups,
+# processor workspaces, iLEAPP output, and generated reports and
+# summaries. EPOCH-460 adds a pre-commit and CI guard behind these rules.
+/backups/
+/decrypted/
+/ileapp_raw_output/
+/mvt-workspace/
+/reports/
+/results/
+investigation_report.md
+analysis-summary.json
+summary.json
+summary.md
+# Editor and merge leftovers
+*.bak
+*.orig
+# Compiler output beside the contracts source; it belongs in dist/ (EPOCH-451)
+packages/contracts/ts/*.js
+packages/contracts/ts/*.d.ts

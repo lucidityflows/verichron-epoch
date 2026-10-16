@@ -7,45 +7,39 @@ Markdown artifact. This replaces the report-generation half of the original
 deep_ips_report.py — that file's PARSING logic moves to /extractors/crash,
 its RENDERING logic (and rendering for every other domain) lives here.
 
-Three things this file must always do, per the "fix, don't punish" principle
-and the correlation design in Extractor Requirements.md §7:
+Three things this file must always do, per the "fix, don't punish" principle:
   1. Query pipeline_stage_status FIRST and render an honest preface —
      which domains are present, which failed, which were never run.
-  2. Render the cross-domain correlation section SECOND, before any
-     single-domain table — it's a synthesis across everything mvt_iocs
-     flagged, not a seventh parallel section, and it's the highest-signal
-     content in the report when present.
+  2. Before any findings, say what the report shows of the evidence's facts
+     and what it leaves out (the Coverage section, EPOCH-448), then what was
+     NOT examined: every skipped stage and errored iLEAPP plugin, and
+     AI-assisted analysis, which has had no producer since EPOCH-489 and
+     returns with EPOCH-442. Indicator checks have their own section, which
+     says which set was checked and what it couldn't check (EPOCH-493).
   3. Never let a missing/failed domain silently disappear from the report.
      A failed stage gets a visible "not available" note, not omission.
+  4. State what was checked and corrected in the tools' output (R36,
+     EPOCH-511): every correction made for a registered tool defect, and
+     every event time outside the device era, kept for review.
 """
 
 import argparse
-import csv
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
-from runtime_env import fatal_if_missing_venv
 
 import psycopg2
 import psycopg2.extras
-
-# Named constant per Extractor Requirements.md §7 ("worth a --correlation-window
-# CLI flag eventually, but a sensible fixed default is fine to ship first").
-CORRELATION_WINDOW = timedelta(minutes=15)
-
-# Mirrors extractors/mvt_iocs/main.py's LOW_SIGNAL equivalent for the
-# timeline.csv *supplement* below — backup-internal bookkeeping churn that's
-# real but not semantically interesting in a correlation table, counted
-# rather than dumped line-by-line.
-LOW_SIGNAL_PLUGINS = {"Manifest"}
+from indicator_set import results_config, stale_after_days
+from runtime_env import redact_password, require_database_url
+from tool_defects import defect as registered_defect
 
 
 def fetch_stage_status(conn, run_id: str) -> list[dict]:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
-            SELECT stage_name, status, error_message, started_at, finished_at
+            SELECT stage_name, status, error_message, warnings, started_at, finished_at
             FROM pipeline_stage_status
             WHERE run_id = %s
             ORDER BY stage_name
@@ -77,185 +71,251 @@ def fetch_records_by_source_type(conn, evidence_id: str, source_type: str) -> li
         return cur.fetchall()
 
 
-def render_stage_preface(stages: list[dict]) -> list[str]:
-    """The honesty section — what's actually in this report, up front."""
+def fetch_crash_records(conn, evidence_id: str) -> list[dict]:
+    return fetch_records_by_source_type(conn, evidence_id, "crash_report")
+
+
+# The orchestrator names a stage after its directory (discovery.ts), so this
+# is the report stage's own name in pipeline_stage_status.
+REPORT_STAGE = Path(__file__).resolve().parent.name
+
+
+def render_stage_preface(stages: list[dict], run_id: str, generated: str) -> list[str]:
+    """The honesty section — what's actually in this report, up front.
+
+    The report's own stage is left out (EPOCH-499): it is still running while
+    the report is written, so its status would always read "running" in the
+    finished document. A line below the table says which run wrote it, and
+    when, instead."""
     lines = ["## Run Completeness", ""]
     lines.append("| Stage | Status | Note |")
     lines.append("| :--- | :--- | :--- |")
     for s in stages:
+        if s["stage_name"] == REPORT_STAGE:
+            continue
         status = s["status"]
         note = s["error_message"] or ""
         if status == "failed":
-            note = f"FAILED — {note}. Fix and re-run the pipeline against the same backup; already-succeeded stages will not be redone."
+            note = (
+                f"FAILED — {note}. Fix and re-run the pipeline against the same backup; "
+                "already-succeeded stages will not be redone."
+            )
         elif status == "pending":
             note = "never ran"
-        lines.append(f"| {s['stage_name']} | {status} | {note} |")
+        elif status == "succeeded" and s.get("warnings"):
+            # The stage's own notes, kept since EPOCH-420; it still succeeded.
+            lines_out = [line.strip() for line in s["warnings"].splitlines() if line.strip()]
+            note = "warnings: " + "; ".join(lines_out)
+        lines.append(f"| {s['stage_name']} | {status} | {_table_cell(note)} |")
+    lines.append("")
+    lines.append(
+        f"This report was generated by run `{run_id}` at {generated}, as the run's last stage; "
+        "the table shows the run's other stages as they stood then."
+    )
     lines.append("")
     return lines
 
 
-# --- correlation section (Extractor Requirements.md §7) ------------------
+# --- provenance (EPOCH-406) ---------------------------------------------
 
 
-def fetch_correlation_pivots(conn, evidence_id: str) -> list[dict]:
-    """Every mvt_ioc_detection / timestamp_anomaly row for this evidence — these
-    are the pivot points the correlation section builds a window around.
-    Rows with a null event_time (e.g. an untimed alert) come back too;
-    they're rendered separately since there's nothing to correlate them
-    against."""
+#: The recorded parameters the report reads from each kind of derivative.
+#: A derivative registered before one of them existed (crash logs before
+#: EPOCH-519 recorded `backup_finished_at`) is refused with a clear message,
+#: never rendered from a guess (EPOCH-531). Development data is disposable.
+REPORTED_PARAMS = {
+    "decrypted": ("repair",),
+    "ileapp_output": ("input_type", "modules"),
+    "crash_reports": ("acquired_at", "backup_finished_at", "files"),
+}
+
+
+class ReportInputError(Exception):
+    """A derivative's recorded parameters lack something the report reads."""
+
+
+def check_params(derivatives: list[dict]) -> list[dict]:
+    """The derivatives as given, once each has every parameter the report reads."""
+    for d in derivatives:
+        missing = [key for key in REPORTED_PARAMS.get(d["kind"], ()) if key not in (d["params"] or {})]
+        if missing:
+            raise ReportInputError(
+                f"the {d['kind']} derivative {d['derivative_id']} ({d['path']}) has no "
+                f"{', '.join(missing)} in its recorded parameters: it was registered before the current marker "
+                "format. Prepare this evidence again, then analyze it."
+            )
+    return derivatives
+
+
+def fetch_run_derivatives(conn, run_id: str) -> list[dict]:
+    """The derivatives this run read: its decrypt, and whatever each stage
+    read (pipeline_stage_status.derivative_id), with the provenance each was
+    registered with."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
-            SELECT id, source_type, event_time, fields
-            FROM current_forensic_records
-            WHERE evidence_id = %s AND source_type IN ('mvt_ioc_detection', 'timestamp_anomaly')
-            ORDER BY event_time NULLS LAST, id
+            SELECT d.derivative_id, d.kind, d.path, d.tool, d.params, d.provenance_key
+            FROM evidence_derivatives d
+            WHERE d.derivative_id IN (
+                SELECT derivative_id FROM pipeline_runs WHERE run_id = %s
+                UNION
+                SELECT derivative_id FROM pipeline_stage_status WHERE run_id = %s
+            )
+            ORDER BY d.kind, d.created_at
+            """,
+            (run_id, run_id),
+        )
+        return check_params(cur.fetchall())
+
+
+def fetch_fact_derivatives(conn, evidence_id: str) -> list[dict]:
+    """The derivatives behind the facts this report reads (every current fact
+    of the evidence), with how many records each contributed. These can
+    differ from the run's inputs: a file whose bytes didn't change since an
+    earlier pass keeps that pass's ingest, and its derivative."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT d.derivative_id, d.kind, d.path, d.tool, d.params, d.provenance_key,
+                   count(*) AS records
+            FROM current_forensic_records f
+            JOIN evidence_derivatives d ON d.derivative_id = f.derivative_id
+            WHERE f.evidence_id = %s
+            GROUP BY d.derivative_id
+            ORDER BY d.kind, d.created_at
             """,
             (evidence_id,),
         )
-        return cur.fetchall()
+        return check_params(cur.fetchall())
 
 
-def fetch_correlated_context(conn, evidence_id: str, event_time, exclude_id: int) -> list[dict]:
-    """Everything else known about this evidence within the
-    correlation window — across every source_type, which is the entire
-    point (crash today; safari/sms/network automatically once they land,
-    with no change needed here)."""
-    lo = event_time - CORRELATION_WINDOW
-    hi = event_time + CORRELATION_WINDOW
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT id, source_type, event_time, process_name, bundle_id, fields
-            FROM current_forensic_records
-            WHERE evidence_id = %s AND event_time BETWEEN %s AND %s AND id != %s
-            ORDER BY event_time, id
-            """,
-            (evidence_id, lo, hi, exclude_id),
-        )
-        return cur.fetchall()
-
-
-def summarize_row(row: dict) -> str:
-    st = row["source_type"]
-    fields = row.get("fields") or {}
-    if st == "safari_history":
-        return f"Safari visit: {fields.get('url', '?')}"
-    if st == "sms_attachment":
-        return f"SMS/attachment from {fields.get('sender_handle', '?')}"
-    if st == "network_usage":
-        return f"Network usage: {row.get('bundle_id') or fields.get('process_name', '?')}"
-    if st == "crash_report":
-        return f"Crash: {row.get('process_name') or 'unknown process'} ({fields.get('filename', '?')})"
-    return f"{st}: {str(fields)[:100]}"
-
-
-def parse_ts(s):
-    if not isinstance(s, str) or not s.strip():
-        return None
-    for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
-        try:
-            return datetime.strptime(s.strip(), fmt).replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-    return None
-
-
-def load_timeline_supplement(results_path: Path | None, center, window=CORRELATION_WINDOW):
-    """Supplementary, UNVALIDATED context for modules that don't have their
-    own extractor yet (today: everything except crash and mvt_iocs itself —
-    SMS, Datausage, InteractionC, etc. all still only exist in mvt's own
-    timeline.csv, not in forensic_records). Clearly separated from the
-    validated forensic_records table above — see extractors/mvt_iocs/README.md
-    'Known limitation'. Returns [] if no --results-path was given or the
-    file isn't there; this is a nice-to-have, not a requirement."""
-    if results_path is None:
-        return []
-    tpath = results_path / "timeline.csv"
-    if not tpath.exists():
-        return []
-    lo, hi = center - window, center + window
-    rows = []
-    with tpath.open(newline="", encoding="utf-8", errors="replace") as f:
-        reader = csv.reader(f)
-        next(reader, None)
-        for row in reader:
-            if len(row) < 4:
-                continue
-            ts = parse_ts(row[0])
-            if ts is None or not (lo <= ts <= hi):
-                continue
-            rows.append((ts, row[1], row[2], row[3]))
-    rows.sort(key=lambda r: r[0])
-    return rows
-
-
-def render_correlation_section(conn, evidence_id: str, results_path: Path | None) -> list[str]:
-    pivots = fetch_correlation_pivots(conn, evidence_id)
-    if not pivots:
-        return []  # nothing flagged this run — omit the section entirely, don't render an empty shell
-
-    lines = ["## ⚠ IOC Detections & Correlated Activity", ""]
-    lines.append(
-        f"Every `mvt_ioc_detection` / `timestamp_anomaly` finding for this evidence, "
-        f"with everything else in `forensic_records` within ±{int(CORRELATION_WINDOW.total_seconds() // 60)} "
-        f"minutes of it. This is what mvt-ios's own report can't show you — it flags an event in isolation; "
-        f"this section shows what else was happening around it.\n"
+def copied_after_backup(params: dict) -> str:
+    """How long after its backup finished a crash-log copy was made (EPOCH-519):
+    a copy made later, after a failed one, describes the device at a later time."""
+    seconds = int(
+        (
+            datetime.fromisoformat(params["acquired_at"]) - datetime.fromisoformat(params["backup_finished_at"])
+        ).total_seconds()
     )
+    if seconds < 0:
+        return "before the backup finished"
+    if seconds < 90:
+        return f"{seconds} s after the backup finished"
+    minutes = seconds // 60
+    if minutes < 90:
+        return f"{minutes} min after the backup finished"
+    hours, minutes = divmod(minutes, 60)
+    if hours < 48:
+        return f"{hours} h {minutes} min after the backup finished"
+    days, hours = divmod(hours, 24)
+    return f"{days} d {hours} h after the backup finished"
 
-    timed = [p for p in pivots if p["event_time"] is not None]
-    untimed = [p for p in pivots if p["event_time"] is None]
 
-    for p in timed:
-        f = p["fields"] or {}
-        ts = p["event_time"]
-        if p["source_type"] == "mvt_ioc_detection":
-            title = f"{f.get('level', '?')} — {f.get('source_module', '?')}"
-            detail = f.get("message", "")
-        else:
-            title = f"timestamp anomaly — {f.get('plugin', '?')}"
-            years = (f.get("delta_from_backup_seconds") or 0) / (365.25 * 24 * 3600)
-            detail = f"{f.get('description', '')} (+{years:.1f} yr after backup)"
-
-        lines.append(f"### `{ts.isoformat()}` — {title}")
-        lines.append(f"> {detail}\n")
-
-        context = fetch_correlated_context(conn, evidence_id, ts, p["id"])
-        supplement = load_timeline_supplement(results_path, ts)
-        supplement_lines, churn = [], {}
-        for sts, plugin, event, desc in supplement:
-            if plugin in LOW_SIGNAL_PLUGINS:
-                churn[plugin] = churn.get(plugin, 0) + 1
-                continue
-            supplement_lines.append((sts, plugin, event, desc))
-
-        if context or supplement_lines:
-            lines.append(f"**Correlated activity ({len(context)} validated, {len(supplement_lines)} supplementary):**\n")
-            lines.append("| Time | Source | Summary |")
-            lines.append("| :--- | :--- | :--- |")
-            for row in context:
-                lines.append(f"| {row['event_time'].strftime('%H:%M:%S')} | `forensic_records`/{row['source_type']} | {summarize_row(row)} |")
-            for sts, plugin, event, desc in supplement_lines:
-                d = desc.strip()
-                d = d if len(d) <= 120 else d[:119] + "…"
-                lines.append(f"| {sts.strftime('%H:%M:%S')} | timeline.csv/{plugin} (unvalidated) | {d} |")
-            if churn:
-                omitted = ", ".join(f"{v} {k}" for k, v in churn.items())
-                lines.append("")
-                lines.append(f"_(+{sum(churn.values())} low-signal event(s) omitted from timeline.csv supplement: {omitted})_")
-        else:
-            lines.append("_No correlated activity found (no --results-path given, or nothing nearby)._")
-        lines.append("")
-
-    if untimed:
-        lines.append("**Findings with no timestamp (not correlatable):**\n")
-        for p in untimed:
-            f = p["fields"] or {}
-            lines.append(f"- {f.get('level', '?')} / {f.get('source_module', '?')}: {f.get('message', '')}")
-        lines.append("")
-
-    lines.append("---\n")
+def describe_derivative(d: dict) -> list[str]:
+    """One line of what produced a derivative, plus any repair failures."""
+    tool = d["tool"]
+    params = d["params"]
+    produced = f"produced by {tool['name']} {tool['version']}"
+    if d["kind"] == "ileapp_output":
+        return [
+            f"- **iLEAPP output** (`{d['path']}`): produced by iLEAPP {tool['version'][:12]}, "
+            f"read as `{params['input_type']}`"
+        ]
+    if d["kind"] == "crash_reports":
+        return [
+            f"- **Crash logs** (`{d['path']}`): copied from the device by {tool['name']} {tool['version']} "
+            f"on {params['acquired_at']}, {copied_after_backup(params)}, and left on the device; "
+            f"{params['files']} file(s)"
+        ]
+    repair = params["repair"]
+    if repair["status"] == "skipped":
+        repair_note = f"repair skipped ({repair['reason']})"
+    else:
+        failed = repair["failed_files"]
+        repair_note = (
+            f"repair by {repair['tool']['name']} {repair['tool']['version']}: "
+            f"{repair['scanned']} database(s) checked, {repair['repaired']} repaired, "
+            f"{len(failed)} could not be fully recovered, "
+            f"{len(repair['preserved_originals'])} original(s) preserved"
+        )
+    lines = [f"- **Decrypted copy** (`{d['path']}`): {produced}; {repair_note}"]
+    if repair["status"] == "ran":
+        for f in repair["failed_files"]:
+            lines.append(f"  - not fully recovered: `{f}` (facts from it may be incomplete)")
     return lines
+
+
+def render_provenance_section(inputs: list[dict], fact_sources: list[dict] | None) -> list[str]:
+    """What this run read, and, separately, what produced the facts shown.
+
+    The two differ whenever a fact was filed by an earlier pass: e.g. after an
+    iLEAPP update, an unchanged artifact table keeps its first ingest, so its
+    records come from the older iLEAPP output, not the one this run read.
+    `fact_sources` is None when no evidence is registered (no facts are read).
+    """
+    lines = ["## Provenance", "", "### Inputs this run read", ""]
+    if not inputs:
+        lines.append("No registered derivative was read by this run.")
+    for d in inputs:
+        lines += describe_derivative(d)
+    lines.append("")
+    if fact_sources is None:
+        return lines
+
+    lines += ["### Where the facts in this report come from", ""]
+    if not fact_sources:
+        lines += ["No facts are recorded for this evidence.", ""]
+        return lines
+    read_now = {d["derivative_id"] for d in inputs}
+    for d in fact_sources:
+        described = describe_derivative(d)
+        note = f" — {d['records']} record(s)"
+        if d["derivative_id"] not in read_now:
+            note += "; **from an earlier pass, not an input of this run**"
+        lines.append(described[0] + note)
+        lines += described[1:]
+    lines.append("")
+    return lines
+
+
+# --- what was not examined (EPOCH-489) ------------------------------------
+
+
+def render_not_examined_section(ileapp_outputs: list[dict], stages: list[dict]) -> list[str]:
+    """Checks this report cannot speak to, stated so their absence is never
+    read as a clean result: every stage this run skipped, with the reason the
+    orchestrator recorded (a disabled stage, or crash logs that were never
+    acquired, EPOCH-447), and every iLEAPP plugin that errored on the output
+    this run read (EPOCH-457), whose artifact is therefore missing."""
+    lines = ["## Not Examined", ""]
+    for s in stages:
+        if s["status"] == "skipped":
+            reason = s["error_message"] or "the orchestrator recorded no reason"
+            lines.append(f"- **The `{s['stage_name']}` stage did not run:** {_table_cell(reason)}")
+    for d in ileapp_outputs:
+        errors = d["params"]["modules"]["errors"]
+        if not errors:
+            lines.append(f"- **iLEAPP plugins** (`{d['path']}`): none errored.")
+            continue
+        lines.append(
+            f"- **iLEAPP plugins that errored** (`{d['path']}`): {len(errors)}. "
+            "Their artifacts were not produced in this output:"
+        )
+        for e in errors:
+            reason = e["error"] or "iLEAPP logged no error text"
+            lines.append(
+                f"  - `{_table_cell(e['artifact'])}` ({_table_cell(e['module'])}, "
+                f"{e['file_count']} file(s)): {_table_cell(reason)}"
+            )
+    return lines + [
+        "- **Indicators of compromise:** what was checked, against which set, and what wasn't, is "
+        "in Indicator Matches.",
+        "- **AI-assisted analysis:** not run. It returns as a separate, labelled section of leads "
+        "for the examiner to confirm or dismiss.",
+        "",
+        "---",
+        "",
+    ]
 
 
 # TODO: one render_<source_type>_section() per domain as extractors land.
@@ -264,7 +324,7 @@ def render_correlation_section(conn, evidence_id: str, results_path: Path | None
 # fields to render crash_report's section, matching the extractor contract's
 # ownership boundaries.
 def render_crash_section(records: list[dict]) -> list[str]:
-    lines = ["## Crash Reports", "", "| Incident | Process | PID | Bug Type | Event Time |", "| :--- | :--- | :--- | :--- | :--- |"]
+    lines = ["| Incident | Process | PID | Bug Type | Event Time |", "| :--- | :--- | :--- | :--- | :--- |"]
     for r in records:
         lines.append(
             f"| `{r['incident_id'] or 'N/A'}` | {r['process_name'] or 'Unknown'} "
@@ -280,9 +340,7 @@ def render_crash_section(records: list[dict]) -> list[str]:
             f"- **OS:** `{fields.get('os_version')}` | **Hardware:** `{fields.get('hardware_model')}` "
             f"| **Arch:** `{fields.get('cpu_type')}`"
         )
-        lines.append(
-            f"- **Bundle:** `{r['bundle_id']}` (`{fields.get('bundle_version')}`)"
-        )
+        lines.append(f"- **Bundle:** `{r['bundle_id']}` (`{fields.get('bundle_version')}`)")
         lines.append(
             f"- **Process:** `{r['process_name']}` (PID `{r['pid']}`), spawned by "
             f"`{fields.get('parent_proc')}` (PID `{fields.get('parent_pid')}`)"
@@ -309,15 +367,545 @@ def render_crash_section(records: list[dict]) -> list[str]:
     return lines
 
 
-RENDERERS = {
-    "crash_report": render_crash_section,
-    # "safari_history": render_safari_section,
-    # ...
-    # mvt_ioc_detection / timestamp_anomaly are intentionally NOT here —
-    # they render via render_correlation_section() above, as a synthesis
-    # section rather than a parallel per-domain table (Extractor
-    # Requirements.md §7).
+# --- iLEAPP records: a per-artifact summary (EPOCH-434) ---------------------
+
+
+def fetch_ileapp_summary(conn, evidence_id: str) -> list[dict]:
+    """One row per iLEAPP artifact: its record count, its time span, and the
+    count iLEAPP itself reported for it (EPOCH-500). iLEAPP output runs to
+    100k+ rows with different columns per artifact, so the report summarizes
+    them and never lists rows.
+
+    iLEAPP's count is the one the bridge checked the artifact's table against
+    and stored with the artifact's ingest unit (`raw_payload.record_count`),
+    read here from the database, never from the workspace (R7, R18). An
+    artifact iLEAPP reported records for but that has no facts gets a row too,
+    so it can't vanish, and so does one with no count recorded; one iLEAPP
+    reported empty gets none."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT fields->>'source_artifact' AS artifact,
+                   count(*) AS records,
+                   count(event_time) AS timed,
+                   min(event_time) AS earliest,
+                   max(event_time) AS latest
+            FROM current_forensic_records
+            WHERE evidence_id = %s AND source_type = 'ileapp_record'
+            GROUP BY fields->>'source_artifact'
+            ORDER BY count(*) DESC, fields->>'source_artifact'
+            """,
+            (evidence_id,),
+        )
+        rows = cur.fetchall()
+        # The current ileapp_record units, as current_forensic_records chooses
+        # them (latest completed parser version per file hash, R8).
+        cur.execute(
+            """
+            SELECT i.raw_payload->>'artifact' AS artifact,
+                   sum((i.raw_payload->>'record_count')::bigint) AS reported,
+                   bool_and(i.raw_payload ? 'record_count') AS all_recorded
+            FROM ingested_files i
+            WHERE i.evidence_id = %s AND i.source_type = 'ileapp_record' AND i.ingest_complete
+              AND NOT EXISTS (
+                SELECT 1 FROM ingested_files newer
+                WHERE newer.evidence_id = i.evidence_id AND newer.file_hash = i.file_hash
+                  AND newer.source_type = i.source_type AND newer.parser_version > i.parser_version
+                  AND newer.ingest_complete)
+            GROUP BY i.raw_payload->>'artifact'
+            """,
+            (evidence_id,),
+        )
+        reported = {r["artifact"]: (r["reported"] if r["all_recorded"] else None) for r in cur.fetchall()}
+    for row in rows:
+        row["reported"] = reported.get(row["artifact"])
+    seen = {row["artifact"] for row in rows}
+    for artifact, count in sorted(reported.items(), key=lambda item: str(item[0])):
+        # A named artifact with no facts gets a row unless iLEAPP reported it
+        # empty: with records reported, or with no count to check, it must not
+        # vanish. A unit naming no artifact can't be given a row.
+        if artifact is not None and artifact not in seen and count != 0:
+            rows.append(
+                {"artifact": artifact, "records": 0, "timed": 0, "earliest": None, "latest": None, "reported": count}
+            )
+    return rows
+
+
+def _table_cell(text: str) -> str:
+    """Text from tool output, made safe for a Markdown table cell: a `|` or a
+    line break would otherwise split the row."""
+    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+
+def _utc(value) -> str:
+    return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def render_ileapp_section(rows: list[dict]) -> list[str]:
+    """Each artifact's facts beside the count iLEAPP itself reported
+    (EPOCH-500): a difference means records were lost or duplicated between
+    iLEAPP's output and the database, so it is flagged, never assumed away."""
+    differ = [r for r in rows if r["reported"] is not None and r["reported"] != r["records"]]
+    unrecorded = [r for r in rows if r["reported"] is None]
+    checked = len(rows) - len(unrecorded)
+    if differ:
+        check = (
+            f"**{len(differ)} artifact(s) differ from iLEAPP's own count**, flagged below: records were lost or "
+            "duplicated between iLEAPP's output and the facts."
+        )
+    elif unrecorded:
+        # Never claim a match for an artifact that couldn't be checked (R36).
+        check = f"The {checked} checked artifact(s) match the count iLEAPP reported for each."
+    else:
+        check = "Every artifact's records match the count iLEAPP reported for it."
+    if unrecorded:
+        check += f" {len(unrecorded)} artifact(s) have no count from iLEAPP recorded, so they could not be checked."
+    lines = [
+        f"{sum(r['records'] for r in rows)} record(s) from {len(rows)} iLEAPP artifact(s), most records first. "
+        "The rows themselves are in Forensic Records, filtered to `ileapp_record` and the artifact.",
+        "",
+        check,
+        "",
+        "| Artifact | Records | iLEAPP reported | With event time | Earliest | Latest |",
+        "| :--- | ---: | ---: | ---: | :--- | :--- |",
+    ]
+    for r in rows:
+        artifact = _table_cell(r["artifact"]) if r["artifact"] else "(no artifact name)"
+        if r["reported"] is None:
+            reported = "not recorded"
+        elif r["reported"] != r["records"]:
+            reported = f"**{r['reported']} (differs)**"
+        else:
+            reported = str(r["reported"])
+        if r["timed"] == 0:
+            span = "no timeline position | "
+        else:
+            span = f"{_utc(r['earliest'])} | {_utc(r['latest'])}"
+        lines.append(f"| {artifact} | {r['records']} | {reported} | {r['timed']} | {span} |")
+    lines.append("")
+    return lines
+
+
+# --- tool checks and corrections (R36, EPOCH-511) -------------------------
+
+#: The first iPhone went on sale on this day: no device time can be earlier.
+DEVICE_ERA = datetime(2007, 6, 29, tzinfo=UTC)
+
+
+def fetch_corrections(conn, evidence_id: str) -> list[dict]:
+    """The corrections recorded on this evidence's current facts, per tool,
+    defect, artifact and column, with the corrected time span."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT r.fields->>'engine' AS tool,
+                   c->>'defect' AS defect,
+                   r.fields->>'source_artifact' AS artifact,
+                   c->>'column' AS column_name,
+                   count(*) AS records,
+                   min(r.event_time) AS earliest,
+                   max(r.event_time) AS latest
+            FROM current_forensic_records r
+            CROSS JOIN LATERAL jsonb_array_elements(r.fields->'corrections') c
+            WHERE r.evidence_id = %s AND jsonb_typeof(r.fields->'corrections') = 'array'
+            GROUP BY 1, 2, 3, 4
+            ORDER BY 2, 3, 4
+            """,
+            (evidence_id,),
+        )
+        return cur.fetchall()
+
+
+def fetch_time_review(conn, evidence_id: str) -> list[dict]:
+    """The declared times a stage flagged on this evidence's current facts as
+    outside the device era (`fields.time_review`), per artifact, column and
+    check. Every declared time column is covered, not only event_time."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT r.fields->>'source_artifact' AS artifact,
+                   t->>'column' AS column_name,
+                   t->>'check' AS check_name,
+                   count(*) AS records,
+                   min((t->>'time')::timestamptz) AS earliest,
+                   max((t->>'time')::timestamptz) AS latest
+            FROM current_forensic_records r
+            CROSS JOIN LATERAL jsonb_array_elements(r.fields->'time_review') t
+            WHERE r.evidence_id = %s AND jsonb_typeof(r.fields->'time_review') = 'array'
+            GROUP BY 1, 2, 3
+            ORDER BY 1, 2, 3
+            """,
+            (evidence_id,),
+        )
+        return cur.fetchall()
+
+
+#: How each time check reads in the report.
+TIME_CHECKS = {
+    "before_device_era": f"before {DEVICE_ERA.date()}, the first iPhone",
+    "after_run": "after the run that read it",
 }
+
+
+def _date_span(first, last) -> str:
+    return _utc(first) if first == last else f"{_utc(first)} to {_utc(last)}"
+
+
+def render_tool_checks_section(corrections: list[dict], review: list[dict]) -> list[str]:
+    lines = [
+        "## Tool Checks and Corrections",
+        "",
+        "Verichron checks the output of the tools it runs rather than trusting it (R36). "
+        "A defect confirmed against the evidence is registered and corrected; the tool's own value "
+        "is kept in each record beside the correction. Each correction below is an error that would "
+        "otherwise have reached this report.",
+        "",
+    ]
+    if corrections:
+        lines += [
+            "| Defect | Tool | Artifact | Column | Records | Corrected time | "
+            "What the tool got wrong | Reported to the tool |",
+            "| :--- | :--- | :--- | :--- | ---: | :--- | :--- | :--- |",
+        ]
+        for c in corrections:
+            entry = registered_defect(c["tool"], c["defect"])
+            span = _date_span(c["earliest"], c["latest"]) if c["earliest"] else "no time"
+            upstream = entry.upstream.status + (f" ({entry.upstream.reference})" if entry.upstream.reference else "")
+            lines.append(
+                f"| {c['defect']} ({entry.ticket}) | {_table_cell(c['tool'])} {_table_cell(', '.join(entry.versions))} "
+                f"| {_table_cell(c['artifact'])} | {_table_cell(c['column_name'])} | {c['records']} | {span} "
+                f"| {_table_cell(entry.defect)} Corrected to within {entry.correction.factor:,} of the column's unit "
+                f"(seconds, for a time). | {upstream} |"
+            )
+        lines.append("")
+    else:
+        lines += ["No registered tool defect applied to this evidence, so nothing was corrected.", ""]
+
+    lines += [
+        f"**Times for review.** A time before {DEVICE_ERA.date()} (the first iPhone) is not one a device can "
+        "have recorded; one after the run that read it can be genuine, such as a scheduled event. Every declared "
+        "time column is checked, and these times are kept as the tool gives them.",
+        "",
+    ]
+    if review:
+        lines += [
+            "| Artifact | Column | Check | Records | Times |",
+            "| :--- | :--- | :--- | ---: | :--- |",
+        ]
+        for r in review:
+            lines.append(
+                f"| {_table_cell(r['artifact'] or '(no artifact name)')} | {_table_cell(r['column_name'])} "
+                f"| {TIME_CHECKS.get(r['check_name'], _table_cell(r['check_name']))} | {r['records']} "
+                f"| {_date_span(r['earliest'], r['latest'])} |"
+            )
+        lines.append("")
+    else:
+        lines += ["No checked time falls outside that range.", ""]
+    lines += ["---", ""]
+    return lines
+
+
+# Each fact type the report shows: its section's heading, how to read its
+# facts, and how to render them. The coverage table reads the same mapping,
+# so a type is listed as shown exactly when a section exists for it
+# (EPOCH-448).
+RENDERERS = {
+    "crash_report": ("Crash Reports", fetch_crash_records, render_crash_section),
+    "ileapp_record": ("iLEAPP Records by Artifact", fetch_ileapp_summary, render_ileapp_section),
+    # "safari_history": ("Safari History", fetch_..., render_...),
+}
+
+
+# --- indicator matches (EPOCH-491, EPOCH-493) -------------------------------
+
+INDICATOR_SECTION = "Indicator Matches"
+INDICATOR_STAGE = "indicator_match"
+#: Always stated, whatever the result; shared with the app (indicator_results.json).
+INDICATOR_LIMIT = results_config()["limit"]
+NOTHING_CHECKED = results_config()["nothing_checked"]
+
+#: Where each fact type is shown. Indicator matches have their own section,
+#: which is per check rather than per fact type (EPOCH-493).
+SECTION_TITLES = {**{k: v[0] for k, v in RENDERERS.items()}, "indicator_match": INDICATOR_SECTION}
+TYPE_LABELS = {
+    "domain": "Domain",
+    "url": "URL",
+    "ip": "IP address",
+    "process_name": "Process name",
+    "bundle_id": "Bundle ID",
+    "email": "Email address",
+    "file_hash": "File hash (SHA-256)",
+    "file_path": "File path",
+    "file_name": "File name",
+}
+#: Why the loader didn't load an indicator (indicator_set.UnsupportedReason), in words.
+NOT_LOADED = {
+    "indicator_type": "of types no iOS backup holds (app certificates, Android properties, configuration profiles)",
+    "operator": "using operators other than = and IN",
+    "comparison_and": "combining comparisons with AND",
+    "observation_and": "combining observations with AND",
+    "observation_or": "combining observations with OR",
+    "followedby": "using FOLLOWEDBY",
+    "qualifier": "using time qualifiers",
+    "object_path": "on object paths no backup supplies",
+    "pattern_type": "whose patterns aren't STIX",
+    "value": "whose values couldn't be normalized",
+    "revoked": "revoked by their publisher",
+}
+
+
+def fetch_indicator_checks(conn, evidence_id: str) -> list[dict]:
+    """Every run's indicator check of this evidence, newest first, with its
+    set, result, sources and matches. Read through the views the app reads
+    too (migration 0013, R27)."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT run_id, status, error_message, finished_at, indicator_set_id, set_name, set_hash,
+                   set_registered_at AS registered_at, newest_indicator, ingest_id, matches, summary
+            FROM indicator_checks
+            WHERE evidence_id = %s
+            ORDER BY finished_at DESC NULLS FIRST, run_id
+            """,
+            (evidence_id,),
+        )
+        checks = cur.fetchall()
+        for check in checks:
+            check["unit"] = (
+                {"ingest_id": check["ingest_id"], "record_count": check["matches"], "raw_payload": check["summary"]}
+                if check["ingest_id"] is not None
+                else None
+            )
+            check["sources"] = []
+            check["matches"] = []
+            if check["indicator_set_id"] is None:
+                continue
+            cur.execute(
+                """
+                SELECT source_repository, source_commit, licence, redistributable, files, downloaded_on
+                FROM indicator_set_sources WHERE set_id = %s
+                ORDER BY source_repository NULLS LAST, source_commit, licence
+                """,
+                (check["indicator_set_id"],),
+            )
+            check["sources"] = cur.fetchall()
+            if check["unit"] is not None:
+                cur.execute(
+                    "SELECT event_time, fields FROM forensic_records WHERE ingest_id = %s ORDER BY event_time, id",
+                    (check["unit"]["ingest_id"],),
+                )
+                check["matches"] = cur.fetchall()
+    return checks
+
+
+def _day(value) -> str:
+    return value.astimezone(UTC).strftime("%Y-%m-%d")
+
+
+def _set_line(check: dict, stale_days: int) -> str:
+    """The set, when it was fetched or registered, and how old its newest indicator was when checked."""
+    downloaded = [s["downloaded_on"] for s in check["sources"] if s["downloaded_on"] is not None]
+    when = f"fetched {max(downloaded).isoformat()}" if downloaded else f"registered {_day(check['registered_at'])}"
+    line = f"Set: {_table_cell(check['set_name'])}, {when} (`{check['set_hash'][:12]}`)."
+    newest = check.get("newest_indicator")
+    if newest is None:
+        return line + " It holds no indicator this check could load."
+    age = (check["finished_at"].astimezone(UTC).date() - newest.astimezone(UTC).date()).days
+    line += f" Newest indicator {_day(newest)}: {age} day(s) old when checked."
+    if age > stale_days:
+        line += f" Older than {stale_days} days when checked: indicators published since are not in it."
+    return line
+
+
+def _sources_lines(check: dict) -> list[str]:
+    """Sources and licences, generated from the set's manifest, never typed by hand."""
+    lines = ["Sources and licences:", ""]
+    for s in check["sources"]:
+        where = (
+            f"`{_table_cell(s['source_repository'])}` @ `{(s['source_commit'] or '')[:12]}`"
+            if s["source_repository"]
+            else "local files"
+        )
+        if s["licence"] == "unknown":
+            licence = "licence unknown: loaded locally; not redistributable"
+        else:
+            licence = s["licence"] + ("" if s["redistributable"] else "; not redistributable")
+        lines.append(f"- {where}, {licence}: {s['files']} file(s)")
+    return lines + [""]
+
+
+def _in_order(types: dict) -> list[tuple[str, dict]]:
+    """Types in one fixed order: the database doesn't keep a JSON object's key order."""
+    order = list(TYPE_LABELS)
+    return sorted(types.items(), key=lambda item: (order.index(item[0]) if item[0] in order else len(order), item[0]))
+
+
+def _check_body(check: dict, stale_days: int) -> list[str]:
+    status = check["status"]
+    if status == "skipped":
+        reason = check["error_message"] or "the orchestrator recorded no reason."
+        return [f"{_table_cell(reason)} {NOTHING_CHECKED}", ""]
+    if status != "succeeded":
+        detail = f": {_table_cell(check['error_message']).rstrip('.')}." if check["error_message"] else "."
+        return [f"The check did not complete ({status}){detail} {NOTHING_CHECKED}", ""]
+    unit = check["unit"]
+    if unit is None:
+        return [f"The check finished but its result is not recorded. {NOTHING_CHECKED}", ""]
+    payload = unit["raw_payload"]
+    found = unit["record_count"]
+    lines = [_set_line(check, stale_days), ""]
+    lines += [f"{found} match(es) against this set." if found else "No match against this set.", ""]
+
+    checked = {t: e for t, e in _in_order(payload["types"]) if e["status"] == "checked"}
+    if checked:
+        lines += ["| Type | In the set | Facts checked | From |", "| :--- | ---: | ---: | :--- |"]
+        for indicator_type, entry in checked.items():
+            sources = [s for s in entry["sources"] if s["values"]]
+            listed = "; ".join(f"{_table_cell(s['source'])} ({s['values']:,})" for s in sources)
+            lines.append(
+                f"| {TYPE_LABELS.get(indicator_type, indicator_type)} | {entry['indicators']:,} | "
+                f"{entry['values_checked']:,} | {len(sources)} source(s): {listed} |"
+            )
+        lines.append("")
+
+    lines += ["Not checked:", ""]
+    for indicator_type, entry in _in_order(payload["types"]):
+        label = TYPE_LABELS.get(indicator_type, indicator_type)
+        if entry["status"] == "no_source":
+            lines.append(
+                f"- **{label}** ({entry['indicators']:,}): no source in any backup. {_table_cell(entry['reason'])}"
+            )
+        elif entry["status"] == "no_facts":
+            lines.append(f"- **{label}** ({entry['indicators']:,}): no facts in this case: {entry['reason']}.")
+    not_loaded = payload.get("not_loaded") or {}
+    if not_loaded:
+        detail = "; ".join(f"{NOT_LOADED.get(reason, reason)}: {n:,}" for reason, n in sorted(not_loaded.items()))
+        lines.append(
+            f"- **Not loaded from the set:** {sum(not_loaded.values()):,} indicators. {detail[0].upper()}{detail[1:]}."
+        )
+    for reason in (payload.get("not_read") or {}).values():
+        lines.append(f"- **Not read:** {_table_cell(reason)}")
+    for error in payload.get("ileapp_plugin_errors") or []:
+        lines.append(
+            f"- **iLEAPP plugin errored:** `{_table_cell(str(error['artifact']))}` "
+            f"({_table_cell(str(error['module']))}); its records weren't checked."
+        )
+    lines.append("")
+
+    if check["matches"]:
+        lines += [
+            "| Time (UTC) | Type | Value | Campaign | Match | Fact | File |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+        ]
+        for m in check["matches"]:
+            i, f = m["fields"]["indicator"], m["fields"]["fact"]
+            mode = m["fields"]["match_mode"]
+            if i["expired"]:
+                mode += f", expired {(i['valid_until'] or '')[:10]}"
+            lines.append(
+                f"| {_utc(m['event_time']) if m['event_time'] else 'no time recorded'} "
+                f"| {TYPE_LABELS.get(i['type'], i['type'])} | `{_table_cell(i['value'])}` "
+                f"| {_table_cell(', '.join(i['campaigns']) or 'not named')} | {mode} "
+                f"| {_table_cell(f['source'])} (record {f['record_id']}) | `{_table_cell(i['source_file'])}` |"
+            )
+        lines.append("")
+    return lines + _sources_lines(check)
+
+
+def render_indicator_section(checks: list[dict], run_id: str, stale_days: int) -> list[str]:
+    """This run's indicator check, then every earlier check of the same
+    evidence, each with its own set and date and never merged (EPOCH-493).
+    Each states what wasn't checked, so "no match" never reads as a clean
+    result; no verdict word appears anywhere."""
+    lines = [f"## {INDICATOR_SECTION}", "", INDICATOR_LIMIT, ""]
+    this_run = [c for c in checks if str(c["run_id"]) == str(run_id)]
+    earlier = [c for c in checks if str(c["run_id"]) != str(run_id)]
+    if this_run:
+        check = this_run[0]
+        when = f" ({_utc(check['finished_at'])})" if check["finished_at"] else ""
+        lines += [f"### This run's check{when}", ""]
+        lines += _check_body(check, stale_days)
+    else:
+        lines += ["### This run's check", "", f"This run did not check indicators. {NOTHING_CHECKED}", ""]
+    if earlier:
+        lines += ["### Earlier checks of this evidence", ""]
+        for check in earlier:
+            when = _day(check["finished_at"]) if check["finished_at"] else "not finished"
+            if check["status"] == "succeeded" and check["unit"] is not None:
+                found = check["unit"]["record_count"]
+                result = f"{found} match(es)" if found else "no match"
+                lines.append(f"- {when} · {_table_cell(check['set_name'])} (`{check['set_hash'][:12]}`) · {result}")
+            else:
+                reason = check["error_message"] or check["status"]
+                lines.append(f"- {when} · not checked: {_table_cell(reason)}")
+        lines.append("")
+    return lines + ["---", ""]
+
+
+# --- coverage (EPOCH-448) --------------------------------------------------
+
+
+def fetch_fact_counts(conn, evidence_id: str) -> list[dict]:
+    """Every fact type recorded for this evidence, with its record count."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT source_type, count(*) AS records
+            FROM current_forensic_records
+            WHERE evidence_id = %s
+            GROUP BY source_type
+            ORDER BY source_type
+            """,
+            (evidence_id,),
+        )
+        return cur.fetchall()
+
+
+def render_coverage_section(
+    counts: list[dict], ileapp_outputs: list[dict], crash_reports: list[dict] | None = None
+) -> list[str]:
+    """What the report shows of the evidence's facts, and what it doesn't, so
+    "not shown" can never read as "not found". Also what iLEAPP's modules did
+    on the output this run read (EPOCH-457): an artifact type with no files in
+    the backup is absent, not missed; and how many crash logs were copied from
+    the device (EPOCH-514), so none copied reads as none held, not none looked
+    for."""
+    lines = [
+        "## Coverage",
+        "",
+        "Every type of fact recorded for this evidence, how many records it has, and where this report shows it.",
+        "",
+    ]
+    if not counts:
+        lines += ["No facts are recorded for this evidence.", ""]
+    else:
+        lines += ["| Fact type | Records | Shown in |", "| :--- | ---: | :--- |"]
+        for row in counts:
+            section = SECTION_TITLES.get(row["source_type"])
+            shown = f"{section} section" if section else "**not shown in this report**; view them in Forensic Records"
+            lines.append(f"| `{row['source_type']}` | {row['records']} | {shown} |")
+        lines.append(f"| **All facts** | {sum(row['records'] for row in counts)} | |")
+        lines.append("")
+    for d in ileapp_outputs:
+        m = d["params"]["modules"]
+        lines.append(
+            f"iLEAPP (`{d['path']}`) ran {m['total']} module(s): {m['complete']} completed, "
+            f"{len(m['no_files_found'])} found no files in the backup, and {len(m['errors'])} errored "
+            "(see Not Examined)."
+        )
+    for d in crash_reports or []:
+        p = d["params"]
+        lines.append(
+            f"Crash logs (`{d['path']}`): {p['files']} file(s) copied from the device on {p['acquired_at']}, "
+            f"{copied_after_backup(p)}."
+            if p["files"]
+            else f"Crash logs (`{d['path']}`): the device held none when they were copied on {p['acquired_at']}, "
+            f"{copied_after_backup(p)}."
+        )
+    if ileapp_outputs or crash_reports:
+        lines.append("")
+    lines += ["---", ""]
+    return lines
 
 
 def fetch_run_evidence(conn, run_id: str) -> str | None:
@@ -328,9 +916,7 @@ def fetch_run_evidence(conn, run_id: str) -> str | None:
     return str(row[0]) if row and row[0] is not None else None
 
 
-def generate_report(
-    conn, run_id: str, evidence_id: str | None, output_path: str, results_path: str | None
-) -> None:
+def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str) -> None:
     """Stage status is this run's own (a run's outcome is about the run);
     every fact is the evidence's, whichever run produced it (R7).
 
@@ -340,7 +926,7 @@ def generate_report(
     """
     if evidence_id is None:
         evidence_id = fetch_run_evidence(conn, run_id)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     stages = fetch_stage_status(conn, run_id)
 
     lines = [
@@ -352,7 +938,13 @@ def generate_report(
         "---",
         "",
     ]
-    lines += render_stage_preface(stages)
+    lines += render_stage_preface(stages, run_id, timestamp)
+    inputs = fetch_run_derivatives(conn, run_id)
+    ileapp_outputs = [d for d in inputs if d["kind"] == "ileapp_output"]
+    lines += render_provenance_section(
+        inputs,
+        fetch_fact_derivatives(conn, evidence_id) if evidence_id else None,
+    )
     lines.append("---")
     lines.append("")
 
@@ -370,13 +962,21 @@ def generate_report(
         print(f"[reporting] wrote {output_path} (no evidence registered for run {run_id})")
         return
 
-    lines += render_correlation_section(conn, evidence_id, Path(results_path) if results_path else None)
+    lines += render_coverage_section(
+        fetch_fact_counts(conn, evidence_id),
+        ileapp_outputs,
+        [d for d in inputs if d["kind"] == "crash_reports"],
+    )
+    lines += render_not_examined_section(ileapp_outputs, stages)
+    lines += render_indicator_section(fetch_indicator_checks(conn, evidence_id), run_id, stale_after_days())
+    lines += render_tool_checks_section(fetch_corrections(conn, evidence_id), fetch_time_review(conn, evidence_id))
 
-    for source_type, renderer in RENDERERS.items():
-        records = fetch_records_by_source_type(conn, evidence_id, source_type)
-        if not records:
+    for title, fetch, render in RENDERERS.values():
+        rows = fetch(conn, evidence_id)
+        if not rows:
             continue
-        lines += renderer(records)
+        lines += [f"## {title}", ""]
+        lines += render(rows)
         lines.append("---")
         lines.append("")
 
@@ -386,38 +986,24 @@ def generate_report(
     print(f"[reporting] wrote {output_path}")
 
 
-def resolve_output_path(output: str | None, results_path: str | None) -> str:
+def resolve_output_path(output: str | None, report_path: str | None) -> str:
     """
-    A bare 'investigation_report.md' default with no run/backup identity in
-    the name meant every run silently overwrote the same file, wherever the
-    orchestrator process's cwd happened to be -- there was no reliable,
-    discoverable per-run report on disk at all.
-
-    The orchestrator already derives --results-path from --backup-path for
-    every stage that can use it (see @verichron/contracts's
-    deriveResultsPath, and mvt_iocs's own resolve_results_path fallback of
-    the same logic) -- reusing that gives the report a real per-run home
-    alongside that backup's own mvt output, with no new CLI surface needed.
-
-    An explicit --output always wins, for manual/ad hoc invocation.
+    <report-path>/investigation_report.md: the orchestrator passes
+    --report-path (<workspace>/reports/<label>/, @verichron/contracts's
+    deriveReportPath) to every stage, which gives each backup's report a
+    stable home the app reads it from (EPOCH-489). An explicit --output
+    wins, for a manual run. With neither, the report is refused rather than
+    written somewhere the next run would overwrite.
     """
     if output is not None:
         return output
-    if results_path:
-        return str(Path(results_path) / "investigation_report.md")
-    print(
-        "[reporting] no --output and no --results-path given -- falling back "
-        "to 'investigation_report.md' in the current working directory. "
-        "This will be silently overwritten by the next run invoked the same "
-        "way -- pass --backup-path (so --results-path can be derived) or "
-        "--output explicitly to get a stable per-run path.",
-        file=sys.stderr,
-    )
-    return "investigation_report.md"
+    if report_path:
+        return str(Path(report_path) / "investigation_report.md")
+    raise SystemExit("[reporting] no --report-path or --output given; nowhere stable to write the report")
 
 
 def main():
-    fatal_if_missing_venv()
+    db_url = require_database_url()
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-id", required=True)
     parser.add_argument(
@@ -428,23 +1014,27 @@ def main():
     # Passed to every stage by the orchestrator; the report reads the
     # evidence's current facts, not one derivative's.
     parser.add_argument("--derivative-id", required=False)
+    parser.add_argument("--derivative-path", required=False)
     parser.add_argument("--backup-path", required=False)  # unused here, present for contract consistency
-    parser.add_argument("--results-path", required=False, help="enables the timeline.csv correlation supplement (see render_correlation_section), and is also where the report itself is written by default -- see resolve_output_path")
-    parser.add_argument("--db-url", required=True)
-    parser.add_argument("--output", default=None, help="defaults to <results-path>/investigation_report.md when --results-path is given; see resolve_output_path")
+    parser.add_argument(
+        "--report-path", required=False, help="the folder the report is written to (see resolve_output_path)"
+    )
+    parser.add_argument(
+        "--output", default=None, help="write the report here instead of <report-path>/investigation_report.md"
+    )
     args = parser.parse_args()
 
-    output_path = resolve_output_path(args.output, args.results_path)
+    output_path = resolve_output_path(args.output, args.report_path)
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        conn = psycopg2.connect(args.db_url)
+        conn = psycopg2.connect(db_url)
     except Exception as e:
-        print(f"[reporting] could not connect to database: {e}", file=sys.stderr)
+        print(f"[reporting] could not connect to database: {redact_password(str(e), db_url)}", file=sys.stderr)
         sys.exit(1)
 
     try:
-        generate_report(conn, args.run_id, args.evidence_id, output_path, args.results_path)
+        generate_report(conn, args.run_id, args.evidence_id, output_path)
     except Exception as e:
         print(f"[reporting] failed: {e}", file=sys.stderr)
         sys.exit(1)
@@ -453,5 +1043,4 @@ def main():
 
 
 if __name__ == "__main__":
-    fatal_if_missing_venv()
     main()

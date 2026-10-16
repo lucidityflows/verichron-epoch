@@ -1,1 +1,0 @@
-"""MVT IOCs extractor package."""

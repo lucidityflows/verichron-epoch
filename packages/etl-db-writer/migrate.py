@@ -13,7 +13,10 @@ pick it up. This script is what keeps a long-lived database in sync with
 migrations/ as the schema evolves after first boot.
 
 Usage:
-    python3 packages/etl-db-writer/migrate.py --db-url postgresql://forensics:forensics_dev_only@localhost:5432/forensics
+    uv run python packages/etl-db-writer/migrate.py
+
+The database comes from DATABASE_URL or DB_* (R28), read from the
+environment or the repo-root .env, never from the command line (R30).
 
 Tracks applied migrations in a schema_migrations table. Migrations are
 applied in filename order (hence the 0001_, 0002_ prefix convention), each
@@ -28,9 +31,10 @@ import sys
 from pathlib import Path
 
 import psycopg2
-from runtime_env import fatal_if_missing_venv, load_root_env
+from runtime_env import fatal_if_missing_venv, load_root_env, redact_password, require_database_url
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+
 
 def ensure_migrations_table(conn) -> None:
     with conn.cursor() as cur:
@@ -56,6 +60,10 @@ def _column(table: str, column: str) -> str:
     )
 
 
+def _constraint(name: str) -> str:
+    return f"SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '{name}')"
+
+
 #: For each migration, two checks: `started` is true once its FIRST object
 #: exists, `finished` once its LAST statement has run. Used only by
 #: bootstrap_if_needed(); add an entry with every new migration, and keep
@@ -76,6 +84,46 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
     "0004_evidence_read_views.sql": (
         _relation("forensic_records_history"),
         _relation("idx_forensic_evidence_source_time"),
+    ),
+    "0005_run_registration.sql": (
+        _relation("run_completeness"),
+        _relation("evidence_derivatives_identity"),
+    ),
+    "0006_stage_parser_version.sql": (
+        _column("pipeline_stage_status", "parser_version"),
+        _column("pipeline_stage_status", "parser_version"),
+    ),
+    "0007_derivative_provenance.sql": (
+        _column("evidence_derivatives", "provenance_key"),
+        _column("pipeline_stage_status", "derivative_id"),
+    ),
+    "0008_ileapp_output_derivative.sql": (
+        _constraint("evidence_derivatives_kind_known"),
+        _constraint("evidence_derivatives_kind_known"),
+    ),
+    "0009_remove_mvt_results.sql": (
+        _constraint("evidence_derivatives_kind_current"),
+        _constraint("evidence_derivatives_kind_current"),
+    ),
+    "0010_stage_warnings.sql": (
+        _column("pipeline_stage_status", "warnings"),
+        _column("pipeline_stage_status", "warnings"),
+    ),
+    "0011_crash_reports_derivative.sql": (
+        _constraint("evidence_derivatives_kind_with_crash_reports"),
+        _constraint("evidence_derivatives_kind_with_crash_reports"),
+    ),
+    "0012_indicator_sets.sql": (
+        _relation("indicator_file_contents"),
+        _relation("idx_indicators_lookup"),
+    ),
+    "0013_indicator_matching.sql": (
+        _column("indicator_sets", "name"),
+        _relation("idx_ingested_files_indicator_set"),
+    ),
+    "0014_stage_order.sql": (
+        _column("pipeline_stage_status", "stage_order"),
+        _column("pipeline_stage_status", "stage_order"),
     ),
 }
 
@@ -170,23 +218,20 @@ def apply_migration(conn, path: Path) -> None:
     sql = path.read_text()
     with conn.cursor() as cur:
         cur.execute(sql)
-        cur.execute(
-            "INSERT INTO schema_migrations (filename) VALUES (%s)", (path.name,)
-        )
+        cur.execute("INSERT INTO schema_migrations (filename) VALUES (%s)", (path.name,))
     conn.commit()
 
 
 def main() -> None:
     load_root_env()
     fatal_if_missing_venv()
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--db-url", required=True)
-    args = parser.parse_args()
+    db_url = require_database_url()
+    argparse.ArgumentParser(description="Apply pending migrations to the configured database.").parse_args()
 
     try:
-        conn = psycopg2.connect(args.db_url)
+        conn = psycopg2.connect(db_url)
     except Exception as e:
-        print(f"[migrate] could not connect to database: {e}", file=sys.stderr)
+        print(f"[migrate] could not connect to database: {redact_password(str(e), db_url)}", file=sys.stderr)
         sys.exit(1)
 
     try:

@@ -19,15 +19,15 @@ catalog:
   # (>=4.8.4 <6.1.0) hard-blocks TS7 until 7.1 ships a stable API, so we
   # want an explicit version bump here, not an implicit one via ^.
   
-  # Node/pg toolchain shared across mvt-runner, orchestrator, etl-db-writer.
+  # Node/pg toolchain shared across the TypeScript control-plane packages.
   # Was pinned to ^20.19.43 with an open question about whether it should
-  # track engines.node instead (apps/epoch and apps/mvt-runner both declare
+  # track engines.node instead (apps/epoch and apps/processor both declare
   # "engines": {"node": ">=24.0.0"} and independently override this catalog
   # entry with @types/node ^24.0.0 to match). Resolved: bump the catalog
   # itself to the 24.x line so there's one answer, not packages quietly
   # diverging from what every other consumer pins.
   '@types/node': ^24.13.3
-  '@types/pg': ^8.23.0ss
+  '@types/pg': ^8.23.0
   '@types/react': ^19.2.5
   '@types/react-dom': ^19.2.5
   '@typescript-eslint/eslint-plugin': ^8.68.0
@@ -54,7 +54,7 @@ catalog:
   "@tanstack/react-virtual": "^3.14.12"
 
   # Shared schema layer (packages/contracts) — zod4, single source of truth
-  # for every consumer (mvt-runner, orchestrator, etl-db-writer, epoch).
+  # for every consumer (processor, orchestrator, etl-db-writer, epoch).
   zod: ^4.4.3
 
 onlyBuiltDependencies:

@@ -5,8 +5,8 @@
  *   - accent   -- the primary-CTA fill used for "Prepare evidence",
  *                 "Run forensic analysis on N backups", "View investigation",
  *                 "Install with Homebrew", the password-modal "Continue".
- *   - outline  -- the surface-raised secondary treatment used for "Change",
- *                 "Check again", "Choose destination"/"Change destination".
+ *   - outline  -- the accent-tinted secondary treatment (EPOCH-506) used for
+ *                 "Check again", "Change Destination", Cancel and the like.
  *   - ghost    -- the bare-text tertiary treatment used for the advanced-
  *                 settings disclosure toggle (no background, no padding,
  *                 color-only hover). Deliberately does NOT also cover
@@ -65,8 +65,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         accent: 'bg-accent text-background shadow-elevation-2 hover:bg-accent/90 active:scale-[0.99]',
+        // A secondary action is tinted in the accent so it reads as a button on
+        // every surface tier, including the raised panels it often sits on
+        // (EPOCH-506; contrast in DESIGN.md §9).
         outline:
-          'bg-surface-raised shadow-elevation-1 hover:shadow-elevation-2 text-foreground active:scale-[0.99]',
+          'bg-accent/15 text-accent shadow-elevation-1 hover:bg-accent/25 hover:shadow-elevation-2 active:scale-[0.99]',
         ghost: 'text-muted-foreground hover:text-foreground',
         danger: 'bg-danger text-background shadow-elevation-2 hover:bg-danger/90 active:scale-[0.99]',
       },
@@ -90,10 +93,10 @@ const buttonVariants = cva(
       { variant: ['accent', 'outline', 'danger'], size: 'default', class: 'px-4 py-3' },
       { variant: ['accent', 'outline', 'danger'], size: 'sm', class: 'px-3 py-2' },
       // `tone` only applies to `outline` -- `accent`/`danger` already carry
-      // their own fixed hover color, and `ghost` has no danger call site
-      // yet. `outline` itself defaults to an accent-tinted hover.
-      { variant: 'outline', tone: 'default', class: 'hover:text-accent' },
-      { variant: 'outline', tone: 'danger', class: 'hover:text-danger' },
+      // their own fixed colour, and `ghost` has no danger call site yet.
+      // A destructive secondary action (Delete It) is tinted in the danger
+      // colour, with foreground text: danger text on the tint misses 4.5:1.
+      { variant: 'outline', tone: 'danger', class: 'bg-danger/15 text-foreground hover:bg-danger/25' },
     ],
     defaultVariants: {
       variant: 'accent',
@@ -104,8 +107,7 @@ const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   /** Shows a spinner and disables the button. Mirrors the current
    * "Prepare evidence" -> "Running..." pattern in WorkspaceView.tsx. */
   loading?: boolean;
@@ -125,7 +127,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {loading && <Loader size={size === 'sm' ? 'sm' : 'md'} />}
-        {loading ? loadingText ?? children : children}
+        {loading ? (loadingText ?? children) : children}
       </button>
     );
   }

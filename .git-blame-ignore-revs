@@ -1,0 +1,7 @@
+# Commits that only reformat code, skipped by `git blame` (docs/development.md).
+
+# Prettier reformat of the TypeScript (EPOCH-469)
+7cee858d7be6f93881c933bcf1ef3065ceab63ac
+
+# Ruff's reformat (EPOCH-459) is not listed: it merged in f30fdf8 together
+# with behaviour changes (docs/decisions.md, EPOCH-513).

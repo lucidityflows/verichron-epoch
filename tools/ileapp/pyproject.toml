@@ -1,7 +1,7 @@
 # iLEAPP's runtime, in its own pinned environment (EPOCH-458).
 #
-# The bridge runs apps/extractors/ileapp_bridge/iLEAPP/ileapp.py (a git
-# submodule, v2026.3.1) as a subprocess with tools/ileapp/.venv/bin/python;
+# The processor runs tools/ileapp/iLEAPP/ileapp.py (a git submodule,
+# v2026.3.1) as a subprocess with tools/ileapp/.venv/bin/python (EPOCH-416);
 # no workspace code imports iLEAPP. Its dependencies live here, apart from the
 # workspace, because they pin versions (e.g. packaging==24.1) that conflict with
 # mvt's.

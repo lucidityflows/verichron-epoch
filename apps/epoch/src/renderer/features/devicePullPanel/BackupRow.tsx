@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Smartphone, Circle, Loader2, CheckCircle2, XCircle, KeyRound } from 'lucide-react';
 import type { Backup } from '@verichron/contracts';
-import { STAGE_ORDER, STAGE_LABELS, type BackupProgress } from '../../libs/mvtLogParser';
+import { STAGE_ORDER, STAGE_LABELS, type BackupProgress, type StageName } from '../../../shared/prepareProgress';
+import type { PreparedBackup } from '../../../shared/types/window';
 
 interface BackupRowProps {
   backup: Backup;
@@ -17,6 +18,8 @@ interface BackupRowProps {
   // user adjust selection for the next run) without losing what happened
   // last time.
   lastResult?: 'done' | 'failed';
+  /** What the workspace records for this backup (EPOCH-497); undefined when not prepared. */
+  prepared?: PreparedBackup;
 }
 
 export function BackupRow({
@@ -27,6 +30,7 @@ export function BackupRow({
   liveProgress,
   awaitingPassword,
   lastResult,
+  prepared,
 }: BackupRowProps) {
   if (liveProgress) {
     return <LiveBackupRow backup={backup} progress={liveProgress} awaitingPassword={awaitingPassword} />;
@@ -34,8 +38,8 @@ export function BackupRow({
 
   return (
     <label
-      className={`flex items-center gap-3.5 px-4 py-3 text-sm cursor-pointer select-none transition-colors ${
-        selected ? 'bg-surface-raised/40' : 'hover:bg-surface-raised/30'
+      className={`flex items-center gap-3 px-4 py-3 text-data cursor-pointer select-none transition-colors ${
+        selected ? 'bg-accent/10' : 'hover:bg-surface'
       } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <input
@@ -45,14 +49,75 @@ export function BackupRow({
         disabled={disabled}
         className="accent-accent w-4 h-4 rounded cursor-pointer shrink-0"
       />
-      <Smartphone size="1.125rem" className="text-muted-foreground shrink-0" />
+      <Smartphone size="1.125rem" className={`shrink-0 ${selected ? 'text-accent' : 'text-muted-foreground'}`} />
       <span className="font-mono text-foreground truncate flex-1 font-medium" title={backup.path}>
         {backup.label}
       </span>
-      {lastResult === 'done' && <CheckCircle2 size="1.125rem" className="text-accent shrink-0" />}
+      <PreparedState prepared={prepared} />
       {lastResult === 'failed' && <XCircle size="1.125rem" className="text-danger shrink-0" />}
     </label>
   );
+}
+
+/** The backup's state in the workspace, in its role colour (DESIGN.md §9). */
+function PreparedState({ prepared }: { prepared?: PreparedBackup }) {
+  if (!prepared) return <span className="text-label text-muted-foreground shrink-0">Not prepared</span>;
+  const when = new Date(prepared.preparedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  if (prepared.state === 'partial') {
+    return (
+      <span className="text-label text-flag shrink-0" title={`Decrypted ${when}; iLEAPP's output is missing`}>
+        Partly prepared · prepare again
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-label text-success shrink-0">
+      <CheckCircle2 size="1rem" /> Prepared · {when}
+    </span>
+  );
+}
+
+function formatGB(bytes: number): string {
+  return `${(bytes / 1e9).toFixed(1)} GB`;
+}
+
+function formatDuration(ms: number): string {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return 'under a minute';
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+}
+
+/** The current time, every second while `active`, for the time a step has taken. */
+function useNow(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+  return now;
+}
+
+/**
+ * What the running step has done so far (EPOCH-487): bytes hashed, bytes
+ * decrypted of the backup's size, or the iLEAPP module running now, with the
+ * time the step (or module) has taken.
+ */
+function stepDetail(progress: BackupProgress, stage: StageName, now: number): string {
+  const startedAt = progress.stageStartedAt[stage];
+  const elapsed = startedAt ? formatDuration(now - startedAt) : null;
+  if (stage === 'hash' && progress.hashed) {
+    return `${formatGB(progress.hashed.bytes)} read, ${progress.hashed.files.toLocaleString()} files${elapsed ? ` · ${elapsed}` : ''}`;
+  }
+  if (stage === 'decrypt' && progress.decrypted) {
+    return `${formatGB(progress.decrypted.bytes)} of ${formatGB(progress.decrypted.total)}${elapsed ? ` · ${elapsed}` : ''}`;
+  }
+  if (stage === 'ileapp' && progress.ileappModule) {
+    const { index, total, name, startedAt: moduleStartedAt } = progress.ileappModule;
+    return `module ${index} of ${total}: ${name} · ${formatDuration(now - moduleStartedAt)} in this module`;
+  }
+  return elapsed ?? '';
 }
 
 function LiveBackupRow({
@@ -66,19 +131,30 @@ function LiveBackupRow({
 }) {
   const failedStage = STAGE_ORDER.find((s) => progress.stages[s] === 'error');
   const runningStage = STAGE_ORDER.find((s) => progress.stages[s] === 'running');
+  const now = useNow(progress.overall === 'running');
+  const detail = progress.overall === 'running' && runningStage ? stepDetail(progress, runningStage, now) : '';
+  // The decrypt's share of the backup's size, held below 100 until it is done.
+  const decryptPercent =
+    runningStage === 'decrypt' && progress.decrypted && progress.decrypted.total > 0
+      ? Math.min(99, Math.floor((progress.decrypted.bytes / progress.decrypted.total) * 100))
+      : null;
 
   let icon = <Circle size="1.125rem" className="text-muted-foreground shrink-0" />;
   let statusText = 'Waiting in queue';
   let statusClass = 'text-muted-foreground';
 
   if (progress.overall === 'running') {
-    icon = <Loader2 size="1.125rem" className="text-flag shrink-0 animate-spin" />;
-    statusText = awaitingPassword ? 'Waiting for password' : runningStage ? `${STAGE_LABELS[runningStage]}...` : 'Working...';
-    statusClass = 'text-flag';
+    icon = <Loader2 size="1.125rem" className="text-accent shrink-0 animate-spin" />;
+    statusText = awaitingPassword
+      ? 'Waiting for password'
+      : runningStage
+        ? `${STAGE_LABELS[runningStage]}…`
+        : 'Working…';
+    statusClass = awaitingPassword ? 'text-flag' : 'text-accent';
   } else if (progress.overall === 'done') {
-    icon = <CheckCircle2 size="1.125rem" className="text-accent shrink-0" />;
+    icon = <CheckCircle2 size="1.125rem" className="text-success shrink-0" />;
     statusText = 'Complete';
-    statusClass = 'text-accent';
+    statusClass = 'text-success';
   } else if (progress.overall === 'failed') {
     icon = <XCircle size="1.125rem" className="text-danger shrink-0" />;
     statusText = failedStage
@@ -89,14 +165,14 @@ function LiveBackupRow({
 
   return (
     <div
-      className={`flex items-center gap-3.5 px-4 py-3 text-sm transition-colors ${
+      className={`flex items-center gap-3 px-4 py-3 text-data transition-colors ${
         progress.overall === 'running'
-          ? 'bg-flag/5'
+          ? 'bg-accent/10'
           : progress.overall === 'done'
-          ? 'bg-accent/5'
-          : progress.overall === 'failed'
-          ? 'bg-danger/5'
-          : ''
+            ? 'bg-success/10'
+            : progress.overall === 'failed'
+              ? 'bg-danger/10'
+              : ''
       }`}
     >
       {awaitingPassword ? <KeyRound size="1.125rem" className="text-flag shrink-0 animate-bounce" /> : icon}
@@ -104,7 +180,28 @@ function LiveBackupRow({
         <div className="font-mono text-foreground truncate font-medium" title={backup.path}>
           {backup.label}
         </div>
-        <div className={`text-xs truncate mt-0.5 ${statusClass}`}>{statusText}</div>
+        <div className={`text-label truncate mt-0.5 ${statusClass}`}>
+          {statusText}
+          {detail && <span className="text-muted-foreground"> · {detail}</span>}
+        </div>
+        {decryptPercent !== null && (
+          <div className="mt-2 flex items-center gap-2">
+            <div
+              role="progressbar"
+              aria-label="Decrypted"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={decryptPercent}
+              className="h-1.5 flex-1 rounded-full bg-inset overflow-hidden"
+            >
+              <div
+                className="h-full rounded-full bg-accent transition-[width]"
+                style={{ width: `${decryptPercent}%` }}
+              />
+            </div>
+            <span className="text-label font-mono text-accent">{decryptPercent}%</span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,27 +1,8 @@
 /**
- * Postgres read helpers for TypeScript callers -- the query-side counterpart
- * to packages/etl-db-writer/dbWriter.ts.
- *
- * Why this is a separate package rather than more exports on etl-db-writer
- * ----------------------------------------------------------------------
- * etl-db-writer's own header comment stakes out a deliberately narrow scope: it
- * owns the atomic ingest boundary for ingested_files/forensic_records, and
- * nothing else. apps/orchestrator already reads pipeline_runs /
- * pipeline_stage_status directly with raw `pg` rather than going through
- * etl-db-writer, and etl-db-writer's comment calls that "the correct boundary for
- * that table pair." Folding read helpers into etl-db-writer would blur exactly
- * the line that comment was written to protect -- someone debugging a slow
- * dashboard query six months from now could reasonably start adding raw SQL
- * next to `ingest()` and nobody would notice the atomicity guarantee's
- * chokepoint had quietly grown a side door.
- *
- * This package is the query side instead: no BEGIN/COMMIT, no dedup keys, no
- * invariants to protect. Just SELECTs, given an already-open client. Every
- * function here takes a `Db` the same way etl-db-writer's do -- this package does
- * not own a Pool, does not read DB_* env vars, and does not know how its
- * caller manages connections. apps/epoch's main process owns the Pool today;
- * a future NestJS service would own a different pool with the exact same
- * query functions underneath.
+ * Read-only Postgres query helpers for TypeScript callers. This package does
+ * not own a Pool, read DB_* env vars, or manage its caller's connections.
+ * Fact ingestion is handled by the Python writer; the orchestrator owns
+ * pipeline run-state writes.
  *
  * Every table/column name below was checked against
  * packages/etl-db-writer/migrations/0001_init.sql and 0002_ingest_completion.sql
@@ -30,10 +11,10 @@
  * here:
  *   - pipeline_runs has no `created_at` column -- only `started_at` /
  *     `finished_at`. getPipelineRuns now orders by `started_at`.
- *   - The table is `pipeline_stage_status`, not `stage_runs`, its FK column
- *     is `run_id` not `pipeline_run_id`, and there is no `stage_order`
- *     column at all -- see CANONICAL_STAGE_ORDER below for how ordering is
- *     done instead.
+ *   - The table is `pipeline_stage_status`, not `stage_runs`, and its FK
+ *     column is `run_id` not `pipeline_run_id`. A run's stages are ordered
+ *     by `stage_order`, which the orchestrator records from each stage.json
+ *     (migration 0014, EPOCH-414).
  *
  * EPOCH-403: facts are read by EVIDENCE, never by run (R7). Since migration
  * 0003, forensic_records has no run_id at all; a run is an audit event and
@@ -44,6 +25,7 @@
  * apps/reporting/generate_report.py can't disagree about them (R27).
  */
 
+import { deriveReportPath } from '@verichron/contracts';
 import type { Client, Pool, PoolClient } from 'pg';
 
 type Db = Client | PoolClient | Pool;
@@ -58,6 +40,16 @@ export interface PipelineRunRow {
   derivative_id: string | null;
   contract_version: string;
   tool_versions: Record<string, string>;
+  /** From the run_completeness view: the ONE completeness predicate (R23,
+   * EPOCH-404). Read this; never re-derive it from stage rows. */
+  state: 'running' | 'incomplete' | 'complete';
+  /** The device's name, as registered with the evidence; null without evidence. */
+  device_label: string | null;
+  /** How many of the run's stages are in each status, for a one-line summary
+   * (EPOCH-430). `state` stays the verdict; never derive it from these. */
+  stage_counts: Record<StageStatus, number>;
+  /** How many of the run's stages succeeded with warnings (EPOCH-420). */
+  stages_with_warnings: number;
 }
 
 export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
@@ -65,10 +57,25 @@ export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skip
 export interface StageStatusRow {
   run_id: string;
   stage_name: string;
+  /** The stage's declared order, from its stage.json (EPOCH-414). */
+  stage_order: number;
   status: StageStatus;
   error_message: string | null;
+  /** What the stage printed while succeeding: its notes (EPOCH-420); null if nothing. */
+  warnings: string | null;
   started_at: string | null;
   finished_at: string | null;
+  /** The parser version the stage declared (migration 0006); null if none. */
+  parser_version: number | null;
+  /** The derivative the stage read (migration 0007), and what it is. */
+  derivative_id: string | null;
+  derivative_kind: string | null;
+  derivative_tool: { name: string; version: string } | null;
+  /** The completed ingest units this run labelled for that derivative, and
+   * their records: what the stage covered (EPOCH-431). A unit already
+   * ingested by an earlier run counts too, since this run saw it. */
+  units: number;
+  records: number;
 }
 
 /**
@@ -79,7 +86,8 @@ export interface ForensicRecordRow {
   id: string;
   ingest_id: string;
   evidence_id: string;
-  derivative_id: string;
+  /** Null for an indicator match, which is filed under the set it checked (migration 0013). */
+  derivative_id: string | null;
   file_hash: string;
   parser_version: number;
   incident_id: string | null;
@@ -101,10 +109,26 @@ const RECORD_COLUMNS = `id, ingest_id, evidence_id, derivative_id, file_hash, pa
  */
 export async function getPipelineRuns(client: Db, limit = 100): Promise<PipelineRunRow[]> {
   const result = await client.query<PipelineRunRow>(
-    `SELECT run_id, backup_source, started_at, finished_at, evidence_id, derivative_id,
-            contract_version, tool_versions
-       FROM pipeline_runs
-      ORDER BY started_at DESC
+    `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id,
+            r.contract_version, r.tool_versions, c.state, d.label AS device_label,
+            s.stage_counts, s.stages_with_warnings
+       FROM pipeline_runs r
+       JOIN run_completeness c USING (run_id)
+       LEFT JOIN evidence_items e ON e.evidence_id = r.evidence_id
+       LEFT JOIN devices d ON d.device_id = e.device_id
+       CROSS JOIN LATERAL (
+         SELECT jsonb_build_object(
+                  'pending', count(*) FILTER (WHERE status = 'pending')::int,
+                  'running', count(*) FILTER (WHERE status = 'running')::int,
+                  'succeeded', count(*) FILTER (WHERE status = 'succeeded')::int,
+                  'failed', count(*) FILTER (WHERE status = 'failed')::int,
+                  'skipped', count(*) FILTER (WHERE status = 'skipped')::int
+                ) AS stage_counts,
+                count(*) FILTER (WHERE warnings IS NOT NULL)::int AS stages_with_warnings
+           FROM pipeline_stage_status ps
+          WHERE ps.run_id = r.run_id
+       ) s
+      ORDER BY r.started_at DESC
       LIMIT $1`,
     [limit]
   );
@@ -125,41 +149,62 @@ export async function getRunEvidence(client: Db, runId: string): Promise<string 
 }
 
 /**
- * Canonical pipeline stage sequence, per the CREATE TABLE comment in
- * 0001_init.sql. The schema has no stage_order column -- stage sequence is
- * currently only encoded here, in application code. If this list drifts
- * from the orchestrator's actual stage sequence, or a stage is added on one
- * side and not the other, this is the file to update; there is nowhere else
- * it's defined. A `stage_order SMALLINT` column on pipeline_stage_status
- * would make this schema-enforced instead of convention-enforced -- worth
- * revisiting if this list needs to change more than once.
+ * Where the decrypted backup a run processed is now: the current path of the
+ * run's decrypted derivative, or null if the run has no registered evidence
+ * (it predates EPOCH-404) or doesn't exist. Registration updates a
+ * derivative's path when its workspace moves, so this follows a moved
+ * workspace; the run's `backup_source` keeps the path it started from.
  */
-export const CANONICAL_STAGE_ORDER = ['crash', 'safari', 'sms', 'network', 'gcloud', 'report'] as const;
+async function runDecryptedPath(client: Db, runId: string): Promise<string | null> {
+  const result = await client.query<{ path: string }>(
+    `SELECT d.path
+       FROM pipeline_runs r
+       JOIN evidence_derivatives d ON d.derivative_id = r.derivative_id
+      WHERE r.run_id = $1 AND d.kind = 'decrypted'`,
+    [runId]
+  );
+  return result.rows[0]?.path ?? null;
+}
 
 /**
- * Stage-level status rows for one pipeline run, sorted into canonical
- * pipeline order rather than execution order -- so a report view always
- * shows all configured stages in the same sequence regardless of which
- * ones have actually started yet. Stages not present in
- * CANONICAL_STAGE_ORDER sort after all known stages, in the order Postgres
- * returned them, rather than being dropped -- an unrecognized stage_name is
- * a signal this list is stale, not a reason to hide the row.
+ * Where a run's report is now: the folder the orchestrator passed every stage
+ * as `--report-path`, derived from the run's decrypt with `deriveReportPath`
+ * (<workspace>/reports/<label>/, EPOCH-489). Null if the run has no
+ * registered evidence or its decrypt is not in a workspace. The decrypt's
+ * path comes from the database, where registration keeps it current when the
+ * workspace moves; the run's `backup_source` goes stale.
+ */
+export async function getRunReportLocation(client: Db, runId: string): Promise<string | null> {
+  const decrypted = await runDecryptedPath(client, runId);
+  return decrypted ? (deriveReportPath(decrypted) ?? null) : null;
+}
+
+/**
+ * Stage-level status rows for one pipeline run, in pipeline order rather
+ * than execution order: by each stage's declared `order`, which the
+ * orchestrator records from its stage.json (`stage_order`, EPOCH-414), so a
+ * view shows every stage in the same sequence whether or not it has started.
+ * The order has one owner (R2); no list of stage names lives here.
  */
 export async function getStageStatus(client: Db, runId: string): Promise<StageStatusRow[]> {
   const result = await client.query<StageStatusRow>(
-    `SELECT run_id, stage_name, status, error_message, started_at, finished_at
-       FROM pipeline_stage_status
-      WHERE run_id = $1`,
+    `SELECT s.run_id, s.stage_name, s.stage_order, s.status, s.error_message, s.warnings, s.started_at, s.finished_at,
+            s.parser_version, s.derivative_id, d.kind AS derivative_kind, d.tool AS derivative_tool,
+            u.units, u.records
+       FROM pipeline_stage_status s
+       LEFT JOIN evidence_derivatives d ON d.derivative_id = s.derivative_id
+       CROSS JOIN LATERAL (
+         SELECT count(f.ingest_id)::int AS units, coalesce(sum(f.record_count), 0)::int AS records
+           FROM ingested_files f
+          WHERE f.derivative_id = s.derivative_id
+            AND s.run_id = ANY (f.produced_by_runs)
+            AND f.ingest_complete
+       ) u
+      WHERE s.run_id = $1
+      ORDER BY s.stage_order, s.stage_name`,
     [runId]
   );
-
-  return result.rows.sort((a, b) => {
-    const orderA = CANONICAL_STAGE_ORDER.indexOf(a.stage_name as (typeof CANONICAL_STAGE_ORDER)[number]);
-    const orderB = CANONICAL_STAGE_ORDER.indexOf(b.stage_name as (typeof CANONICAL_STAGE_ORDER)[number]);
-    const rankA = orderA === -1 ? CANONICAL_STAGE_ORDER.length : orderA;
-    const rankB = orderB === -1 ? CANONICAL_STAGE_ORDER.length : orderB;
-    return rankA - rankB;
-  });
+  return result.rows;
 }
 
 /** Sort keys a caller may ask for (R24: named, allowlisted; never raw SQL). */
@@ -206,7 +251,15 @@ export interface ForensicRecordPage {
 }
 
 const QUERY_KEYS = new Set<keyof ForensicRecordQuery>([
-  'sourceType', 'eventTimeFrom', 'eventTimeTo', 'text', 'sort', 'direction', 'history', 'limit', 'cursor',
+  'sourceType',
+  'eventTimeFrom',
+  'eventTimeTo',
+  'text',
+  'sort',
+  'direction',
+  'history',
+  'limit',
+  'cursor',
 ]);
 
 interface CursorState {
@@ -335,89 +388,116 @@ export async function getForensicRecords(
   const fetched = result.rows.filter((row) => row.id !== null);
   const pageRows = fetched.slice(0, limit);
   const last = pageRows.at(-1);
-  const nextCursor =
-    fetched.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
-  const rows = pageRows.map(
-    ({ total: _total, sort_value: _cursorOnly, ...row }) => row as ForensicRecordRow
-  );
+  const nextCursor = fetched.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
+  const rows = pageRows.map(({ total: _total, sort_value: _cursorOnly, ...row }) => row as ForensicRecordRow);
   return { rows, total, nextCursor };
 }
 
-/**
- * Correlation pivots + context, mirroring apps/reporting/generate_report.py's
- * fetch_correlation_pivots / fetch_correlated_context exactly -- same source
- * types, same window, same query shape. Two functions, not one, matching the
- * Python file's own split: pivots is cheap (one query, all of them, since a
- * run's mvt_ioc_detection + timestamp_anomaly count is small), context is
- * per-pivot and only worth fetching when a caller actually wants to expand
- * one -- fetching context for every pivot up front doesn't scale the same
- * way pivots does.
- */
+// --- indicator checks (EPOCH-491, EPOCH-493) --------------------------------
 
-export interface CorrelationPivotRow {
-  id: string;
-  source_type: string;
-  event_time: string | null;
-  fields: Record<string, unknown>;
+/** One type's line in a check's summary, as the indicator_match stage wrote it. */
+export interface IndicatorTypeSummary {
+  indicators: number;
+  status: 'checked' | 'no_facts' | 'no_source';
+  reason?: string;
+  values_checked?: number;
+  matches?: number;
+  sources?: { source: string; values: number; unreadable: number; not_email: number }[];
 }
 
-export interface CorrelatedContextRow {
-  id: string;
-  source_type: string;
-  event_time: string | null;
-  process_name: string | null;
-  bundle_id: string | null;
-  fields: Record<string, unknown>;
+export interface IndicatorCheckSummary {
+  set: { set_id: string; set_hash: string; name: string };
+  matches: number;
+  types: Record<string, IndicatorTypeSummary>;
+  not_loaded: Record<string, number>;
+  not_read: Record<string, string>;
+  ileapp_plugin_errors: { module: string | null; artifact: string | null }[];
 }
 
-/** Minutes on either side of a pivot's event_time to pull as context. Matches
- * generate_report.py's CORRELATION_WINDOW (a fixed default, not yet a CLI
- * flag there either -- see that file's own comment on why a sensible fixed
- * default shipped first). */
-export const CORRELATION_WINDOW_MINUTES = 15;
+export interface IndicatorSetSourceRow {
+  source_repository: string | null;
+  source_commit: string | null;
+  licence: string;
+  redistributable: boolean;
+  /** count(*): BIGINT, a string from the driver (R26). */
+  files: string;
+  downloaded_on: string | null;
+}
+
+export interface IndicatorMatchRow {
+  event_time: string | null;
+  fields: {
+    indicator: {
+      type: string;
+      value: string;
+      campaigns: string[];
+      expired: boolean;
+      valid_until: string | null;
+      source_file: string;
+    };
+    match_mode: string;
+    fact: { source: string; record_id: number };
+  };
+}
+
+/** One run's indicator check of the evidence, from the indicator_checks view (R27). */
+export interface IndicatorCheckRow {
+  run_id: string;
+  status: StageStatus;
+  error_message: string | null;
+  finished_at: string | null;
+  indicator_set_id: string | null;
+  set_name: string | null;
+  set_hash: string | null;
+  set_registered_at: string | null;
+  newest_indicator: string | null;
+  /** The completed unit's record count; null when the check produced no unit. */
+  matches: number | null;
+  summary: IndicatorCheckSummary | null;
+  sources: IndicatorSetSourceRow[];
+  /** The first MATCH_LIMIT matches; `matches` is the true total (R25). */
+  match_rows: IndicatorMatchRow[];
+}
+
+/** Matches returned per check; the check's `matches` says how many there are in all. */
+export const MATCH_LIMIT = 500;
 
 /**
- * Every mvt_ioc_detection / timestamp_anomaly row for an evidence item -- the pivot
- * points a correlation view builds a window around. Rows with a null
- * event_time (e.g. an untimed alert) come back too; there's nothing to
- * correlate them against, so a caller should render those separately rather
- * than pass them to getCorrelatedContext.
+ * Every run's indicator check of one evidence item, newest first, each with
+ * its set's sources and its first MATCH_LIMIT matches. The same views the
+ * report reads (migration 0013), so the two can't disagree (R27).
  */
-export async function getCorrelationPivots(client: Db, evidenceId: string): Promise<CorrelationPivotRow[]> {
-  const result = await client.query<CorrelationPivotRow>(
-    `SELECT id, source_type, event_time, fields
-       FROM current_forensic_records
-      WHERE evidence_id = $1 AND source_type IN ('mvt_ioc_detection', 'timestamp_anomaly')
-      ORDER BY event_time ASC NULLS LAST, id ASC`,
+export async function getIndicatorChecks(client: Db, evidenceId: string): Promise<IndicatorCheckRow[]> {
+  const checks = await client.query<Omit<IndicatorCheckRow, 'sources' | 'match_rows'> & { ingest_id: string | null }>(
+    `SELECT run_id, status, error_message, finished_at, indicator_set_id, set_name, set_hash,
+            set_registered_at, newest_indicator, ingest_id, matches, summary
+       FROM indicator_checks
+      WHERE evidence_id = $1
+      ORDER BY finished_at DESC NULLS FIRST, run_id`,
     [evidenceId]
   );
-  return result.rows;
-}
-
-/**
- * Everything else known about this evidence within the correlation
- * window of one pivot's event_time, across every source_type -- the entire
- * point per generate_report.py's own comment: crash today, every other
- * domain automatically once its extractor lands, no change needed here when
- * that happens. `excludeId` keeps the pivot itself out of its own context.
- */
-export async function getCorrelatedContext(
-  client: Db,
-  evidenceId: string,
-  eventTime: string,
-  excludeId: string,
-  windowMinutes: number = CORRELATION_WINDOW_MINUTES
-): Promise<CorrelatedContextRow[]> {
-  const center = new Date(eventTime);
-  const lo = new Date(center.getTime() - windowMinutes * 60_000).toISOString();
-  const hi = new Date(center.getTime() + windowMinutes * 60_000).toISOString();
-
-  const result = await client.query<CorrelatedContextRow>(
-    `SELECT id, source_type, event_time, process_name, bundle_id, fields
-       FROM current_forensic_records
-      WHERE evidence_id = $1 AND event_time BETWEEN $2 AND $3 AND id != $4
-      ORDER BY event_time ASC, id ASC`,
-    [evidenceId, lo, hi, excludeId]
-  );
-  return result.rows;
+  const out: IndicatorCheckRow[] = [];
+  for (const { ingest_id, ...check } of checks.rows) {
+    const sources = check.indicator_set_id
+      ? (
+          await client.query<IndicatorSetSourceRow>(
+            `SELECT source_repository, source_commit, licence, redistributable, files, downloaded_on
+               FROM indicator_set_sources WHERE set_id = $1
+              ORDER BY source_repository NULLS LAST, source_commit, licence`,
+            [check.indicator_set_id]
+          )
+        ).rows
+      : [];
+    const matchRows = ingest_id
+      ? (
+          await client.query<IndicatorMatchRow>(
+            `SELECT event_time, fields FROM forensic_records
+              WHERE ingest_id = $1 ORDER BY event_time, id LIMIT $2`,
+            [ingest_id, MATCH_LIMIT]
+          )
+        ).rows
+      : [];
+    out.push({ ...check, sources, match_rows: matchRows });
+  }
+  return out;
 }

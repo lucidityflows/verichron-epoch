@@ -65,7 +65,7 @@ Numbers are stable: a retired rule keeps its number.
 
 | | Rule |
 |---|---|
-| R28 | One configuration order: `DATABASE_URL`, then `DB_*`, then a dev default only under an explicit dev flag. No credential defaults in packaged code, and no database URL flag |
+| R28 | One configuration order: `DATABASE_URL`, then complete `DB_*` credentials. If neither is configured, fail clearly; there are no credential defaults and no database URL flag |
 | R29 | The orchestrator selects the interpreter and validates the environment before spawning; extractors don't police themselves |
 | R30 | Secrets travel by environment or stdin, never on the command line, and are never logged |
 | R31 | Least privilege: the UI reads through a read-only role; only run state and the ingest door can write |
@@ -78,6 +78,7 @@ Numbers are stable: a retired rule keeps its number.
 | R33 | One test body runs against both PgDouble and real Postgres; a double never certifies SQL |
 | R34 | Every mechanically checkable rule is checked in CI |
 | R35 | Every run records its provenance: contract version (schema hash), tool versions and configuration |
+| R36 | Tool output is verified, not trusted. A tool defect confirmed against the evidence is registered, corrected only through the registry (limited to the tool versions affected, with the tool's value kept and the record marked), disclosed in the report, and reported upstream |
 
 ## Deliberately not done
 
@@ -89,10 +90,7 @@ Numbers are stable: a retired rule keeps its number.
 
 ## Where the code breaks a rule today
 
-Known violations are ticketed and fixed, never waived.
+Known violations are ticketed and fixed, never waived. Resolved entries are
+removed from this current-state table; numbered rules remain stable.
 
-| Rule | Violation | Ticket |
-|---|---|---|
-| R28 | `resolve_database_url()` falls back to a hard-coded dev credential | EPOCH-424 |
-| R29 | Extractors check their own environment (`fatal_if_missing_venv()`), and the orchestrator falls back to `python3` on PATH when `.venv` is missing | EPOCH-456 |
-| R30 | The backup password and the database URL are passed on the command line | EPOCH-423 |
+No current violations are recorded.

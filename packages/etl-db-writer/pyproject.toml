@@ -16,4 +16,4 @@ dependencies = [
 verichron-contracts = { workspace = true }
 
 [tool.setuptools]
-py-modules = ["db_writer", "migrate"]
+py-modules = ["db_writer", "indicator_sets", "migrate"]

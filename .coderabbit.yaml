@@ -1,0 +1,119 @@
+# yaml-language-server: $schema=https://www.coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit pull request review. Free for public repositories.
+# Reference: https://docs.coderabbit.ai/reference/configuration
+#
+# Reviews are grounded in the repository's own rules: AGENTS.md, docs/rules.md
+# (cite rules as R<n>), docs/decisions.md and the stage contract.
+
+language: en-US
+tone_instructions: >-
+  Formal and concise. Cite repository rules as R<n> from docs/rules.md and
+  decisions from docs/decisions.md. Prefer correctness and evidence-integrity
+  findings over style.
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+  sequence_diagrams: false
+  suggested_reviewers: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    # Feature work targets dev; main (the default branch) is reviewed already.
+    base_branches:
+      - "^dev$"
+
+  path_filters:
+    - "!tools/ileapp/iLEAPP/**"
+    - "!**/pnpm-lock.yaml"
+    - "!**/uv.lock"
+    - "!**/dist/**"
+
+  path_instructions:
+    - path: "apps/extractors/**"
+      instructions: |
+        Pipeline stages (packages/contracts/EXTRACTOR_CONTRACT.md). Check that:
+        facts are written only through db_writer.ingest(), one atomic unit per
+        source file or artifact, with no commit() in the stage (R13, R15);
+        evidence, derivative, run and parser version come from the
+        orchestrator's arguments and are never invented or defaulted (R16);
+        times are UTC and timezone-aware or null, never guessed (R11); a
+        stage reads only the derivative it declares in stage.json; and a
+        change to what a stage writes bumps its parserVersion (R8).
+    - path: "apps/extractors/ileapp_bridge/**"
+      instructions: |
+        The bridge reads only _lava_artifacts.db and _lava_data.lava
+        (EPOCH-461), never exports, data/ or media/. event_time is the first
+        declared datetime column. An artifact table's unit identity is a
+        content hash over everything its records carry.
+    - path: "packages/etl-db-writer/**"
+      instructions: |
+        db_writer.py is the only fact writer. Completed units are immutable;
+        a failed unit must leave no ledger row. Check transaction boundaries
+        and rollback on every exception path.
+    - path: "packages/etl-db-writer/migrations/**"
+      instructions: |
+        Migrations are append-only: an applied migration is never edited.
+        Each new migration needs an APPLIED_MARKERS entry in migrate.py.
+        Development data is disposable, so no backfills or compatibility
+        paths; prefer single statements that cannot leave a half-applied
+        constraint.
+    - path: "apps/processor/**"
+      instructions: |
+        The processor produces derivatives and never touches the database.
+        A completion marker is withdrawn before its derivative is redone and
+        written only after it completes; every marker records the evidence
+        content_root and the tool provenance. Check child-process timeouts,
+        error handling and that paths passed to subprocesses are absolute.
+    - path: "apps/orchestrator/**"
+      instructions: |
+        Registration happens before any run row exists and refuses anything
+        unverifiable (EPOCH-404). Run completeness comes only from the
+        run_completeness view (R23). Stages receive explicit paths (R18).
+    - path: "apps/epoch/**"
+      instructions: |
+        UI work follows apps/epoch/DESIGN.md. The renderer never sees a raw
+        device UDID. TypeScript runs the control plane; it does not write
+        facts.
+    - path: "packages/contracts/**"
+      instructions: |
+        Contracts are the single source for schemas, markers and path
+        helpers (R2). TypeScript and Python mirrors must stay in parity.
+    - path: "docs/**"
+      instructions: |
+        Public documentation: formal, professional phrasing. docs/decisions.md
+        is append-only; amendments are added, earlier entries kept verbatim.
+        Each concept is explained once and linked elsewhere.
+    - path: "**/*test*"
+      instructions: |
+        Database behavior must be tested on the real-Postgres tier as well as
+        the test double. A regression test should fail on the code it
+        guards. Flag tests that pass for the wrong reason.
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "docs/rules.md"
+      - "docs/decisions.md"
+      - "docs/evidence-model.md"
+      - "docs/architecture.md"
+      - "packages/contracts/EXTRACTOR_CONTRACT.md"
+      - files: "apps/epoch/DESIGN.md"
+        applyTo: "apps/epoch/**"
+  # Never connected: the Linear workspace is private and this repository is
+  # public, so ticket content must not reach public review comments. The
+  # integration also needs a paid CodeRabbit plan. Reviews get ticket context
+  # from the PR description ("Resolves EPOCH-<n>") instead.
+  linear:
+    usage: disabled
+
+chat:
+  auto_reply: true

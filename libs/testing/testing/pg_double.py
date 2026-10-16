@@ -39,6 +39,7 @@ import re
 import sqlite3
 from typing import Any
 
+import psycopg2.errors
 import psycopg2.extras
 
 #: UPSERT needs 3.24, RETURNING needs 3.35. Checked explicitly so a stale
@@ -58,7 +59,9 @@ SCHEMA = """
 CREATE TABLE ingested_files (
     ingest_id        INTEGER PRIMARY KEY AUTOINCREMENT,
     evidence_id      TEXT NOT NULL,
-    derivative_id    TEXT NOT NULL,
+    derivative_id    TEXT,
+    -- 0013: a unit's input is a derivative or an indicator set, never both.
+    indicator_set_id TEXT,
     file_hash        TEXT NOT NULL,
     source_type      TEXT NOT NULL,
     parser_version   INTEGER NOT NULL CHECK (parser_version >= 1),
@@ -74,6 +77,7 @@ CREATE TABLE ingested_files (
     completed_at     TEXT,
     UNIQUE (evidence_id, file_hash, source_type, parser_version),
     UNIQUE (ingest_id, evidence_id),
+    CHECK ((derivative_id IS NULL) <> (indicator_set_id IS NULL)),
     CHECK (
         (ingest_complete = 1 AND record_count IS NOT NULL AND completed_at IS NOT NULL)
         OR
@@ -148,11 +152,28 @@ def _translate(sql: str) -> str:
     return sql
 
 
+def _holds_nul(value: Any) -> bool:
+    if isinstance(value, str):
+        return "\x00" in value
+    if isinstance(value, dict):
+        return any(_holds_nul(k) or _holds_nul(v) for k, v in value.items())
+    if isinstance(value, (list, tuple)):
+        return any(_holds_nul(v) for v in value)
+    return False
+
+
 def _adapt(value: Any) -> Any:
-    """psycopg2 parameter -> SQLite parameter."""
+    """psycopg2 parameter -> SQLite parameter. Refuses NUL (U+0000) the way
+    PostgreSQL does, so the double can't accept what the database rejects
+    (EPOCH-502): in jsonb the server raises UntranslatableCharacter, and in
+    text psycopg2 itself raises ValueError."""
     if isinstance(value, psycopg2.extras.Json):
         # .adapted is the original Python object handed to Json(...)
+        if _holds_nul(value.adapted):
+            raise psycopg2.errors.UntranslatableCharacter("unsupported Unicode escape sequence: \\u0000 in jsonb")
         return json.dumps(value.adapted)
+    if isinstance(value, str) and "\x00" in value:
+        raise ValueError("A string literal cannot contain NUL (0x00) characters.")
     if isinstance(value, bool):
         return 1 if value else 0
     if value is None or isinstance(value, (int, float, str, bytes)):
@@ -184,7 +205,7 @@ class _Cursor:
     path rather than a reimplementation of it.
     """
 
-    def __init__(self, conn: sqlite3.Connection, owner: "PgDouble"):
+    def __init__(self, conn: sqlite3.Connection, owner: PgDouble):
         self._conn = conn
         self._cur = conn.cursor()
         # execute_values reads cur.connection.encoding to pick the codec for the
@@ -192,7 +213,7 @@ class _Cursor:
         # it through psycopg2.extensions.encodings to Python's 'utf-8'.
         self.connection = owner
 
-    def __enter__(self) -> "_Cursor":
+    def __enter__(self) -> _Cursor:
         return self
 
     def __exit__(self, *exc_info: object) -> None:
@@ -266,9 +287,7 @@ class PgDouble:
     def ledger(self) -> list[dict[str, Any]]:
         self._conn.row_factory = sqlite3.Row
         try:
-            rows = self._conn.execute(
-                "SELECT * FROM ingested_files ORDER BY file_hash, ingest_id"
-            ).fetchall()
+            rows = self._conn.execute("SELECT * FROM ingested_files ORDER BY file_hash, ingest_id").fetchall()
             out = [dict(row) for row in rows]
         finally:
             self._conn.row_factory = None
@@ -288,7 +307,6 @@ class PgDouble:
         if file_hash is None:
             return self._conn.execute("SELECT COUNT(*) FROM forensic_records").fetchone()[0]
         return self._conn.execute(
-            "SELECT COUNT(*) FROM forensic_records f JOIN ingested_files i USING (ingest_id) "
-            "WHERE i.file_hash = ?",
+            "SELECT COUNT(*) FROM forensic_records f JOIN ingested_files i USING (ingest_id) WHERE i.file_hash = ?",
             (file_hash,),
         ).fetchone()[0]

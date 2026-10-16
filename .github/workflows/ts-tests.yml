@@ -1,12 +1,12 @@
 name: TS Tests
 
-# EPOCH-401: first TypeScript test job in the repo. Scoped to mvt-runner and
-# its workspace dependencies (the `...` filter) so the Electron app's install
-# isn't pulled into every run. Widen the filter as other packages gain tests.
+# EPOCH-401: first TypeScript test job in the repo. Each package is installed
+# with its workspace dependencies (the `...` filter). EPOCH-454 adds the desktop
+# app; its install skips Electron's binary, which no step here launches.
 #
 # Linux only, by decision (2026-10-07): the macOS-specific inputs the evidence
 # manifest must be invariant to (NFD filenames, `\` separators) are simulated
-# in apps/mvt-runner/src/utils/manifest.test.ts rather than run on a macOS
+# in apps/processor/src/utils/manifest.test.ts rather than run on a macOS
 # runner.
 
 on:
@@ -15,43 +15,97 @@ on:
   pull_request:
 
 jobs:
-  mvt-runner:
+  typescript:
+    name: TypeScript
     runs-on: ubuntu-latest
+    env:
+      # The etl-db-reader tests create and drop their own throwaway database
+      # on this server (EPOCH-403), so this role must be allowed CREATE DATABASE.
+      TEST_DATABASE_URL: postgresql://verichron_ci:verichron_ci@localhost:5432/verichron_ci
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: verichron_ci
+          POSTGRES_USER: verichron_ci
+          POSTGRES_PASSWORD: verichron_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U verichron_ci -d verichron_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      # Version comes from package.json's packageManager field.
-      - name: Install pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-
-      - name: Install Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      # Node, pnpm and uv at the versions pinned in mise.toml (EPOCH-458).
+      - name: Install toolchain
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
         with:
-          node-version: 24
-          cache: pnpm
+          version: 2026.10.4
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter "@verichron/mvt-runner..." --filter "@verichron/etl-db-writer..." --filter "@verichron/etl-db-reader..."
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: pnpm install --frozen-lockfile --filter verichron-epoch --filter "@verichron/processor..." --filter "@verichron/etl-db-reader..." --filter "@verichron/orchestrator..." --filter "@verichron/epoch..."
 
-      # mvt-runner resolves @verichron/contracts through its built dist/.
+      # EPOCH-469: every TypeScript file in the repo, the desktop app included,
+      # in the layout .prettierrc.json gives it.
+      - name: Check formatting
+        run: pnpm format:check
+
+      # The processor resolves @verichron/contracts through its built dist/.
       - name: Build contracts
         run: pnpm --filter @verichron/contracts build
 
       - name: Typecheck
-        run: pnpm --filter @verichron/mvt-runner typecheck
+        run: pnpm --filter @verichron/processor typecheck
+
+      - name: Typecheck processor tests
+        run: pnpm --filter @verichron/processor typecheck:tests
 
       - name: Test
-        run: pnpm --filter @verichron/mvt-runner test
-
-      - name: Typecheck etl-db-writer
-        run: pnpm --filter @verichron/etl-db-writer typecheck
-
-      - name: Test etl-db-writer
-        run: pnpm --filter @verichron/etl-db-writer test
+        run: pnpm --filter @verichron/processor test
 
       - name: Typecheck etl-db-reader
         run: pnpm --filter @verichron/etl-db-reader typecheck
 
+      - name: Typecheck etl-db-reader tests
+        run: pnpm --filter @verichron/etl-db-reader typecheck:tests
+
       - name: Test etl-db-reader (real Postgres)
         run: pnpm --filter @verichron/etl-db-reader test
+
+      - name: Typecheck orchestrator
+        run: pnpm --filter @verichron/orchestrator typecheck
+
+      - name: Typecheck orchestrator tests
+        run: pnpm --filter @verichron/orchestrator typecheck:tests
+
+      # The orchestrator CLI validates the workspace's Python environment
+      # before it runs anything (EPOCH-456); uv builds it at the version
+      # .python-version pins.
+      - name: Install Python environment
+        run: uv sync --locked
+
+      # EPOCH-404: pre-flight registration, evidence-keyed resume and the
+      # completeness predicate, against a throwaway database on this server.
+      - name: Test orchestrator (real Postgres)
+        run: pnpm --filter @verichron/orchestrator test
+
+      # EPOCH-454: the desktop app reads the reader through its built dist/.
+      - name: Build etl-db-reader
+        run: pnpm --filter @verichron/etl-db-reader build
+
+      - name: Typecheck app
+        run: pnpm --filter @verichron/epoch typecheck
+
+      - name: Build app (main, preload, renderer)
+        run: pnpm --filter @verichron/epoch build:vite
+
+      # Main-process and IPC tests in Node (the IPC handlers against a
+      # throwaway database on this server); renderer tests in jsdom.
+      - name: Test app
+        run: pnpm --filter @verichron/epoch test

@@ -3,7 +3,7 @@
   "entrypoint": "main.py",
   "runtime": "python",
   "order": 10,
-  "requiresResultsPath": false,
-  "parserVersion": 1,
+  "reads": "crash_reports",
+  "parserVersion": 2,
   "enabled": true
 }

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "verichron-indicators"
+version = "0.1.0"
+description = "Indicator sets as data: our own STIX 2.1 loader and the one normalization shared by indicators and facts (EPOCH-490)."
+requires-python = "==3.14.*"
+dependencies = [
+    # D1: BSD-3-Clause (OASIS Open); its one runtime dependency,
+    # antlr4-python3-runtime, is BSD-3-Clause too.
+    "stix2-patterns==2.1.2",
+    # IDNA 2008 with UTS #46 mapping, for internationalized domains. BSD-3-Clause.
+    "idna>=3.10",
+    "verichron-contracts",
+]
+
+[tool.uv.sources]
+verichron-contracts = { workspace = true }
+
+[tool.setuptools]
+py-modules = ["indicator_loader", "indicator_normalize"]

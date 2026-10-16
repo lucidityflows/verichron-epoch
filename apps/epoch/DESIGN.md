@@ -32,6 +32,10 @@ signal the same thing (accent-color left-borders like `RunsView`'s
 status indicator are a different signal — state color, not elevation —
 and can coexist with a shadow tier).
 
+**Table rows:** a selected row has the accent bar (an inset accent shadow),
+an expanded row has `shadow-elevation-1`, and a row that is both has both
+(EPOCH-470). Selection is never hidden by expansion.
+
 **State-color banners (flag/danger/accent) are always `shadow-elevation-1`
 + the state-color border together, never border alone.** This was
 previously inconsistent — e.g. `DevicePullPanel.tsx` had two flag-toned
@@ -40,16 +44,35 @@ for no reason other than having been written at different times. Fixed
 in that file (see §5); the rule going forward is that every state-color
 banner gets both, uniformly.
 
-## 2. Type scale — three tiers, by role not by size
+**Error banners carry a Copy button** (`components/ui/CopyButton`). It
+copies the error with what's needed to diagnose it elsewhere: the step,
+the device, and the log or tool output that led to it. It never copies
+secrets such as passwords. In place: the iPhone pull error and the setup
+failure banner (EPOCH-466); other views' error banners follow in the
+EPOCH-464 review.
+
+**Toasts** (`components/ui/Toast`, EPOCH-455; approved 2026-10-14) are for
+confirmations and errors that don't belong to a place on the page, such as
+the result of an action whose panel has closed. They float at the bottom
+right at `shadow-elevation-3` on `surface-raised`, with the role's `/30` border
+(§9): `success` for done, `danger` for failed, and the plain border for
+information. A success or information toast closes itself after five seconds;
+a failure stays until it is dismissed, so it can't be missed. Screen readers
+hear successes politely (`role="status"`) and failures at once
+(`role="alert"`). A toast never replaces an error banner that belongs to a
+view, and never carries a secret.
+
+## 2. Type scale — four tiers, by role not by size
 
 Each tier is a **composite** Tailwind v4 utility (`text-display`,
-`text-label`, `text-data`) that carries font-size, line-height, and
+`text-heading`, `text-label`, `text-data`) that carries font-size, line-height, and
 font-weight together — never hand-combine `text-base` + `font-medium`
 to approximate one of these; use the named class.
 
 | Class | Size / weight | Use for |
 |---|---|---|
 | `text-display` | 1.25rem / 600 | The one heading per view/route — page titles. Every top-level section header in the sidebar-navigated views (`WorkspaceView`, `RunsView`, `IocsView`, `ReportsView`, `RecordsView`) is a page title in this sense, even though some render inside a shared shell — there is exactly one per view. |
+| `text-heading` | 1rem / 600 | Section and card titles (`h2`/`h3`) inside a view: the option cards on New Investigation, "Backups Found", a dialog's title. Added 2026-10-09 (EPOCH-464); see the amendment below the table. |
 | `text-label` | 0.75rem / 500 | UI chrome: form labels, tab/filter labels, panel sub-headings (e.g. a card's own `<h3>` inside a page that already has its `text-display` title), uppercase eyebrow text, **and button text** (see EPOCH-203 / `Button.tsx` — a button's label is UI chrome, not content). |
 | `text-data` | 0.8125rem / 400 | Actual content — table cells, timestamps, IDs, badge-adjacent values, log lines. This is the default for anything that isn't a heading or a form label. |
 
@@ -61,6 +84,21 @@ for it elsewhere; use `text-label` or `text-data` instead.
 We are explicitly **not** adding a 4th tier right now. If a real gap
 shows up during 202/203/204/301, raise it as its own ticket rather than
 inventing an ad hoc size in place.
+
+*Amended 2026-10-09 (EPOCH-464):* the gap showed up. With only
+`text-display` (20px) and `text-label` (12px), a card title had no correct
+size, so New Investigation improvised three (16px semibold, 12px label, 14px
+semibold) and titles ended up smaller than their own descriptions.
+`text-heading` (1rem / 600) is the fourth tier, for section and card titles
+only. Content stays `text-data`; labels stay `text-label`. In order of size:
+`text-display` > `text-heading` > `text-data` > `text-label`.
+
+*Fixed 2026-10-12 (EPOCH-484):* `cn()` merges classes with tailwind-merge,
+which didn't know these names. It read them as text colours and dropped
+`text-label` from `text-label text-background`, so every `Button` rendered at
+the inherited 16px and outranked the card titles above it. `libs/utils.ts`
+now registers the scale as font sizes. A new type-scale class is added there
+too.
 
 ## 3. Spacing scale — 4px grid, with one named exception
 
@@ -146,3 +184,229 @@ what makes the future toggle a CSS-only change.
 | `WorkspaceView.tsx` | No change needed (already elevation-only; dashed drop-zone border is a legitimate functional exception) | No change needed (`<h1>` already correct) | Not yet audited against §3 — known half-steps remain (e.g. modal `px-3.5`/`py-2.5`, several `gap-3.5`/`gap-2.5` outside the icon-label exception) |
 | `DevicePullPanel.tsx` | **Yes (this pass)** — both flag banners standardized to `shadow-elevation-1` + `border-flag/30`; `pullError`/`pulled` state banners also given `shadow-elevation-1` to match (this second part extends beyond the literal flag-banner instruction to the general state-banner rule above — flagged for confirmation, not silently assumed) | **Discrepancy:** this table previously said "Yes — internal `<h3>` sub-headings moved to `text-label`", but the file as currently pushed still shows `text-base font-semibold` on that heading. Needs reconciling — either the fix hasn't landed or this row was marked done prematurely. | Yes — padding/margin normalized to the §3 grid (confirmed by diff against the pre-202 version) |
 | `Button.tsx` (EPOCH-203) | **Resolved (this pass)** — added `tone="danger"` on `outline`, replacing the two independent flat-border/hover-reveal patterns (DevicePullPanel.tsx's Homebrew fallback, WorkspaceView.tsx's Cancel button) with one elevation-based treatment, per this section's rule above | Yes — `text-label` adopted for all button text per §2's row above. Confirmed decision: keep as-is even though it visibly shrinks default-size CTA text versus the old `text-sm`; revisit later rather than block on it now | Yes — `px-4 py-3` / `px-3 py-2`, matching `DevicePullPanel.tsx`'s already-landed grid |
+
+## 6. View layout — one gutter, one title, one left edge
+
+Every sidebar-navigated view (`WorkspaceView`, `RunsView`, `RecordsView`,
+`IocsView`, `ReportsView`) renders inside `ViewLayout`
+(`components/layout/ViewLayout.tsx`), and switching views never moves the
+content edge or the title (EPOCH-464).
+
+- **Gutter:** the app shell's content area (`App.tsx`) is the only place a
+  view's outer spacing is set: `p-8` (32px) on every side. A view sets no
+  outer padding or margin of its own; doing so is what made the edge jump
+  between 32px and 64px.
+- **Title:** `ViewLayout` renders the view's one `text-display` title (§2) as
+  an `h1` in the foreground colour, beside an icon chip in the view's section
+  colour (§9), with 24px (`mb-6`) below the header. An optional description
+  sits under it, and an optional aside (e.g. a count) beside it. Each view
+  passes its `section`.
+- **Width:** `full` by default. Form-like views use `readable`, which caps the
+  width at `max-w-4xl` (896px) but stays left-aligned, so the left edge
+  matches every other view. Views are never centered.
+- **Height:** the content below the header is a flex column that fills the
+  remaining height (`flex-1 min-h-0`). A view with a virtualized table passes
+  `overflow-hidden` and gives the table `flex-1 min-h-0`, so the table's
+  scrollport is bounded by the layout, never by a `calc(100vh - …)` constant.
+- **No data:** every state with nothing to show (nothing selected, still
+  loading, nothing found, evidence not registered) is an `EmptyState`
+  (`components/ui/EmptyState.tsx`): centered in the space it fills, its icon
+  (or a spinner while loading) in a chip of the view's section colour
+  (`bg-section/20 text-section`, §9), the state as one `text-heading` line in
+  the foreground colour, and an optional muted `text-data` detail. A view never
+  shows a bare line of text for these. One exception: a view that is loading
+  *into a table* shows a skeleton of that table (`TableSkeleton` in
+  `components/ui/Skeleton.tsx`, as `RunsView` does), so the
+  layout doesn't jump from a centered spinner to a full table when the rows
+  arrive. Errors are not empty states: they use the flag banner (§1).
+
+## 7. Capitalization and wording — names are Title Case, sentences are not
+
+Decided 2026-10-09 (EPOCH-464), following the common desktop convention
+(Apple Human Interface Guidelines, Microsoft Writing Style Guide).
+
+- **Title Case for names:** page titles, sidebar items, section and card
+  titles, dialog titles and buttons ("New Investigation", "Backups Found",
+  "Pull Encrypted Backup"). Articles, coordinating conjunctions and
+  prepositions of four letters or fewer stay lowercase unless first or last
+  ("Pull from a Connected iPhone", "Install with Homebrew").
+- **Sentence case for sentences:** descriptions, status lines, empty-state
+  lines, banners and their headings, errors, field labels, tooltips and
+  placeholders ("No investigation selected", "Setup failed", "Backup
+  encryption password (required)").
+- **A page's title is its sidebar label**, word for word, so the user always
+  knows where they are.
+- **Product names keep their own casing:** iPhone, iOS, iLEAPP.
+- **Ellipsis:** the single character `…`, never three periods, for
+  in-progress states ("Checking for the required tool…").
+- **One term per concept:** the user-facing unit of work is an
+  *investigation*; "run" is a pipeline term and doesn't appear in the UI's
+  names.
+
+
+## 8. Progressive disclosure — one step at a time, secrets only while needed
+
+Decided 2026-10-11 (EPOCH-467), after a real-device pull: both import paths
+were on screen at once, and the backup password was asked for before the
+pull had anywhere to go.
+
+- **Choose first.** Where a task has alternative paths (pull from a
+  connected iPhone, or use an existing backup), the view asks which one
+  before showing either. Choosing one hides the others; **Change** goes back
+  to the choice.
+- **Steps appear in order.** A step is shown once the steps before it are
+  complete: device, then destination, then password, then the action.
+- **Sensitive fields appear only while needed.** A password field appears
+  only when the action that uses it is next, and is cleared when it is hidden
+  or its inputs change (another device, another folder, another import path),
+  and as soon as the action has taken it.
+- **A running operation locks its inputs.** While it runs, the choice, its
+  steps and Change are disabled, and leaving the view and coming back shows
+  the operation still running (its state lives in the main process).
+
+## 9. Colour roles — one meaning per colour
+
+Decided 2026-10-12 (EPOCH-484), after the New Investigation page read as
+dull: one cyan marked selection, progress, information and success alike (30
+times as text on that page), the three surface tiers barely separated
+(1.14:1 and 1.17:1), and 13 improvised surface opacities layered panels
+unevenly.
+
+**Each colour has one meaning.** A state uses its role's colour, never
+another state's.
+
+| Token | Means | Examples |
+|---|---|---|
+| `accent` | Interactive, selected, current, in progress | Primary button, selected device, the current step, a running pull or analysis |
+| `success` | Done and verified | A backup verified as finished, installed tools, a completed step |
+| `flag` | You must act, or caution | "Action Needed" on the iPhone, an unfinished backup, encryption consent |
+| `danger` | Failed or destructive | A failed pull, setup failure, Delete |
+| `foreground` / `muted-foreground` | Information | Notes, paths, explanations |
+
+**Role tints have three strengths:** `/10` for a banner or row fill, `/20`
+for an icon chip on a tinted banner, `/30` for a state banner's border (§1).
+
+**Surfaces have four tiers, lightest on top:** `inset` (wells: logs, inputs,
+command lines, progress tracks), `background` (the page), `surface` (cards),
+`surface-raised` (panels inside a card). Components use these tokens, never a
+`bg-surface/NN` opacity. The one exception is the dimmed scrim behind a
+modal (`bg-background/80`).
+
+**Contrast is measured, not judged.** Every role and section colour is at
+least 4.5:1 (WCAG AA for body text) on every surface tier. Values on
+2026-10-12, as contrast against inset / background / surface / surface-raised:
+
+| Token | HSL | Contrast |
+|---|---|---|
+| `foreground` | 220 15% 92% | 16.1 / 15.6 / 13.7 / 11.2 |
+| `muted-foreground` | 222 18% 68% | 8.1 / 7.8 / 6.9 / 5.7 |
+| `accent` | 188 78% 52% | 9.9 / 9.6 / 8.4 / 6.9 |
+| `success` | 152 60% 50% | 9.4 / 9.1 / 8.0 / 6.5 |
+| `flag` | 36 90% 58% | 9.7 / 9.4 / 8.2 / 6.7 |
+| `danger` | 4 85% 67% | 6.6 / 6.4 / 5.6 / 4.6 |
+| `section-runs` | 268 80% 74% | 7.3 / 7.0 / 6.2 / 5.1 |
+| `section-records` | 212 85% 66% | 7.4 / 7.2 / 6.3 / 5.2 |
+| `section-iocs` | 326 75% 70% | 7.4 / 7.2 / 6.3 / 5.2 |
+| `section-reports` | 244 80% 76% | 7.1 / 6.9 / 6.0 / 4.9 |
+
+Text on a filled accent, success or danger button uses `background`: 9.6,
+9.1 and 6.4:1. The tiers separate by 1.03 (inset to background), 1.14
+(background to surface) and 1.22 (surface to raised).
+
+**A secondary button is tinted, never surface-coloured** (EPOCH-506, decided
+2026-10-14): `outline` is `bg-accent/15` with `text-accent`, so it reads as a
+button on every tier, including the raised panels where a surface-coloured
+button disappeared. Accent text on that fill is 7.7, 7.3, 6.2 and 5.1:1 on
+inset, background, surface and surface-raised, and the fill stands 1.29 to
+1.35:1 off each tier. A destructive one (`tone="danger"`: Delete It, Cancel) is
+`bg-danger/15` with `foreground` text: danger text on that fill is only 3.8:1
+on surface-raised, while foreground is 9.2 to 13.4:1.
+
+The surface tiers are `inset` 6%, `background` 8%, `surface` 14% and
+`surface-raised` 21% lightness, at hue 224, saturation 32%: deep blue ink
+rather than grey, so the page itself carries colour. A new colour token is
+added only with its contrast on every tier recorded here, and is defined in
+`:root` so the light theme (§4) stays a same-file change.
+
+**Each section has a colour.** The five sidebar sections each have an
+identity colour, in the hue range 210–330 that no role uses, so a section
+colour never reads as a state:
+
+| Section | Token |
+|---|---|
+| New Investigation | `section-workspace` (the accent) |
+| Investigations | `section-runs`, violet |
+| Forensic Records | `section-records`, blue |
+| Indicator Matches | `section-iocs`, pink |
+| Reports | `section-reports`, periwinkle |
+
+A section colour marks only where you are: the section's icon in the sidebar
+(always), the current section's sidebar tint and bar, the view's title chip
+and the soft glow behind its header, the view's empty states and its tip. It
+is never used for a state, an action or data. Components use it as
+`text-section` and `bg-section/NN`; `ViewLayout` sets `--section` for its view
+(`components/layout/sections.ts`).
+
+**The sidebar recedes.** The sidebar sits on `inset`, the darkest tier, so
+the view beside it leads. Page titles are in the foreground colour, not the
+accent: a title isn't interactive. The brand mark is the one gradient
+(accent, blue, violet) in the app.
+
+**Choices look choosable.** A selectable option (an iPhone to back up) is a
+card with a 2px `accent/30` outline at rest, the full `accent` outline on
+hover, and an `accent/10` fill with the `accent` outline once selected. Its
+action reads **Select**, as a filled accent button, while choosing is the
+current step. The current step's action is always the primary (filled)
+button; it becomes an outline button once the step is done.
+
+**Steps show their state.** A multi-step flow (§8) shows its steps as a
+numbered rail: pending (muted), current (accent ring), done (success check),
+blocked (flag). It is the shared `StepList` (EPOCH-455); the iPhone pull and
+New Investigation use it (§10).
+
+**Long steps show what they have done** (EPOCH-487). A step that runs for
+minutes or hours says how far it has got and how long it has taken, never
+only its name: bytes read, bytes written against a known size (with an
+accent bar on an `inset` track, held below 100% until the step finishes), or
+the item it is on ("module 212 of 540: <name>"). Prepare Evidence's backup
+rows follow this rule.
+
+**Applied so far:** the New Investigation page (`WorkspaceView`,
+`DevicePullPanel`, `BackupProgressCard`, `BackupRow`, `ToolSetup`), and
+app-wide the tokens, the sidebar, `ViewLayout`, `EmptyState` and `Badge`
+(running is accent, succeeded and complete are success). The other views'
+own panels still use surface opacities and adopt the roles as they are next
+changed.
+
+## 10. Step flows — the user always sees what is done and what comes next
+
+Decided 2026-10-13 (EPOCH-497), after the first full run on a real backup:
+"Prepare Evidence" stayed the main action once preparation was complete, and
+read as needing to be run again; Analyze read like a separate feature rather
+than the step that creates the investigation; and after a restart the page
+forgot what was prepared. "We must guide clearly, or we look untrustworthy."
+
+- **One rail per task.** A page that is one task shows its steps as a
+  `StepList` at the top (§9): New Investigation's are Choose Evidence,
+  Prepare Evidence and Analyze. Done steps read as done, not as actions.
+- **State comes from the evidence, not memory.** What a step has done is read
+  from the workspace (the completion markers), so a restart or another
+  session shows the same state. New Investigation shows each backup as
+  "Not prepared", "Partly prepared · prepare again" (flag) or
+  "Prepared · <date>" (success).
+- **The next step leads.** Once a step is done, its action becomes a
+  secondary outline button with a name that says what it would do again
+  ("Prepare Again", which redoes the step from the start), and the next
+  step's action is the primary button.
+- **An action says what it creates.** Analyze's button is "Analyze and Create
+  Investigation", and its result points to the investigation ("Investigation
+  created." then "View Investigation").
+- **A finished long task hands over explicitly.** A finished iPhone pull shows
+  a results card (device, size, finish time, folder) with one next action,
+  "Continue to Prepare Evidence", instead of moving on by itself.
+- **A card that opens looks like it opens, and one that doesn't, doesn't.**
+  An investigation's stage cards open on click, Enter or Space, with a
+  chevron; closed, they show the status and what the stage produced; open,
+  what it read, what it wrote, exact times and its output (EPOCH-431). A card
+  with nothing to open has no hover lift.
+

@@ -4,10 +4,10 @@ import path from 'path';
 // A discovered backup: `label` is the friendly top-level directory name
 // under `source` (used for workspace organization), `path` is the actual
 // directory containing Manifest.db / Info.plist (what gets passed to
-// mvt-ios). These are the same directory in the simple case, but idevice-
+// the decrypt). These are the same directory in the simple case, but idevice-
 // backup2 output is commonly one level deeper: <source>/<label>/<UDID>/Manifest.db
 //
-// Shared between apps/mvt-runner (CLI --only filtering) and apps/epoch
+// Shared between apps/processor (CLI --only filtering) and apps/epoch
 // (the workspace picker UI needs the same discovered set, not a
 // reimplementation, so Stage 1's backup list and the CLI's actual
 // processing set never drift apart).
@@ -51,10 +51,7 @@ export async function discoverBackups(source: string, only?: string): Promise<Ba
       // (matching the wrong one, or both). The full relative path is
       // unique per root by construction, since findBackupRoots never
       // returns the same directory twice.
-      const label =
-        roots.length > 1
-          ? `${e.name}__${path.relative(topPath, root).split(path.sep).join('__')}`
-          : e.name;
+      const label = roots.length > 1 ? `${e.name}__${path.relative(topPath, root).split(path.sep).join('__')}` : e.name;
 
       // Matched against either the final (possibly disambiguated) label
       // or the plain top-level directory name. The latter preserves the

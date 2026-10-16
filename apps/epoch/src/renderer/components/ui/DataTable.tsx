@@ -136,11 +136,13 @@ export function DataTable<TData extends Record<string, any>>({
                 transform: `translateY(${virtualRow.start}px)`,
               }}
               className={`transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${
-                isExpanded
-                  ? 'bg-surface shadow-elevation-1'
-                  : isSelected
-                  ? 'bg-surface shadow-[inset_0.125rem_0_0_hsl(var(--accent))]'
-                  : 'hover:bg-surface/60'
+                isExpanded && isSelected
+                  ? 'bg-surface shadow-[inset_0.125rem_0_0_hsl(var(--accent)),var(--shadow-elevation-1)]'
+                  : isExpanded
+                    ? 'bg-surface shadow-elevation-1'
+                    : isSelected
+                      ? 'bg-surface shadow-[inset_0.125rem_0_0_hsl(var(--accent))]'
+                      : 'hover:bg-surface/60'
               }`}
             >
               <div className="grid" style={{ gridTemplateColumns }}>
@@ -155,9 +157,7 @@ export function DataTable<TData extends Record<string, any>>({
                 ))}
               </div>
               {expandedContent && (
-                <div className="px-4 py-4 border-b border-border/40 bg-surface">
-                  {expandedContent}
-                </div>
+                <div className="px-4 py-4 border-b border-border/40 bg-surface">{expandedContent}</div>
               )}
             </div>
           );

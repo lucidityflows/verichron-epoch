@@ -25,8 +25,6 @@ export function hostedReleaseManifestFor(platform: NodeJS.Platform, arch: string
   // a placeholder -- do not point production code at this until then.
   return {
     releaseUrl: `https://github.com/vermiliontides/verichron-epoch/releases/download/idevicebackup2-tools/idevicebackup2-${platform}-${arch}.tar.gz`,
-    checksums: [
-      { algorithm: 'sha256', value: 'PLACEHOLDER_NOT_A_REAL_CHECKSUM' },
-    ],
+    checksums: [{ algorithm: 'sha256', value: 'PLACEHOLDER_NOT_A_REAL_CHECKSUM' }],
   };
 }

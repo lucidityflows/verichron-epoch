@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "verichron-indicator-registry"
+version = "0.1.0"
+description = "Registers an indicator set: loads STIX 2.1 files and stores them in the append-only registry (EPOCH-490)."
+requires-python = "==3.14.*"
+dependencies = [
+    "psycopg2-binary>=2.9",
+    "verichron-contracts",
+    "verichron-etl-db-writer",
+    "verichron-indicators",
+    "verichron-runtime-env",
+]
+
+[tool.uv.sources]
+verichron-contracts = { workspace = true }
+verichron-etl-db-writer = { workspace = true }
+verichron-indicators = { workspace = true }
+verichron-runtime-env = { workspace = true }
+
+[tool.setuptools]
+py-modules = []

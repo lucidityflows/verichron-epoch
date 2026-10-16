@@ -1,12 +1,32 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { app, ipcMain, dialog, BrowserWindow } from 'electron';
+import { addPullDestination, pullFolderName, readPullDestinations } from '../tools/device-backup/pullDestinations';
+import { PullStateTracker } from '../tools/device-backup/pullState';
 import path from 'path';
 import fs from 'fs/promises';
 import { spawn } from 'child_process';
-import { listDeviceBackupSources, getDeviceBackupSource, getAcquisitionStrategy } from '../tools/device-backup/registry';
-import { isHomebrewAvailable } from '../tools/device-backup/ios/buildSteps';
-import type { DeviceInfo, ToolAcquisitionCommand, BackupProgress, ToolAcquisitionResult } from '../../shared/types/tools';
+import {
+  listDeviceBackupSources,
+  getDeviceBackupSource,
+  getAcquisitionStrategy,
+} from '../tools/device-backup/registry';
+import type {
+  DeviceInfo,
+  ToolAcquisitionCommand,
+  BackupProgress,
+  BackupStats,
+  DevicePullState,
+  IncompleteBackup,
+  PullOptions,
+  ToolAcquisitionResult,
+  ToolSetupEvent,
+  ToolSetupResult,
+  ToolSetupStatus,
+} from '../../shared/types/tools';
 
 export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null) {
+  // The running pull, so a panel that mounts mid-pull can show it (EPOCH-467).
+  const pull = new PullStateTracker();
+
   function sendToRenderer(channel: string, ...args: unknown[]) {
     const win = getMainWindow();
     if (win) {
@@ -38,6 +58,9 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
   ipcMain.handle('epoch:listConnectedDevices', async (_event, sourceId: string) => {
     const source = getDeviceBackupSource(sourceId);
     if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    // No device queries during a pull (EPOCH-467): the device being backed up is the one listed.
+    const running = pull.current();
+    if (running) return [running.device];
     return source.listConnectedDevices();
   });
 
@@ -47,146 +70,216 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     return strategy.availableActions();
   });
 
-  let deviceBackupInFlight = false;
+  ipcMain.handle('epoch:getDevicePullState', async (): Promise<DevicePullState | null> => pull.current());
+
+  ipcMain.handle('epoch:getBackupEncryption', async (_event, sourceId: string, device: DeviceInfo) => {
+    // A device query during a backup would compete with it for the device.
+    if (pull.running()) throw new Error('A device backup is running. Wait for it to finish or cancel it first.');
+    const source = getDeviceBackupSource(sourceId);
+    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    return source.backupEncryptionEnabled(device);
+  });
+
+  ipcMain.handle('epoch:cancelDeviceBackup', async (_event, sourceId: string) => {
+    const source = getDeviceBackupSource(sourceId);
+    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    return source.cancelPull();
+  });
+
+  // Incomplete backups in every folder pulls have written to, plus the
+  // chosen one, so leftovers are found after the user picks another folder.
+  ipcMain.handle(
+    'epoch:listIncompleteBackups',
+    async (_event, sourceId: string, device: DeviceInfo, destDir: string | null): Promise<IncompleteBackup[]> => {
+      const source = getDeviceBackupSource(sourceId);
+      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+      const known = await readPullDestinations(app.getPath('userData'));
+      const folders = [...new Set([...(destDir ? [destDir] : []), ...known])];
+      const found: IncompleteBackup[] = [];
+      for (const folder of folders) {
+        // The backup being written isn't finished yet, but it isn't left over either.
+        if (pull.writes(folder, device.id)) continue;
+        const incomplete = await source.incompleteBackup(folder, device);
+        if (incomplete) found.push(incomplete);
+      }
+      return found;
+    }
+  );
+
+  ipcMain.handle(
+    'epoch:deleteIncompleteBackup',
+    async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
+      if (pull.running()) throw new Error('A device backup is running; cancel it before deleting.');
+      const source = getDeviceBackupSource(sourceId);
+      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+      // Only a folder an earlier pull wrote to, so the renderer can't name an arbitrary one.
+      const known = await readPullDestinations(app.getPath('userData'));
+      if (!known.includes(destDir)) throw new Error(`${destDir} isn't a folder Epoch has pulled a backup to.`);
+      return source.deleteIncompleteBackup(destDir, device);
+    }
+  );
+
+  // EPOCH-519: crash logs copied again for a finished backup after a failed copy.
+  ipcMain.handle(
+    'epoch:copyDeviceCrashReports',
+    async (_event, sourceId: string, device: DeviceInfo, backupDir: string) => {
+      if (pull.running()) throw new Error('A device backup is running; wait for it to finish.');
+      const source = getDeviceBackupSource(sourceId);
+      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+      return source.copyCrashReportsAgain(device, backupDir);
+    }
+  );
 
   ipcMain.handle(
     'epoch:pullDeviceBackup',
-    async (_event, sourceId: string, device: DeviceInfo, destDir: string, password?: string) => {
-      if (!password || password.trim() === '') {
-        throw new Error('A secure password is required to encrypt the backup session.');
-      }
-
-      if (deviceBackupInFlight) {
-        throw new Error('A device backup is already in progress -- wait for it to finish before starting another.');
+    async (_event, sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) => {
+      if (!options?.password || options.password.trim() === '') {
+        throw new Error('A backup password is required.');
       }
       const source = getDeviceBackupSource(sourceId);
       if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
 
-      deviceBackupInFlight = true;
+      // Each pull writes into a folder of its own inside the one chosen
+      // (EPOCH-504), created here and never reused: a pull never meets an
+      // existing backup. Created without `recursive`, so it fails rather than
+      // share a folder with another pull.
+      const pullDir = path.join(destDir, pullFolderName(new Date()));
+      // Reserved before anything awaits, so a second pull is refused before it
+      // creates or registers a folder.
+      pull.start(sourceId, device, pullDir);
+      let created = false;
+      try {
+        try {
+          await fs.mkdir(pullDir);
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+            throw new Error(
+              `Another pull into ${destDir} started this same second (${pullDir}). Wait a moment and try again.`,
+              { cause: err }
+            );
+          }
+          throw err;
+        }
+        created = true;
+        await addPullDestination(app.getPath('userData'), pullDir);
+      } catch (err) {
+        // Nothing has been written into it yet: it leaves no trace (R14).
+        if (created) await fs.rmdir(pullDir).catch(() => undefined);
+        pull.end();
+        throw err;
+      }
       try {
         return await source.pullBackup(
           device,
-          destDir,
+          pullDir,
           (progress: BackupProgress) => {
+            pull.progress(progress);
             sendToRenderer('epoch:deviceBackupProgress', progress);
           },
-          password
+          (stats: BackupStats) => {
+            pull.stats(stats);
+            sendToRenderer('epoch:deviceBackupStats', stats);
+          },
+          options
         );
+      } catch (err) {
+        // Every pull ends with done or an error on the progress channel, so a
+        // panel that mounted mid-pull (and isn't awaiting this call) sees it end.
+        if (!pull.reportedEnd()) {
+          sendToRenderer('epoch:deviceBackupProgress', {
+            phase: 'error',
+            message: err instanceof Error ? err.message : String(err),
+          } satisfies BackupProgress);
+        }
+        throw err;
       } finally {
-        deviceBackupInFlight = false;
+        pull.end();
       }
     }
   );
 
   let acquisitionInFlight = false;
 
-  ipcMain.handle('epoch:runToolAcquisitionSteps', async (_event, steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> => {
-    if (acquisitionInFlight) {
-      throw new Error('A tool acquisition run is already in progress.');
+  ipcMain.handle(
+    'epoch:runToolAcquisitionSteps',
+    async (_event, steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> => {
+      if (acquisitionInFlight) {
+        throw new Error('A tool acquisition run is already in progress.');
+      }
+      acquisitionInFlight = true;
+
+      try {
+        if (steps.length > 0) {
+          const buildRoot = steps[0].cwd;
+          if (buildRoot) await fs.mkdir(buildRoot, { recursive: true }).catch(() => undefined);
+        }
+        await fs.mkdir(installPrefix, { recursive: true }).catch(() => undefined);
+
+        for (const step of steps) {
+          sendToRenderer('epoch:toolAcquisitionStepStarted', step.label);
+          const pkgConfigPath = path.join(installPrefix, 'lib', 'pkgconfig');
+
+          const env: NodeJS.ProcessEnv = {
+            ...process.env,
+            PKG_CONFIG_PATH: [pkgConfigPath, process.env.PKG_CONFIG_PATH].filter(Boolean).join(path.delimiter),
+          };
+
+          const exitCode = await new Promise<number>((resolve, reject) => {
+            const child = spawn(step.command, step.args, { cwd: step.cwd, env });
+            child.stdout?.on('data', (chunk: Buffer) => {
+              sendToRenderer('epoch:toolAcquisitionOutput', { step: step.label, line: chunk.toString('utf-8') });
+            });
+            child.stderr?.on('data', (chunk: Buffer) => {
+              sendToRenderer('epoch:toolAcquisitionOutput', { step: step.label, line: chunk.toString('utf-8') });
+            });
+            child.once('error', reject);
+            child.once('close', (code) => resolve(code ?? 1));
+          });
+
+          if (exitCode !== 0) {
+            const result: ToolAcquisitionResult = { success: false, failedStep: step.label };
+            sendToRenderer('epoch:toolAcquisitionFinished', result);
+            return result;
+          }
+        }
+
+        const result: ToolAcquisitionResult = { success: true };
+        sendToRenderer('epoch:toolAcquisitionFinished', result);
+        return result;
+      } finally {
+        acquisitionInFlight = false;
+      }
     }
+  );
+
+  // Guided setup (EPOCH-465): Linux and macOS. One run at a time, shared with
+  // the Windows acquisition steps above.
+  function guidedFor(sourceId: string) {
+    const guided = getAcquisitionStrategy(sourceId)?.guided;
+    if (!guided) throw new Error(`Guided setup isn't available for ${sourceId} on this platform`);
+    return guided;
+  }
+
+  async function runGuided(work: (emit: (event: ToolSetupEvent) => void) => Promise<ToolSetupResult>) {
+    if (acquisitionInFlight) throw new Error('A setup run is already in progress.');
     acquisitionInFlight = true;
-
     try {
-      if (steps.length > 0) {
-        const buildRoot = steps[0].cwd;
-        if (buildRoot) await fs.mkdir(buildRoot, { recursive: true }).catch(() => undefined);
-      }
-      await fs.mkdir(installPrefix, { recursive: true }).catch(() => undefined);
-
-      for (const step of steps) {
-        sendToRenderer('epoch:toolAcquisitionStepStarted', step.label);
-        const pkgConfigPath = path.join(installPrefix, 'lib', 'pkgconfig');
-        
-        const env: NodeJS.ProcessEnv = {
-          ...process.env,
-          PKG_CONFIG_PATH: [pkgConfigPath, process.env.PKG_CONFIG_PATH].filter(Boolean).join(path.delimiter),
-        };
-
-        if (process.platform === 'darwin') {
-          const macPaths = [
-            '/opt/homebrew/bin',
-            '/usr/local/bin',
-            '/opt/homebrew/opt/libtool/bin',
-            '/usr/local/opt/libtool/bin'
-          ].join(':');
-          
-          env.PATH = env.PATH ? `${macPaths}:${env.PATH}` : macPaths;
-        }
-
-        const exitCode = await new Promise<number>((resolve, reject) => {
-          const child = spawn(step.command, step.args, { cwd: step.cwd, env });
-          child.stdout?.on('data', (chunk: Buffer) => {
-            sendToRenderer('epoch:toolAcquisitionOutput', { step: step.label, line: chunk.toString('utf-8') });
-          });
-          child.stderr?.on('data', (chunk: Buffer) => {
-            sendToRenderer('epoch:toolAcquisitionOutput', { step: step.label, line: chunk.toString('utf-8') });
-          });
-          child.once('error', reject);
-          child.once('close', (code) => resolve(code ?? 1));
-        });
-
-        if (exitCode !== 0) {
-          const homebrewFallbackAvailable = process.platform === 'darwin' && isHomebrewAvailable();
-          const result: ToolAcquisitionResult = { success: false, failedStep: step.label, homebrewFallbackAvailable };
-          sendToRenderer('epoch:toolAcquisitionFinished', result);
-          return result;
-        }
-      }
-
-      const result: ToolAcquisitionResult = { success: true };
-      sendToRenderer('epoch:toolAcquisitionFinished', result);
-      return result;
+      return await work((event) => sendToRenderer('epoch:toolSetupEvent', event));
     } finally {
       acquisitionInFlight = false;
     }
+  }
+
+  ipcMain.handle('epoch:getToolSetupStatus', async (_event, sourceId: string): Promise<ToolSetupStatus | null> => {
+    const guided = getAcquisitionStrategy(sourceId)?.guided;
+    return guided ? guided.status() : null;
   });
 
-  ipcMain.handle('epoch:runHomebrewInstall', async (_event, formulas: string[]): Promise<{ success: boolean }> => {
-    if (acquisitionInFlight) {
-      throw new Error('A tool acquisition run is already in progress.');
-    }
-    if (process.platform !== 'darwin') {
-      throw new Error('Homebrew installation is only supported on macOS.');
-    }
-    if (!isHomebrewAvailable()) {
-      throw new Error('brew was not found on PATH.');
-    }
+  ipcMain.handle('epoch:installToolSetupRequirements', async (_event, sourceId: string): Promise<ToolSetupResult> =>
+    runGuided((emit) => guidedFor(sourceId).installRequirements(emit))
+  );
 
-    acquisitionInFlight = true;
-    const label = `Install via Homebrew (${formulas.join(', ')})`;
-
-    try {
-      sendToRenderer('epoch:toolAcquisitionStepStarted', label);
-
-      const env: NodeJS.ProcessEnv = {
-        ...process.env,
-      };
-      const macPaths = [
-        '/opt/homebrew/bin',
-        '/usr/local/bin',
-        '/opt/homebrew/opt/libtool/bin',
-        '/usr/local/opt/libtool/bin',
-      ].join(':');
-      env.PATH = env.PATH ? `${macPaths}:${env.PATH}` : macPaths;
-
-      const exitCode = await new Promise<number>((resolve, reject) => {
-        const child = spawn('brew', ['install', ...formulas], { env });
-        child.stdout?.on('data', (chunk: Buffer) => {
-          sendToRenderer('epoch:toolAcquisitionOutput', { step: label, line: chunk.toString('utf-8') });
-        });
-        child.stderr?.on('data', (chunk: Buffer) => {
-          sendToRenderer('epoch:toolAcquisitionOutput', { step: label, line: chunk.toString('utf-8') });
-        });
-        child.once('error', reject);
-        child.once('close', (code) => resolve(code ?? 1));
-      });
-
-      const success = exitCode === 0;
-      const result: ToolAcquisitionResult = success ? { success: true } : { success: false, failedStep: label };
-      sendToRenderer('epoch:toolAcquisitionFinished', result);
-      return { success };
-    } finally {
-      acquisitionInFlight = false;
-    }
-  });
+  ipcMain.handle('epoch:buildToolSetup', async (_event, sourceId: string): Promise<ToolSetupResult> =>
+    runGuided((emit) => guidedFor(sourceId).build(emit))
+  );
 }

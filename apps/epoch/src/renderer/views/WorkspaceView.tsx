@@ -1,15 +1,34 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FolderOpen, HardDrive, Play, AlertCircle, ChevronDown, ChevronRight, CheckCircle2, XCircle, Pencil, Microscope, ArrowRight } from 'lucide-react';
+import {
+  FolderOpen,
+  HardDrive,
+  Play,
+  Smartphone,
+  AlertCircle,
+  Lightbulb,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  Pencil,
+  Microscope,
+  ArrowRight,
+  RotateCcw,
+} from 'lucide-react';
 import { BackupRow } from '../features/devicePullPanel/BackupRow';
 import { TerminalLog } from '../components/layout/TerminalLog';
 import { DevicePullPanel } from '../features/devicePullPanel/DevicePullPanel';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
-import type { MvtLogEntry, MvtFinishedResult, StartPipelineOptions } from '../../shared/types/window';
+import type { PipelineFinishedResult, PreparedBackup, StartPipelineOptions } from '../../shared/types/window';
+import { StepList, type Step } from '../components/ui/StepList';
 import type { Backup } from '@verichron/contracts';
-import { applyMvtLogLine, initMvtRunProgress, type MvtRunProgress } from '../libs/mvtLogParser';
 import { pipelineApi } from '../api/pipeline';
-
+import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
+import { analysisShown } from './analysisShown';
+import { analysisSelection, listLabels } from '../../shared/analysisSelection';
+import { devicesApi } from '../api/devices';
+import { ViewLayout } from '../components/layout/ViewLayout';
 
 export interface WorkspaceViewProps {
   onAnalysisComplete: () => void;
@@ -17,6 +36,21 @@ export interface WorkspaceViewProps {
 
 export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  // How the evidence is imported (EPOCH-467): null until the user chooses, so
+  // only the chosen path is on screen.
+  const [importSource, setImportSource] = useState<'device' | null>(null);
+
+  // A pull still running from before this view mounted is shown, not hidden
+  // behind the choice.
+  useEffect(() => {
+    let active = true;
+    devicesApi.getDevicePullState().then((running) => {
+      if (active && running) setImportSource('device');
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [backups, setBackups] = useState<Backup[]>([]);
   const [discoveringBackups, setDiscoveringBackups] = useState(false);
@@ -26,109 +60,87 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const [showOptions, setShowOptions] = useState(false);
   const [workspace, setWorkspace] = useState('');
   const [forceDecrypt, setForceDecrypt] = useState(false);
-  const [refreshIOCs, setRefreshIOCs] = useState(false);
 
   const [isStarting, setIsStarting] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
-  const [logLines, setLogLines] = useState<MvtLogEntry[]>([]);
-  const [finishResult, setFinishResult] = useState<MvtFinishedResult | null>(null);
 
-  const [runProgress, setRunProgress] = useState<MvtRunProgress | null>(null);
-
-  const [pendingPasswordFor, setPendingPasswordFor] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [submittingPassword, setSubmittingPassword] = useState(false);
 
-  const [lastRunWorkspace, setLastRunWorkspace] = useState<string | null>(null);
-  const [analysisRunning, setAnalysisRunning] = useState(false);
-  const [analysisLog, setAnalysisLog] = useState<MvtLogEntry[]>([]);
-  const [analysisResult, setAnalysisResult] = useState<MvtFinishedResult | null>(null);
   const [analysisStartError, setAnalysisStartError] = useState<string | null>(null);
   // EPOCH-305: true while a cancel request is in flight -- distinct from
   // analysisRunning flipping false, which only happens once the main
-  // process actually confirms the subprocess is gone (via
-  // onOrchestratorFinished). Prevents double-clicking Cancel from firing a
-  // second IPC call while the first kill is still working its way through
-  // the SIGTERM -> grace period -> SIGKILL escalation.
+  // process confirms the subprocess is gone (through the analysis state).
+  // Prevents double-clicking Cancel from firing a second IPC call while the
+  // first kill is still working its way through the SIGTERM -> grace period
+  // -> SIGKILL escalation.
   const [analysisCancelling, setAnalysisCancelling] = useState(false);
+  // A past analysis of this workspace that never closed out (EPOCH-305).
+  const [analysisInterrupted, setAnalysisInterrupted] = useState(false);
 
+  // Both runs live in the main process (EPOCH-487), so leaving this page and
+  // coming back shows a run still going, a password the processor is
+  // waiting for, or a finished result.
+  const { state: prepare, log: prepareLog } = usePrepareState();
+  const { state: analysis, log: analysisLogAll } = useAnalysisState();
+  const isRunning = prepare?.status === 'running';
+  // The run belongs to the folder it was started on; another folder shows none.
+  const showsRun = !!prepare && prepare.status !== 'idle' && prepare.source === selectedPath;
+  const runProgress = showsRun ? prepare.progress : null;
+  const logLines = showsRun ? prepareLog : [];
+  const finishResult = showsRun && prepare.status === 'finished' ? prepare.result : null;
+  const pendingPasswordFor = prepare?.passwordFor ?? null;
+  const lastRunWorkspace = showsRun && prepare.status === 'finished' ? prepare.workspace : null;
+
+  // What the workspace records as prepared (EPOCH-497), read from its markers
+  // when the page opens and after each run, so a restart still offers
+  // Analyze. Analyze uses the workspace the last run used, else this one.
+  const [preparedInfo, setPreparedInfo] = useState<{ workspace: string; backups: PreparedBackup[] } | null>(null);
+  const prepareStatus = prepare?.status;
+  const analysisStatus = analysis?.status;
   useEffect(() => {
-    let mvtBuffer: MvtLogEntry[] = [];
-    let mvtRafId: number | null = null;
-
-    const flushMvtBuffer = () => {
-      if (mvtBuffer.length > 0) {
-        const batch = [...mvtBuffer];
-        mvtBuffer = [];
-        setLogLines((prev) => [...prev, ...batch]);
-        setRunProgress((prev) => {
-          if (!prev) return prev;
-          let current = prev;
-          for (const item of batch) {
-            current = applyMvtLogLine(current, item.line);
-          }
-          return current;
-        });
-      }
-      mvtRafId = null;
-    };
-
-    let orchBuffer: MvtLogEntry[] = [];
-    let orchRafId: number | null = null;
-
-    const flushOrchBuffer = () => {
-      if (orchBuffer.length > 0) {
-        const batch = [...orchBuffer];
-        orchBuffer = [];
-        setAnalysisLog((prev) => [...prev, ...batch]);
-      }
-      orchRafId = null;
-    };
-
-    const unsubLog = pipelineApi.onMvtLog((entry) => {
-      mvtBuffer.push(entry);
-      if (mvtRafId === null) {
-        mvtRafId = requestAnimationFrame(flushMvtBuffer);
-      }
-    });
-    const unsubPassword = pipelineApi.onMvtPasswordRequired((backupName) => {
-      setPendingPasswordFor(backupName);
-      setPasswordInput('');
-    });
-    const unsubFinished = pipelineApi.onMvtFinished((result) => {
-      if (mvtRafId !== null) {
-        cancelAnimationFrame(mvtRafId);
-        flushMvtBuffer();
-      }
-      setIsRunning(false);
-      setFinishResult(result);
-    });
-    const unsubOrchestratorLog = pipelineApi.onOrchestratorLog((entry) => {
-      orchBuffer.push(entry);
-      if (orchRafId === null) {
-        orchRafId = requestAnimationFrame(flushOrchBuffer);
-      }
-    });
-    const unsubOrchestratorFinished = pipelineApi.onOrchestratorFinished((result) => {
-      if (orchRafId !== null) {
-        cancelAnimationFrame(orchRafId);
-        flushOrchBuffer();
-      }
-      setAnalysisRunning(false);
-      setAnalysisCancelling(false);
-      setAnalysisResult(result);
-    });
+    let active = true;
+    pipelineApi
+      .getPreparedBackups(workspace.trim() || undefined)
+      .then((info) => {
+        if (active) setPreparedInfo(info);
+      })
+      .catch((err) => console.error('Failed to read prepared backups:', err));
     return () => {
-      if (mvtRafId !== null) cancelAnimationFrame(mvtRafId);
-      if (orchRafId !== null) cancelAnimationFrame(orchRafId);
-      unsubLog();
-      unsubPassword();
-      unsubFinished();
-      unsubOrchestratorLog();
-      unsubOrchestratorFinished();
+      active = false;
     };
-  }, []);
+  }, [workspace, prepareStatus, analysisStatus]);
+  const preparedByLabel = new Map((preparedInfo?.backups ?? []).map((b) => [b.label, b]));
+  const preparedCount = (preparedInfo?.backups ?? []).filter((b) => b.state === 'prepared').length;
+  // What Analyze reads: the selected backups that are prepared (EPOCH-530).
+  const selection = analysisSelection(selectedLabels, preparedInfo?.backups ?? []);
+  const analysisWorkspace = lastRunWorkspace ?? preparedInfo?.workspace ?? null;
+  // A result from before the latest Prepare doesn't hide Analyze (EPOCH-516).
+  const analysisForRun = analysisShown(analysis, prepare, analysisWorkspace);
+  const analysisRunning = analysisForRun && analysis?.status === 'running';
+  const analysisLog = analysisForRun ? analysisLogAll : [];
+  const analysisResult: PipelineFinishedResult | null = analysisRunning
+    ? null
+    : analysisForRun && analysis?.status === 'finished'
+      ? analysis.result
+      : analysisInterrupted
+        ? { success: false, error: 'A previous analysis run for this workspace was interrupted and never finished.' }
+        : null;
+
+  // Opening the page while a run exists shows that run's folder: once, when
+  // the run's state first arrives (adjusted during render, not in an effect).
+  const [restoredRun, setRestoredRun] = useState(false);
+  if (!restoredRun && prepare) {
+    setRestoredRun(true);
+    if (prepare.status !== 'idle' && prepare.source && selectedPath === null) setSelectedPath(prepare.source);
+  }
+
+  // A new password request starts with an empty field.
+  const [promptFor, setPromptFor] = useState<string | null>(null);
+  if (pendingPasswordFor !== promptFor) {
+    setPromptFor(pendingPasswordFor);
+    setPasswordInput('');
+  }
 
   const handleSelectDirectory = async () => {
     const dir = await pipelineApi.selectBackupDirectory();
@@ -188,31 +200,26 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const selectAllBackups = () => setSelectedLabels(new Set(backups.map((b) => b.label)));
   const selectNoBackups = () => setSelectedLabels(new Set());
 
-  const handleStartPipeline = async () => {
+  // Prepare Again redoes the selected backups from the start; Prepare
+  // Evidence uses the Advanced setting.
+  const handleStartPipeline = async (again = false) => {
     if (!selectedPath || selectedLabels.size === 0) return;
     setIsStarting(true);
     setStartError(null);
-    setLogLines([]);
-    setFinishResult(null);
-    setAnalysisResult(null);
-    setAnalysisLog([]);
     setAnalysisStartError(null);
     setAnalysisCancelling(false);
+    setAnalysisInterrupted(false);
     const selected = Array.from(selectedLabels);
-    setRunProgress(initMvtRunProgress(selected));
     try {
       const options: StartPipelineOptions = {
         workspace: workspace.trim() || undefined,
-        forceDecrypt,
-        refreshIOCs,
+        forceDecrypt: again || forceDecrypt,
         only: selected,
       };
-      const result = await pipelineApi.startPipeline(selectedPath, options);
-      setLastRunWorkspace(result.workspace);
-      setIsRunning(true);
+      // The run's progress and result arrive through the prepare state.
+      await pipelineApi.startPipeline(selectedPath, options);
     } catch (err) {
       setStartError(err instanceof Error ? err.message : 'Unknown error');
-      setRunProgress(null);
     } finally {
       setIsStarting(false);
     }
@@ -221,8 +228,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const handleSubmitPassword = async () => {
     setSubmittingPassword(true);
     try {
-      await pipelineApi.submitMvtPassword(passwordInput);
-      setPendingPasswordFor(null);
+      await pipelineApi.submitBackupPassword(passwordInput);
       setPasswordInput('');
     } catch (err) {
       console.error('Failed to submit password:', err);
@@ -232,22 +238,19 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   };
 
   const handleStartAnalysis = async () => {
-    if (!lastRunWorkspace) return;
+    if (!analysisWorkspace || selection.included.length === 0) return;
     // EPOCH-305 retry actionability: clear every piece of state a stale
     // run could have left behind before dispatching a new one, so "Try
     // again" after a crash/cancel/timeout starts from the same clean slate
     // as a first run rather than carrying forward old logs or a stuck
     // cancelling flag.
-    setAnalysisRunning(true);
     setAnalysisCancelling(false);
     setAnalysisStartError(null);
-    setAnalysisLog([]);
-    setAnalysisResult(null);
+    setAnalysisInterrupted(false);
     try {
-      await pipelineApi.startAnalysis(lastRunWorkspace);
+      await pipelineApi.startAnalysis(analysisWorkspace, selection.included);
     } catch (err) {
       setAnalysisStartError(err instanceof Error ? err.message : 'Unknown error');
-      setAnalysisRunning(false);
     }
   };
 
@@ -256,11 +259,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     setAnalysisCancelling(true);
     try {
       await pipelineApi.cancelAnalysis();
-      // Deliberately not setting analysisRunning(false) here -- the actual
-      // transition out of 'running' happens when onOrchestratorFinished
-      // fires for the kill, same as any other termination path. Flipping
-      // it here too would let the UI show "done" a moment before the
-      // subprocess is actually confirmed gone.
+      // Deliberately not ending the run here -- the transition out of
+      // 'running' arrives with the analysis state once the main process has
+      // seen the subprocess exit, the same as any other termination path.
     } catch (err) {
       setAnalysisCancelling(false);
       setAnalysisStartError(err instanceof Error ? err.message : 'Failed to cancel the running analysis.');
@@ -268,7 +269,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   };
 
   // EPOCH-305 persistence criterion: as soon as a workspace becomes known
-  // (a fresh mvt-runner pass just finished, or -- if this view is ever
+  // (a fresh processor pass just finished, or -- if this view is ever
   // remounted while lastRunWorkspace is already set -- on that remount),
   // check whether a *previous* analysis for it is still marked running in
   // Postgres with nothing in this process actually running it. That state
@@ -277,26 +278,15 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   // run (with a Try again path) is what keeps a re-entered view honest
   // instead of either looking falsely fresh or spinning on nothing.
   useEffect(() => {
-    if (!lastRunWorkspace) return;
+    if (!analysisWorkspace) return;
     let cancelled = false;
 
     pipelineApi
-      .getAnalysisRunStatus(lastRunWorkspace)
+      .getAnalysisRunStatus(analysisWorkspace)
       .then((status) => {
         if (cancelled) return;
-        if (status.status === 'interrupted') {
-          setAnalysisRunning(false);
-          setAnalysisResult({
-            success: false,
-            error: 'A previous analysis run for this workspace was interrupted and never finished.',
-          });
-        } else if (status.status === 'running') {
-          // The view (re)mounted while the main process still has this
-          // workspace's orchestrator tracked as in flight -- reflect that
-          // rather than showing the "start analysis" button over a run
-          // that's genuinely still going.
-          setAnalysisRunning(true);
-        }
+        // A run still going here is shown by the analysis state (EPOCH-487).
+        setAnalysisInterrupted(status.status === 'interrupted');
       })
       .catch((err) => {
         console.error('Failed to check analysis run status:', err);
@@ -305,51 +295,69 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [lastRunWorkspace]);
+  }, [analysisWorkspace]);
 
   const busy = isStarting || isRunning;
 
   const completedBackups = finishResult?.backups?.filter((backup) => backup.success && backup.decrypted);
   const failedBackups = finishResult?.backups?.filter((backup) => !backup.success);
-  const doneCount = completedBackups?.length ?? (runProgress ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'done').length : 0);
-  const failedCount = failedBackups?.length ?? (runProgress
-    ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'failed').length
-    : 0);
+  const doneCount =
+    completedBackups?.length ??
+    (runProgress ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'done').length : 0);
+  const failedCount =
+    failedBackups?.length ??
+    (runProgress ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'failed').length : 0);
   const analysisFailedCount = analysisResult?.analysis?.filter((result) => result.status === 'failed').length ?? 0;
 
-  return (
-    <div className="flex-1 flex flex-col p-8 max-w-4xl mx-auto w-full min-h-full gap-7">
-      <div>
-        <h1 className="font-display text-display font-bold text-foreground tracking-tight mb-2">Start an investigation</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Import an iPhone backup or connect a device to examine evidence for suspicious activity.
-        </p>
-      </div>
+  // The page's steps (DESIGN.md §10, EPOCH-497): what is done, what is
+  // current, what comes next.
+  const selected = Array.from(selectedLabels);
+  const selectedAllPrepared =
+    selected.length > 0 && selected.every((label) => preparedByLabel.get(label)?.state === 'prepared');
+  const analyzed = !!analysisResult?.success && analysisFailedCount === 0;
+  const showAnalyze = !!selectedPath && !busy && (preparedCount > 0 || analysisForRun);
+  const steps: Step[] = [
+    { label: 'Choose Evidence', state: selectedPath ? 'done' : 'current' },
+    {
+      label: 'Prepare Evidence',
+      state: !selectedPath ? 'pending' : !busy && selectedAllPrepared ? 'done' : 'current',
+    },
+    {
+      label: 'Analyze',
+      state: analyzed ? 'done' : selectedPath && !busy && selectedAllPrepared ? 'current' : 'pending',
+    },
+  ];
 
-      {!selectedPath ? (
-        <>
-          <DevicePullPanel onBackupPulled={handleBackupPulled} />
-          <div
-            onClick={handleSelectDirectory}
-            className="group relative flex flex-col items-center justify-center p-12 border-2 border-dashed border-border/90 rounded-2xl bg-surface/30 hover:bg-surface/60 hover:border-accent/60 cursor-pointer transition-all shadow-elevation-1"
-          >
-            <div className="bg-surface-raised p-4 rounded-full shadow-elevation-1 mb-4 group-hover:scale-105 group-hover:shadow-elevation-2 transition-all">
-              <FolderOpen size="2rem" className="text-muted-foreground group-hover:text-accent transition-colors" />
-            </div>
-            <h3 className="font-display text-label text-foreground mb-1">Import an iPhone backup</h3>
-            <p className="text-sm text-muted-foreground mb-5 text-center max-w-md leading-relaxed">
-              Choose the folder containing your iPhone backups. Epoch will identify compatible backups automatically.
-            </p>
-            {/* Decorative -- the parent div (not this element) owns the click handler and
-                group-hover state, so this stays a plain styled button rather than <Button>. */}
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 bg-surface-raised shadow-elevation-1 group-hover:shadow-elevation-2 group-hover:bg-accent group-hover:text-background text-foreground font-semibold px-4 py-2 rounded-lg text-sm transition-all pointer-events-none"
-            >
-              <FolderOpen size="1rem" /> Choose backup folder
-            </button>
-          </div>
-        </>
+  return (
+    <ViewLayout
+      section="workspace"
+      title="New Investigation"
+      description="Import an iPhone backup or connect a device to examine evidence for suspicious activity."
+      width="readable"
+      className="gap-7"
+    >
+      <StepList steps={steps} label="New Investigation steps" className="" />
+      {!selectedPath && importSource === 'device' ? (
+        <DevicePullPanel onBackupPulled={handleBackupPulled} onChangeSource={() => setImportSource(null)} />
+      ) : !selectedPath ? (
+        <div className="grid gap-5 sm:grid-cols-2">
+          <ImportChoice
+            icon={<Smartphone size="2rem" />}
+            title="Pull from a Connected iPhone"
+            description="Make a new encrypted backup of an iPhone connected to this computer by USB."
+            action="Connect an iPhone"
+            tone="accent"
+            onChoose={() => setImportSource('device')}
+          />
+          <ImportChoice
+            icon={<FolderOpen size="2rem" />}
+            title="Use an Existing Backup"
+            description="Choose the folder containing your iPhone backups. Epoch will identify compatible backups automatically."
+            action="Choose Backup Folder"
+            tone="neutral"
+            onChoose={handleSelectDirectory}
+          />
+        </div>
       ) : (
         <>
           <div className="flex items-center gap-3 bg-surface shadow-elevation-1 rounded-xl px-4 py-3">
@@ -358,7 +366,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-label text-muted-foreground uppercase tracking-wider">Evidence location</p>
-              <p className="text-sm font-mono text-foreground font-medium truncate" title={selectedPath}>
+              <p className="text-data font-mono text-foreground truncate" title={selectedPath}>
                 {selectedPath}
               </p>
             </div>
@@ -370,58 +378,74 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             )}
           </div>
 
-          <div className="bg-surface shadow-elevation-2 rounded-xl p-6">
+          <div className="bg-surface shadow-elevation-1 rounded-xl p-6">
             <div className="flex items-center justify-between mb-5">
-              <p className="text-sm font-semibold text-foreground">
-                Backups found{backups.length > 0 ? ` (${backups.length})` : ''}
-              </p>
+              <h2 className="font-display text-heading text-foreground">
+                Backups Found{backups.length > 0 ? ` (${backups.length})` : ''}
+              </h2>
               <div className="flex items-center gap-3">
                 {backups.length > 1 && !busy && (
-                  <div className="flex items-center gap-2 text-xs bg-surface-raised shadow-elevation-1 rounded-lg p-1">
+                  <div className="flex items-center gap-2 text-label bg-surface-raised shadow-elevation-1 rounded-lg p-1">
                     {/* Segmented pill toggle -- a compound control, not a plain button;
                         left on Button.tsx's deferred list rather than forced into `ghost`. */}
                     <button
                       onClick={selectAllBackups}
                       className="px-3 py-1 rounded-md text-foreground/80 hover:text-foreground hover:bg-surface transition-colors cursor-pointer font-medium"
                     >
-                      Select all
+                      Select All
                     </button>
                     <span className="text-border">|</span>
                     <button
                       onClick={selectNoBackups}
                       className="px-3 py-1 rounded-md text-foreground/80 hover:text-foreground hover:bg-surface transition-colors cursor-pointer font-medium"
                     >
-                      Select none
+                      Select None
                     </button>
                   </div>
                 )}
-                <Button
-                  onClick={handleStartPipeline}
-                  disabled={discoveringBackups || selectedLabels.size === 0}
-                  loading={busy}
-                  loadingText={isStarting ? 'Starting...' : 'Running...'}
-                  className="shrink-0"
-                >
-                  <Play size="1rem" fill="currentColor" />
-                  Prepare evidence{selectedLabels.size > 0 ? ` (${selectedLabels.size})` : ''}
-                </Button>
+                {selectedAllPrepared && !busy ? (
+                  // Done already: preparing again is a secondary choice, and
+                  // Analyze is the next step (EPOCH-497).
+                  <Button variant="outline" onClick={() => handleStartPipeline(true)} className="shrink-0">
+                    <RotateCcw size="1rem" />
+                    Prepare Again{selectedLabels.size > 1 ? ` (${selectedLabels.size})` : ''}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => handleStartPipeline()}
+                    disabled={discoveringBackups || selectedLabels.size === 0}
+                    loading={busy}
+                    loadingText={isStarting ? 'Starting…' : 'Running…'}
+                    className="shrink-0"
+                  >
+                    <Play size="1rem" fill="currentColor" />
+                    Prepare Evidence{selectedLabels.size > 0 ? ` (${selectedLabels.size})` : ''}
+                  </Button>
+                )}
               </div>
             </div>
+            <p className="text-data text-muted-foreground mb-4">
+              {selectedAllPrepared && !busy
+                ? 'The selected backups are prepared. Analyze them next; Prepare Again decrypts and reads them again from the start.'
+                : 'Hashes, decrypts and repairs each backup, then reads it with iLEAPP. A large backup takes a while; you can leave this page and come back.'}
+            </p>
 
-            {discoveringBackups && <p className="text-sm text-muted-foreground">Looking for compatible iPhone backups...</p>}
+            {discoveringBackups && (
+              <p className="text-data text-muted-foreground">Looking for compatible iPhone backups…</p>
+            )}
 
             {!discoveringBackups && discoverError && (
-              <p className="text-sm text-danger">Could not scan directory: {discoverError}</p>
+              <p className="text-data text-danger">Could not scan directory: {discoverError}</p>
             )}
 
             {!discoveringBackups && !discoverError && backups.length === 0 && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-data text-muted-foreground">
                 No compatible iPhone backups were found here. Choose the folder where your device backups are stored.
               </p>
             )}
 
             {!discoveringBackups && backups.length > 0 && (
-              <div className="rounded-xl divide-y divide-border/60 max-h-80 overflow-auto bg-surface/40 shadow-inner">
+              <div className="rounded-xl divide-y divide-border/60 max-h-80 overflow-auto bg-surface-raised shadow-inner">
                 {backups.map((b) => {
                   const progress = runProgress?.byLabel[b.label];
                   const isLive = busy && !!progress;
@@ -438,25 +462,20 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       liveProgress={isLive ? progress : undefined}
                       awaitingPassword={isLive && pendingPasswordFor === b.label}
                       lastResult={lastResult}
+                      prepared={preparedByLabel.get(b.label)}
                     />
                   );
                 })}
               </div>
             )}
 
-            <div className="mt-6 pt-5 shadow-elevation-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowOptions((v) => !v)}
-                disabled={busy}
-                className="uppercase tracking-wider font-semibold"
-              >
+            <div className="mt-6 pt-4 border-t border-border/60">
+              <Button variant="ghost" size="sm" onClick={() => setShowOptions((v) => !v)} disabled={busy}>
                 {showOptions ? <ChevronDown size="0.9rem" /> : <ChevronRight size="0.9rem" />}
-                Advanced settings
+                Advanced Settings
               </Button>
               {showOptions && (
-                <div className="mt-4 flex flex-col gap-4 p-4 rounded-xl bg-surface/30 shadow-elevation-1">
+                <div className="mt-4 flex flex-col gap-4 p-4 rounded-xl bg-surface-raised shadow-elevation-1">
                   <label className="flex flex-col gap-2">
                     <span className="text-label uppercase tracking-wider text-muted-foreground">
                       Analysis workspace (optional)
@@ -467,10 +486,10 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       onChange={(e) => setWorkspace(e.target.value)}
                       disabled={busy}
                       placeholder="Use the default workspace"
-                      className="bg-background/90 border border-border/80 focus:border-accent focus:outline-none rounded-lg px-4 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/60 disabled:opacity-50 transition-colors"
+                      className="bg-inset border border-border/80 focus:border-accent focus:outline-none rounded-lg px-4 py-2 text-data font-mono text-foreground placeholder:text-muted-foreground/60 disabled:opacity-50 transition-colors"
                     />
                   </label>
-                  <label className="flex items-center gap-3 text-sm cursor-pointer select-none">
+                  <label className="flex items-center gap-3 text-data cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={forceDecrypt}
@@ -478,17 +497,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       disabled={busy}
                       className="accent-accent w-4 h-4 rounded"
                     />
-                    <span className="text-foreground/90">Process backups again, even if they were previously imported</span>
-                  </label>
-                  <label className="flex items-center gap-3 text-sm cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={refreshIOCs}
-                      onChange={(e) => setRefreshIOCs(e.target.checked)}
-                      disabled={busy}
-                      className="accent-accent w-4 h-4 rounded"
-                    />
-                    <span className="text-foreground/90">Update threat indicators before analysis</span>
+                    <span className="text-foreground/90">
+                      Process backups again, even if they were previously imported
+                    </span>
                   </label>
                 </div>
               )}
@@ -498,11 +509,11 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       )}
 
       {startError && (
-        <div className="flex items-start gap-3 text-danger bg-danger/10 border border-danger/30 rounded-xl p-4 sm:p-5 text-sm shadow-elevation-1">
+        <div className="flex items-start gap-3 text-danger bg-danger/10 border border-danger/30 rounded-xl p-4 sm:p-5 text-data shadow-elevation-1">
           <AlertCircle size="1.25rem" className="shrink-0 mt-1" />
           <div>
-            <p className="font-medium">Failed to start preparation</p>
-            <p className="text-xs text-danger/80 mt-1">{startError}</p>
+            <p>Failed to start preparation</p>
+            <p className="text-danger/80 mt-1">{startError}</p>
           </div>
         </div>
       )}
@@ -510,24 +521,24 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       {finishResult && runProgress && (
         <div
           className={`flex items-start gap-4 rounded-xl p-5 shadow-elevation-1 ${
-            failedCount === 0 ? 'bg-accent/10 border border-accent/30' : 'bg-danger/10 border border-danger/30'
+            failedCount === 0 ? 'bg-success/10 border border-success/30' : 'bg-danger/10 border border-danger/30'
           }`}
         >
           {failedCount === 0 ? (
-            <CheckCircle2 className="text-accent shrink-0 mt-1" size="1.25rem" />
+            <CheckCircle2 className="text-success shrink-0 mt-1" size="1.25rem" />
           ) : (
             <XCircle className="text-danger shrink-0 mt-1" size="1.25rem" />
           )}
-          <div className="text-sm">
-            <p className={failedCount === 0 ? 'text-accent font-semibold' : 'text-danger font-semibold'}>
+          <div className="text-data">
+            <p className={failedCount === 0 ? 'text-success' : 'text-danger'}>
               {failedCount === 0
-                ? `Analysis completed for all ${doneCount} backup${doneCount === 1 ? '' : 's'}.`
+                ? `Evidence prepared for ${doneCount === 1 ? 'the backup' : `all ${doneCount} backups`}. Analyze it next.`
                 : `${doneCount} of ${runProgress.order.length} backup${
                     runProgress.order.length === 1 ? '' : 's'
-                  } finished; ${failedCount} couldn't be completed.`}
+                  } prepared; ${failedCount} couldn't be prepared.`}
             </p>
             {!finishResult.success && finishResult.error && (
-              <p className="text-muted-foreground text-xs mt-1">{finishResult.error}</p>
+              <p className="text-muted-foreground mt-1">{finishResult.error}</p>
             )}
           </div>
         </div>
@@ -535,30 +546,54 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
       {(isRunning || logLines.length > 0) && <TerminalLog lines={logLines} live={isRunning} />}
 
-      {finishResult && runProgress && doneCount > 0 && lastRunWorkspace && (
-        <div className="bg-surface shadow-elevation-2 rounded-xl p-6">
+      {showAnalyze && (
+        <div className="bg-surface shadow-elevation-1 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-md bg-accent/10 text-accent">
               <Microscope size="1.25rem" />
             </div>
             <div>
-              <h3 className="font-display text-label text-foreground">Run forensic analysis</h3>
-              <p className="text-xs text-muted-foreground">Examine prepared data for threat indicators and timeline anomalies</p>
+              <h2 className="font-display text-heading text-foreground">Analyze</h2>
+              <p className="text-data text-muted-foreground">
+                Creates the investigation: its facts and its report appear under Investigations.
+              </p>
             </div>
           </div>
 
           {!analysisRunning && !analysisResult && (
             <div className="mt-4">
-              <p className="text-sm text-foreground/80 leading-relaxed mb-4">
-                Run forensic analysis on the {doneCount} prepared backup{doneCount === 1 ? '' : 's'} to find indicators,
-                and timeline anomalies.
-              </p>
-              <Button onClick={handleStartAnalysis}>
+              {selection.included.length > 0 ? (
+                <p className="text-data text-foreground/80 mb-4">
+                  {selection.included.length === 1
+                    ? `Analyze reads the selected backup ${selection.included[0]}. Its crash logs and iLEAPP's records become facts, they are`
+                    : `Analyze reads the ${selection.included.length} selected backups: ${listLabels(selection.included)}. Their crash logs and iLEAPP's records become facts, they are`}{' '}
+                  checked against the newest registered indicator set, if one is registered, and the investigation
+                  report is written. AI-assisted analysis is not available yet; the report lists it as not examined.
+                  {selection.included.length > 1 && ' Each backup becomes its own investigation.'}
+                </p>
+              ) : (
+                <p className="text-data text-foreground/80 mb-4">Select a prepared backup above to analyze it.</p>
+              )}
+              {selection.notIncluded.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-label text-muted-foreground mb-1">Not included</h3>
+                  <ul className="list-disc pl-5 space-y-0.5 text-data text-foreground/80">
+                    {selection.notIncluded.map(({ label, reason }) => (
+                      <li key={label}>
+                        <span className="font-mono">{label}</span>: {reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <Button onClick={handleStartAnalysis} disabled={selection.included.length === 0}>
                 <Microscope size="1rem" />
-                Run forensic analysis on {doneCount} backup{doneCount === 1 ? '' : 's'}
+                {selection.included.length > 1
+                  ? `Analyze and Create ${selection.included.length} Investigations`
+                  : 'Analyze and Create Investigation'}
               </Button>
               {analysisStartError && (
-                <div className="flex items-center gap-1.5 text-sm text-danger mt-3">
+                <div className="flex items-center gap-1.5 text-data text-danger mt-3">
                   <AlertCircle size="1rem" />
                   <span>{analysisStartError}</span>
                 </div>
@@ -568,9 +603,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
           {analysisRunning && (
             <div className="flex items-center justify-between gap-3 py-3">
-              <div className="flex items-center gap-1.5 text-sm text-flag">
-                <Loader className="text-flag" />
-                <span>{analysisCancelling ? 'Stopping analysis...' : 'Examining the imported evidence...'}</span>
+              <div className="flex items-center gap-1.5 text-data text-accent">
+                <Loader className="text-accent" />
+                <span>{analysisCancelling ? 'Stopping analysis…' : 'Examining the imported evidence…'}</span>
               </div>
               {/* EPOCH-305: always available while running, so a stalled or
                * abnormally long run can be broken out of without restarting
@@ -584,7 +619,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                 disabled={analysisCancelling}
               >
                 <XCircle size="0.875rem" />
-                {analysisCancelling ? 'Stopping...' : 'Cancel'}
+                {analysisCancelling ? 'Stopping…' : 'Cancel'}
               </Button>
             </div>
           )}
@@ -593,13 +628,15 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             <div>
               {analysisResult.success && analysisFailedCount === 0 ? (
                 <div>
-                  <p className="text-sm text-accent flex items-center gap-1.5 mb-3">
-                    <CheckCircle2 size="1rem" /> Analysis complete.
+                  <p className="text-data text-success flex items-center gap-1.5 mb-3">
+                    <CheckCircle2 size="1rem" /> Investigation created.
                   </p>
                   {analysisResult.analysis && (
-                    <p className="text-xs text-muted-foreground mb-3">
+                    <p className="text-data text-muted-foreground mb-3">
                       {analysisResult.analysis.filter((result) => result.status === 'succeeded').length} investigation
-                      {analysisResult.analysis.filter((result) => result.status === 'succeeded').length === 1 ? '' : 's'}
+                      {analysisResult.analysis.filter((result) => result.status === 'succeeded').length === 1
+                        ? ''
+                        : 's'}
                       analyzed
                       {analysisResult.analysis.filter((result) => result.status === 'skipped').length > 0
                         ? `, ${analysisResult.analysis.filter((result) => result.status === 'skipped').length} already up to date`
@@ -608,13 +645,13 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                     </p>
                   )}
                   <Button onClick={onAnalysisComplete}>
-                    View investigation
+                    View Investigation
                     <ArrowRight size="1rem" />
                   </Button>
                 </div>
               ) : (
                 <div>
-                  <p className="text-sm text-danger flex items-center gap-1.5">
+                  <p className="text-data text-danger flex items-center gap-1.5">
                     <XCircle size="1rem" />
                     {/* EPOCH-305: cancelled/timedOut/interrupted all reach
                      * this same branch (success: false) -- distinguish them
@@ -622,23 +659,28 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                     {analysisResult.cancelled
                       ? 'Analysis was cancelled.'
                       : analysisResult.timedOut
-                        ? analysisResult.error ?? 'Analysis timed out and was stopped.'
+                        ? (analysisResult.error ?? 'Analysis timed out and was stopped.')
                         : analysisFailedCount > 0
                           ? `Analysis completed with ${analysisFailedCount} investigation${analysisFailedCount === 1 ? '' : 's'} needing attention.`
                           : `Analysis failed${analysisResult.error ? `: ${analysisResult.error}` : '.'}`}
                   </p>
                   {analysisResult.analysis && (
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-data text-muted-foreground mt-1">
                       {analysisResult.analysis.filter((result) => result.status === 'failed').length} investigation
                       {analysisResult.analysis.filter((result) => result.status === 'failed').length === 1 ? '' : 's'}
                       need attention.
                     </p>
                   )}
-                  {/* "Try again" reads as an inline link (accent color, underline-on-hover),
-                      not a restatement of `ghost` -- deferred per Button.tsx's header note. */}
-                  <button onClick={handleStartAnalysis} className="text-xs text-accent hover:underline mt-2">
-                    Try again
-                  </button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleStartAnalysis}
+                    disabled={selection.included.length === 0}
+                    className="mt-3"
+                  >
+                    <RotateCcw size="0.875rem" />
+                    Try Again
+                  </Button>
                 </div>
               )}
             </div>
@@ -652,12 +694,14 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         </div>
       )}
 
-      {!selectedPath && (
-        <div className="flex items-start gap-4 bg-surface-raised/40 shadow-elevation-1 rounded-xl p-4 sm:p-5">
-          <AlertCircle className="text-accent shrink-0 mt-1" size="1.125rem" />
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            <strong className="text-foreground font-semibold">Tip:</strong> Connect an iPhone by USB to import a fresh backup,
-            or choose an existing backup folder from your computer.
+      {!selectedPath && importSource === null && (
+        <div className="flex items-start gap-4 bg-surface shadow-elevation-1 rounded-xl p-4 sm:p-5">
+          <div className="p-2 rounded-lg bg-section/15 text-section shrink-0">
+            <Lightbulb size="1.125rem" />
+          </div>
+          <p className="text-data text-muted-foreground">
+            <strong className="text-foreground font-semibold">Tip:</strong> Connect an iPhone by USB to import a fresh
+            backup, or choose an existing backup folder from your computer.
           </p>
         </div>
       )}
@@ -665,10 +709,10 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       {pendingPasswordFor && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-surface shadow-elevation-3 rounded-xl p-6 w-full max-w-sm">
-            <h3 className="font-display text-label mb-1 text-foreground">Password required</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <h2 className="font-display text-heading mb-1 text-foreground">Password Required</h2>
+            <p className="text-data text-muted-foreground mb-4">
               The selected backup requires its password for{' '}
-              <span className="font-mono text-foreground font-medium">{pendingPasswordFor}</span>.
+              <span className="font-mono text-foreground">{pendingPasswordFor}</span>.
             </p>
             <input
               type="password"
@@ -677,12 +721,12 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
               onKeyDown={(e) => e.key === 'Enter' && !submittingPassword && handleSubmitPassword()}
               autoFocus
               disabled={submittingPassword}
-              className="w-full bg-surface-raised border border-border focus:border-accent focus:outline-hidden rounded-lg px-4 py-3 text-sm font-mono text-foreground mb-4 disabled:opacity-50 transition-colors"
+              className="w-full bg-surface-raised border border-border focus:border-accent focus:outline-hidden rounded-lg px-4 py-3 text-data font-mono text-foreground mb-4 disabled:opacity-50 transition-colors"
             />
             <Button
               onClick={handleSubmitPassword}
               loading={submittingPassword}
-              loadingText="Submitting..."
+              loadingText="Submitting…"
               className="w-full"
             >
               Continue
@@ -690,6 +734,39 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
           </div>
         </div>
       )}
-    </div>
+    </ViewLayout>
+  );
+}
+interface ImportChoiceProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  action: string;
+  /** The icon chip's colour, so the two paths read apart at a glance (DESIGN.md §9). */
+  tone: 'accent' | 'neutral';
+  onChoose: () => void;
+}
+
+/** One way to import evidence; choosing it hides the other (EPOCH-467). */
+function ImportChoice({ icon, title, description, action, tone, onChoose }: ImportChoiceProps) {
+  return (
+    <button
+      type="button"
+      onClick={onChoose}
+      className="group flex flex-col items-center text-center p-8 rounded-2xl bg-surface border-2 border-accent/30 hover:border-accent hover:bg-accent/5 shadow-elevation-1 hover:shadow-elevation-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:border-accent"
+    >
+      <div
+        className={`p-4 rounded-full mb-4 group-hover:scale-105 transition-transform ${
+          tone === 'accent' ? 'bg-accent/15 text-accent ring-1 ring-accent/30' : 'bg-surface-raised text-foreground'
+        }`}
+      >
+        {icon}
+      </div>
+      <h2 className="font-display text-heading text-foreground mb-1">{title}</h2>
+      <p className="text-data text-muted-foreground mb-5 max-w-md">{description}</p>
+      <span className="inline-flex items-center gap-1.5 bg-accent text-background shadow-elevation-2 group-hover:bg-accent/90 px-4 py-2 rounded-lg text-label font-semibold transition-all">
+        {action}
+      </span>
+    </button>
   );
 }

@@ -11,12 +11,6 @@ import { TooltipProvider } from './components/ui/Tooltip';
 import { useEpochStore } from './store/useEpochStore';
 import { runsApi } from './api/runs';
 
-function runPhase(run: PipelineRunRow): 'in_progress' | 'finished' {
-  return run.finished_at ? 'finished' : 'in_progress';
-}
-
-const IOC_SOURCE_TYPES = ['mvt_ioc_detection', 'timestamp_anomaly'] as const;
-
 export const App: React.FC = () => {
   const {
     section,
@@ -87,21 +81,24 @@ export const App: React.FC = () => {
     }
   };
 
-  const refreshRun = useCallback(async (runId: string) => {
-    try {
-      const data = await runsApi.getPipelineRuns();
-      setRuns(data);
-      const refreshedRun = data.find((run) => run.run_id === runId);
-      const currentSelectedRun = useEpochStore.getState().selectedRun;
-      if (refreshedRun && currentSelectedRun?.run_id === runId) {
-        setSelectedRun(refreshedRun);
+  const refreshRun = useCallback(
+    async (runId: string) => {
+      try {
+        const data = await runsApi.getPipelineRuns();
+        setRuns(data);
+        const refreshedRun = data.find((run) => run.run_id === runId);
+        const currentSelectedRun = useEpochStore.getState().selectedRun;
+        if (refreshedRun && currentSelectedRun?.run_id === runId) {
+          setSelectedRun(refreshedRun);
+        }
+        setDbStatus('connected');
+      } catch (err) {
+        console.error('Failed to refresh run:', err);
+        setDbStatus('error');
       }
-      setDbStatus('connected');
-    } catch (err) {
-      console.error('Failed to refresh run:', err);
-      setDbStatus('error');
-    }
-  }, [setDbStatus, setRuns, setSelectedRun]);
+    },
+    [setDbStatus, setRuns, setSelectedRun]
+  );
 
   const loadRecords = async (run: PipelineRunRow) => {
     if (!run.evidence_id) {
@@ -126,16 +123,13 @@ export const App: React.FC = () => {
 
   const handleSectionSelect = (next: Section) => {
     setSection(next);
-    if ((next === 'records' || next === 'iocs') && selectedRun && !recordsLoaded) {
+    if (next === 'records' && selectedRun && !recordsLoaded) {
       loadRecords(selectedRun);
     }
   };
 
-  const nonIocRecords = records.filter((r) => !(IOC_SOURCE_TYPES as readonly string[]).includes(r.source_type));
-  const availableSourceTypes = Array.from(new Set(nonIocRecords.map((r) => r.source_type))).sort();
-  const visibleRecords = sourceTypeFilter
-    ? nonIocRecords.filter((r) => r.source_type === sourceTypeFilter)
-    : nonIocRecords;
+  const availableSourceTypes = Array.from(new Set(records.map((r) => r.source_type))).sort();
+  const visibleRecords = sourceTypeFilter ? records.filter((r) => r.source_type === sourceTypeFilter) : records;
 
   return (
     <TooltipProvider>
@@ -143,9 +137,10 @@ export const App: React.FC = () => {
         <Sidebar active={section} onSelect={handleSectionSelect} dbStatus={dbStatus} />
 
         <div className="flex-1 flex flex-col min-w-0">
-          {selectedRun && <EvidenceTag run={selectedRun} phase={runPhase(selectedRun)} />}
+          {selectedRun && <EvidenceTag run={selectedRun} />}
 
-          <div className="flex-1 overflow-auto p-8">
+          {/* The one place a view's gutter is set (EPOCH-464, DESIGN.md §6). */}
+          <div className="flex-1 min-h-0 overflow-auto p-8 flex flex-col">
             {section === 'workspace' && (
               <WorkspaceView
                 onAnalysisComplete={() => {
@@ -181,15 +176,9 @@ export const App: React.FC = () => {
               />
             )}
 
-            {section === 'iocs' && (
-              <IocsView selectedRun={selectedRun} />
-            )}
+            {section === 'iocs' && <IocsView selectedRun={selectedRun} />}
 
-            {section === 'reports' && (
-              <ReportsView 
-                selectedRun={selectedRun} 
-              />
-            )}
+            {section === 'reports' && <ReportsView selectedRun={selectedRun} />}
           </div>
         </div>
       </div>

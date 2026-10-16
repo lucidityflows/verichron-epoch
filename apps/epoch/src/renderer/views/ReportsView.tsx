@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import { FileQuestion, FileText, MousePointerClick } from 'lucide-react';
 import type { PipelineRunRow } from '@verichron/etl-db-reader';
 import type { ReportResult } from '../../shared/types/window';
 import { Button } from '../components/ui/Button';
 import { reportsApi } from '../api/reports';
- 
+import { ViewLayout } from '../components/layout/ViewLayout';
+import { EmptyState } from '../components/ui/EmptyState';
+
 interface ReportsViewProps {
   selectedRun: PipelineRunRow | null;
 }
- 
+
 export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
   const [report, setReport] = useState<ReportResult | null>(null);
   const [reportLoadError, setReportLoadError] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
- 
+
   const loadReport = async (run: PipelineRunRow) => {
     setReportLoading(true);
     setReportLoadError(null);
@@ -26,7 +29,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
       setReportLoading(false);
     }
   };
- 
+
   useEffect(() => {
     if (selectedRun) {
       loadReport(selectedRun);
@@ -34,36 +37,36 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
       setReport(null);
     }
   }, [selectedRun]);
- 
+
   const openReportFile = async () => {
     if (!selectedRun) return;
     const opened = await reportsApi.openReport(selectedRun.run_id);
     if (!opened) console.error('Failed to open report in default app');
   };
- 
+
   return (
-    <div>
-      <h2 className="font-display text-display text-accent mb-6">Reports</h2>
+    <ViewLayout section="reports" title="Reports">
       {!selectedRun ? (
-        <p className="text-muted-foreground text-sm">Select an investigation first.</p>
+        <EmptyState
+          icon={MousePointerClick}
+          title="No investigation selected"
+          detail="Select an investigation in Investigations to see its report."
+        />
       ) : reportLoadError ? (
         // §1 state-color banner rule: shadow-elevation-1 + state-color border together, never border alone.
         <div className="text-flag bg-flag/10 shadow-elevation-1 border border-flag/30 rounded-lg p-4 text-data">
           Error: {reportLoadError}
         </div>
       ) : reportLoading || !report ? (
-        <p className="text-muted-foreground text-sm">Loading...</p>
-      ) : report.status === 'no-results-path' ? (
-        <div className="bg-surface shadow-elevation-1 rounded-lg p-5 text-data text-muted-foreground">
-          This run has no registered evidence location (it predates evidence registration), so its
-          report can't be located.
-        </div>
+        <EmptyState loading title="Loading the report…" />
+      ) : report.status === 'no-report-path' ? (
+        <EmptyState
+          icon={FileQuestion}
+          title="Report location unknown"
+          detail="This run has no registered evidence location (it predates evidence registration), so its report can't be located."
+        />
       ) : report.status === 'not-found' ? (
-        <div className="bg-surface shadow-elevation-1 rounded-lg p-5 text-data text-muted-foreground">
-          No report generated yet. Expected at:
-          <br />
-          <span className="font-mono text-data">{report.path}</span>
-        </div>
+        <EmptyState icon={FileText} title="No report generated yet" detail={<>Expected at {report.path}</>} />
       ) : (
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -72,7 +75,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
                 control -- routed through the shared elevation-based Button primitive
                 instead, which also brings text-label for free (§2). */}
             <Button variant="outline" size="sm" onClick={openReportFile}>
-              Open in default app
+              Open in Default App
             </Button>
           </div>
           {/* §1: was bg-surface + flat border -- panel containers use elevation, not
@@ -82,6 +85,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
           </pre>
         </div>
       )}
-    </div>
+    </ViewLayout>
   );
 };

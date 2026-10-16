@@ -14,8 +14,8 @@
 #
 # Environments it creates:
 #   .venv/           the uv workspace (our Python code), Python from .python-version
-#   tools/mvt/.venv     mvt-ios, pinned; run by mvt-runner
-#   tools/ileapp/.venv  iLEAPP's runtime, pinned; run by the iLEAPP bridge
+#   tools/decrypt/.venv the backup decrypt, pinned; run by the processor
+#   tools/ileapp/.venv  iLEAPP's runtime, pinned; run by the processor
 #   node_modules/    the pnpm workspace
 
 set -euo pipefail
@@ -139,8 +139,8 @@ echo "  done  submodules (iLEAPP)"
 uv sync --locked
 echo "  done  workspace .venv (Python $PYTHON_WANT)"
 
-uv sync --locked --project tools/mvt
-echo "  done  tools/mvt/.venv ($(tools/mvt/.venv/bin/mvt-ios version 2>/dev/null | sed -n 's/^ *Version: *//p'))"
+uv sync --locked --project tools/decrypt
+echo "  done  tools/decrypt/.venv ($(tools/decrypt/.venv/bin/python -I tools/decrypt/decrypt_backup.py --version 2>/dev/null))"
 
 uv sync --locked --project tools/ileapp
 echo "  done  tools/ileapp/.venv"
@@ -148,10 +148,12 @@ echo "  done  tools/ileapp/.venv"
 pnpm install --frozen-lockfile
 echo "  done  node_modules"
 
+git config core.hooksPath .githooks
+echo "  done  git hooks (.githooks)"
+
 cat <<EOF
 
 [setup] complete. Next:
   docker compose -f infra/docker-compose.yml up -d postgres
-  set -a; . ./.env; set +a
-  uv run python packages/etl-db-writer/migrate.py --db-url "postgresql://\$DB_USER:\$DB_PASSWORD@\$DB_HOST:\$DB_PORT/\$DB_NAME"
+  uv run python packages/etl-db-writer/migrate.py
 EOF

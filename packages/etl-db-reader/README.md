@@ -8,10 +8,9 @@ writes or commits.
 |---|---|
 | `getPipelineRuns` | Recent runs, with `state` from `run_completeness` (R23) |
 | `getRunEvidence` | The evidence a run processed |
-| `getRunResultsLocation` | Where a run's results, and its report, are now: the mvt results it read, else the path derived from its decrypt; follows a moved workspace |
+| `getRunReportLocation` | Where a run's report is now (`<workspace>/reports/<label>/`), derived from its decrypt; follows a moved workspace |
 | `getStageStatus` | A run's stages |
 | `getForensicRecords` | One evidence's facts: keyset-paged, with the true total and a cursor (R25), and only allow-listed sorts and filters |
-| `getCorrelationPivots`, `getCorrelatedContext` | IOC detections and the activity around each |
 
 Facts are read through `current_forensic_records`, the same view the report
 uses (R27).
@@ -22,5 +21,6 @@ uses (R27).
 pnpm --filter @verichron/etl-db-reader test    # needs TEST_DATABASE_URL (a throwaway database)
 ```
 
-**Known issues:** the correlation window is also defined in the report
-(EPOCH-425), and stage order is hard-coded here (EPOCH-414).
+**Known issues:** stage order is hard-coded here (EPOCH-414). The indicator
+correlation reads were removed with mvt-ios (EPOCH-489) and return with
+indicator matching (EPOCH-491).

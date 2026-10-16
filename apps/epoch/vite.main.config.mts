@@ -10,7 +10,7 @@ export default defineConfig({
       fileName: () => 'main.js', // forces exact output filename
     },
     rollupOptions: {
-      // @verichron/db-reader is a CJS workspace package (compiled via
+      // @verichron/etl-db-reader is a CJS workspace package (compiled via
       // tsc, not Vite/Rollup) whose re-exports use TypeScript's
       // Object.defineProperty getter pattern. Rollup can't statically
       // analyze that as ESM named exports, so bundling it fails with

@@ -8,8 +8,8 @@ reached the bad state on their *ordinary* error paths, no interruption required.
 
   crash/main.py            committed the ledger row, then `continue`d when
                            parse_ips_file() returned an error
-  mvt_iocs.process_alerts  committed the ledger row, then `return`ed when
-                           alerts.json would not parse
+  mvt_iocs.process_alerts  the same when alerts.json would not parse (the
+                           extractor was removed with mvt-ios, EPOCH-489)
   ileapp_bridge
     .process_artifact_file committed the ledger row, then `return`ed when every
                            record in the artifact failed to normalize
@@ -26,21 +26,32 @@ the fix changed the extractors and not just db_writer.py.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-
-import pytest
 
 import crash.main as crash_main
-import mvt_iocs.main as mvt_main
+import pytest
+from db_writer import IngestContext
 from testing.pg_real import BACKENDS, open_db
 
 RUN_ID = "aaaaaaaa-0000-0000-0000-000000000000"
 RETRY_RUN_ID = "bbbbbbbb-0000-0000-0000-000000000000"
 
 
+EVIDENCE_ID = "aaaa0000-0000-0000-0000-00000000000a"
+DERIVATIVE_ID = "aaaa0000-0000-0000-0000-0000000000da"
+OTHER_EVIDENCE_ID = "bbbb0000-0000-0000-0000-00000000000b"
+OTHER_DERIVATIVE_ID = "bbbb0000-0000-0000-0000-0000000000db"
+SEEDED_EVIDENCE = {EVIDENCE_ID: DERIVATIVE_ID, OTHER_EVIDENCE_ID: OTHER_DERIVATIVE_ID}
+
+
+def ctx(run_id: str, evidence_id: str = EVIDENCE_ID) -> IngestContext:
+    return IngestContext(
+        evidence_id=evidence_id, derivative_id=SEEDED_EVIDENCE[evidence_id], run_id=run_id, parser_version=1
+    )
+
+
 @pytest.fixture(params=BACKENDS)
 def db(request):
-    yield from open_db(request.param, (RUN_ID, RETRY_RUN_ID))
+    yield from open_db(request.param, (RUN_ID, RETRY_RUN_ID), SEEDED_EVIDENCE)
 
 
 # ==========================================================================
@@ -52,7 +63,7 @@ def test_unparseable_ips_file_is_reported_failed_and_left_retryable(db, tmp_path
     bad = tmp_path / "broken.ips"
     bad.write_text("this is not an ips file")
 
-    result = crash_main.run(db, RUN_ID, str(tmp_path))
+    result = crash_main.run(db, ctx(RUN_ID), str(tmp_path))
 
     assert result.succeeded == 0
     assert result.failed == 1
@@ -72,7 +83,7 @@ def test_one_bad_ips_file_does_not_prevent_the_good_ones(db, tmp_path):
     good = _valid_ips()
     (tmp_path / "good.ips").write_text(good)
 
-    result = crash_main.run(db, RUN_ID, str(tmp_path))
+    result = crash_main.run(db, ctx(RUN_ID), str(tmp_path))
 
     assert result.failed == 1
     assert result.succeeded == 1
@@ -87,33 +98,60 @@ def test_a_previously_failed_ips_file_is_retried_on_the_next_run(db, tmp_path):
     target = tmp_path / "evidence.ips"
     target.write_text("garbage")
 
-    first = crash_main.run(db, RUN_ID, str(tmp_path))
+    first = crash_main.run(db, ctx(RUN_ID), str(tmp_path))
     assert first.failed == 1
 
     # The file is repaired (or was truncated mid-copy the first time).
     target.write_text(_valid_ips())
 
-    retry = crash_main.run(db, RETRY_RUN_ID, str(tmp_path))
+    retry = crash_main.run(db, ctx(RETRY_RUN_ID), str(tmp_path))
     assert retry.failed == 0
     assert retry.succeeded == 1, "the retried file must actually be ingested, not skipped"
     assert db.record_count() == 1
 
 
+def test_every_real_ips_shape_is_ingested_and_other_device_files_are_counted(db, tmp_path):
+    """EPOCH-447: the redacted real fixtures (JSON, text and binary bodies)
+    each become one record; the device's other diagnostic files are named in
+    the stage's notes, never dropped silently."""
+    import shutil
+    from pathlib import Path
+
+    fixtures = Path(crash_main.__file__).parent / "fixtures"
+    for ips in fixtures.glob("*.ips"):
+        shutil.copy(ips, tmp_path / ips.name)
+    (tmp_path / "Analytics-2026-01-02.ca").write_text("{}")
+    (tmp_path / "DiagnosticLogs").mkdir()
+    (tmp_path / "DiagnosticLogs" / "boot.log").write_text("log")
+    # The processor's completion marker is not a device file (EPOCH-518).
+    (tmp_path / ".crash_reports_ok").write_text("{}")
+
+    result = crash_main.run(db, ctx(RUN_ID), str(tmp_path))
+
+    assert result.failed == 0, result.failures
+    assert result.succeeded == 4
+    assert db.record_count() == 4
+    assert result.notes == ["2 file(s) not read, not .ips crash reports: 1 .ca, 1 .log"]
+
+
 def test_a_successful_ips_file_is_deduped_not_duplicated(db, tmp_path):
-    """A resumed run still counts an already-complete file as succeeded — it is
-    successfully in the database, and reporting it as skipped would make a
-    resumed run look like it had lost files. What must not happen is a second
-    copy of the records."""
+    """A resumed run writes nothing for an already-complete file, so it counts
+    zero records (EPOCH-421), and notes the file as already ingested so it
+    doesn't read as lost. What must not happen is a second copy of the records."""
     (tmp_path / "good.ips").write_text(_valid_ips())
 
-    crash_main.run(db, RUN_ID, str(tmp_path))
-    retry = crash_main.run(db, RETRY_RUN_ID, str(tmp_path))
+    crash_main.run(db, ctx(RUN_ID), str(tmp_path))
+    retry = crash_main.run(db, ctx(RETRY_RUN_ID), str(tmp_path))
 
     assert retry.failed == 0
-    assert retry.succeeded == 1
+    assert retry.succeeded == 0, "the retry wrote no records"
+    assert retry.notes == ["good.ips: already ingested; nothing new was written"]
     assert db.record_count() == 1, "dedup must not duplicate evidence"
     assert len(db.ledger()) == 1
-    assert db.ledger()[0]["run_id"] == RUN_ID, "the original ingest run is preserved"
+    assert db.ledger()[0]["produced_by_runs"] == [RUN_ID, RETRY_RUN_ID], (
+        "one unit for one evidence item, labeled with both runs that saw it (R7)"
+    )
+    assert db.ledger()[0]["parser_version"] == 1, "stamped from the context, not the extractor"
 
 
 def _valid_ips() -> str:
@@ -129,61 +167,51 @@ def _valid_ips() -> str:
     return json.dumps(header) + "\n" + json.dumps(payload) + "\n"
 
 
+def test_an_identical_file_in_two_backups_is_ingested_for_both(db, tmp_path):
+    """EPOCH-402's regression: a file can be byte-identical across backups.
+    Under the old global file-hash dedup the second backup's ingest was
+    silently skipped. Each evidence item gets its own unit."""
+    for name in ("backup_a", "backup_b"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "same.ips").write_text(_valid_ips())
+
+    first = crash_main.run(db, ctx(RUN_ID, EVIDENCE_ID), str(tmp_path / "backup_a"))
+    second = crash_main.run(db, ctx(RUN_ID, OTHER_EVIDENCE_ID), str(tmp_path / "backup_b"))
+
+    assert first.failed == second.failed == 0
+    ledger = db.ledger()
+    assert len(ledger) == 2
+    assert {row["evidence_id"] for row in ledger} == {EVIDENCE_ID, OTHER_EVIDENCE_ID}
+    assert all(row["ingest_complete"] for row in ledger)
+
+
 # ==========================================================================
-# mvt_iocs extractor
+# analysis (LLM findings)
 # ==========================================================================
 
 
-def test_unparseable_alerts_json_is_reported_failed_and_left_retryable(db, tmp_path):
-    (tmp_path / "alerts.json").write_text("{ not valid json")
+def test_llm_findings_ingest_through_the_evidence_scoped_door(db, tmp_path):
+    """The analysis stage is the fourth writer. It was missed in the first
+    EPOCH-402 pass and kept calling ingest() with a bare run_id, so every
+    file's findings failed with a TypeError. Driven end to end here so it
+    can't silently fall behind the writer's signature again."""
+    import analysis.automated_forensics as analysis_main
 
-    result = mvt_main.process_alerts(db, RUN_ID, tmp_path)
-
-    assert result.succeeded == 0
-    assert result.failed == 1
-    assert result.failures
-    assert db.ledger() == [], (
-        "a malformed alerts.json left a ledger row, so the MVT detections for "
-        "this backup would never be ingested by any later run"
+    analyzed = tmp_path / "datausage.json"
+    analyzed.write_text("{}")
+    checkpoint = analysis_main.init_checkpoint_db(str(tmp_path / "checkpoint.db"))
+    checkpoint.execute(
+        "INSERT INTO chunk_status (file_name, chunk_index, total_chunks, status, result_rows, updated_at) "
+        "VALUES (?, 0, 1, 'flagged', ?, '2026-10-07T00:00:00Z')",
+        (analyzed.name, json.dumps(["| 101 | suspicious_proc | High | odd network use |"])),
     )
+    checkpoint.commit()
 
+    result = analysis_main.ingest_file_findings(db, ctx(RUN_ID), str(analyzed), checkpoint, analyzed.name)
 
-def test_repaired_alerts_json_is_ingested_on_retry(db, tmp_path):
-    alerts = tmp_path / "alerts.json"
-    alerts.write_text("{ not valid json")
-    mvt_main.process_alerts(db, RUN_ID, tmp_path)
-
-    alerts.write_text(json.dumps([]))
-    result = mvt_main.process_alerts(db, RETRY_RUN_ID, tmp_path)
-
-    assert result.failed == 0
-    assert db.ledger(), "the retried file should now be recorded"
-    assert db.ledger()[0]["ingest_complete"] == 1
-
-
-def test_empty_alerts_json_completes_rather_than_retrying_forever(db, tmp_path):
-    """A clean backup legitimately has zero detections. That is a completed
-    ingest with record_count = 0, not an unfinished one."""
-    (tmp_path / "alerts.json").write_text(json.dumps([]))
-
-    result = mvt_main.process_alerts(db, RUN_ID, tmp_path)
-    assert result.failed == 0
-
-    row = db.ledger()[0]
-    assert row["ingest_complete"] == 1
-    assert row["record_count"] == 0
-
-    # Second run must treat it as done.
-    retry = mvt_main.process_alerts(db, RETRY_RUN_ID, tmp_path)
-    assert retry.failed == 0
-    assert retry.succeeded == 0
-    assert len(db.ledger()) == 1
-
-
-def test_missing_alerts_json_is_not_a_failure(db, tmp_path):
-    """No alerts.json at all means mvt did not produce one; that is a skip, and
-    it must not create a ledger row for a file that does not exist."""
-    result = mvt_main.process_alerts(db, RUN_ID, tmp_path)
-
-    assert (result.succeeded, result.failed) == (0, 0)
-    assert db.ledger() == []
+    assert result.failed == 0, result.failures
+    ledger = db.ledger()
+    assert len(ledger) == 1
+    assert ledger[0]["payload_kind"] == "none"
+    assert ledger[0]["parser_version"] == 1
+    assert db.record_count() == 1

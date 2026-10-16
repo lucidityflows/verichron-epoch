@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, ArrowDown, TerminalSquare } from 'lucide-react';
-import type { MvtLogEntry } from '../../../shared/types/window';
+import type { PipelineLogEntry } from '../../../shared/types/window';
 import { Loader } from '../ui/Loader';
 
 interface TerminalLogProps {
-  lines: MvtLogEntry[];
+  lines: Array<Pick<PipelineLogEntry, 'stream' | 'line'>>;
   live: boolean;
   defaultOpen?: boolean;
   label?: string;
@@ -16,13 +16,20 @@ export function TerminalLog({ lines, live, defaultOpen = false, label = 'Technic
   const [open, setOpen] = useState(defaultOpen);
   const [stickToBottom, setStickToBottom] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [unseenCount, setUnseenCount] = useState(0);
+  // Whether output arrived while the log was closed. A count would be wrong
+  // once the log is capped (EPOCH-487): the oldest lines drop as new ones come.
+  const [unseen, setUnseen] = useState(false);
+  const lastLine = lines.length > 0 ? lines[lines.length - 1] : null;
+
+  // New output while closed is noted during render, not in an effect.
+  const [noted, setNoted] = useState(lastLine);
+  if (lastLine !== noted) {
+    setNoted(lastLine);
+    if (!open && lastLine) setUnseen(true);
+  }
 
   useEffect(() => {
-    if (!open) {
-      setUnseenCount((prev) => prev + 1);
-      return;
-    }
+    if (!lastLine || !open) return;
     if (stickToBottom && scrollRef.current) {
       const el = scrollRef.current;
       requestAnimationFrame(() => {
@@ -30,13 +37,13 @@ export function TerminalLog({ lines, live, defaultOpen = false, label = 'Technic
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines.length, open]);
+  }, [lastLine, open]);
 
   const [prevOpenForReset, setPrevOpenForReset] = useState(open);
   if (open !== prevOpenForReset) {
     setPrevOpenForReset(open);
     if (open) {
-      setUnseenCount(0);
+      setUnseen(false);
     }
   }
 
@@ -72,15 +79,15 @@ export function TerminalLog({ lines, live, defaultOpen = false, label = 'Technic
           <TerminalSquare size="0.9rem" />
           {label}
           {live && (
-            <span className="flex items-center gap-1.5 ml-1 text-label uppercase tracking-wide text-flag">
+            <span className="flex items-center gap-1.5 ml-1 text-label uppercase tracking-wide text-accent">
               <Loader variant="pulse-dot" />
               live
             </span>
           )}
         </span>
-        {!open && unseenCount > 0 && (
+        {!open && unseen && (
           <span className="text-2xs font-mono text-muted-foreground bg-background rounded px-1.5 py-0.5">
-            {unseenCount} new line{unseenCount === 1 ? '' : 's'}
+            New output
           </span>
         )}
       </button>
@@ -96,10 +103,7 @@ export function TerminalLog({ lines, live, defaultOpen = false, label = 'Technic
               <p className="text-muted-foreground italic">No output yet.</p>
             ) : (
               lines.map((entry, i) => (
-                <div
-                  key={i}
-                  className={entry.stream === 'stderr' ? 'text-danger' : 'text-foreground/80'}
-                >
+                <div key={i} className={entry.stream === 'stderr' ? 'text-danger' : 'text-foreground/80'}>
                   {entry.line || '\u00A0'}
                 </div>
               ))

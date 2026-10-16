@@ -1,21 +1,24 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import { randomUUID } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { readFile, rm, stat } from 'node:fs/promises';
 import type { Pool } from 'pg';
 import { discoverBackups, type Backup } from '@verichron/contracts';
-import type { MvtFinishedResult, AnalysisRunStatus } from '../../shared/types/window';
- 
+import type { PipelineFinishedResult, AnalysisRunStatus, PipelineLogEntry } from '../../shared/types/window';
+import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
+import { analysisTargets, orchestratorArgs } from './analysisTargets';
+import { defaultWorkspace, readPreparedBackups } from './preparedBackups';
+
 interface StartPipelineOptions {
   workspace?: string;
   forceDecrypt?: boolean;
-  refreshIOCs?: boolean;
   only?: string[];
 }
- 
+
 const PASSWORD_PROMPT_RE = /password for (.+): $/;
- 
+
 // EPOCH-305: how long the orchestrator subprocess may run before Epoch gives
 // up waiting and kills it. A real investigation over several large backups
 // can legitimately run long, so this is intentionally generous -- it exists
@@ -24,10 +27,10 @@ const PASSWORD_PROMPT_RE = /password for (.+): $/;
 // default guess rather than a considered value -- worth tuning once there's
 // real data on how long a full run against a large backup set takes.
 const ORCHESTRATOR_TIMEOUT_MS = 45 * 60 * 1000; // 45 minutes
- 
+
 // Grace period between SIGTERM and SIGKILL when cancelling or timing out.
 const KILL_GRACE_MS = 5000;
- 
+
 /**
  * EPOCH-305 app-restart reconciliation. The per-run cleanup inside
  * registerPipelineHandlers (markWorkspaceRunsAborted) only fires when this
@@ -79,9 +82,9 @@ export async function reconcileStaleRunsOnStartup(dbPool: Pool): Promise<void> {
     console.error('[pipelineHandlers] startup reconciliation of dangling pipeline runs failed:', err);
   }
 }
- 
+
 export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | null, repoRoot: string, dbPool: Pool) {
-  let runningMvtProcess: ChildProcessWithoutNullStreams | null = null;
+  let runningProcessor: ChildProcessWithoutNullStreams | null = null;
   let runningOrchestratorProcess: ChildProcessWithoutNullStreams | null = null;
   // Which workspace the currently-tracked orchestrator invocation is for --
   // lets epoch:getAnalysisRunStatus tell "still actually running" apart from
@@ -101,61 +104,60 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   // person an accurate message instead of a generic "orchestrator failed".
   let orchestratorTerminationReason: 'cancelled' | 'timeout' | null = null;
   let pendingPasswordResolve: ((password: string) => void) | null = null;
- 
+
   function sendToRenderer(channel: string, ...args: unknown[]) {
     const win = getMainWindow();
     if (win) {
       win.webContents.send(channel, ...args);
     }
   }
- 
-  function makeStreamBuffer(stream: 'stdout' | 'stderr', child: ChildProcessWithoutNullStreams) {
-    let pending = '';
-    return (chunk: Buffer) => {
-      pending += chunk.toString('utf-8');
-      const lines = pending.split('\n');
-      pending = lines.pop() ?? '';
- 
-      for (const line of lines) {
-        sendToRenderer('epoch:mvtLog', { stream, line });
-      }
- 
+
+  // EPOCH-487: each run's state outlives New Investigation, which unmounts
+  // when another view is opened.
+  const prepareSession = new PrepareSession((state) => sendToRenderer('epoch:prepareState', state));
+  const analysisSession = new AnalysisSession((state) => sendToRenderer('epoch:analysisState', state));
+
+  /** Relays the processor's output line by line, and its password prompt (which ends without a newline). */
+  function makeStreamBuffer(stream: PipelineLogEntry['stream'], child: ChildProcessWithoutNullStreams) {
+    const splitter = new LineSplitter();
+    const emit = (line: string) => sendToRenderer('epoch:prepareLog', prepareSession.line(stream, line));
+    const onChunk = (chunk: Buffer) => {
+      splitter.push(chunk).forEach(emit);
       if (stream === 'stdout') {
-        const match = PASSWORD_PROMPT_RE.exec(pending);
+        const match = PASSWORD_PROMPT_RE.exec(splitter.pending());
         if (match) {
-          sendToRenderer('epoch:mvtLog', { stream, line: pending });
+          emit(splitter.takePending());
           pendingPasswordResolve = (password: string) => {
             child.stdin.write(password + '\n');
           };
-          sendToRenderer('epoch:mvtPasswordRequired', match[1]);
-          pending = '';
+          prepareSession.passwordRequested(match[1]);
         }
       }
     };
-  }
- 
-  function makeOrchestratorStreamBuffer(stream: 'stdout' | 'stderr') {
-    let pending = '';
-    const emitPending = () => {
-      if (pending) {
-        sendToRenderer('epoch:orchestratorLog', { stream, line: pending });
-        pending = '';
-      }
+    const end = () => {
+      const rest = splitter.end();
+      if (rest) emit(rest);
     };
-    const onChunk = (chunk: Buffer) => {
-      pending += chunk.toString('utf-8');
-      const lines = pending.split('\n');
-      pending = lines.pop() ?? '';
-      for (const line of lines) {
-        sendToRenderer('epoch:orchestratorLog', { stream, line });
-      }
+    return { onChunk, end };
+  }
+
+  function makeOrchestratorStreamBuffer(stream: PipelineLogEntry['stream']) {
+    const splitter = new LineSplitter();
+    const emit = (line: string) => sendToRenderer('epoch:orchestratorLog', analysisSession.line(stream, line));
+    const onChunk = (chunk: Buffer) => splitter.push(chunk).forEach(emit);
+    const emitPending = () => {
+      const rest = splitter.end();
+      if (rest) emit(rest);
     };
     return { onChunk, emitPending };
   }
- 
-  async function readPreparationSummary(workspace: string) {
+
+  /** The processor's summary.json, if this run wrote it: one left by an earlier run is ignored. */
+  async function readPreparationSummary(workspace: string, runStartedAt: number) {
     try {
-      const raw = await readFile(path.join(workspace, 'summary.json'), 'utf8');
+      const file = path.join(workspace, 'summary.json');
+      if ((await stat(file)).mtimeMs < runStartedAt) return undefined;
+      const raw = await readFile(file, 'utf8');
       const parsed: unknown = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { backups?: unknown }).backups)) {
         return undefined;
@@ -165,24 +167,41 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       return undefined;
     }
   }
- 
-  async function readAnalysisSummary(workspace: string) {
+
+  /** A file of its own for one orchestrator call's result (EPOCH-409), so no
+   * call ever reads another's. */
+  function newSummaryPath(): string {
+    return path.join(os.tmpdir(), `epoch-analysis-${randomUUID()}.json`);
+  }
+
+  /** One orchestrator call's result: each backup's outcome, and why the call
+   * stopped before any backup, if it did (EPOCH-498: pending migrations). The
+   * file is the app's own temporary file, removed once read. */
+  async function readAnalysisSummary(
+    summaryPath: string
+  ): Promise<{ analysis?: PipelineFinishedResult['analysis']; error?: string }> {
     try {
-      const raw = await readFile(path.join(workspace, 'analysis-summary.json'), 'utf8');
+      const raw = await readFile(summaryPath, 'utf8');
       const parsed: unknown = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { results?: unknown }).results)) {
-        return undefined;
+        return {};
       }
-      return (parsed as { results: MvtFinishedResult['analysis'] }).results;
+      const summary = parsed as { results: PipelineFinishedResult['analysis']; error?: unknown };
+      return {
+        analysis: summary.results,
+        error: typeof summary.error === 'string' ? summary.error : undefined,
+      };
     } catch {
-      return undefined;
+      return {};
+    } finally {
+      await rm(summaryPath, { force: true });
     }
   }
- 
+
   function backupSourceLikePrefix(workspace: string): string {
     return `${path.join(workspace, 'decrypted')}${path.sep}%`;
   }
- 
+
   /**
    * EPOCH-305: closes out any pipeline_runs / pipeline_stage_status rows the
    * orchestrator subprocess left dangling for this workspace when it did not
@@ -257,7 +276,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       console.error('[pipelineHandlers] failed to mark dangling single-run aborted:', err);
     }
   }
- 
+
   function clearOrchestratorTimers(): void {
     if (orchestratorTimeoutHandle) {
       clearTimeout(orchestratorTimeoutHandle);
@@ -268,7 +287,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       orchestratorKillEscalationHandle = null;
     }
   }
- 
+
   function killOrchestrator(reason: 'cancelled' | 'timeout'): void {
     if (!runningOrchestratorProcess) return;
     orchestratorTerminationReason = reason;
@@ -279,7 +298,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       }
     }, KILL_GRACE_MS);
   }
- 
+
   ipcMain.handle('epoch:selectBackupDirectory', async () => {
     const mainWindow = getMainWindow();
     if (!mainWindow) return null;
@@ -290,68 +309,79 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
   });
- 
+
   ipcMain.handle('epoch:discoverBackups', async (_event, source: string): Promise<Backup[]> => {
     if (!source || !source.trim()) {
       throw new Error('A source directory is required.');
     }
     return discoverBackups(source);
   });
- 
+
+  ipcMain.handle('epoch:getPreparedBackups', async (_event, workspace?: string) => {
+    const resolved = workspace?.trim() || defaultWorkspace();
+    return { workspace: resolved, backups: readPreparedBackups(resolved) };
+  });
+
   ipcMain.handle('epoch:startPipeline', async (_event, source: string, options?: StartPipelineOptions) => {
-    if (runningMvtProcess) {
-      throw new Error('mvt-runner is already running -- wait for it to finish before starting another.');
+    if (runningProcessor) {
+      throw new Error('The processor is already running -- wait for it to finish before starting another.');
     }
     if (!source || !source.trim()) {
       throw new Error('A source directory is required.');
     }
- 
-    const workspacePath = options?.workspace?.trim() || path.join(os.homedir(), 'mvt-workspace');
-    const args = ['--filter', '@verichron/mvt-runner', 'dev', '--', '--source', source];
+
+    const workspacePath = options?.workspace?.trim() || defaultWorkspace();
+    const args = ['--filter', '@verichron/processor', 'dev', '--', '--source', source];
     args.push('--workspace', workspacePath);
     if (options?.forceDecrypt) args.push('--force-decrypt');
-    if (options?.refreshIOCs) args.push('--refresh-iocs');
     if (options?.only && options.only.length > 0) args.push('--only', options.only.join(','));
- 
+
     const child = spawn('pnpm', args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] });
-    runningMvtProcess = child;
+    runningProcessor = child;
     pendingPasswordResolve = null;
- 
-    child.stdout.on('data', makeStreamBuffer('stdout', child));
-    child.stderr.on('data', makeStreamBuffer('stderr', child));
- 
+    const startedAt = Date.now();
+    prepareSession.start(source, workspacePath, options?.only ?? [], startedAt);
+
+    const stdoutBuffer = makeStreamBuffer('stdout', child);
+    const stderrBuffer = makeStreamBuffer('stderr', child);
+    child.stdout.on('data', stdoutBuffer.onChunk);
+    child.stderr.on('data', stderrBuffer.onChunk);
+
     child.on('error', (err) => {
-      runningMvtProcess = null;
+      runningProcessor = null;
       pendingPasswordResolve = null;
-      sendToRenderer('epoch:mvtFinished', { success: false, error: err.message });
+      prepareSession.finish({ success: false, error: err.message, workspace: workspacePath });
     });
- 
+
     child.on('close', (code) => {
-      runningMvtProcess = null;
+      runningProcessor = null;
       pendingPasswordResolve = null;
-      void readPreparationSummary(workspacePath).then((backups) => {
-        sendToRenderer('epoch:mvtFinished', {
-          success: code === 0,
-          exitCode: code,
-          workspace: workspacePath,
-          backups,
-        });
+      stdoutBuffer.end();
+      stderrBuffer.end();
+      void readPreparationSummary(workspacePath, startedAt).then((backups) => {
+        prepareSession.finish({ success: code === 0, exitCode: code, workspace: workspacePath, backups });
       });
     });
- 
+
     return { started: true, workspace: workspacePath };
   });
- 
-  ipcMain.handle('epoch:submitMvtPassword', async (_event, password: string) => {
-    if (!runningMvtProcess || !pendingPasswordResolve) {
+
+  ipcMain.handle('epoch:submitBackupPassword', async (_event, password: string) => {
+    if (!runningProcessor || !pendingPasswordResolve) {
       throw new Error('No password prompt is currently pending.');
     }
     const resolve = pendingPasswordResolve;
     pendingPasswordResolve = null;
     resolve(password);
+    prepareSession.passwordSubmitted();
   });
- 
-  ipcMain.handle('epoch:startAnalysis', async (_event, workspace: string) => {
+
+  ipcMain.handle('epoch:getPrepareState', () => prepareSession.snapshot());
+  ipcMain.handle('epoch:getAnalysisState', () => analysisSession.snapshot());
+
+  // Analyze reads the backups the examiner selected, each checked to be
+  // prepared in this workspace, never every prepared backup there (EPOCH-530).
+  ipcMain.handle('epoch:startAnalysis', async (_event, workspace: string, labels: unknown) => {
     if (runningOrchestratorProcess) {
       throw new Error('The orchestrator is already running -- wait for analysis to finish before starting another.');
     }
@@ -359,16 +389,18 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       throw new Error('An analysis workspace is required.');
     }
     const trimmedWorkspace = workspace.trim();
- 
-    const child = spawn(
-      'pnpm',
-      ['--filter', '@verichron/orchestrator', 'investigate', '--', '--workspace', trimmedWorkspace],
-      { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] }
-    );
+    const backupPaths = analysisTargets(trimmedWorkspace, Array.isArray(labels) ? labels : []);
+    const summaryPath = newSummaryPath();
+
+    const child = spawn('pnpm', orchestratorArgs(backupPaths, summaryPath), {
+      cwd: repoRoot,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     runningOrchestratorProcess = child;
     runningOrchestratorWorkspace = trimmedWorkspace;
     orchestratorTerminationReason = null;
- 
+    analysisSession.start('workspace', trimmedWorkspace);
+
     // EPOCH-305 timeout guardrail: a hung orchestrator (e.g. blocked on a
     // stalled DB connection) never fires 'error' or 'close' on its own --
     // this is the only thing that gets the renderer out of an indefinite
@@ -376,12 +408,12 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     orchestratorTimeoutHandle = setTimeout(() => {
       killOrchestrator('timeout');
     }, ORCHESTRATOR_TIMEOUT_MS);
- 
+
     const stdoutBuffer = makeOrchestratorStreamBuffer('stdout');
     const stderrBuffer = makeOrchestratorStreamBuffer('stderr');
     child.stdout.on('data', stdoutBuffer.onChunk);
     child.stderr.on('data', stderrBuffer.onChunk);
- 
+
     child.on('error', (err) => {
       clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
@@ -392,14 +424,15 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       if (workspaceAtFailure) {
         void markWorkspaceRunsAborted(workspaceAtFailure, `orchestrator process error: ${err.message}`);
       }
-      sendToRenderer('epoch:orchestratorFinished', {
+      void rm(summaryPath, { force: true });
+      analysisSession.finish({
         success: false,
         error: err.message,
         cancelled: reason === 'cancelled',
         timedOut: reason === 'timeout',
       });
     });
- 
+
     child.on('close', (code) => {
       clearOrchestratorTimers();
       stdoutBuffer.emitPending();
@@ -409,10 +442,10 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       runningOrchestratorProcess = null;
       runningOrchestratorWorkspace = null;
       orchestratorTerminationReason = null;
- 
+
       const cancelled = reason === 'cancelled';
       const timedOut = reason === 'timeout';
- 
+
       // A clean `code === 0` exit means the orchestrator's own main()
       // already closed out pipeline_runs/pipeline_stage_status itself.
       // Any other outcome -- a crash, our own timeout kill, or a manual
@@ -423,31 +456,31 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
           : timedOut
             ? `orchestrator timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minute(s)`
             : `orchestrator process exited unexpectedly (code ${code})`;
- 
-        void markWorkspaceRunsAborted(workspaceAtClose, closeReason).then(() =>
-          readAnalysisSummary(workspaceAtClose)
-        ).then((analysis) => {
-          sendToRenderer('epoch:orchestratorFinished', {
-            success: false,
-            exitCode: code,
-            analysis,
-            cancelled,
-            timedOut,
-            error: cancelled
-              ? 'Analysis was cancelled.'
-              : timedOut
-                ? `Analysis timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minutes and was stopped.`
-                : undefined,
+
+        void markWorkspaceRunsAborted(workspaceAtClose, closeReason)
+          .then(() => readAnalysisSummary(summaryPath))
+          .then(({ analysis, error }) => {
+            analysisSession.finish({
+              success: false,
+              exitCode: code,
+              analysis,
+              cancelled,
+              timedOut,
+              error: cancelled
+                ? 'Analysis was cancelled.'
+                : timedOut
+                  ? `Analysis timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minutes and was stopped.`
+                  : error,
+            });
           });
-        });
         return;
       }
- 
-      void readAnalysisSummary(workspaceAtClose).then((analysis) => {
-        sendToRenderer('epoch:orchestratorFinished', { success: true, exitCode: code, analysis });
+
+      void readAnalysisSummary(summaryPath).then(({ analysis }) => {
+        analysisSession.finish({ success: true, exitCode: code, analysis });
       });
     });
- 
+
     return { started: true };
   });
 
@@ -468,15 +501,17 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       throw new Error('A backup source is required.');
     }
     const trimmedBackupSource = backupSource.trim();
+    const summaryPath = newSummaryPath();
 
     const child = spawn(
       'pnpm',
-      ['--filter', '@verichron/orchestrator', 'investigate', '--', trimmedBackupSource],
+      ['--filter', '@verichron/orchestrator', 'investigate', '--', '--summary-path', summaryPath, trimmedBackupSource],
       { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] }
     );
     runningOrchestratorProcess = child;
     runningOrchestratorBackupSource = trimmedBackupSource;
     orchestratorTerminationReason = null;
+    analysisSession.start('retry', trimmedBackupSource);
 
     orchestratorTimeoutHandle = setTimeout(() => {
       killOrchestrator('timeout');
@@ -497,7 +532,8 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       if (scopedBackupSource) {
         void markSingleRunAborted(scopedBackupSource, `orchestrator process error: ${err.message}`);
       }
-      sendToRenderer('epoch:orchestratorFinished', {
+      void rm(summaryPath, { force: true });
+      analysisSession.finish({
         success: false,
         error: err.message,
         cancelled: reason === 'cancelled',
@@ -525,23 +561,26 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
             ? `orchestrator timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minute(s)`
             : `orchestrator process exited unexpectedly (code ${code})`;
 
-        void markSingleRunAborted(scopedBackupSource, closeReason).then(() => {
-          sendToRenderer('epoch:orchestratorFinished', {
-            success: false,
-            exitCode: code,
-            cancelled,
-            timedOut,
-            error: cancelled
-              ? 'Analysis was cancelled.'
-              : timedOut
-                ? `Analysis timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minutes and was stopped.`
-                : undefined,
+        void markSingleRunAborted(scopedBackupSource, closeReason)
+          .then(() => readAnalysisSummary(summaryPath))
+          .then(({ error }) => {
+            analysisSession.finish({
+              success: false,
+              exitCode: code,
+              cancelled,
+              timedOut,
+              error: cancelled
+                ? 'Analysis was cancelled.'
+                : timedOut
+                  ? `Analysis timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minutes and was stopped.`
+                  : error,
+            });
           });
-        });
         return;
       }
 
-      sendToRenderer('epoch:orchestratorFinished', { success: true, exitCode: code });
+      void rm(summaryPath, { force: true });
+      analysisSession.finish({ success: true, exitCode: code });
     });
 
     return { started: true };
@@ -554,7 +593,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     killOrchestrator('cancelled');
     return { cancelled: true };
   });
- 
+
   /**
    * EPOCH-305 persistence criterion: lets the renderer ask, for a given
    * workspace, whether there's a run actually in flight right now (tracked
@@ -567,11 +606,11 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   ipcMain.handle('epoch:getAnalysisRunStatus', async (_event, workspace: string): Promise<AnalysisRunStatus> => {
     const trimmedWorkspace = (workspace ?? '').trim();
     if (!trimmedWorkspace) return { status: 'idle' };
- 
+
     if (runningOrchestratorProcess && runningOrchestratorWorkspace === trimmedWorkspace) {
       return { status: 'running' };
     }
- 
+
     try {
       const result = await dbPool.query(
         `SELECT 1 FROM pipeline_runs WHERE backup_source LIKE $1 AND finished_at IS NULL LIMIT 1`,

@@ -20,7 +20,7 @@ updates:
 
   # The uv workspace and the two pinned tool environments.
   - package-ecosystem: uv
-    directories: ["/", "/tools/mvt", "/tools/ileapp"]
+    directories: ["/", "/tools/decrypt", "/tools/ileapp"]
     schedule:
       interval: weekly
     groups:

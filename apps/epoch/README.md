@@ -3,7 +3,7 @@
 The Electron app examiners use to:
 
 - pull an encrypted backup from a connected device;
-- run mvt-runner and the orchestrator;
+- run the processor and the orchestrator;
 - browse runs, records, IOC detections and reports.
 
 It reads the database through [`@verichron/etl-db-reader`](../../packages/etl-db-reader)
@@ -23,7 +23,7 @@ The app loads the repository's `.env` for the database connection.
 
 | Path | Contents |
 |---|---|
-| `src/main/` | Main process: IPC handlers (`ipc/`), device-backup tooling (`tools/device-backup/`), spawning mvt-runner and the orchestrator |
+| `src/main/` | Main process: IPC handlers (`ipc/`), device-backup tooling (`tools/device-backup/`), spawning the processor and the orchestrator |
 | `src/preload/` | The `window.epoch` bridge exposed to the renderer |
 | `src/renderer/` | React UI: `views/`, `features/`, `components/ui/` (shared primitives), `store/` (Zustand), `hooks/`, `api/` |
 | `src/shared/` | Types shared by the main process and the renderer |
@@ -34,7 +34,4 @@ Visual design follows [DESIGN.md](DESIGN.md).
 
 | Issue | Ticket |
 |---|---|
-| Device pull hangs (`encryptionToggledByUs`), and a typo in `window.d.ts` | EPOCH-413 |
-| The app isn't typechecked, built or tested in CI | EPOCH-454 |
-| `prestart`/`predev` build a package named `@verichron/db-reader`, which doesn't exist (the reader is `@verichron/etl-db-reader`), so the reader isn't rebuilt before start | EPOCH-454 |
 | The IPC bridge is hand-written in three places | EPOCH-453 |

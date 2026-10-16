@@ -1,23 +1,26 @@
-import type { StartPipelineOptions, MvtLogEntry, MvtFinishedResult, AnalysisRunStatus } from '../../shared/types/window';
+import type {
+  StartPipelineOptions,
+  PipelineLogEntry,
+  AnalysisRunStatus,
+  AnalysisState,
+  PrepareState,
+} from '../../shared/types/window';
 
 export const pipelineApi = {
   selectBackupDirectory: () => window.epoch.selectBackupDirectory(),
   discoverBackups: (source: string) => window.epoch.discoverBackups(source),
-  startPipeline: (source: string, options?: StartPipelineOptions) =>
-    window.epoch.startPipeline(source, options),
+  getPreparedBackups: (workspace?: string) => window.epoch.getPreparedBackups(workspace),
+  startPipeline: (source: string, options?: StartPipelineOptions) => window.epoch.startPipeline(source, options),
   retryRun: (backupSource: string) => window.epoch.retryRun(backupSource),
-  submitMvtPassword: (password: string) => window.epoch.submitMvtPassword(password),
-  onMvtLog: (callback: (entry: MvtLogEntry) => void) => window.epoch.onMvtLog(callback),
-  onMvtPasswordRequired: (callback: (backupName: string) => void) =>
-    window.epoch.onMvtPasswordRequired(callback),
-  onMvtFinished: (callback: (result: MvtFinishedResult) => void) =>
-    window.epoch.onMvtFinished(callback),
+  submitBackupPassword: (password: string) => window.epoch.submitBackupPassword(password),
+  onPrepareLog: (callback: (entry: PipelineLogEntry) => void) => window.epoch.onPrepareLog(callback),
+  getPrepareState: () => window.epoch.getPrepareState(),
+  onPrepareState: (callback: (state: PrepareState) => void) => window.epoch.onPrepareState(callback),
 
-  startAnalysis: (workspace: string) => window.epoch.startAnalysis(workspace),
+  startAnalysis: (workspace: string, labels: string[]) => window.epoch.startAnalysis(workspace, labels),
   cancelAnalysis: () => window.epoch.cancelAnalysis(),
   getAnalysisRunStatus: (workspace: string) => window.epoch.getAnalysisRunStatus(workspace),
-  onOrchestratorLog: (callback: (entry: MvtLogEntry) => void) =>
-    window.epoch.onOrchestratorLog(callback),
-  onOrchestratorFinished: (callback: (result: MvtFinishedResult) => void) =>
-    window.epoch.onOrchestratorFinished(callback),
+  onOrchestratorLog: (callback: (entry: PipelineLogEntry) => void) => window.epoch.onOrchestratorLog(callback),
+  getAnalysisState: () => window.epoch.getAnalysisState(),
+  onAnalysisState: (callback: (state: AnalysisState) => void) => window.epoch.onAnalysisState(callback),
 };

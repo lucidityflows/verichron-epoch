@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import json
 import requests
+from runtime_env import fatal_if_missing_venv
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODELS = ["qwen2.5:3b-instruct", "llama3:8b-instruct-q4_K_M"]
@@ -23,21 +23,25 @@ SCHEMA_KEYS = ["timestamp", "process", "network_dest", "status"]
 MOCK_CHUNK = """[
   {"timestamp": "2026-05-28T02:14:00Z", "process": "dasd", "status": "background_activity"},
   {"timestamp": "2026-05-28T03:00:15Z", "process": "com.apple.WebKit.Networking", "status": "active"},
-  {"timestamp": "2026-05-28T03:01:00Z", "process": "pwned_sys_updater", "network_dest": "103.45.67.89", "status": "running"}
+  {"timestamp": "2026-05-28T03:01:00Z", "process": "pwned_sys_updater",
+   "network_dest": "103.45.67.89", "status": "running"}
 ]"""
+
 
 def run_benchmark():
     print("Starting Forensics Benchmark (Speed & Accuracy)...\n")
 
     for model in MODELS:
-        print(f"========================================")
+        print("========================================")
         print(f"🧪 Testing Model: {model}")
-        print(f"========================================")
+        print("========================================")
 
         # Wake/Load the model into VRAM first so we don't benchmark disk-read time
         requests.post(OLLAMA_URL, json={"model": model, "prompt": "wake up", "stream": False})
 
-        prompt = f"DATABASE SCHEMA FIELDS FOR REFERENCE: {SCHEMA_KEYS}\n\n{SYSTEM_PROMPT}\n\nLOG DATA CHUNK:\n{MOCK_CHUNK}"
+        prompt = (
+            f"DATABASE SCHEMA FIELDS FOR REFERENCE: {SCHEMA_KEYS}\n\n{SYSTEM_PROMPT}\n\nLOG DATA CHUNK:\n{MOCK_CHUNK}"
+        )
         payload = {"model": model, "prompt": prompt, "stream": False}
 
         try:
@@ -68,6 +72,8 @@ def run_benchmark():
         except Exception as e:
             print(f"Failed to test {model}: Is it installed? Error: {e}\n")
 
+
 if __name__ == "__main__":
+    # A standalone script, not a stage the orchestrator validates (R29).
     fatal_if_missing_venv()
     run_benchmark()

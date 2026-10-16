@@ -13,7 +13,7 @@ setup:
 | [mise](https://mise.jdx.dev/getting-started.html) | Provides Node, pnpm and uv at the versions in `mise.toml` |
 | A C compiler (`build-essential` on Debian/Ubuntu, Xcode Command Line Tools on macOS) | Two of iLEAPP's dependencies, `pyliblzfse` and `astc-decomp-faster`, publish no Linux wheels and are compiled |
 | Docker with the compose plugin | Local PostgreSQL 16 |
-| `sqlite3` (optional) | mvt-runner's repair pass; recorded as skipped if missing |
+| `sqlite3` (optional) | The processor's repair pass; recorded as skipped if missing |
 
 ## Pinned versions
 
@@ -25,9 +25,12 @@ Each version is declared once, in the file the enforcing tool reads:
 | pnpm | 10.34.5 | `packageManager` in `package.json` |
 | uv | 0.12.23 | `mise.toml` (`required-version` in `pyproject.toml` guards it) |
 | Python | 3.14.8, a uv-managed CPython; system interpreters are never used | `.python-version` |
+| Pyright | 1.1.414 | `pyproject.toml` |
+| Ruff | 0.17.0 | `pyproject.toml` |
 | Electron | 44.7.0 | `apps/epoch/package.json` |
-| mvt | 2026.10.5 | `tools/mvt/pyproject.toml` |
+| iphone_backup_decrypt | 0.10.0 (exact; the decrypt uses two of its internals) | `tools/decrypt/pyproject.toml` |
 | iLEAPP | v2026.3.1 (submodule) | `.gitmodules` pin; its dependencies in `tools/ileapp/pyproject.toml` |
+| Prettier | 3.9.6 | `devDependencies` in `package.json` |
 
 Dependabot proposes updates to the npm and uv dependencies, the CI actions and
 the iLEAPP submodule. `mise.toml` and `.python-version` are updated by hand.
@@ -37,13 +40,13 @@ the iLEAPP submodule. `mise.toml` and `.python-version` are updated by hand.
 | Environment | Holds | Used by |
 |---|---|---|
 | `.venv/` | The uv workspace: our Python stages, writer, report and tests | the orchestrator's stages, `uv run` |
-| `tools/mvt/.venv/` | mvt, pinned | mvt-runner runs `tools/mvt/.venv/bin/mvt-ios` (or `--mvt-bin`) |
-| `tools/ileapp/.venv/` | iLEAPP's runtime dependencies, pinned | the iLEAPP bridge runs `iLEAPP/ileapp.py` with this interpreter |
-| `node_modules/` | The pnpm workspace | the app, mvt-runner, the orchestrator |
+| `tools/decrypt/.venv/` | The backup decrypt's library, pinned | The processor runs `tools/decrypt/decrypt_backup.py` with this interpreter (or `--decrypt-python`) |
+| `tools/ileapp/.venv/` | iLEAPP's runtime dependencies, pinned | the processor runs the submodule, `tools/ileapp/iLEAPP/ileapp.py`, with this interpreter |
+| `node_modules/` | The pnpm workspace | the app, the processor, the orchestrator |
 
-mvt and iLEAPP each have their own uv project and lockfile because their exact
-dependency pins conflict (for example, `packaging`). No workspace code imports
-either tool; both run as subprocesses.
+The backup decrypt and iLEAPP each have their own uv project and lockfile, so
+each tool's exact pins stay its own. No workspace code imports either tool;
+both run as subprocesses.
 
 ## First-time setup
 
@@ -54,8 +57,7 @@ mise install                             # Node, pnpm and uv at the pinned versi
 mise run check                           # report any missing prerequisite; changes nothing
 mise run setup                           # check again, then install every environment from the lockfiles
 docker compose -f infra/docker-compose.yml up -d postgres
-set -a; . ./.env; set +a                 # load DB_* into this shell
-uv run python packages/etl-db-writer/migrate.py --db-url "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME"
+uv run python packages/etl-db-writer/migrate.py   # reads DB_* from .env
 ```
 
 `mise run setup` reports every missing prerequisite at once, each with the
@@ -68,6 +70,12 @@ PostgreSQL applies the migrations itself on its first boot; `migrate.py` records
 what was applied and applies anything newer. It refuses a database where a
 migration stopped part-way.
 
+Analyze refuses a database that is behind the code: before registering
+anything, the orchestrator compares `migrations/` with `migrate.py`'s
+`schema_migrations` ledger, and a missing ledger or any unlisted file stops the
+run with a message naming them. A database PostgreSQL initialized on first boot
+has no ledger until `migrate.py` has run once.
+
 **Development data is disposable.** When a migration changes existing tables,
 recreate the database instead of patching it:
 
@@ -78,27 +86,84 @@ docker compose -f infra/docker-compose.yml down -v && docker compose -f infra/do
 ## Running the pipeline
 
 ```bash
-# 1. Prepare backups: hash, decrypt (prompts for the password), repair, IOC scan
-pnpm --filter @verichron/mvt-runner dev -- --source /path/to/backups --workspace ~/mvt-workspace
+# 1. Prepare backups: hash, decrypt (prompts for the password), repair, iLEAPP
+pnpm --filter @verichron/processor dev -- --source /path/to/backups --workspace ~/verichron-workspace
 
-# 2. Register the evidence and run every stage, for every decrypted backup in the workspace
-pnpm --filter @verichron/orchestrator investigate -- --workspace ~/mvt-workspace
+# 2. Register the evidence and run every stage: for every prepared backup in the workspace,
+#    or for the backups named (the app's Analyze names the selected ones, EPOCH-530)
+pnpm --filter @verichron/orchestrator investigate -- --workspace ~/verichron-workspace
+pnpm --filter @verichron/orchestrator investigate -- ~/verichron-workspace/decrypted/<label>
 
 # 3. Or drive both from the desktop app
 pnpm --filter @verichron/epoch dev
 ```
 
-The orchestrator reads `DATABASE_URL` or `DB_*` from `.env`. The report is
-written by the `reporting` stage to `results/<label>/investigation_report.md`.
+The app's `predev` and `prestart` scripts build the shared packages its main
+process loads from their `dist/` (`@verichron/contracts`,
+`@verichron/etl-db-reader`). Typing `rs` in a running Electron Forge session
+restarts the app without them, so after updating the code, quit and run the
+command again; otherwise the app runs the previous build of those packages
+(EPOCH-518). The orchestrator and processor are started fresh by each
+Analyze and Prepare Evidence, from the source.
+
+The orchestrator reads `DATABASE_URL` or complete `DB_USER`, `DB_PASSWORD`,
+and `DB_NAME` values from `.env` (with optional `DB_HOST` and `DB_PORT`). If
+neither configuration is present, the app, orchestrator, and database
+inspection tool fail before connecting; there is no built-in development
+credential. The report is written by the `reporting` stage to
+`reports/<label>/investigation_report.md`.
+A database created before EPOCH-489 that still holds mvt results is refused by
+migration 0009; recreate it with the command above.
+A database with runs from before EPOCH-414 is refused the same way by migration 0014,
+which adds each stage's order.
+
+## Forensic data and the repository
+
+Keep backups, decrypted data, extractor output, crash logs, SQLite databases,
+and generated reports outside the repository. The pre-commit hook checks staged
+files, and `python-tests.yml` checks every tracked file so `--no-verify` does
+not bypass CI enforcement. Both use `scripts/check_no_forensic_output.py`; a
+refusal names the file and the output class or rule that matched. Files over
+50 MiB are refused as well. To run the tracked-file check manually:
+`uv run python scripts/check_no_forensic_output.py --tracked`.
+
+The only declared forensic-looking fixture path is
+`apps/extractors/crash/fixtures/`, which contains recorded crash-report samples
+used by extractor tests. Add an exception only for a deliberate test fixture
+and document its path and reason in the guard's allowlist; keep it small, and
+never put real evidence there.
+
+If real forensic data is committed, stop sharing the repository and notify its
+maintainer immediately. Removing the file from the latest commit does not
+remove it from history; assess exposure and credentials, then coordinate a
+history rewrite and any required credential rotation.
+
+### Indicator sets
+
+```bash
+# Fetch the public feeds at pinned commits (connected machine only), into a new directory
+uv run python scripts/fetch_indicator_feeds.py ~/indicator-sets/mvt-2026-10-15
+
+# Show what the set holds, per file, without touching the database
+uv run python apps/indicator_registry/register.py --check ~/indicator-sets/mvt-2026-10-15
+
+# Register it (again: no change). Any STIX 2.1 file or directory of them works the same way;
+# a set fetched by the script is named in its set.json, any other needs --name
+uv run python apps/indicator_registry/register.py ~/indicator-sets/mvt-2026-10-15
+```
+
+Analyze checks the evidence against the newest registered set. To check
+against another one, give the orchestrator its set hash:
+`investigate -- --workspace <dir> --indicator-set <set hash>`. Registering a
+newer set makes the next Analyze of already-analyzed evidence run again; the
+extractors find their facts already ingested and write nothing new.
 
 Useful tools:
 
 | Command | What it does |
 |---|---|
 | `uv run python scripts/db_peek.py` | Shows the latest run's stages and records |
-| `uv run python scripts/synthetic_backup_generator.py` | Builds a synthetic backup for testing |
-| `pnpm gen:fake-stix` | Builds a fake STIX2 IOC set from generated indicators |
-| `uv run python scripts/inspect_ileapp_output.py <dir>` | Shows what an iLEAPP output directory contains |
+| `uv run python scripts/inspect_ileapp_output.py <dir>` | Shows what the iLEAPP bridge will read from one report, and what would fail |
 
 ## Testing
 
@@ -111,31 +176,70 @@ There are two test tiers, and both run in CI (R33):
   database, never your dev one.
 
 ```bash
+mise run lint
 uv run pytest                                        # Python: packages/, scripts/, apps/
+uv run pyright                                       # Python type checking
+uv run pyright -p tools/decrypt                      # the decrypt, against its own environment
 TEST_DATABASE_URL=postgresql://.../verichron_test uv run pytest
 
-pnpm --filter @verichron/mvt-runner test             # TypeScript (node:test via tsx)
+pnpm --filter @verichron/processor test             # TypeScript (node:test via tsx)
+pnpm --filter @verichron/processor typecheck:tests  # Includes *.test.ts
+pnpm --filter @verichron/etl-db-reader typecheck:tests
+pnpm --filter @verichron/orchestrator typecheck:tests
 pnpm --filter @verichron/orchestrator test           # real-Postgres tests need TEST_DATABASE_URL
 pnpm --filter @verichron/etl-db-reader test
+pnpm --filter @verichron/epoch test                  # Vitest: main process in Node, renderer in jsdom
 pnpm check:contracts                                 # schema ↔ TS ↔ Python mirrors in sync
 ```
 
 `mise run test` runs both suites (`mise run test:py`, `mise run test:ts`).
+`mise run lint` runs Ruff, Python formatting validation and Pyright on first-party
+code: `packages/`, `libs/`, `apps/`, `scripts/` and `tools/`, without the iLEAPP
+submodule (`tools/ileapp/iLEAPP`), which both tools exclude. Pyright checks
+`tools/decrypt` separately, against the decrypt's own environment
+(`tools/decrypt/pyrightconfig.json`), so `mise run setup` must have built it.
 
-External tools are tested through stub executables and servers (a stub
-`mvt-ios`, `sqlite3`, Ollama), so tests exercise the real process boundary.
+The desktop app's tests run in Vitest: main-process and IPC handler tests in
+Node (the IPC tests against real Postgres, with a stand-in for Electron's
+`ipcMain`), and renderer tests in jsdom with Testing Library. They read the
+reader through its built `dist/`, so build `@verichron/etl-db-reader` first.
+CI also type-checks the app and builds its main, preload and renderer bundles.
+
+External tools are tested through stub executables and servers (a stub decrypt
+interpreter, `sqlite3`, iLEAPP, Ollama), so tests exercise the real process
+boundary.
+
+### Real-device checks for iPhone pulls
+
+Stub tools can't show what an iPhone does. A ticket that changes the iPhone
+pull is closed only after these run on a real device, with the results (device
+model, iOS version, tool version, what happened) recorded on the ticket:
+
+1. A fresh full pull into an empty folder completes and is verified as finished.
+2. Cancel during the transfer stops the pull and records it as cancelled.
+3. Unplugging the device mid-pull ends the pull with the device's reason.
+4. Starting with the device locked shows the passcode request on screen first.
+5. A destination without enough free space is refused before the device is touched.
+6. A second pull of the device into the same folder lands in a new dated
+   folder, and the earlier backup is unchanged (its `Manifest.db` hash before
+   and after).
+7. An unfinished backup left by an earlier pull is offered for deletion, and
+   Delete It removes it and records it.
+8. Leaving New Investigation and returning mid-pull shows the running pull, with Cancel.
+
+New device behaviour seen during these checks is added to the verified list in
+[architecture.md](architecture.md#verified-device-behaviour).
 
 ## CI
 
 | Workflow | Runs |
 |---|---|
-| `.github/workflows/python-tests.yml` | Migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, the index-usage check for evidence reads, and a check that the tool lockfiles match their manifests |
-| `.github/workflows/ts-tests.yml` | Typecheck and tests for mvt-runner, the reader and the orchestrator, with real PostgreSQL |
+| `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
+| `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, Vite build and tests |
 
 Both workflows install the toolchain from `mise.toml` and Python from
 `.python-version`, the same files a development machine uses. All Actions are
-pinned to full commit SHAs. The desktop app isn't built or
-tested in CI yet (EPOCH-454).
+pinned to full commit SHAs.
 
 ## Conventions
 
@@ -149,5 +253,14 @@ tested in CI yet (EPOCH-454).
   `migrate.py`. Never edit a merged migration; add a new one.
 - **Contracts:** add a `source_type` to `normalized-record.schema.json` first,
   then run `pnpm sync:contracts`.
+- **Formatting:** Ruff formats first-party Python (`packages/`, `libs/`,
+  `apps/`, `scripts/`, `tools/`); run `mise run lint` to check lint and formatting.
+  Prettier formats TypeScript (`.ts`, `.tsx`, `.mts`) with the settings in
+  `.prettierrc.json`. Run `pnpm format` before committing; CI runs
+  `pnpm format:check`. Markdown, YAML and JSON aren't formatted. Prettier's
+  one-time reformat is listed in `.git-blame-ignore-revs` (Ruff's isn't; see
+  [decisions](decisions.md#testing-and-ci)); run
+  `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so `git blame`
+  skips it (GitHub's blame view does this already).
 - **Fail fast:** no fallbacks, backfills or legacy-compatibility paths for
   development data.

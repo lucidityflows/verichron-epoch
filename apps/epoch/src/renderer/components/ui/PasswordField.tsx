@@ -10,7 +10,13 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
     const [visible, setVisible] = React.useState(false);
     return (
       <div className="relative">
-        <Input ref={ref} type={visible ? 'text' : 'password'} autoComplete={autoComplete} className={cn('pr-9', className)} {...props} />
+        <Input
+          ref={ref}
+          type={visible ? 'text' : 'password'}
+          autoComplete={autoComplete}
+          className={cn('pr-9', className)}
+          {...props}
+        />
         <button
           type="button"
           tabIndex={-1}

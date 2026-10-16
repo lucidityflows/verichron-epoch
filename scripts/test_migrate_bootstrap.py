@@ -23,7 +23,6 @@ from urllib.parse import urlsplit, urlunsplit
 
 import psycopg2
 import pytest
-
 from testing.pg_real import TEST_DATABASE_URL_ENV
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -33,6 +32,8 @@ MIGRATIONS = sorted((REPO_ROOT / "packages" / "etl-db-writer" / "migrations").gl
 
 def _load_migrate():
     spec = importlib.util.spec_from_file_location("migrate_under_test", MIGRATE_PY)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load migration module from {MIGRATE_PY}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

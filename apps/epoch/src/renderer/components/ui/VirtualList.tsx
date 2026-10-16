@@ -15,14 +15,13 @@ import { useVirtualizer } from '@tanstack/react-virtual';
  * ---------------------------------
  * Same mechanism as DataTable: `measureElement` re-measures via
  * ResizeObserver whenever the rendered item's content changes, so
- * IocsView's existing toggleCorrelatedContext / expandedPivotId state
- * works unchanged -- the caller doesn't need to tell the virtualizer
+ * a caller's own expanded-item state works unchanged -- the caller doesn't
+ * need to tell the virtualizer
  * anything when a row expands, it just re-renders and gets re-measured.
  *
  * Why a render-prop instead of a fixed item shape
  * -------------------------------------------------
- * IocsView's two item shapes (mvt_ioc_detection vs timestamp_anomaly)
- * already branch heavily inside one card body. Rather than this
+ * A list's item shapes can branch heavily inside one card body. Rather than this
  * component trying to model that branching, it stays a dumb virtualized
  * container and hands the caller `(item, index) => ReactNode` -- same
  * division of concerns as DataTable's `renderExpanded`, just for the

@@ -18,6 +18,12 @@ console.log('=======================================\n');
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 loadRootEnv(REPO_ROOT);
 
+// Missing database configuration is fatal startup input, not a recoverable runtime exception.
+const dbPool = new Pool({
+  connectionString: resolveDatabaseUrl(),
+  max: 10,
+});
+
 process.on('uncaughtException', (error) => {
   console.error('\n--- FATAL UNCAUGHT EXCEPTION ---');
   console.error(error);
@@ -29,17 +35,6 @@ process.on('unhandledRejection', (reason) => {
   console.error(reason);
   console.error('-----------------------------------\n');
 });
-
-
-const dbPool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'forensics',
-  user: process.env.DB_USER || 'forensics', 
-  password: process.env.DB_PASSWORD || 'forensics_dev_only',
-  connectionString: resolveDatabaseUrl(), 
-  max: 10,
- });
 
 let mainWindow: BrowserWindowType | null = null;
 const getMainWindow = () => mainWindow;

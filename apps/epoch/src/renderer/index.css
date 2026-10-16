@@ -3,20 +3,36 @@
 :root {
   /* current dark values -- this is the DEFAULT, not a "dark" override.
      See DESIGN.md §3 -- do not restructure this when light theme lands. */
-  --background: 217 17% 9%;
-  --surface: 217 17% 14%;
-  --surface-raised: 217 17% 19%;
-  --foreground: 47 5% 90%;
-  --accent: 186 54% 54%;
-  --flag: 34 80% 60%;
-  --danger: 6 78% 62%;
-  --border: 217 16% 23%;
-  --muted-foreground: 220 16% 65%;
+  /* Surface tiers (DESIGN.md §9): inset wells < page < cards < raised panels.
+     Deep blue ink rather than grey, so the page itself carries colour. */
+  --inset: 224 32% 6%;
+  --background: 224 32% 8%;
+  --surface: 224 32% 14%;
+  --surface-raised: 224 32% 21%;
+  --foreground: 220 15% 92%;
+  /* Colour roles (DESIGN.md §9); each is at least 4.5:1 on every surface tier. */
+  --accent: 188 78% 52%;
+  --success: 152 60% 50%;
+  --flag: 36 90% 58%;
+  --danger: 4 85% 67%;
+  --border: 224 28% 24%;
+  --muted-foreground: 222 18% 68%;
+
+  /* Section colours (DESIGN.md §9): each view's identity, used for its icon in
+     the sidebar, its title chip and its empty states. They sit in the hue
+     range no role uses (210-330), so a section colour never reads as a state. */
+  --section-workspace: var(--accent);
+  --section-runs: 268 80% 74%;
+  --section-records: 212 85% 66%;
+  --section-iocs: 326 75% 70%;
+  --section-reports: 244 80% 76%;
+  /* The current view's section colour; ViewLayout sets it per view. */
+  --section: var(--accent);
 
   /* EPOCH-201: hue-matched shadow tint, not flat black -- keeps shadows
      feeling native to this palette instead of the generic
      rgba(0,0,0,.1) the frontend-design skill flags as an AI-tell. */
-  --shadow-tint: 217 40% 3%;
+  --shadow-tint: 224 50% 3%;
 }
 
 /* Placeholder for the future light/dark toggle (see DESIGN.md §3).
@@ -26,15 +42,22 @@
 }
 
 @theme {
+  --color-inset: hsl(var(--inset));
   --color-background: hsl(var(--background));
   --color-surface: hsl(var(--surface));
   --color-surface-raised: hsl(var(--surface-raised));
   --color-foreground: hsl(var(--foreground));
   --color-accent: hsl(var(--accent));
+  --color-success: hsl(var(--success));
   --color-flag: hsl(var(--flag));
   --color-danger: hsl(var(--danger));
   --color-border: hsl(var(--border));
   --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-section-workspace: hsl(var(--section-workspace));
+  --color-section-runs: hsl(var(--section-runs));
+  --color-section-records: hsl(var(--section-records));
+  --color-section-iocs: hsl(var(--section-iocs));
+  --color-section-reports: hsl(var(--section-reports));
 
   --font-sans: 'Inter', sans-serif;
   --font-display: 'Space Grotesk', sans-serif;
@@ -50,6 +73,11 @@
   --text-display: 1.25rem;
   --text-display--line-height: 1.75rem;
   --text-display--font-weight: 600;
+
+  /* EPOCH-464: section and card titles, between the page title and content. */
+  --text-heading: 1rem;
+  --text-heading--line-height: 1.5rem;
+  --text-heading--font-weight: 600;
 
   --text-label: 0.75rem;
   --text-label--line-height: 1rem;
@@ -68,17 +96,26 @@
                         0 2px 6px hsl(var(--shadow-tint) / 0.35);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* `inline` so `bg-section` resolves `--section` where it is used: ViewLayout
+   sets `--section` on its own element, and a value fixed on :root would ignore
+   that. */
+@theme inline {
+  --color-section: hsl(var(--section));
 }
 
-body {
-  font-family: var(--font-sans);
-  background: var(--color-background);
-  color: var(--color-foreground);
-  overflow: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Element defaults live in @layer base, below Tailwind's utilities (EPOCH-464).
+   Unlayered rules outrank every layered one, so a rule here outside a layer
+   would override utilities whatever their specificity: an unlayered
+   `* { margin: 0; padding: 0 }` reset did exactly that, and no padding,
+   margin or space-* utility ever applied. Tailwind's preflight already
+   resets margin, padding and box-sizing on every element. */
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-background);
+    color: var(--color-foreground);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }

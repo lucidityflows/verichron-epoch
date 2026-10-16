@@ -17,7 +17,6 @@ from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
-
 from source_type import SourceType
 
 __all__ = ["SourceType", "NormalizedRecord"]

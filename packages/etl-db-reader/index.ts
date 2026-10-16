@@ -1,8 +1,8 @@
 /**
- * Public entry point for `@verichron/db-reader`.
+ * Public entry point for `@verichron/etl-db-reader`.
  *
- * Query-side counterpart to `@verichron/etl-db-writer` -- see dbReader.ts for
- * why this is a separate package rather than more exports on etl-db-writer.
+ * Read-only query helpers for TypeScript consumers. Fact ingestion is handled
+ * by the Python writer; run-state writes are owned by the orchestrator.
  *
  * Every table/column name here was verified against
  * packages/etl-db-writer/migrations/0001_init.sql and 0002_ingest_completion.sql. The
@@ -14,28 +14,28 @@
  * apps/epoch/src/main.ts would have executed successfully against this
  * schema as written.
  */
- 
- 
+
 export type {
   PipelineRunRow,
   StageStatusRow,
   ForensicRecordRow,
   StageStatus,
-  CorrelationPivotRow,
-  CorrelatedContextRow,
   ForensicRecordQuery,
   ForensicRecordPage,
   RecordSortKey,
+  IndicatorCheckRow,
+  IndicatorCheckSummary,
+  IndicatorTypeSummary,
+  IndicatorSetSourceRow,
+  IndicatorMatchRow,
 } from './dbReader.js';
 export {
   getPipelineRuns,
   getRunEvidence,
+  getRunReportLocation,
   getStageStatus,
   getForensicRecords,
-  getCorrelationPivots,
-  getCorrelatedContext,
-  CANONICAL_STAGE_ORDER,
-  CORRELATION_WINDOW_MINUTES,
+  getIndicatorChecks,
+  MATCH_LIMIT,
   MAX_RECORDS_PAGE,
 } from './dbReader.js';
- 

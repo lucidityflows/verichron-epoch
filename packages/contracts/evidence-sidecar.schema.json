@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://verichron.local/contracts/evidence-sidecar.schema.json",
   "title": "EvidenceSidecar",
-  "description": "Written by mvt-runner next to each backup's canonical manifest (EPOCH-401). content_root is the evidence identity that EPOCH-402 keys evidence_items on. Zod mirror: ts/evidenceSidecar.ts.",
+  "description": "Written by the processor next to each backup's canonical manifest (EPOCH-401). content_root is the evidence identity that EPOCH-402 keys evidence_items on. Zod mirror: ts/evidenceSidecar.ts.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -22,7 +22,7 @@
     "evidence_name": {
       "type": "string",
       "minLength": 1,
-      "description": "Backup directory name as discovered by mvt-runner."
+      "description": "Backup directory name as discovered by the processor."
     },
     "algorithm": { "const": "sha256" },
     "content_root": {

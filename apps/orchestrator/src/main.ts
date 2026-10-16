@@ -1,22 +1,31 @@
-import * as fsp from "node:fs/promises";
-import * as path from "node:path";
-import { Client } from "pg";
-import { parseCliConfig, resolvePythonBin } from "./cli.js";
-import { discoverStages } from "./discovery.js";
-import { runPipelineForBackup } from "./pipeline.js";
+import { Client } from 'pg';
+import { type AnalysisResult, preflightPython, writeCallSummary } from './callSummary.js';
+import { parseCliConfig } from './cli.js';
+import { discoverStages } from './discovery.js';
+import { migrationRefusal, readMigrationStatus } from './migrations.js';
+import { runPipelineForBackup } from './pipeline.js';
 
 async function main() {
   const cfg = await parseCliConfig();
-  const pythonBin = await resolvePythonBin();
+  const pythonBin = await preflightPython(cfg.summaryPath);
+  if (!pythonBin) {
+    process.exitCode = 1;
+    return;
+  }
   const stages = await discoverStages();
-  
+
   if (stages.enabled.length === 0) {
-    console.error("[orchestrator] no enabled stages discovered under apps/extractors/ or apps/reporting/ — nothing to run.");
-    process.exit(1);
+    const error = 'No enabled stages were found under apps/extractors/ or apps/reporting/, so there is nothing to run.';
+    console.error(`[orchestrator] ${error}`);
+    await writeCallSummary(cfg.summaryPath, [], error);
+    process.exitCode = 1;
+    return;
   }
 
   if (cfg.backupPaths.length === 0) {
-    console.error("[orchestrator] no successfully decrypted backups were found in the workspace.");
+    const error = 'No successfully decrypted backups were found in the workspace.';
+    console.error(`[orchestrator] ${error}`);
+    await writeCallSummary(cfg.summaryPath, [], error);
     process.exitCode = 1;
     return;
   }
@@ -24,22 +33,29 @@ async function main() {
   const client = new Client({ connectionString: cfg.dbUrl });
   await client.connect();
 
+  // EPOCH-498: a database behind the code fails deep inside registration with
+  // a constraint error. Refuse before registering anything, and say why.
+  const refusal = migrationRefusal(await readMigrationStatus(client));
+  if (refusal) {
+    await client.end();
+    console.error(`[orchestrator] ${refusal}`);
+    await writeCallSummary(cfg.summaryPath, [], refusal);
+    process.exitCode = 1;
+    return;
+  }
+
   let failedBackups = 0;
-  const analysisResults: Array<{
-    backupPath: string;
-    status: "succeeded" | "failed" | "skipped";
-    runId?: string;
-    stages?: { stage: string; success: boolean }[];
-    error?: string;
-  }> = [];
+  const analysisResults: AnalysisResult[] = [];
 
   for (const backupPath of cfg.backupPaths) {
     try {
       // Registration and the evidence-keyed resume check happen inside, before
       // any run is created (EPOCH-404).
-      const result = await runPipelineForBackup(client, backupPath, cfg.dbUrl, pythonBin, stages);
+      const result = await runPipelineForBackup(client, backupPath, cfg.dbUrl, pythonBin, stages, {
+        indicatorSetHash: cfg.indicatorSetHash,
+      });
       if (result.skipped) {
-        analysisResults.push({ backupPath, status: "skipped" });
+        analysisResults.push({ backupPath, status: 'skipped' });
         continue;
       }
 
@@ -47,7 +63,7 @@ async function main() {
 
       analysisResults.push({
         backupPath,
-        status: result.success ? "succeeded" : "failed",
+        status: result.success ? 'succeeded' : 'failed',
         runId: result.runId,
         stages: result.results,
         error: result.error, // Captures pre-flight validation failures
@@ -57,20 +73,19 @@ async function main() {
       failedBackups += 1;
       analysisResults.push({
         backupPath,
-        status: "failed",
+        status: 'failed',
         error: err instanceof Error ? err.message : String(err),
       });
     }
   }
- 
+
   await client.end();
-  const workspacePath = path.dirname(path.dirname(cfg.backupPaths[0]));
-  await fsp.writeFile(path.join(workspacePath, "analysis-summary.json"), JSON.stringify({ results: analysisResults }, null, 2));
-  
+  await writeCallSummary(cfg.summaryPath, analysisResults);
+
   if (failedBackups > 0) process.exitCode = 1;
 }
- 
+
 main().catch((err) => {
-  console.error("[orchestrator] fatal error:", err);
+  console.error('[orchestrator] fatal error:', err);
   process.exit(1);
 });

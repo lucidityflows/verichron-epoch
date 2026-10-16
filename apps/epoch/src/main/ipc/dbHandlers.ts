@@ -5,11 +5,12 @@ import {
   getRunEvidence,
   getStageStatus,
   getForensicRecords,
-  getCorrelationPivots,
-  getCorrelatedContext,
+  getIndicatorChecks,
   type ForensicRecordPage,
   type ForensicRecordQuery,
 } from '@verichron/etl-db-reader';
+import { indicatorResultsConfig } from '@verichron/contracts';
+import type { IndicatorResults } from '../../shared/types/window';
 
 /** What a run with no registered evidence (pre-EPOCH-404) shows: nothing,
  * stated as such, rather than another evidence item's facts. */
@@ -48,28 +49,16 @@ export function registerDbHandlers(dbPool: Pool) {
     }
   });
 
-  ipcMain.handle('epoch:getCorrelationPivots', async (_event, runId: string) => {
+  // Every check of the selected run's evidence (EPOCH-493), with the stale
+  // threshold the report uses too, read here because the renderer can't.
+  ipcMain.handle('epoch:getIndicatorResults', async (_event, runId: string): Promise<IndicatorResults> => {
     try {
       const evidenceId = await getRunEvidence(dbPool, runId);
-      if (!evidenceId) return [];
-      return await getCorrelationPivots(dbPool, evidenceId);
+      const checks = evidenceId ? await getIndicatorChecks(dbPool, evidenceId) : [];
+      return { evidenceRegistered: !!evidenceId, checks, ...indicatorResultsConfig() };
     } catch (err) {
       console.error('DB error:', err);
       throw err;
     }
   });
-
-  ipcMain.handle(
-    'epoch:getCorrelatedContext',
-    async (_event, runId: string, eventTime: string, excludeId: string, windowMinutes?: number) => {
-      try {
-        const evidenceId = await getRunEvidence(dbPool, runId);
-        if (!evidenceId) return [];
-        return await getCorrelatedContext(dbPool, evidenceId, eventTime, excludeId, windowMinutes);
-      } catch (err) {
-        console.error('DB error:', err);
-        throw err;
-      }
-    }
-  );
 }

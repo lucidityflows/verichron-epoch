@@ -27,6 +27,15 @@ run = "scripts/bootstrap-dev.sh --check"
 description = "Check prerequisites, then install every environment from the lockfiles"
 run = "scripts/bootstrap-dev.sh"
 
+[tasks.lint]
+description = "Lint, format-check and type-check first-party Python"
+run = [
+  "uv run ruff check packages libs apps scripts tools",
+  "uv run ruff format --check packages libs apps scripts tools",
+  "uv run pyright",
+  "uv run pyright -p tools/decrypt",
+]
+
 [tasks."test:py"]
 description = "Python test suite (TEST_DATABASE_URL enables the real-Postgres tier)"
 run = "uv run pytest -q"
@@ -35,10 +44,11 @@ run = "uv run pytest -q"
 description = "TypeScript test suites (need TEST_DATABASE_URL)"
 run = [
   "pnpm --filter @verichron/contracts build",
-  "pnpm --filter @verichron/mvt-runner test",
-  "pnpm --filter @verichron/etl-db-writer test",
+  "pnpm --filter @verichron/processor test",
   "pnpm --filter @verichron/etl-db-reader test",
   "pnpm --filter @verichron/orchestrator test",
+  "pnpm --filter @verichron/etl-db-reader build",
+  "pnpm --filter @verichron/epoch test",
 ]
 
 [tasks.test]

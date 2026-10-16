@@ -27,15 +27,16 @@ How AI coding agents (Claude, Gemini and others) work in this repository.
 - **Verify claims against the code before acting on them,** including claims in
   tickets, reviews and earlier conversation. Re-check rather than cite a past fix.
 - **Keep the polyglot split:**
-  - TypeScript runs the control plane (`apps/epoch`, `apps/mvt-runner`,
+  - TypeScript runs the control plane (`apps/epoch`, `apps/processor`,
     `apps/orchestrator`);
   - Python parses, writes facts (`db_writer.py`, the only writer) and renders the
     report.
 - **Workspaces:** respect `pnpm` (e.g. `pnpm --filter <pkg>`) and `uv`
   (`uv run`, `uv sync`) conventions. Tool versions are pinned once, in
   `mise.toml`, `.python-version` and `package.json`; set up with
-  `mise run setup` ([development](docs/development.md)). mvt and iLEAPP run from
-  their own environments under `tools/`, never from the workspace venv.
+  `mise run setup` ([development](docs/development.md)). The backup decrypt and
+  iLEAPP run from their own environments under `tools/`, never from the
+  workspace venv.
 - **Product:** the first target is an air-gapped **Lab build**, a separate build
   rather than a runtime mode. A Personal build follows. The LLM produces *leads*,
   never evidence.

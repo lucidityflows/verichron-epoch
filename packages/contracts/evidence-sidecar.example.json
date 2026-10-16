@@ -8,5 +8,5 @@
   "total_bytes": 288,
   "source_path": "/evidence/backups/00008030-001A2B3C4D5E6F70",
   "hashed_at": "2026-10-07T21:30:00.000Z",
-  "tool": { "name": "mvt-runner", "version": "0.1.0" }
+  "tool": { "name": "processor", "version": "0.1.0" }
 }

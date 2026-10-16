@@ -3,6 +3,6 @@
   "entrypoint": "generate_report.py",
   "runtime": "python",
   "order": 1000,
-  "requiresResultsPath": false,
+  "reads": "decrypted",
   "enabled": true
 }

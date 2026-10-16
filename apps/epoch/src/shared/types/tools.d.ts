@@ -41,11 +41,10 @@ export interface DeviceInfo {
   osVersion?: string;
 }
 
-export type ToolAvailabilityStatus =
-  | { available: true; path: string }
-  | { available: false; reason: string };
+export type ToolAvailabilityStatus = { available: true; path: string } | { available: false; reason: string };
 
-export type BackupProgressPhase = 'preparing' | 'transferring' | 'verifying' | 'done' | 'error';
+/** `device-action`: the pull is waiting for the user to do something on the device. */
+export type BackupProgressPhase = 'preparing' | 'device-action' | 'transferring' | 'verifying' | 'done' | 'error';
 
 export interface BackupProgress {
   phase: BackupProgressPhase;
@@ -53,6 +52,77 @@ export interface BackupProgress {
   percent?: number;
   /** Short human-readable status line, safe to show directly in the UI. */
   message: string;
+  /** With `done`: what the crash-log copy did (EPOCH-514, 519). */
+  crashReports?: CrashReportsResult;
+}
+
+/** What copying a backup's crash logs did, as the panel shows it (EPOCH-519). */
+export interface CrashReportsResult {
+  outcome: 'copied' | 'failed' | 'unavailable';
+  /** The backup the crash logs belong to, for copying them again. */
+  backupDir: string;
+  files?: number;
+  error?: string;
+  /** The device refused because it was locked: unlocking it and copying again can succeed. */
+  locked?: boolean;
+}
+
+/** How a running backup is going (EPOCH-466), sent every few seconds. */
+export interface BackupStats {
+  startedAt: number;
+  /** Bytes written to the backup folder by this pull so far. */
+  receivedBytes: number;
+  /** When the folder last grew; null before any data arrived. */
+  lastDataAt: number | null;
+  /** Received bytes as a percentage of the estimate, at most 99 until the backup finishes; null without an estimate. */
+  percent: number | null;
+  /** The device's used storage, a rough size for the backup; null when unknown. */
+  estimatedBytes: number | null;
+}
+
+/**
+ * What a pull destination already holds for the device (EPOCH-483). A pull
+ * never writes into it: a finished backup is evidence, and an unfinished one
+ * can't be resumed.
+ */
+export interface DestinationBackup {
+  destDir: string;
+  /** The device's folder inside destDir. */
+  path: string;
+  state: 'finished' | 'unfinished' | 'unrecognised';
+}
+
+/** A backup folder left by a pull that didn't finish. */
+export interface IncompleteBackup {
+  /** The folder the pull wrote to; `path` is the device's folder inside it. */
+  destDir: string;
+  path: string;
+  bytes: number;
+}
+
+/**
+ * The running device pull, as the main process tracks it (EPOCH-467), so a
+ * panel that mounts mid-pull can show it.
+ */
+export interface DevicePullState {
+  sourceId: string;
+  device: DeviceInfo;
+  destDir: string;
+  startedAt: number;
+  /** Progress so far, oldest first; the newest 500 are kept. */
+  progress: BackupProgress[];
+  stats: BackupStats | null;
+  /** The "Action Needed" banner's message, if one is up. */
+  deviceAction: string | null;
+  /** True once the pull has reported done or an error. */
+  ended: boolean;
+}
+
+export interface PullOptions {
+  /** The backup password: the device's existing one, or the new one when encryption is turned on. */
+  password: string;
+  /** The user agreed to turn on the device's encrypted backups if they're off (EPOCH-466). */
+  enableEncryption: boolean;
 }
 
 export interface DeviceBackupSource {
@@ -60,28 +130,38 @@ export interface DeviceBackupSource {
   readonly label: string;
   checkToolAvailable(): Promise<ToolAvailabilityStatus>;
   listConnectedDevices(): Promise<DeviceInfo[]>;
+  /** Whether the device makes encrypted backups; throws when it can't be read. */
+  backupEncryptionEnabled(device: DeviceInfo): Promise<boolean>;
   pullBackup(
     device: DeviceInfo,
     destDir: string,
     onProgress: (progress: BackupProgress) => void,
-    password?: string
+    onStats: (stats: BackupStats) => void,
+    options: PullOptions
   ): Promise<string>;
+  /** Stops the running pull; false when none is running. */
+  cancelPull(): boolean;
+  /** What destDir already holds for the device; null when a pull may write there. */
+  destinationBackup(destDir: string, device: DeviceInfo): Promise<DestinationBackup | null>;
+  incompleteBackup(destDir: string, device: DeviceInfo): Promise<IncompleteBackup | null>;
+  deleteIncompleteBackup(destDir: string, device: DeviceInfo): Promise<void>;
+  /**
+   * Copies a finished backup's crash logs again after a failed copy
+   * (EPOCH-519): only from the device the backup came from, and never over a
+   * copy that exists.
+   */
+  copyCrashReportsAgain(device: DeviceInfo, backupDir: string): Promise<CrashReportsResult>;
 }
 
 export type ToolAcquisitionAction =
   | { kind: 'install-instructions'; title: string; commands: string[] }
   | { kind: 'compile-from-source'; title: string; steps: ToolAcquisitionCommand[] }
-  | { kind: 'download-verified-release'; title: string; manifestUrl: string }
-  | { kind: 'homebrew-install'; title: string; formulas: string[] };
+  | { kind: 'download-verified-release'; title: string; manifestUrl: string };
 
-/** Result of running an acquisition action. `homebrewFallbackAvailable` is
- * set only when a compile-from-source step failed on macOS AND `brew` is
- * present on the host -- it tells the UI it can offer the Homebrew path
- * instead of leaving the user stuck on manual terminal instructions. */
+/** Result of running a (Windows) acquisition action. */
 export interface ToolAcquisitionResult {
   success: boolean;
   failedStep?: string;
-  homebrewFallbackAvailable?: boolean;
 }
 
 export interface ToolAcquisitionCommand {
@@ -97,9 +177,97 @@ export interface ToolAcquisitionCommand {
 }
 
 export interface ToolAcquisitionStrategy {
+  /** Guided setup, where this platform supports it (EPOCH-465). */
+  guided?: GuidedToolSetup;
   /** What can this platform actually do to get the tool installed? Returns
    * every viable action so the UI can offer a choice (e.g. Linux: compile
    * from source, only option; Windows: bundled binary check, or a verified
    * download) rather than this layer picking one on the caller's behalf. */
   availableActions(): ToolAcquisitionAction[];
+}
+
+/* ---------------------------------------------------------------------------
+ * Guided tool setup (EPOCH-465): what a source needs on this machine, whether
+ * each requirement is met, and a step-by-step install with structured
+ * progress. Linux and macOS; Windows keeps ToolAcquisitionAction.
+ * ------------------------------------------------------------------------- */
+
+export type ToolSetupGroup = 'system' | 'service' | 'libraries';
+
+export interface ToolSetupRequirement {
+  id: string;
+  group: ToolSetupGroup;
+  /** A name, e.g. "pkg-config" or "libplist 2.8.0". */
+  label: string;
+  ok: boolean;
+  /** The installed version when known. */
+  version?: string;
+  /** One sentence: what it's for, or why it isn't met. */
+  detail?: string;
+}
+
+export interface ToolSetupInstallPlan {
+  /** The packages that would be installed. */
+  packages: string[];
+  /** The exact command, for the user to read or copy. */
+  command: string;
+  /** True when the app can run it itself (through the OS's admin prompt where needed). */
+  automatic: boolean;
+  /** Anything the user should know first, e.g. "Epoch will ask for your administrator password." */
+  note?: string;
+}
+
+export interface ToolSetupStatus {
+  /** Guided setup is available on this platform. */
+  supported: boolean;
+  requirements: ToolSetupRequirement[];
+  /** Every system and service requirement is met, so the libraries can be built. */
+  systemReady: boolean;
+  /** The libraries are installed at the pinned versions and verified. */
+  installed: boolean;
+  /** How to install what's missing from the system, or null when nothing is. */
+  install: ToolSetupInstallPlan | null;
+  /** A previous build stopped part-way and can resume. */
+  canResume: boolean;
+  /** Why guided setup isn't available, when `supported` is false. */
+  unsupportedReason?: string;
+}
+
+export type ToolSetupStepStatus = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+
+export interface ToolSetupStep {
+  id: string;
+  label: string;
+  status: ToolSetupStepStatus;
+  /** The current phase of a running step, e.g. "Configuring", or why it was skipped. */
+  detail?: string;
+}
+
+export type ToolSetupEvent =
+  | { type: 'plan'; steps: ToolSetupStep[] }
+  | { type: 'step'; id: string; status: ToolSetupStepStatus; detail?: string }
+  | { type: 'output'; id: string; line: string };
+
+export interface ToolSetupFailure {
+  stepId: string;
+  /** What failed, as a name: "Configure libplist 2.8.0". */
+  label: string;
+  /** A plain-language cause when the output shows one. */
+  hint?: string;
+  /** The last lines of the failed command's output. */
+  tail: string[];
+}
+
+export interface ToolSetupResult {
+  success: boolean;
+  failure?: ToolSetupFailure;
+  /** Something to do next, e.g. finishing Apple's installer. */
+  note?: string;
+}
+
+/** Implemented by an acquisition strategy that offers guided setup. */
+export interface GuidedToolSetup {
+  status(): Promise<ToolSetupStatus>;
+  installRequirements(emit: (event: ToolSetupEvent) => void): Promise<ToolSetupResult>;
+  build(emit: (event: ToolSetupEvent) => void): Promise<ToolSetupResult>;
 }

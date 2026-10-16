@@ -1,8 +1,8 @@
 /**
  * Public entry point for `@verichron/contracts`.
  *
- * `epoch` and `@verichron/etl-db-writer` both declare a dependency on this
- * package, and its package.json has always pointed `main` at `dist/index.js`.
+ * TypeScript consumers declare a dependency on this package, and its
+ * package.json has always pointed `main` at `dist/index.js`.
  * TypeScript consumers validate with the Zod model exported here.
  *
  * The canonical JSON Schema (`normalized-record.schema.json`, a sibling of
@@ -13,13 +13,46 @@
  * directory.
  */
 
-export { NormalizedRecord } from "./ts/normalizedRecord.js";
-export { discoverBackups, BACKUP_SEARCH_MAX_DEPTH } from "./ts/discoverBackups.js";
-export type { Backup } from "./ts/discoverBackups.js";
-export { deriveResultsPath } from './ts/deriveResultsPath.js';
+export { NormalizedRecord } from './ts/normalizedRecord.js';
+export { discoverBackups, BACKUP_SEARCH_MAX_DEPTH } from './ts/discoverBackups.js';
+export type { Backup } from './ts/discoverBackups.js';
+export {
+  deriveReportPath,
+  deriveIleappPath,
+  deriveCrashReportsPath,
+  deriveRunSummaryPath,
+} from './ts/deriveWorkspacePaths.js';
+export { crashReportsAcquisitionPaths, CrashReportsAcquisition } from './ts/crashReportsAcquisition.js';
 export { deriveEvidencePath } from './ts/deriveEvidencePath.js';
 export { EvidenceSidecar } from './ts/evidenceSidecar.js';
 export { contractVersion, CONTRACT_SCHEMAS } from './ts/contractVersion.js';
-export { SourceType, isSourceType } from './ts/sourceType'
-export type { SourceType as SourceTypeValue } from './ts/sourceType'
+export { indicatorResultsConfig, type IndicatorResultsConfig } from './ts/indicatorResults.js';
+export {
+  DECRYPT_MARKER,
+  ILEAPP_MARKER,
+  DerivativeKind,
+  StageInput,
+  ToolVersion,
+  RepairProvenance,
+  DecryptParams,
+  IleappParams,
+  IleappModules,
+  IleappModuleError,
+  DecryptMarker,
+  IleappMarker,
+  readDecryptMarker,
+  readIleappMarker,
+  renderDecryptMarker,
+  renderIleappMarker,
+  CRASH_REPORTS_MARKER,
+  CrashReportsParams,
+  CrashReportsMarker,
+  readCrashReportsMarker,
+  renderCrashReportsMarker,
+  identityParams,
+  canonicalJson,
+  provenanceKey,
+} from './ts/derivativeMarker.js';
+export { SourceType, isSourceType } from './ts/sourceType';
+export type { SourceType as SourceTypeValue } from './ts/sourceType';
 export { loadRootEnv, resolveDatabaseUrl } from './ts/env.js';

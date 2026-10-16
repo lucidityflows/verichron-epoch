@@ -14,7 +14,6 @@ from __future__ import annotations
 import io
 
 import pytest
-
 from etl_run import ETLRunResult
 
 
@@ -151,7 +150,7 @@ def test_itemized_failures_are_truncated_but_the_count_is_not():
         result.fail(f"timeline.csv[{index}]", "bad row")
 
     stream = io.StringIO()
-    result.print_summary("mvt_iocs", stream=stream)
+    result.print_summary("ileapp_bridge", stream=stream)
     rendered = stream.getvalue()
 
     assert "250 failure(s)" in rendered

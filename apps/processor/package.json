@@ -1,0 +1,34 @@
+{
+  "name": "@verichron/processor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "bin": {
+    "processor": "./dist/main.js"
+  },
+  "scripts": {
+    "build:contracts": "pnpm --filter @verichron/contracts build",
+    "prebuild": "pnpm run build:contracts",
+    "build": "tsc",
+    "prestart": "pnpm run build:contracts",
+    "start": "node dist/main.js",
+    "predev": "pnpm run build:contracts",
+    "dev": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --project tsconfig.test.json",
+    "pretest": "pnpm run build:contracts",
+    "test": "tsx --test 'src/**/*.test.ts'"
+  },
+  "dependencies": {
+    "@verichron/contracts": "workspace:*",
+    "@verichron/etl-db-reader": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

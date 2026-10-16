@@ -4,7 +4,7 @@ import * as path from 'node:path';
 
 /**
  * Repo-root .env, loaded once per process. Every Node entrypoint in this
- * monorepo (Electron main, orchestrator, mvt-runner) should call this
+ * monorepo (Electron main, orchestrator, processor) should call this
  * instead of independently guessing a path -- apps/epoch/src/main/main.ts
  * previously did `loadEnv({ path: '../../../.env' })`, which dotenv
  * resolves relative to process.cwd(), not this file's location, so it
@@ -37,12 +37,14 @@ export function resolveDatabaseUrl(): string {
   const user = process.env.DB_USER;
   const password = process.env.DB_PASSWORD;
   const name = process.env.DB_NAME;
-  const host = process.env.DB_HOST ?? 'localhost';
-  const port = process.env.DB_PORT ?? '5432';
+  const host = process.env.DB_HOST || 'localhost';
+  const port = process.env.DB_PORT || '5432';
 
   if (user && password && name) {
-    return `postgresql://${user}:${password}@${host}:${port}/${name}`;
+    // Encoded, so a password holding ?, #, @ or / still parses as itself.
+    const enc = encodeURIComponent;
+    return `postgresql://${enc(user)}:${enc(password)}@${host}:${port}/${enc(name)}`;
   }
 
-  return 'postgresql://forensics:forensics_dev_only@localhost:5432/forensics';
+  throw new Error('Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME.');
 }

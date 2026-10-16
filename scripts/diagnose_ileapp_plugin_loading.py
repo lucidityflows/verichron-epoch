@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Diagnose why apps/extractors/ileapp_bridge/iLEAPP's PluginLoader discovers
+Diagnose why tools/ileapp/iLEAPP's PluginLoader discovers
 zero plugins even though scripts/artifacts/ contains hundreds of real
 plugin .py files (confirmed: 384 files present in a real smoketest run).
 
@@ -18,11 +18,12 @@ from __future__ import annotations
 import pathlib
 import sys
 import traceback
+from importlib import import_module
 
 
 def main() -> int:
     repo_root = pathlib.Path(__file__).resolve().parent.parent
-    ileapp_dir = repo_root / "apps" / "extractors" / "ileapp_bridge" / "iLEAPP"
+    ileapp_dir = repo_root / "tools" / "ileapp" / "iLEAPP"
 
     if not ileapp_dir.exists():
         print(f"error: {ileapp_dir} does not exist -- vendored iLEAPP checkout missing.")
@@ -30,8 +31,8 @@ def main() -> int:
 
     # ileapp.py itself does `import scripts.plugin_loader as plugin_loader`, so
     # `scripts` must be importable as a top-level package -- ileapp_dir (not
-    # ileapp_dir/scripts) needs to be on sys.path. This matches how bridge.py
-    # invokes iLEAPP (cwd=ileapp_script.parent, i.e. ileapp_dir).
+    # ileapp_dir/scripts) needs to be on sys.path. This matches how the
+    # processor invokes iLEAPP (cwd = ileapp_dir; apps/processor/src/utils/ileapp.ts).
     #
     # IMPORTANT: this repo ALSO has an unrelated scripts/plugin_loader.py at
     # <repo_root>/scripts/plugin_loader.py (flagged for deletion -- see that
@@ -57,7 +58,7 @@ def main() -> int:
 
     sys.path.insert(0, str(ileapp_dir))
 
-    import scripts.plugin_loader as plugin_loader  # noqa: E402
+    plugin_loader = import_module("scripts.plugin_loader")
 
     resolved_from = getattr(plugin_loader, "__file__", "<unknown>")
     print(f"plugin_loader module resolved from: {resolved_from}")
@@ -97,7 +98,10 @@ def main() -> int:
             print(f"  __artifacts__ present:    {v1 is not None}" + (f" ({len(v1)} entries)" if v1 is not None else ""))
             if v2 is None and v1 is None:
                 print("  -> load_module_lazy() did not raise, but neither attribute was found.")
-                print(f"     Non-dunder attributes actually present: {[a for a in dir(mod) if not a.startswith('_')][:20]}")
+                print(
+                    "     Non-dunder attributes actually present: "
+                    f"{[a for a in dir(mod) if not a.startswith('_')][:20]}"
+                )
         except Exception:
             print("  load_module_lazy() raised an exception:")
             traceback.print_exc()
@@ -109,6 +113,7 @@ def main() -> int:
         print("--- probing same file with an ordinary (non-lazy) load, for comparison ---")
         try:
             import importlib.util as ilu
+
             spec = ilu.spec_from_file_location(f"eager.{sample.stem}", sample)
             if spec is None or spec.loader is None:
                 print("  could not build an import spec/loader for this file -- skipping.")
@@ -117,8 +122,14 @@ def main() -> int:
                 spec.loader.exec_module(eager_mod)
                 v2e = getattr(eager_mod, "__artifacts_v2__", None)
                 v1e = getattr(eager_mod, "__artifacts__", None)
-                print(f"  __artifacts_v2__ present: {v2e is not None}" + (f" ({len(v2e)} entries)" if v2e is not None else ""))
-                print(f"  __artifacts__ present:    {v1e is not None}" + (f" ({len(v1e)} entries)" if v1e is not None else ""))
+                print(
+                    f"  __artifacts_v2__ present: {v2e is not None}"
+                    + (f" ({len(v2e)} entries)" if v2e is not None else "")
+                )
+                print(
+                    f"  __artifacts__ present:    {v1e is not None}"
+                    + (f" ({len(v1e)} entries)" if v1e is not None else "")
+                )
         except Exception:
             print("  eager load raised an exception:")
             traceback.print_exc()
