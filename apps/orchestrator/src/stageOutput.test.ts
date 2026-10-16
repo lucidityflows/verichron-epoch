@@ -74,3 +74,83 @@ it('stops and fails a stage that exceeds its timeout', async () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it(
+  'kills a stage process group when a helper keeps its output streams open',
+  { skip: process.platform === 'win32' },
+  async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'orchestrator-process-tree-'));
+    const readyPath = path.join(dir, 'helper-ready');
+    const helperPath = path.join(dir, 'helper.mjs');
+    fs.writeFileSync(
+      helperPath,
+      `import { writeFileSync } from 'node:fs';\n` +
+        `process.on('SIGTERM', () => {});\n` +
+        `writeFileSync(${JSON.stringify(readyPath)}, String(process.ppid));\n` +
+        `setInterval(() => {}, 1000);\n`
+    );
+    fs.writeFileSync(
+      path.join(dir, 'stage.mjs'),
+      `import { spawn } from 'node:child_process';\n` +
+        `import { existsSync } from 'node:fs';\n` +
+        `spawn(process.execPath, [${JSON.stringify(helperPath)}], { stdio: 'inherit' });\n` +
+        `while (!existsSync(${JSON.stringify(readyPath)})) await new Promise((resolve) => setTimeout(resolve, 10));\n` +
+        `setInterval(() => {}, 1000);\n`
+    );
+    const stage: StageDefinition = {
+      name: 'helper-stage',
+      dir,
+      manifest: { entrypoint: 'stage.mjs', runtime: 'node', order: 10, reads: 'decrypted', enabled: true },
+    };
+    let processGroupId: number | null = null;
+    let testTimeout: NodeJS.Timeout | null = null;
+    try {
+      const startedAt = Date.now();
+      const resultPromise = runStage(
+        stage,
+        { backupPath: dir, dbUrl: '******h/d', pythonBin: 'unused' },
+        'run-1',
+        {
+          evidenceId: 'evidence-1',
+          deviceId: 'device-1',
+          decryptedDerivativeId: 'derivative-1',
+          ileappDerivativeId: null,
+          crashReportsDerivativeId: null,
+        },
+        null,
+        2000
+      );
+      const readyDeadline = Date.now() + 1500;
+      while (!fs.existsSync(readyPath) && Date.now() < readyDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      if (!fs.existsSync(readyPath)) {
+        const earlyResult = await resultPromise;
+        assert.fail(`the helper did not start before the timeout: ${JSON.stringify(earlyResult)}`);
+      }
+      processGroupId = Number(fs.readFileSync(readyPath, 'utf8'));
+      const result = await Promise.race([
+        resultPromise,
+        new Promise<never>((_, reject) => {
+          testTimeout = setTimeout(
+            () => reject(new Error('runStage did not close after killing the process group')),
+            12_000
+          );
+        }),
+      ]);
+      assert.equal(result.status, 'failed');
+      assert.ok(Date.now() - startedAt >= 7000, 'the uncooperative helper survived SIGTERM until SIGKILL escalation');
+      assert.match(result.stderr, /Stage "helper-stage" timed out after 2000 ms and was stopped\./);
+    } finally {
+      if (testTimeout) clearTimeout(testTimeout);
+      if (processGroupId !== null) {
+        try {
+          process.kill(-processGroupId, 'SIGKILL');
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== 'ESRCH') throw err;
+        }
+      }
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);

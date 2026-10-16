@@ -54,6 +54,17 @@ export const STAGE_TIMEOUT_MS = 30 * 60 * 1000;
 const STAGE_KILL_GRACE_MS = 5000;
 
 function signalStageProcess(child: ChildProcess, signal: NodeJS.Signals): string | null {
+  if (process.platform !== 'win32' && child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, signal);
+      return null;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ESRCH') return null;
+      return `Could not send ${signal} to the stage process group: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (child.exitCode !== null || child.signalCode !== null) return null;
   try {
     return child.kill(signal) ? null : `Could not send ${signal} to the stage process.`;
   } catch (err) {
@@ -132,6 +143,7 @@ export function runStage(
     const child = spawn(bin, [entrypointPath, ...extraArgs], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, DATABASE_URL: config.dbUrl },
+      detached: process.platform !== 'win32',
     });
 
     let stderr = '';
@@ -156,7 +168,7 @@ export function runStage(
       stderr += text;
     });
     timeoutHandle = setTimeout(() => {
-      if (child.exitCode !== null || child.signalCode !== null) return;
+      if (process.platform === 'win32' && (child.exitCode !== null || child.signalCode !== null)) return;
       timedOut = true;
       stopError = signalStageProcess(child, 'SIGTERM');
       killEscalationHandle = setTimeout(() => {
