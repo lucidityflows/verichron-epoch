@@ -29,6 +29,7 @@ import { analysisShown } from './analysisShown';
 import { analysisSelection, listLabels } from '../../shared/analysisSelection';
 import { devicesApi } from '../api/devices';
 import { ViewLayout } from '../components/layout/ViewLayout';
+import { AnalysisStageProgress } from '../features/investigations/AnalysisStageProgress';
 
 export interface WorkspaceViewProps {
   onAnalysisComplete: () => void;
@@ -118,6 +119,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   // A result from before the latest Prepare doesn't hide Analyze (EPOCH-516).
   const analysisForRun = analysisShown(analysis, prepare, analysisWorkspace);
   const analysisRunning = analysisForRun && analysis?.status === 'running';
+  const currentAnalysisStage = analysisRunning ? analysis?.currentStage : null;
   const analysisLog = analysisForRun ? analysisLogAll : [];
   const analysisResult: PipelineFinishedResult | null = analysisRunning
     ? null
@@ -603,9 +605,17 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
           {analysisRunning && (
             <div className="flex items-center justify-between gap-3 py-3">
-              <div className="flex items-center gap-1.5 text-data text-accent">
-                <Loader className="text-accent" />
-                <span>{analysisCancelling ? 'Stopping analysis…' : 'Examining the imported evidence…'}</span>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 text-data text-accent">
+                  <Loader className="text-accent" />
+                  <span>{analysisCancelling ? 'Stopping analysis…' : 'Examining the imported evidence…'}</span>
+                </div>
+                {currentAnalysisStage && (
+                  <AnalysisStageProgress
+                    stage={currentAnalysisStage}
+                    className="pl-6 text-data text-muted-foreground"
+                  />
+                )}
               </div>
               {/* EPOCH-305: always available while running, so a stalled or
                * abnormally long run can be broken out of without restarting

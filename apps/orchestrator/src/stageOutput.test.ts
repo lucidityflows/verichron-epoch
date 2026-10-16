@@ -44,3 +44,33 @@ it('keeps a UTF-8 character that arrives split across two chunks', async () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it('stops and fails a stage that exceeds its timeout', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'orchestrator-timeout-'));
+  fs.writeFileSync(path.join(dir, 'stage.mjs'), 'setInterval(() => {}, 1000);\n');
+  const stage: StageDefinition = {
+    name: 'slow-stage',
+    dir,
+    manifest: { entrypoint: 'stage.mjs', runtime: 'node', order: 10, reads: 'decrypted', enabled: true },
+  };
+  try {
+    const result = await runStage(
+      stage,
+      { backupPath: dir, dbUrl: '******h/d', pythonBin: 'unused' },
+      'run-1',
+      {
+        evidenceId: 'evidence-1',
+        deviceId: 'device-1',
+        decryptedDerivativeId: 'derivative-1',
+        ileappDerivativeId: null,
+        crashReportsDerivativeId: null,
+      },
+      null,
+      100
+    );
+    assert.equal(result.status, 'failed');
+    assert.match(result.stderr, /Stage "slow-stage" timed out after 100 ms and was stopped\./);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

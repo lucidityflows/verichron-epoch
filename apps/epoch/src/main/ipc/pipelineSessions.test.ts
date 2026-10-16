@@ -117,6 +117,22 @@ describe('AnalysisSession', () => {
     assert.equal(analysis.snapshot().status, 'finished');
     assert.equal(analysis.snapshot().log.length, 1);
   });
+
+  it('tracks stage start time from orchestrator lifecycle lines and clears it at completion', () => {
+    const analysis = new AnalysisSession(() => {});
+    analysis.start('workspace', '/w', 1000);
+    analysis.line('stdout', '[orchestrator] stage started: ileapp_bridge', 2500);
+    assert.deepEqual(analysis.snapshot().currentStage, { name: 'ileapp_bridge', startedAt: 2500 });
+    assert.equal(analysis.hasActiveStage(), true);
+
+    analysis.line('stdout', '[orchestrator] stage finished: ileapp_bridge', 3500);
+    assert.equal(analysis.snapshot().currentStage, null);
+    assert.equal(analysis.hasActiveStage(), false);
+
+    analysis.line('stdout', '[orchestrator] stage started: reporting', 4000);
+    analysis.finish({ success: false });
+    assert.equal(analysis.snapshot().currentStage, null);
+  });
 });
 
 describe('LineSplitter', () => {

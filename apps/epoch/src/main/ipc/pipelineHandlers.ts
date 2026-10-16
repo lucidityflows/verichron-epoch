@@ -19,14 +19,7 @@ interface StartPipelineOptions {
 
 const PASSWORD_PROMPT_RE = /password for (.+): $/;
 
-// EPOCH-305: how long the orchestrator subprocess may run before Epoch gives
-// up waiting and kills it. A real investigation over several large backups
-// can legitimately run long, so this is intentionally generous -- it exists
-// to catch a genuinely hung/deadlocked process (e.g. blocked on a stalled
-// Postgres connection), not to cap ordinary runtimes. Flagging this as a
-// default guess rather than a considered value -- worth tuning once there's
-// real data on how long a full run against a large backup set takes.
-const ORCHESTRATOR_TIMEOUT_MS = 45 * 60 * 1000; // 45 minutes
+const OUTSIDE_STAGE_TIMEOUT_MS = 5 * 60 * 1000;
 
 // Grace period between SIGTERM and SIGKILL when cancelling or timing out.
 const KILL_GRACE_MS = 5000;
@@ -96,7 +89,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   // mutually exclusive -- only one is ever non-null, since both paths share
   // the single-flight guard on runningOrchestratorProcess below.
   let runningOrchestratorBackupSource: string | null = null;
-  let orchestratorTimeoutHandle: NodeJS.Timeout | null = null;
+  let outsideStageTimeoutHandle: NodeJS.Timeout | null = null;
   let orchestratorKillEscalationHandle: NodeJS.Timeout | null = null;
   // Set immediately before *we* kill the process, so the 'close'/'error'
   // handlers -- which fire identically for a crash, a clean exit, or a kill
@@ -141,9 +134,25 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     return { onChunk, end };
   }
 
+  function armOutsideStageTimeout(): void {
+    if (outsideStageTimeoutHandle) {
+      clearTimeout(outsideStageTimeoutHandle);
+      outsideStageTimeoutHandle = null;
+    }
+    if (!runningOrchestratorProcess || orchestratorTerminationReason !== null || analysisSession.hasActiveStage()) {
+      return;
+    }
+    outsideStageTimeoutHandle = setTimeout(() => {
+      killOrchestrator('timeout');
+    }, OUTSIDE_STAGE_TIMEOUT_MS);
+  }
+
   function makeOrchestratorStreamBuffer(stream: PipelineLogEntry['stream']) {
     const splitter = new LineSplitter();
-    const emit = (line: string) => sendToRenderer('epoch:orchestratorLog', analysisSession.line(stream, line));
+    const emit = (line: string) => {
+      sendToRenderer('epoch:orchestratorLog', analysisSession.line(stream, line));
+      armOutsideStageTimeout();
+    };
     const onChunk = (chunk: Buffer) => splitter.push(chunk).forEach(emit);
     const emitPending = () => {
       const rest = splitter.end();
@@ -278,9 +287,9 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   }
 
   function clearOrchestratorTimers(): void {
-    if (orchestratorTimeoutHandle) {
-      clearTimeout(orchestratorTimeoutHandle);
-      orchestratorTimeoutHandle = null;
+    if (outsideStageTimeoutHandle) {
+      clearTimeout(outsideStageTimeoutHandle);
+      outsideStageTimeoutHandle = null;
     }
     if (orchestratorKillEscalationHandle) {
       clearTimeout(orchestratorKillEscalationHandle);
@@ -405,9 +414,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     // stalled DB connection) never fires 'error' or 'close' on its own --
     // this is the only thing that gets the renderer out of an indefinite
     // spinner in that case.
-    orchestratorTimeoutHandle = setTimeout(() => {
-      killOrchestrator('timeout');
-    }, ORCHESTRATOR_TIMEOUT_MS);
+    armOutsideStageTimeout();
 
     const stdoutBuffer = makeOrchestratorStreamBuffer('stdout');
     const stderrBuffer = makeOrchestratorStreamBuffer('stderr');
@@ -434,9 +441,9 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     });
 
     child.on('close', (code) => {
-      clearOrchestratorTimers();
       stdoutBuffer.emitPending();
       stderrBuffer.emitPending();
+      clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
       const workspaceAtClose = runningOrchestratorWorkspace ?? trimmedWorkspace;
       runningOrchestratorProcess = null;
@@ -454,7 +461,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
         const closeReason = cancelled
           ? 'cancelled by user'
           : timedOut
-            ? `orchestrator timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minute(s)`
+            ? `orchestrator stalled outside a stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes`
             : `orchestrator process exited unexpectedly (code ${code})`;
 
         void markWorkspaceRunsAborted(workspaceAtClose, closeReason)
@@ -469,7 +476,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
               error: cancelled
                 ? 'Analysis was cancelled.'
                 : timedOut
-                  ? `Analysis timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minutes and was stopped.`
+                  ? `Analysis stalled outside an active stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes and was stopped.`
                   : error,
             });
           });
@@ -513,9 +520,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     orchestratorTerminationReason = null;
     analysisSession.start('retry', trimmedBackupSource);
 
-    orchestratorTimeoutHandle = setTimeout(() => {
-      killOrchestrator('timeout');
-    }, ORCHESTRATOR_TIMEOUT_MS);
+    armOutsideStageTimeout();
 
     const stdoutBuffer = makeOrchestratorStreamBuffer('stdout');
     const stderrBuffer = makeOrchestratorStreamBuffer('stderr');
@@ -542,9 +547,9 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     });
 
     child.on('close', (code) => {
-      clearOrchestratorTimers();
       stdoutBuffer.emitPending();
       stderrBuffer.emitPending();
+      clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
       const scopedBackupSource = runningOrchestratorBackupSource ?? trimmedBackupSource;
       runningOrchestratorProcess = null;
@@ -558,7 +563,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
         const closeReason = cancelled
           ? 'cancelled by user'
           : timedOut
-            ? `orchestrator timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minute(s)`
+            ? `orchestrator stalled outside a stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes`
             : `orchestrator process exited unexpectedly (code ${code})`;
 
         void markSingleRunAborted(scopedBackupSource, closeReason)
@@ -572,7 +577,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
               error: cancelled
                 ? 'Analysis was cancelled.'
                 : timedOut
-                  ? `Analysis timed out after ${ORCHESTRATOR_TIMEOUT_MS / 60000} minutes and was stopped.`
+                  ? `Analysis stalled outside an active stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes and was stopped.`
                   : error,
             });
           });
