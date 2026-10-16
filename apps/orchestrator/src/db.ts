@@ -1,33 +1,21 @@
 import { Client } from "pg";
 import { randomUUID } from "node:crypto";
-import type { StageSet } from "./types.js";
-import type { Registration } from "./registration.js";
+import { StageDefinition } from "./types.js";
 
-export type RunState = "running" | "incomplete" | "complete";
-
-/**
- * Whether this evidence has already been fully processed from this
- * derivative: a run against the same (evidence, derivative) whose state in
- * the run_completeness view is 'complete'. The view is the ONE definition of
- * completeness (R23, migration 0005); nothing here re-derives it.
- */
-export async function hasSucceededRun(client: Client, evidenceId: string, derivativeId: string): Promise<boolean> {
+export async function hasSucceededRun(client: Client, backupPath: string): Promise<boolean> {
   const { rows } = await client.query(
-    `SELECT 1 FROM run_completeness
-      WHERE evidence_id = $1 AND derivative_id = $2 AND state = 'complete'
-      LIMIT 1`,
-    [evidenceId, derivativeId]
+    `SELECT pr.run_id
+     FROM pipeline_runs pr
+     WHERE pr.backup_source = $1
+       AND pr.finished_at IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM pipeline_stage_status pss
+         WHERE pss.run_id = pr.run_id AND pss.status = 'failed'
+       )
+     LIMIT 1`,
+    [backupPath]
   );
   return rows.length > 0;
-}
-
-/** A run's state from the canonical predicate, or null if no such run. */
-export async function getRunState(client: Client, runId: string): Promise<RunState | null> {
-  const { rows } = await client.query<{ state: RunState }>(
-    `SELECT state FROM run_completeness WHERE run_id = $1`,
-    [runId]
-  );
-  return rows[0]?.state ?? null;
 }
 
 /** What a run records about how it was produced (R35). */
@@ -38,43 +26,21 @@ export interface RunProvenance {
   toolVersions: Record<string, string>;
 }
 
-/**
- * Create a run for registered evidence. Only called after registration
- * succeeds (EPOCH-404), so every run row carries its evidence and derivative.
- * Disabled stages are recorded as 'skipped' so the run's stage list is whole;
- * 'skipped' never makes a run incomplete.
- */
 export async function createRun(
   client: Client,
   backupPath: string,
-  stages: StageSet,
-  provenance: RunProvenance,
-  registration: Pick<Registration, "evidenceId" | "decryptedDerivativeId">
+  stages: StageDefinition[],
+  provenance: RunProvenance
 ): Promise<string> {
   const runId = randomUUID();
   await client.query(
-    `INSERT INTO pipeline_runs
-       (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [
-      runId,
-      backupPath,
-      provenance.contractVersion,
-      provenance.toolVersions,
-      registration.evidenceId,
-      registration.decryptedDerivativeId,
-    ]
+    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions)
+     VALUES ($1, $2, $3, $4)`,
+    [runId, backupPath, provenance.contractVersion, provenance.toolVersions]
   );
-  for (const stage of stages.enabled) {
+  for (const stage of stages) {
     await client.query(
       `INSERT INTO pipeline_stage_status (run_id, stage_name, status) VALUES ($1, $2, 'pending')`,
-      [runId, stage.name]
-    );
-  }
-  for (const stage of stages.disabled) {
-    await client.query(
-      `INSERT INTO pipeline_stage_status (run_id, stage_name, status, error_message)
-       VALUES ($1, $2, 'skipped', 'stage disabled in its stage.json')`,
       [runId, stage.name]
     );
   }
