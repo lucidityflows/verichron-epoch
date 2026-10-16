@@ -3,9 +3,8 @@ import { readFileSync } from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
 import { Client } from "pg";
-import type { StageDefinition, StageSet, RunConfig } from "./types.js";
-import { createRun, hasCompleteRunFor, markStage, markRunFailed, type RunProvenance } from "./db.js";
-import { derivativeFor, registerEvidence, RegistrationError, type Registration } from "./registration.js";
+import { StageDefinition, RunConfig } from "./types.js";
+import { createRun, markStage, markRunFailed, type RunProvenance } from "./db.js";
 import { contractVersion, deriveResultsPath } from "@verichron/contracts";
 
 async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { ok: false; reason: string }> {
@@ -24,17 +23,7 @@ async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { 
   return { ok: true };
 }
 
-/**
- * The derivative a stage reads: mvt-ios's results for stages that need them,
- * otherwise the decrypted backup. Null when the stage needs results that
- * weren't registered (no results directory).
- */
-function runStage(
-  stage: StageDefinition,
-  config: RunConfig,
-  runId: string,
-  registration: Registration
-): Promise<{ success: boolean; stderr: string }> {
+function runStage(stage: StageDefinition, config: RunConfig, runId: string): Promise<{ success: boolean; stderr: string }> {
   if (stage.manifest.requiresResultsPath && !config.resultsPath) {
     return Promise.resolve({
       success: false,
@@ -43,24 +32,7 @@ function runStage(
   }
 
   return new Promise((resolve) => {
-    // Identity comes from here, never from the stage (R16): the evidence, the
-    // derivative this stage reads, and its declared parser version.
-    const derivativeId = derivativeFor(stage, registration);
-    if (!derivativeId) {
-      resolve({
-        success: false,
-        stderr: `stage "${stage.name}" reads mvt-ios results, but no results directory was registered for this backup`,
-      });
-      return;
-    }
-    const extraArgs = [
-      "--run-id", runId,
-      "--evidence-id", registration.evidenceId,
-      "--backup-path", config.backupPath,
-      "--db-url", config.dbUrl,
-    ];
-    extraArgs.push("--derivative-id", derivativeId);
-    if (stage.manifest.parserVersion !== undefined) extraArgs.push("--parser-version", String(stage.manifest.parserVersion));
+    const extraArgs = ["--run-id", runId, "--backup-path", config.backupPath, "--db-url", config.dbUrl];
     if (config.resultsPath) extraArgs.push("--results-path", config.resultsPath);
     
     const entrypointPath = path.join(stage.dir, stage.manifest.entrypoint);
@@ -101,60 +73,28 @@ export function collectProvenance(pythonBin: string): RunProvenance {
   };
 }
 
-export interface BackupRunResult {
-  runId?: string;
-  results?: { stage: string; success: boolean }[];
-  success: boolean;
-  /** True when a complete run already exists for this evidence and derivative. */
-  skipped?: boolean;
-  evidenceId?: string;
-  error?: string;
-}
-
-export interface RunPipelineOptions {
-  /** Per-install device-key secret file; tests point this at a temp file. */
-  secretPath?: string;
-}
-
 export async function runPipelineForBackup(
   client: Client,
   backupPath: string,
   dbUrl: string,
   pythonBin: string,
-  stages: StageSet,
-  options: RunPipelineOptions = {}
-): Promise<BackupRunResult> {
-  // Validate, then register, BEFORE touching pipeline_runs: a bad path or an
-  // unverifiable sidecar must not leave an orphaned run row (EPOCH-404).
+  stages: StageDefinition[]
+): Promise<{ runId?: string; results?: { stage: string; success: boolean }[]; success: boolean; error?: string }> {
+  
+  // PR 2 Guard: Validate before touching the database
   const validation = await validateBackupPath(backupPath);
   if (!validation.ok) {
     return { success: false, error: validation.reason };
   }
 
+  const runId = await createRun(client, backupPath, stages, collectProvenance(pythonBin));
   const resultsPath = deriveResultsPath(backupPath);
-  let registration: Registration;
-  try {
-    registration = await registerEvidence(client, { backupPath, resultsPath, secretPath: options.secretPath });
-  } catch (err) {
-    if (err instanceof RegistrationError) return { success: false, error: err.message };
-    throw err;
-  }
-
-  // Resume is keyed by evidence identity, not by path: the same backup
-  // registered from another mount path is the same evidence. It is also
-  // keyed by the stage plan: a bumped parserVersion or a newly enabled stage
-  // is not "already done".
-  if (await hasCompleteRunFor(client, registration, stages.enabled)) {
-    return { success: true, skipped: true, evidenceId: registration.evidenceId };
-  }
-
-  const runId = await createRun(client, backupPath, stages, collectProvenance(pythonBin), registration);
   const results: { stage: string; success: boolean }[] = [];
 
   try {
-    for (const stage of stages.enabled) {
+    for (const stage of stages) {
       await markStage(client, runId, stage.name, "running");
-      const { success, stderr } = await runStage(stage, { backupPath, resultsPath, dbUrl, pythonBin }, runId, registration);
+      const { success, stderr } = await runStage(stage, { backupPath, resultsPath, dbUrl, pythonBin }, runId);
 
       if (success) {
         await markStage(client, runId, stage.name, "succeeded");
@@ -163,9 +103,9 @@ export async function runPipelineForBackup(
       }
       results.push({ stage: stage.name, success });
     }
-
+ 
     await client.query(`UPDATE pipeline_runs SET finished_at = now() WHERE run_id = $1`, [runId]);
-    return { runId, results, evidenceId: registration.evidenceId, success: results.every((result) => result.success) };
+    return { runId, results, success: results.every((result) => result.success) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await markRunFailed(client, runId, message);

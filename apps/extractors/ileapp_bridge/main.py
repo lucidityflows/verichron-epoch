@@ -26,6 +26,9 @@ except ImportError:
 
 import psycopg2
 
+#: Bump when parsing or normalization changes what this extractor writes. A
+#: bump re-ingests every artifact as a new unit beside the old rows (R8).
+PARSER_VERSION = 1
 
 def _coerce_str(value: Any) -> str | None:
     if value is None:
@@ -128,6 +131,7 @@ def process_artifact_file(conn, ctx: IngestContext, file_path: Path) -> ETLRunRe
         ctx,
         file_path,
         source_type=SourceType.ILEAPP_RECORD.value,
+        parser_version=PARSER_VERSION,
         # A summary with sample rows, not the artifact itself (R12).
         payload_kind="summary",
         raw_payload=summary,

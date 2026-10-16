@@ -66,8 +66,8 @@ def _seed(cur) -> None:
             (evidence, root),
         )
         cur.execute(
-            "INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key) "
-            "VALUES (%s, %s, 'decrypted', '/explain', '{\"name\": \"explain\", \"version\": \"0\"}', '{\"repair\": {\"status\": \"skipped\", \"reason\": \"explain fixture\"}}', repeat('0', 64))",
+            "INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path) "
+            "VALUES (%s, %s, 'decrypted', '/explain')",
             (evidence, evidence),
         )
     for evidence, units, per_unit in ((EVIDENCE, UNITS, RECORDS // UNITS), (OTHER, UNITS // 10, RECORDS // UNITS)):
