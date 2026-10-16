@@ -9,6 +9,7 @@ import type {
 import type {
   BackupProgress,
   CrashReportsResult,
+  CrashReportsRetryTarget,
   DeviceInfo,
   PullOptions,
   BackupStats,
@@ -183,6 +184,10 @@ declare global {
       ) => Promise<IncompleteBackup[]>;
       deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) => Promise<void>;
       copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string) => Promise<CrashReportsResult>;
+      findCrashReportsRetryTargets: (
+        sourceId: string,
+        backupDirs: string[]
+      ) => Promise<CrashReportsRetryTarget[]>;
       onDeviceBackupStats: (callback: (stats: BackupStats) => void) => () => void;
       runToolAcquisitionSteps: (
         steps: ToolAcquisitionCommand[],

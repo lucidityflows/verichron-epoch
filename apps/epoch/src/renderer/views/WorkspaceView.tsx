@@ -28,6 +28,7 @@ import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
 import { analysisShown } from './analysisShown';
 import { analysisSelection, listLabels } from '../../shared/analysisSelection';
 import { devicesApi } from '../api/devices';
+import type { CrashReportsRetryTarget } from '../../shared/types/tools';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { AnalysisStageProgress } from '../features/investigations/AnalysisStageProgress';
 
@@ -57,6 +58,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const [discoveringBackups, setDiscoveringBackups] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
+  const [crashReportsRetryTargets, setCrashReportsRetryTargets] = useState<CrashReportsRetryTarget[]>([]);
+  const [crashReportsRetryError, setCrashReportsRetryError] = useState<string | null>(null);
 
   const [showOptions, setShowOptions] = useState(false);
   const [workspace, setWorkspace] = useState('');
@@ -189,6 +192,38 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       cancelled = true;
     };
   }, [selectedPath]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const backupDirs = backups.map((backup) => backup.path);
+    Promise.resolve().then(async () => {
+      if (backupDirs.length === 0) {
+        if (!cancelled) {
+          setCrashReportsRetryTargets([]);
+          setCrashReportsRetryError(null);
+        }
+        return;
+      }
+      try {
+        const sources = await devicesApi.listDeviceBackupSources();
+        const targets = await Promise.all(
+          sources.map((source) => devicesApi.findCrashReportsRetryTargets(source.id, backupDirs))
+        );
+        if (!cancelled) {
+          setCrashReportsRetryTargets(targets.flat());
+          setCrashReportsRetryError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setCrashReportsRetryTargets([]);
+          setCrashReportsRetryError(err instanceof Error ? err.message : String(err));
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [backups]);
 
   const toggleBackup = (label: string) => {
     setSelectedLabels((prev) => {
@@ -465,10 +500,26 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       awaitingPassword={isLive && pendingPasswordFor === b.label}
                       lastResult={lastResult}
                       prepared={preparedByLabel.get(b.label)}
+                      crashReportsRetryTarget={crashReportsRetryTargets.find((target) => target.backupDir === b.path)}
+                      onCopyCrashReportsAgain={async (target) => {
+                        const result = await devicesApi.copyDeviceCrashReports(
+                          target.sourceId,
+                          target.device,
+                          target.backupDir
+                        );
+                        if (result.outcome !== 'copied') {
+                          throw new Error(result.error ?? 'Crash logs were not copied.');
+                        }
+                      }}
                     />
                   );
                 })}
               </div>
+            )}
+            {crashReportsRetryError && (
+              <p role="alert" className="text-label text-danger mt-3">
+                Could not check whether connected devices have crash logs to copy: {crashReportsRetryError}
+              </p>
             )}
 
             <div className="mt-6 pt-4 border-t border-border/60">

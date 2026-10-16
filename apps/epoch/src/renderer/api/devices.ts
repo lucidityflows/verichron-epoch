@@ -9,6 +9,7 @@ import type {
   ToolSetupResult,
   ToolSetupStatus,
   BackupProgress,
+  CrashReportsRetryTarget,
 } from '../../shared/types/tools';
 
 export const devicesApi = {
@@ -29,6 +30,8 @@ export const devicesApi = {
     window.epoch.deleteIncompleteBackup(sourceId, destDir, device),
   copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string) =>
     window.epoch.copyDeviceCrashReports(sourceId, device, backupDir),
+  findCrashReportsRetryTargets: (sourceId: string, backupDirs: string[]): Promise<CrashReportsRetryTarget[]> =>
+    window.epoch.findCrashReportsRetryTargets(sourceId, backupDirs),
   onDeviceBackupStats: (callback: (stats: BackupStats) => void) => window.epoch.onDeviceBackupStats(callback),
   runToolAcquisitionSteps: (steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> =>
     window.epoch.runToolAcquisitionSteps(steps, installPrefix),

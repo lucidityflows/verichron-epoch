@@ -67,6 +67,13 @@ export interface CrashReportsResult {
   locked?: boolean;
 }
 
+/** An existing finished backup whose crash logs can be copied from its connected device. */
+export interface CrashReportsRetryTarget {
+  sourceId: string;
+  backupDir: string;
+  device: DeviceInfo;
+}
+
 /** How a running backup is going (EPOCH-466), sent every few seconds. */
 export interface BackupStats {
   startedAt: number;
@@ -151,6 +158,8 @@ export interface DeviceBackupSource {
    * copy that exists.
    */
   copyCrashReportsAgain(device: DeviceInfo, backupDir: string): Promise<CrashReportsResult>;
+  /** Existing finished backups that lack a crash-log copy and have their device connected. */
+  findCrashReportsRetryTargets(backupDirs: string[]): Promise<CrashReportsRetryTarget[]>;
 }
 
 export type ToolAcquisitionAction =

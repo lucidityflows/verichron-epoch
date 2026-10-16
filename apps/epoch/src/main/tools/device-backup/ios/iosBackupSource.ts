@@ -3,6 +3,7 @@ import type {
   BackupProgress,
   BackupStats,
   CrashReportsResult,
+  CrashReportsRetryTarget,
   DestinationBackup,
   DeviceBackupSource,
   DeviceInfo,
@@ -33,7 +34,12 @@ import {
   type OutputEvent,
 } from './backupRun';
 import { appendPullRecord, type PullRecord } from './pullRecord';
-import { copyCrashReports, discardCrashReportsCopy, type CrashReportCopy } from './crashReports';
+import {
+  copyCrashReports,
+  crashReportsCopyExists,
+  discardCrashReportsCopy,
+  type CrashReportCopy,
+} from './crashReports';
 
 /**
  * NOTE (EPOCH-103 review): the password captured here (used as
@@ -228,6 +234,30 @@ export class IosBackupSource implements DeviceBackupSource {
     } finally {
       this.copyingCrashLogs = false;
     }
+  }
+
+  async findCrashReportsRetryTargets(backupDirs: string[]): Promise<CrashReportsRetryTarget[]> {
+    if (this.running !== null || this.cancelRequested !== null || this.copyingCrashLogs) return [];
+    const devices = await this.listConnectedDevices();
+    if (devices.length === 0) return [];
+
+    const plistutil = trustedToolPath('plistutil');
+    if (!plistutil) throw new Error('plistutil is not available -- complete the iPhone tool setup first.');
+
+    const targets: CrashReportsRetryTarget[] = [];
+    for (const backupDir of backupDirs) {
+      if ((await incompleteReason(plistutil, backupDir)) !== null) continue;
+      const deviceId = await backupDeviceId(plistutil, backupDir);
+      if (!deviceId) continue;
+      const device = devices.find(
+        (connected) =>
+          connected.id.toUpperCase() === deviceId.toUpperCase() &&
+          path.basename(backupDir) === connected.id
+      );
+      if (!device || (await crashReportsCopyExists(backupDir))) continue;
+      targets.push({ sourceId: this.id, backupDir, device });
+    }
+    return targets;
   }
 
   async checkToolAvailable(): Promise<ToolAvailabilityStatus> {
