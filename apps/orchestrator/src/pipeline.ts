@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
@@ -49,6 +50,32 @@ const DERIVATIVE_NAMES: Record<DerivativeKind, string> = {
 
 export type StageOutcome = { status: 'succeeded' | 'failed'; stderr: string } | { status: 'skipped'; reason: string };
 
+export const STAGE_TIMEOUT_MS = 30 * 60 * 1000;
+const STAGE_KILL_GRACE_MS = 5000;
+
+function signalStageProcess(child: ChildProcess, signal: NodeJS.Signals): string | null {
+  if (process.platform !== 'win32' && child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, signal);
+      return null;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ESRCH') return null;
+      return `Could not send ${signal} to the stage process group: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (child.exitCode !== null || child.signalCode !== null) return null;
+  try {
+    return child.kill(signal) ? null : `Could not send ${signal} to the stage process.`;
+  } catch (err) {
+    return `Could not send ${signal} to the stage process: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
+function formatTimeout(timeoutMs: number): string {
+  return timeoutMs % 60_000 === 0 ? `${timeoutMs / 60_000} minutes` : `${timeoutMs} ms`;
+}
+
 /**
  * Runs one stage against the input its stage.json says it reads: a derivative,
  * whose id and path it passes, or the indicator set the run checks, whose id it
@@ -62,7 +89,8 @@ export function runStage(
   config: RunConfig,
   runId: string,
   registration: Registration,
-  indicatorSet: IndicatorSetChoice | null = null
+  indicatorSet: IndicatorSetChoice | null = null,
+  timeoutMs = STAGE_TIMEOUT_MS
 ): Promise<StageOutcome> {
   // Identity comes from here, never from the stage (R16): the evidence, the
   // input this stage reads, and its declared parser version.
@@ -115,9 +143,23 @@ export function runStage(
     const child = spawn(bin, [entrypointPath, ...extraArgs], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, DATABASE_URL: config.dbUrl },
+      detached: process.platform !== 'win32',
     });
 
     let stderr = '';
+    let timedOut = false;
+    let stopError: string | null = null;
+    let timeoutHandle: NodeJS.Timeout | null = null;
+    let killEscalationHandle: NodeJS.Timeout | null = null;
+    let settled = false;
+    const finish = (outcome: StageOutcome) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+      if (killEscalationHandle) clearTimeout(killEscalationHandle);
+      resolve(outcome);
+    };
+
     child.stdout?.pipe(process.stdout);
     // Decoded as a stream, so a UTF-8 character split across two chunks
     // survives intact into error_message or warnings.
@@ -125,8 +167,25 @@ export function runStage(
     child.stderr?.on('data', (text: string) => {
       stderr += text;
     });
-    child.on('error', (err) => resolve({ status: 'failed', stderr: err.message }));
-    child.on('close', (code) => resolve({ status: code === 0 ? 'succeeded' : 'failed', stderr: stderr.trim() }));
+    timeoutHandle = setTimeout(() => {
+      if (process.platform === 'win32' && (child.exitCode !== null || child.signalCode !== null)) return;
+      timedOut = true;
+      stopError = signalStageProcess(child, 'SIGTERM');
+      killEscalationHandle = setTimeout(() => {
+        stopError ??= signalStageProcess(child, 'SIGKILL');
+      }, STAGE_KILL_GRACE_MS);
+    }, timeoutMs);
+    child.on('error', (err) => finish({ status: 'failed', stderr: err.message }));
+    child.on('close', (code) => {
+      const details = [
+        stderr.trim(),
+        ...(timedOut ? [`Stage "${stage.name}" timed out after ${formatTimeout(timeoutMs)} and was stopped.`] : []),
+        ...(stopError ? [stopError] : []),
+      ]
+        .filter(Boolean)
+        .join('\n');
+      finish({ status: timedOut || code !== 0 ? 'failed' : 'succeeded', stderr: details });
+    });
   });
 }
 
@@ -239,6 +298,7 @@ export async function runPipelineForBackup(
   try {
     for (const stage of stages.enabled) {
       await markStage(client, runId, stage.name, 'running');
+      process.stdout.write(`[orchestrator] stage started: ${stage.name}\n`);
       const outcome = await runStage(
         stage,
         { backupPath, reportPath, ileappPath, crashReportsPath, dbUrl, pythonBin },
@@ -246,6 +306,7 @@ export async function runPipelineForBackup(
         registration,
         indicatorSet
       );
+      process.stdout.write(`[orchestrator] stage finished: ${stage.name}\n`);
 
       if (outcome.status === 'skipped') {
         // Nothing failed, and nothing was examined: the reason says which

@@ -127,6 +127,7 @@ export class AnalysisSession {
     kind: null,
     target: null,
     startedAt: null,
+    currentStage: null,
     result: null,
   };
   private readonly log = new LogBuffer();
@@ -138,17 +139,31 @@ export class AnalysisSession {
 
   start(kind: 'workspace' | 'retry', target: string, now = Date.now()): void {
     this.log.clear();
-    this.state = { status: 'running', kind, target, startedAt: now, result: null };
+    this.state = { status: 'running', kind, target, startedAt: now, currentStage: null, result: null };
     this.notifier.now();
   }
 
-  line(stream: PipelineLogEntry['stream'], text: string): PipelineLogEntry {
+  line(stream: PipelineLogEntry['stream'], text: string, now = Date.now()): PipelineLogEntry {
+    if (stream === 'stdout') {
+      const started = /^\[orchestrator\] stage started: (.+)$/.exec(text);
+      if (started) {
+        this.state = { ...this.state, currentStage: { name: started[1], startedAt: now } };
+        this.notifier.soon();
+      } else if (/^\[orchestrator\] stage finished: (.+)$/.test(text)) {
+        this.state = { ...this.state, currentStage: null };
+        this.notifier.soon();
+      }
+    }
     return this.log.add(stream, text);
   }
 
   finish(result: PipelineFinishedResult): void {
-    this.state = { ...this.state, status: 'finished', result };
+    this.state = { ...this.state, status: 'finished', currentStage: null, result };
     this.notifier.now();
+  }
+
+  hasActiveStage(): boolean {
+    return this.state.currentStage !== null;
   }
 
   snapshot(): AnalysisState {

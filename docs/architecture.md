@@ -47,7 +47,11 @@ analyze → report**. The orchestrator coordinates the last three.
    as subprocesses, passing each one its identity and the derivative it declares
    it reads. Each extraction stage reads that derivative, normalizes it, and
    loads facts through the one writer, `ingest()`, one atomic unit per source
-   file.
+   file. Each running Analyze stage has a 30-minute limit; on expiry its process
+   is stopped and that stage is recorded as failed, while later stages still
+   run. The app shows the active stage and elapsed time. A separate five-minute
+   no-output guard applies only while the orchestrator is outside an active
+   stage, so it does not cap total Analyze time.
 4. **Analyze (`apps/analysis`).** The LLM stage proposes leads from the facts;
    leads are never evidence. It is out of the pipeline until it reads the
    project's own facts (EPOCH-442); the report says it was not run.
@@ -122,6 +126,11 @@ tool versions. The reference backup is the 77,217,764,077-byte pull above.
 | iLEAPP reads the decrypt to the end with `-t itunes`: 879 modules started, 878 completed, one module error inside `zalo_messages` (`IndexError`); 114 artifacts with records, 46,434 records | 1,773 s, partly with the CPU throttled | iLEAPP 24ba13da | 2026-10-13 |
 | iLEAPP copies every file it reads into its output's `data/` folder, in either input mode (`FileSeekerItunes` and `FileSeekerDir` both copy), so its output is close to a third copy of the backup: 71 GB in all, 70 GB of it `data/` | `_lava_artifacts.db` 101 MB, `_HTML` 259 MB, `_TSV Exports` 194 MB | iLEAPP 24ba13da | 2026-10-13 |
 | The full run in the app, Prepare Evidence then Analyze, completes. Hashing finished at 12:31 (11,227 files); the decrypt and repair finished by 12:52, including the wait for the password (repair: 634 databases checked, 59 repaired, 0 not fully recovered, 59 originals kept); iLEAPP ran 12:52 to 13:05 (878 of 879 modules). Analyze then took 77 s: `crash` 0.6 s (no crash reports found), `ileapp_bridge` 76.6 s (114 artifact tables, 46,434 records, every unit complete), `reporting` 0.3 s; the run's state is `complete` | Decrypted copy 72 GiB, iLEAPP output 71 GiB. The CPU was held at about 600 MHz by firmware clock modulation until about 12:45, then ran at 2.2–2.4 GHz | `iphone_backup_decrypt` 0.10.0, sqlite3 3.46.1, iLEAPP 24ba13da (EPOCH-489) | 2026-10-13 |
+
+The 30-minute Analyze timeout is per running stage, not per backup or
+workspace. The longest stage in the reference Analyze run took 76.6 seconds
+(`ileapp_bridge`); the limit leaves substantial room for slower machines and
+larger inputs without stopping a healthy multi-stage run at a fixed total time.
 
 Before decrypting, Prepare Evidence checks free space on the workspace
 filesystem. The reference run used a 77,217,764,077-byte backup and produced a

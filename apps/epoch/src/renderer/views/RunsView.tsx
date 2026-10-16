@@ -17,6 +17,7 @@ import { pipelineApi } from '../api/pipeline';
 import { useAnalysisState } from '../hooks/usePipelineState';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { ViewLayout } from '../components/layout/ViewLayout';
+import { AnalysisStageProgress } from '../features/investigations/AnalysisStageProgress';
 import { EmptyState } from '../components/ui/EmptyState';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/Tooltip';
@@ -287,6 +288,10 @@ export function RunsView({
           <div className="text-flag bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-md px-4 py-3 text-data">
             {retryError}
           </div>
+        )}
+
+        {retrying && analysis?.currentStage && (
+          <AnalysisStageProgress stage={analysis.currentStage} className="text-data text-muted-foreground" />
         )}
 
         {(retrying || retryLog.length > 0) && <TerminalLog lines={retryLog} live={retrying} label="Retry details" />}

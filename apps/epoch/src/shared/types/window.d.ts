@@ -123,6 +123,7 @@ export interface AnalysisState {
   /** The workspace, or the retried backup's source. */
   target: string | null;
   startedAt: number | null;
+  currentStage: { name: string; startedAt: number } | null;
   result: PipelineFinishedResult | null;
   log: PipelineLogEntry[];
 }
