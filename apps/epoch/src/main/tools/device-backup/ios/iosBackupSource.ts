@@ -3,6 +3,7 @@ import type {
   BackupProgress,
   BackupStats,
   CrashReportsResult,
+  CrashReportsRetryLookup,
   CrashReportsRetryTarget,
   DestinationBackup,
   DeviceBackupSource,
@@ -236,28 +237,34 @@ export class IosBackupSource implements DeviceBackupSource {
     }
   }
 
-  async findCrashReportsRetryTargets(backupDirs: string[]): Promise<CrashReportsRetryTarget[]> {
-    if (this.running !== null || this.cancelRequested !== null || this.copyingCrashLogs) return [];
+  async findCrashReportsRetryTargets(backupDirs: string[]): Promise<CrashReportsRetryLookup> {
+    if (this.running !== null || this.cancelRequested !== null || this.copyingCrashLogs) {
+      return { targets: [], errors: [] };
+    }
     const devices = await this.listConnectedDevices();
-    if (devices.length === 0) return [];
+    if (devices.length === 0) return { targets: [], errors: [] };
 
     const plistutil = trustedToolPath('plistutil');
     if (!plistutil) throw new Error('plistutil is not available -- complete the iPhone tool setup first.');
 
     const targets: CrashReportsRetryTarget[] = [];
+    const errors: string[] = [];
     for (const backupDir of backupDirs) {
-      if ((await incompleteReason(plistutil, backupDir)) !== null) continue;
-      const deviceId = await backupDeviceId(plistutil, backupDir);
-      if (!deviceId) continue;
-      const device = devices.find(
-        (connected) =>
-          connected.id.toUpperCase() === deviceId.toUpperCase() &&
-          path.basename(backupDir) === connected.id
-      );
-      if (!device || (await crashReportsCopyExists(backupDir))) continue;
-      targets.push({ sourceId: this.id, backupDir, device });
+      try {
+        if ((await incompleteReason(plistutil, backupDir)) !== null) continue;
+        const deviceId = await backupDeviceId(plistutil, backupDir);
+        if (!deviceId) continue;
+        const device = devices.find(
+          (connected) =>
+            connected.id.toUpperCase() === deviceId.toUpperCase() && path.basename(backupDir) === connected.id
+        );
+        if (!device || (await crashReportsCopyExists(backupDir))) continue;
+        targets.push({ sourceId: this.id, backupDir, device });
+      } catch (err) {
+        errors.push(`${path.basename(backupDir)}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
-    return targets;
+    return { targets, errors };
   }
 
   async checkToolAvailable(): Promise<ToolAvailabilityStatus> {

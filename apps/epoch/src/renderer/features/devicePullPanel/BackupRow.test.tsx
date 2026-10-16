@@ -56,5 +56,7 @@ describe('BackupRow crash-log retry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy now' }));
     assert.ok(await screen.findByRole('alert'));
     assert.ok(screen.getByText(/Could not copy crash logs: device became locked/));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    assert.equal(screen.queryByRole('alert'), null);
   });
 });

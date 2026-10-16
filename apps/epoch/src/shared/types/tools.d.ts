@@ -74,6 +74,11 @@ export interface CrashReportsRetryTarget {
   device: DeviceInfo;
 }
 
+export interface CrashReportsRetryLookup {
+  targets: CrashReportsRetryTarget[];
+  errors: string[];
+}
+
 /** How a running backup is going (EPOCH-466), sent every few seconds. */
 export interface BackupStats {
   startedAt: number;
@@ -159,7 +164,7 @@ export interface DeviceBackupSource {
    */
   copyCrashReportsAgain(device: DeviceInfo, backupDir: string): Promise<CrashReportsResult>;
   /** Existing finished backups that lack a crash-log copy and have their device connected. */
-  findCrashReportsRetryTargets(backupDirs: string[]): Promise<CrashReportsRetryTarget[]>;
+  findCrashReportsRetryTargets(backupDirs: string[]): Promise<CrashReportsRetryLookup>;
 }
 
 export type ToolAcquisitionAction =

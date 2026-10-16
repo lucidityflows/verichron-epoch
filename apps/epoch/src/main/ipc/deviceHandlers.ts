@@ -130,18 +130,15 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
     }
   );
 
-  ipcMain.handle(
-    'epoch:findCrashReportsRetryTargets',
-    async (_event, sourceId: string, backupDirs: unknown) => {
-      if (!Array.isArray(backupDirs) || !backupDirs.every((backupDir) => typeof backupDir === 'string')) {
-        throw new Error('Backup paths must be a list of strings.');
-      }
-      if (pull.running()) return [];
-      const source = getDeviceBackupSource(sourceId);
-      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
-      return source.findCrashReportsRetryTargets(backupDirs);
+  ipcMain.handle('epoch:findCrashReportsRetryTargets', async (_event, sourceId: string, backupDirs: unknown) => {
+    if (!Array.isArray(backupDirs) || !backupDirs.every((backupDir) => typeof backupDir === 'string')) {
+      throw new Error('Backup paths must be a list of strings.');
     }
-  );
+    if (pull.running()) return { targets: [], errors: [] };
+    const source = getDeviceBackupSource(sourceId);
+    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    return source.findCrashReportsRetryTargets(backupDirs);
+  });
 
   ipcMain.handle(
     'epoch:pullDeviceBackup',

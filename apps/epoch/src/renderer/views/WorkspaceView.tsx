@@ -195,33 +195,66 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
   useEffect(() => {
     let cancelled = false;
+    let refreshing = false;
+    let lastAvailability: string | null = null;
     const backupDirs = backups.map((backup) => backup.path);
-    Promise.resolve().then(async () => {
-      if (backupDirs.length === 0) {
-        if (!cancelled) {
-          setCrashReportsRetryTargets([]);
-          setCrashReportsRetryError(null);
-        }
-        return;
-      }
+    const refreshEligibility = async (force = false) => {
+      if (cancelled || refreshing) return;
+      refreshing = true;
       try {
         const sources = await devicesApi.listDeviceBackupSources();
-        const targets = await Promise.all(
+        const connectedDevices = await Promise.all(sources.map((source) => devicesApi.listConnectedDevices(source.id)));
+        const availability = JSON.stringify(
+          sources.map((source, index) => [source.id, connectedDevices[index].map((device) => device.id).sort()])
+        );
+        const availabilityChanged = availability !== lastAvailability;
+        lastAvailability = availability;
+        if (!force && !availabilityChanged) return;
+
+        if (backupDirs.length === 0) {
+          if (!cancelled) {
+            setCrashReportsRetryTargets([]);
+            setCrashReportsRetryError(null);
+          }
+          return;
+        }
+
+        const lookups = await Promise.all(
           sources.map((source) => devicesApi.findCrashReportsRetryTargets(source.id, backupDirs))
         );
         if (!cancelled) {
-          setCrashReportsRetryTargets(targets.flat());
-          setCrashReportsRetryError(null);
+          setCrashReportsRetryTargets(lookups.flatMap((lookup) => lookup.targets));
+          const errors = lookups.flatMap((lookup) => lookup.errors);
+          setCrashReportsRetryError(
+            errors.length > 0 ? `Some backups could not be checked: ${errors.join('; ')}` : null
+          );
         }
       } catch (err) {
+        lastAvailability = null;
         if (!cancelled) {
           setCrashReportsRetryTargets([]);
           setCrashReportsRetryError(err instanceof Error ? err.message : String(err));
         }
+      } finally {
+        refreshing = false;
       }
-    });
+    };
+
+    const onFocus = () => void refreshEligibility(true);
+    const onVisibilityChange = () => {
+      if (!document.hidden) void refreshEligibility(true);
+    };
+    void refreshEligibility(true);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void refreshEligibility();
+    }, 10_000);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [backups]);
 

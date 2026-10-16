@@ -83,7 +83,10 @@ export function BackupRow({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setRetryConfirming(false)}
+                  onClick={() => {
+                    setRetryError(null);
+                    setRetryConfirming(false);
+                  }}
                   disabled={retrying || disabled}
                 >
                   Cancel
