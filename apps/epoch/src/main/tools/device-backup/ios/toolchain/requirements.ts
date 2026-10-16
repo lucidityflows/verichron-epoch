@@ -1,7 +1,7 @@
 import path from 'path';
 import type { ToolSetupInstallPlan, ToolSetupRequirement, ToolSetupStatus } from '../../../../../shared/types/tools';
 import type { PinnedComponent } from './pins';
-import { manifestMatchesPins, readManifest, readProgress } from './manifest';
+import { componentInstalled, manifestMatchesPins, readManifest, readProgress } from './manifest';
 import type { Run } from './process';
 
 /**
@@ -203,8 +203,16 @@ async function serviceRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): P
   ];
 }
 
+/**
+ * Lists the pinned libraries, using `installed` as every entry's readiness.
+ * Otherwise, labels recorded progress as built only if every recorded component
+ * has a matching pkg-config entry; one missing entry invalidates all progress.
+ */
 function libraryRequirements(ctx: SetupContext, installed: boolean): ToolSetupRequirement[] {
-  const done = new Set(readProgress(ctx.buildDir, ctx.components).map((c) => c.name));
+  const progress = readProgress(ctx.buildDir, ctx.components);
+  const done = progress.every((c) => componentInstalled(ctx.prefix, c.name))
+    ? new Set(progress.map((c) => c.name))
+    : new Set<string>();
   return ctx.components.map((c) => ({
     id: c.name,
     group: 'libraries' as const,
@@ -268,6 +276,14 @@ function installPlan(
   };
 }
 
+/**
+ * Probes Linux or macOS prerequisites and returns an installation plan without
+ * installing anything; other platforms return an unsupported status.
+ * `installed` reflects a manifest matching the pins. `canResume` requires an
+ * incomplete installation with recorded progress and matching pkg-config entries
+ * for every recorded component; it does not require system prerequisites to pass.
+ * Errors thrown by context callbacks or caused by malformed stored state propagate.
+ */
 export async function checkRequirements(ctx: SetupContext): Promise<ToolSetupStatus> {
   if (ctx.platform !== 'linux' && ctx.platform !== 'darwin') {
     return {
@@ -293,7 +309,10 @@ export async function checkRequirements(ctx: SetupContext): Promise<ToolSetupSta
     systemReady: missing.length === 0,
     installed,
     install: installPlan(ctx, missing, havePkexec),
-    canResume: !installed && readProgress(ctx.buildDir, ctx.components).length > 0,
+    canResume:
+      !installed &&
+      readProgress(ctx.buildDir, ctx.components).length > 0 &&
+      readProgress(ctx.buildDir, ctx.components).every((c) => componentInstalled(ctx.prefix, c.name)),
   };
 }
 

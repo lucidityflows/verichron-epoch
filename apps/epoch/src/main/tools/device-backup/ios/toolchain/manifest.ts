@@ -76,3 +76,22 @@ export function readProgress(buildDir: string, pins: readonly PinnedComponent[] 
 export function writeProgress(buildDir: string, done: BuiltComponent[]): void {
   fs.writeFileSync(path.join(buildDir, PROGRESS_FILE), JSON.stringify(done, null, 2) + '\n');
 }
+
+/**
+ * Checks for a pkg-config entry in `prefix/lib/pkgconfig` named
+ * `<componentName>.pc` or beginning with `<componentName>-` and ending in `.pc`
+ * (EPOCH-468). Returns false if the directory is missing or cannot be read.
+ * Does not inspect entry contents, versions, or other installed artifacts.
+ */
+export function componentInstalled(prefix: string, componentName: string): boolean {
+  const pkgDir = path.join(prefix, 'lib', 'pkgconfig');
+  if (!fs.existsSync(pkgDir)) return false;
+  try {
+    const entries = fs.readdirSync(pkgDir);
+    return entries.some(
+      (file) => file.endsWith('.pc') && (file === `${componentName}.pc` || file.startsWith(`${componentName}-`))
+    );
+  } catch {
+    return false;
+  }
+}
