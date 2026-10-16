@@ -29,13 +29,8 @@ import {
   DECRYPT_MARKER,
   deriveEvidencePath,
   EvidenceSidecar,
-  provenanceKey,
-  readCheckMarker,
-  readDecryptMarker,
-  type ToolVersion,
+  readDerivativeMarker,
 } from '@verichron/contracts';
-
-import type { StageDefinition } from './types.js';
 
 /** Registration refused: the run must not start. The message says why. */
 export class RegistrationError extends Error {
@@ -52,20 +47,6 @@ export interface Registration {
   decryptedDerivativeId: string;
   /** mvt-ios's results for that decrypt, when the results directory exists. */
   resultsDerivativeId: string | null;
-}
-
-/** The derivative a stage reads: the results set if it needs one, else the decrypt. */
-export function derivativeFor(
-  stage: StageDefinition,
-  registration: Pick<Registration, 'decryptedDerivativeId' | 'resultsDerivativeId'>
-): string | null {
-  return stage.manifest.requiresResultsPath ? registration.resultsDerivativeId : registration.decryptedDerivativeId;
-}
-
-/** What made a derivative, as its completion marker records it (EPOCH-406). */
-interface Provenance {
-  tool: ToolVersion;
-  params: unknown;
 }
 
 export interface RegistrationInput {
@@ -163,11 +144,7 @@ function readDevice(candidates: string[]): { udid: string; name: string } {
   const keys = readPlistStrings(plistPath);
   const udid = keys.get('Unique Identifier') || keys.get('Target Identifier');
   if (!udid) {
-    // "GUID" is deliberately not accepted: in an iTunes/Finder backup it is
-    // an iTunes-assigned backup GUID, not the device's UDID, so keying the
-    // device by it would file the evidence under the wrong identity.
-    const guidNote = keys.has('GUID') ? ' ("GUID" is the backup\'s iTunes GUID, not the device UDID)' : '';
-    throw new RegistrationError(`${plistPath} has no "Unique Identifier" or "Target Identifier"${guidNote}`);
+    throw new RegistrationError(`${plistPath} has no "Unique Identifier" or "Target Identifier"`);
   }
   return { udid, name: keys.get('Device Name') || keys.get('Display Name') || 'Unknown device' };
 }
@@ -254,16 +231,11 @@ function verifySidecar(workspace: string, label: string): VerifiedSidecar {
  * left over from an earlier version of the backup under the same label is
  * refused, so its facts can't be filed under the new evidence.
  *
- * Returns each derivative's provenance from its marker, and the results
- * directory to register, or null when there are none yet (results-reading
- * stages then fail clearly before they start).
+ * Returns the results directory to register, or null when there are none
+ * yet (results-reading stages then fail clearly before they start).
  */
-function verifyDerivatives(
-  decryptedPath: string,
-  resultsPath: string | undefined,
-  contentRoot: string
-): { decrypt: Provenance; results: { path: string; provenance: Provenance } | null } {
-  const decrypt = readDecryptMarker(decryptedPath);
+function verifyDerivatives(decryptedPath: string, resultsPath: string | undefined, contentRoot: string): string | null {
+  const decrypt = readDerivativeMarker(decryptedPath, DECRYPT_MARKER);
   if (decrypt?.content_root !== contentRoot) {
     throw new RegistrationError(
       decrypt
@@ -274,25 +246,19 @@ function verifyDerivatives(
     );
   }
 
-  const decryptProvenance = { tool: decrypt.tool, params: decrypt.params };
-
-  if (!resultsPath || !existsSync(resultsPath)) return { decrypt: decryptProvenance, results: null };
+  if (!resultsPath || !existsSync(resultsPath)) return null;
   if (!statSync(resultsPath).isDirectory()) {
     throw new RegistrationError(`the results path ${resultsPath} exists but is not a directory`);
   }
-  const check = readCheckMarker(resultsPath);
-  // check-backup hasn't completed: no results to register
-  if (!check) return { decrypt: decryptProvenance, results: null };
+  const check = readDerivativeMarker(resultsPath, CHECK_MARKER);
+  if (!check) return null; // check-backup hasn't completed: no results to register
   if (check.content_root !== contentRoot) {
     throw new RegistrationError(
       `the mvt results at ${resultsPath} were made from content root ${check.content_root.slice(0, 12)}…, ` +
         `but the evidence sidecar names ${contentRoot.slice(0, 12)}…; re-run mvt-runner`
     );
   }
-  return {
-    decrypt: decryptProvenance,
-    results: { path: path.resolve(resultsPath), provenance: { tool: check.tool, params: check.params } },
-  };
+  return path.resolve(resultsPath);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,12 +279,9 @@ async function appendEvent(
 }
 
 /**
- * A derivative's identity is (evidence, kind, parent, provenance), not its
- * path (migration 0007). A pass made by a different tool version, with a
- * different repair outcome or against a different IOC set is a new
- * derivative; a row's tool and params are never rewritten. The path is its
- * last-known location and is the one thing updated here, so a moved
- * workspace keeps its derivative (and its completed runs).
+ * A derivative's identity is (evidence, kind, parent), not its path: the
+ * path is its last-known location and is updated here, so a moved workspace
+ * keeps its derivative (and its completed runs) instead of starting over.
  */
 async function upsertDerivative(
   client: Client,
@@ -326,24 +289,20 @@ async function upsertDerivative(
   kind: 'decrypted' | 'mvt_results',
   derivativePath: string,
   parentId: string | null,
-  host: string,
-  provenance: Provenance
+  host: string
 ): Promise<string> {
-  const key = provenanceKey(provenance.tool, provenance.params);
   const { rows } = await client.query<{ derivative_id: string; inserted: boolean }>(
-    `INSERT INTO evidence_derivatives (evidence_id, kind, path, parent_derivative_id, tool, params, provenance_key)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (evidence_id, kind, parent_derivative_id, provenance_key) DO UPDATE SET path = EXCLUDED.path
+    `INSERT INTO evidence_derivatives (evidence_id, kind, path, parent_derivative_id)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (evidence_id, kind, parent_derivative_id) DO UPDATE SET path = EXCLUDED.path
      RETURNING derivative_id, (xmax = 0) AS inserted`,
-    [evidenceId, kind, derivativePath, parentId, provenance.tool, provenance.params, key]
+    [evidenceId, kind, derivativePath, parentId]
   );
   if (rows[0].inserted) {
     await appendEvent(client, evidenceId, 'derivative_registered', host, {
       derivative_id: rows[0].derivative_id,
       kind,
       path: derivativePath,
-      tool: provenance.tool,
-      provenance_key: key,
     });
   }
   return rows[0].derivative_id;
@@ -361,7 +320,7 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
   const device = readDevice([path.resolve(input.backupPath), sidecar.sourcePath]);
   const key = deviceKey(device.udid, loadDeviceSecret(input.secretPath));
   const decryptedPath = path.resolve(input.backupPath);
-  const derivatives = verifyDerivatives(decryptedPath, input.resultsPath, sidecar.contentRoot);
+  const resultsPath = verifyDerivatives(decryptedPath, input.resultsPath, sidecar.contentRoot);
 
   await client.query('BEGIN');
   try {
@@ -421,14 +380,9 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
       await appendEvent(client, evidenceId, 'location_added', host, { path: sidecar.sourcePath });
     }
 
-    const decryptedDerivativeId = await upsertDerivative(
-      client, evidenceId, 'decrypted', decryptedPath, null, host, derivatives.decrypt
-    );
-    const resultsDerivativeId = derivatives.results
-      ? await upsertDerivative(
-          client, evidenceId, 'mvt_results', derivatives.results.path, decryptedDerivativeId, host,
-          derivatives.results.provenance
-        )
+    const decryptedDerivativeId = await upsertDerivative(client, evidenceId, 'decrypted', decryptedPath, null, host);
+    const resultsDerivativeId = resultsPath
+      ? await upsertDerivative(client, evidenceId, 'mvt_results', resultsPath, decryptedDerivativeId, host)
       : null;
 
     await client.query('COMMIT');

@@ -19,16 +19,9 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 
 import pg from 'pg';
 
-import {
-  CHECK_MARKER,
-  DECRYPT_MARKER,
-  renderCheckMarker,
-  renderDecryptMarker,
-  type CheckParams,
-  type DecryptParams,
-} from '@verichron/contracts';
+import { CHECK_MARKER, DECRYPT_MARKER, renderDerivativeMarker } from '@verichron/contracts';
 
-import { getRunState, hasCompleteRunFor } from './db.js';
+import { getRunState, hasSucceededRun } from './db.js';
 import { runPipelineForBackup } from './pipeline.js';
 import { deviceKey, loadDeviceSecret, readPlistStrings, registerEvidence, RegistrationError } from './registration.js';
 import type { StageDefinition, StageSet } from './types.js';
@@ -36,23 +29,6 @@ import type { StageDefinition, StageSet } from './types.js';
 const DSN = process.env.TEST_DATABASE_URL;
 const MIGRATIONS = path.resolve(import.meta.dirname, '../../../packages/etl-db-writer/migrations');
 const UDID = '00008030-001A2B3C4D5E6F70';
-const MVT = { name: 'mvt-ios', version: '2.6.1' };
-const REPAIRED: DecryptParams = {
-  repair: {
-    status: 'ran',
-    tool: { name: 'sqlite3', version: '3.45.1' },
-    scanned: 12,
-    repaired: 1,
-    failed_files: [],
-    preserved_originals: ['HomeDomain/Library/sms.db.corrupt-2026-10-08T00-00-00-000Z'],
-  },
-};
-const IOCS_A: CheckParams = { ioc_set_hash: 'a'.repeat(64), ioc_file_count: 14 };
-const IOCS_B: CheckParams = { ioc_set_hash: 'b'.repeat(64), ioc_file_count: 15 };
-
-/** The markers mvt-runner writes once each derivative is done (EPOCH-404, EPOCH-406). */
-const decryptMarker = (root: string, params: DecryptParams = REPAIRED) => renderDecryptMarker(root, MVT, params);
-const checkMarker = (root: string, params: CheckParams = IOCS_A) => renderCheckMarker(root, MVT, params);
 
 let admin: pg.Client;
 let db: pg.Client;
@@ -138,10 +114,10 @@ function makeWorkspace(
   writeFileSync(path.join(backupPath, 'Info.plist'), infoPlist(UDID, 'Alice &amp; Bob&apos;s iPhone'));
   const contentRoot = createHash('sha256').update(manifest).digest('hex');
   // Provenance markers, as mvt-runner writes them once each derivative is done.
-  writeFileSync(path.join(backupPath, DECRYPT_MARKER), decryptMarker(contentRoot));
+  writeFileSync(path.join(backupPath, DECRYPT_MARKER), renderDerivativeMarker(contentRoot));
   if (results) {
     mkdirSync(resultsPath, { recursive: true });
-    writeFileSync(path.join(resultsPath, CHECK_MARKER), checkMarker(contentRoot));
+    writeFileSync(path.join(resultsPath, CHECK_MARKER), renderDerivativeMarker(contentRoot));
   }
 
   const evidenceDir = path.join(workspace, 'evidence', label);
@@ -322,15 +298,10 @@ describe('pre-flight registration', live, () => {
 
   for (const [label, corrupt] of [
     ['a decrypt made from an earlier version of the backup', (ws: Workspace) =>
-      writeFileSync(path.join(ws.backupPath, DECRYPT_MARKER), decryptMarker('f'.repeat(64)))],
+      writeFileSync(path.join(ws.backupPath, DECRYPT_MARKER), renderDerivativeMarker('f'.repeat(64)))],
     ['a decrypt with no provenance marker', (ws: Workspace) => rmSync(path.join(ws.backupPath, DECRYPT_MARKER))],
-    ['a decrypt marker without tool provenance (pre-EPOCH-406 format)', (ws: Workspace) =>
-      writeFileSync(
-        path.join(ws.backupPath, DECRYPT_MARKER),
-        JSON.stringify({ content_root: ws.contentRoot, completed_at: '2026-10-08T00:00:00.000Z' })
-      )],
     ['mvt results made from an earlier version of the backup', (ws: Workspace) =>
-      writeFileSync(path.join(ws.resultsPath, CHECK_MARKER), checkMarker('f'.repeat(64)))],
+      writeFileSync(path.join(ws.resultsPath, CHECK_MARKER), renderDerivativeMarker('f'.repeat(64)))],
     ['a results path that is a file, not a directory', (ws: Workspace) => {
       rmSync(ws.resultsPath, { recursive: true });
       writeFileSync(ws.resultsPath, 'not a directory');
@@ -419,130 +390,8 @@ describe('stages and the completeness predicate', live, () => {
     for (const stuck of ['pending', 'running']) {
       await db.query(`UPDATE pipeline_stage_status SET status = $1 WHERE run_id = $2`, [stuck, result.runId]);
       assert.equal(await getRunState(db, result.runId!), 'incomplete', `a stage left ${stuck} by a killed process`);
-      const registration = {
-        evidenceId: result.evidenceId!,
-        decryptedDerivativeId: derivative.rows[0].derivative_id,
-        resultsDerivativeId: null,
-      };
-      assert.equal(await hasCompleteRunFor(db, registration, []), false);
+      assert.equal(await hasSucceededRun(db, result.evidenceId!, derivative.rows[0].derivative_id), false);
     }
-  });
-
-  it('records each stage\'s declared parser version on the run', async () => {
-    const ws = makeWorkspace('stage-versions');
-    const versioned = recordingStage('versioned', 10, { parserVersion: 4 });
-    const unversioned = recordingStage('unversioned', 20);
-    const off = recordingStage('off', 30, { parserVersion: 2, enabled: false });
-    const result = await run(ws.backupPath, { enabled: [versioned, unversioned], disabled: [off] });
-    const { rows } = await db.query(
-      `SELECT stage_name, parser_version FROM pipeline_stage_status WHERE run_id = $1 ORDER BY stage_name`,
-      [result.runId]
-    );
-    assert.deepEqual(rows, [
-      { stage_name: 'off', parser_version: 2 },
-      { stage_name: 'unversioned', parser_version: null },
-      { stage_name: 'versioned', parser_version: 4 },
-    ]);
-  });
-
-  it('a parserVersion bump re-runs complete evidence; the same version does not', async () => {
-    const ws = makeWorkspace('version-bump');
-    const v1 = recordingStage('parser', 10, { parserVersion: 1 });
-    const first = await run(ws.backupPath, { enabled: [v1], disabled: [] });
-    assert.equal(await getRunState(db, first.runId!), 'complete');
-
-    const same = await run(ws.backupPath, { enabled: [v1], disabled: [] });
-    assert.equal(same.skipped, true, 'nothing changed, so the complete run stands');
-
-    const v2 = recordingStage('parser', 10, { parserVersion: 2 });
-    const bumped = await run(ws.backupPath, { enabled: [v2], disabled: [] });
-    assert.notEqual(bumped.skipped, true, 'R8: a new parser version must reach the stage');
-    assert.notEqual(bumped.runId, first.runId);
-    assert.equal(argsOf(v2)['--parser-version'], '2');
-
-    const again = await run(ws.backupPath, { enabled: [v2], disabled: [] });
-    assert.equal(again.skipped, true, 'once version 2 has run, it is done');
-  });
-
-  it('a stage enabled after a complete run gets a new run', async () => {
-    const ws = makeWorkspace('newly-enabled');
-    const base = recordingStage('base', 10, { parserVersion: 1 });
-    const later = recordingStage('later', 20, { parserVersion: 1, enabled: false });
-    const first = await run(ws.backupPath, { enabled: [base], disabled: [later] });
-    assert.equal(await getRunState(db, first.runId!), 'complete');
-
-    const enabledLater = recordingStage('later', 20, { parserVersion: 1 });
-    const second = await run(ws.backupPath, { enabled: [base, enabledLater], disabled: [] });
-    assert.notEqual(second.skipped, true, 'the stage skipped as disabled never ran');
-    assert.equal(argsOf(enabledLater)['--evidence-id'], first.evidenceId);
-
-    const disabledAgain = await run(ws.backupPath, { enabled: [base], disabled: [later] });
-    assert.equal(disabledAgain.skipped, true, 'disabling a stage again needs no new run');
-  });
-
-  it('refuses a backup identified only by GUID, which is not the device UDID', async () => {
-    const ws = makeWorkspace('guid-only');
-    writeFileSync(
-      path.join(ws.backupPath, 'Info.plist'),
-      infoPlist(UDID, 'Phone').replace('<key>Unique Identifier</key>', '<key>GUID</key>')
-    );
-    const result = await run(ws.backupPath);
-    assert.equal(result.success, false);
-    assert.match(result.error ?? '', /"GUID" is the backup's iTunes GUID, not the device UDID/);
-    assert.equal(await count('evidence_items'), 0);
-    assert.equal(await count('pipeline_runs'), 0);
-  });
-
-  it('records each derivative\'s tool, parameters and provenance key', async () => {
-    const ws = makeWorkspace('provenance');
-    await run(ws.backupPath);
-    const { rows } = await db.query(
-      `SELECT kind, tool, params, provenance_key FROM evidence_derivatives ORDER BY kind`
-    );
-    assert.deepEqual(rows.map((r) => [r.kind, r.tool]), [['decrypted', MVT], ['mvt_results', MVT]]);
-    assert.deepEqual(rows[0].params, REPAIRED, 'repair counts, failed files and preserved originals are queryable');
-    assert.deepEqual(rows[1].params, IOCS_A);
-    for (const r of rows) assert.match(r.provenance_key, /^[0-9a-f]{64}$/);
-    const events = await db.query(`SELECT detail FROM evidence_events WHERE kind = 'derivative_registered' ORDER BY event_id`);
-    assert.deepEqual(events.rows.map((e) => e.detail.tool), [MVT, MVT]);
-  });
-
-  it('results checked against a new IOC set are a new derivative, and results stages run again', async () => {
-    const ws = makeWorkspace('new-iocs');
-    const reader = recordingStage('ioc-reader', 10, { requiresResultsPath: true, parserVersion: 1 });
-    const first = await run(ws.backupPath, { enabled: [reader], disabled: [] });
-    assert.equal(await getRunState(db, first.runId!), 'complete');
-    const firstResults = argsOf(reader)['--derivative-id'];
-
-    writeFileSync(path.join(ws.resultsPath, CHECK_MARKER), checkMarker(ws.contentRoot, IOCS_B));
-    const second = await run(ws.backupPath, { enabled: [reader], disabled: [] });
-    assert.notEqual(second.skipped, true, 'the new results set has not been read');
-    const secondResults = argsOf(reader)['--derivative-id'];
-    assert.notEqual(secondResults, firstResults);
-
-    const { rows } = await db.query(
-      `SELECT derivative_id, params, parent_derivative_id FROM evidence_derivatives WHERE kind = 'mvt_results' ORDER BY created_at`
-    );
-    assert.deepEqual(rows.map((r) => r.params.ioc_set_hash), [IOCS_A.ioc_set_hash, IOCS_B.ioc_set_hash]);
-    assert.equal(rows[0].parent_derivative_id, rows[1].parent_derivative_id, 'both were checked from the same decrypt');
-    assert.equal(rows[0].derivative_id, firstResults, 'the old results keep their own row and provenance');
-
-    const third = await run(ws.backupPath, { enabled: [reader], disabled: [] });
-    assert.equal(third.skipped, true, 'once the new results are read, the evidence is done again');
-  });
-
-  it('a decrypt with a different repair outcome is a new derivative, never an update in place', async () => {
-    const ws = makeWorkspace('re-repaired');
-    await run(ws.backupPath);
-    const unrepaired: DecryptParams = { repair: { status: 'skipped', reason: 'sqlite3 not available (sqlite3)' } };
-    writeFileSync(path.join(ws.backupPath, DECRYPT_MARKER), decryptMarker(ws.contentRoot, unrepaired));
-    rmSync(ws.resultsPath, { recursive: true });
-    const second = await run(ws.backupPath);
-    assert.notEqual(second.skipped, true, 'a new decrypt is new input');
-    const { rows } = await db.query(
-      `SELECT params FROM evidence_derivatives WHERE kind = 'decrypted' ORDER BY created_at`
-    );
-    assert.deepEqual(rows.map((r) => r.params), [REPAIRED, unrepaired]);
   });
 
   it('a failed stage makes the run incomplete, so the next invocation re-runs it', async () => {
