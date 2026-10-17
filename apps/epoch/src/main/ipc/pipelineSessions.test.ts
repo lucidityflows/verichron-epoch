@@ -106,12 +106,12 @@ describe('PrepareSession', () => {
 describe('AnalysisSession', () => {
   it('records whether a run is a workspace analysis or one retried backup', () => {
     const analysis = new AnalysisSession(() => {});
-    analysis.start('retry', '/w/decrypted/BK', 1000);
+    analysis.start('retry', 'run-123', 1000);
     analysis.line('stdout', 'retrying');
     assert.deepEqual((({ status, kind, target }) => ({ status, kind, target }))(analysis.snapshot()), {
       status: 'running',
       kind: 'retry',
-      target: '/w/decrypted/BK',
+      target: 'run-123',
     });
     analysis.finish({ success: true });
     assert.equal(analysis.snapshot().status, 'finished');

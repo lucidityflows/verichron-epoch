@@ -10,8 +10,8 @@ through it. Identity and provenance are explained in
 ```mermaid
 flowchart LR
   A[Encrypted backup] --> B[processor]
-  B -->|evidence/ sidecar + manifest| W[(Workspace)]
-  B -->|decrypted/ + ileapp/ with markers| W
+  B -->|workspace.json + evidence paths| W[(Workspace)]
+  B -->|manifest-declared derivatives + markers| W
   W --> C[orchestrator]
   C -->|register evidence| D[(PostgreSQL)]
   C -->|spawn in order| S[stages]
@@ -100,8 +100,8 @@ never on a path guessed from the layout (R18):
 
 New Investigation lists the backups under the chosen folder and names each
 after its top-level folder there, which is the pull's `<UTC start>`. Two pulls
-of one device therefore get different names, and different `decrypted/<label>`
-folders in the workspace.
+of one device therefore get different names and separate manifest entries in
+the workspace.
 
 ### Verified device behaviour
 
@@ -185,26 +185,25 @@ line, still analyzes every prepared backup in the workspace.
 
 ```
 <workspace>/
-  evidence/<label>/sidecar.json            identity: content_root, file count, source path
-  evidence/<label>/manifests/<root>.sha256 canonical manifest, content-addressed, never overwritten
-  evidence/<label>/fingerprints.json       stat cache that makes re-hashing cheap
-  decrypted/<label>/                       decrypted backup (iTunes layout) + .decrypted_ok marker
-  ileapp/<label>/                          iLEAPP's report + .ileapp_ok marker
-  reports/<label>/investigation_report.md  the report stage's output
-  runs/<label>/<run_id>.json               one run's summary, exported from the database
-  logs/<label>.ileapp.log                  iLEAPP output
-  logs/<label>.ileapp-modules.json         each iLEAPP module's timing
-  summary.json, summary.md                 the processor's run summary
+  workspace.json                           explicit paths for every backup and processor summary
+  <manifest-declared paths>                evidence, derivatives, reports, run summaries and logs
 ```
 
-Each run writes its own summary file, so no run touches another's. The
-database stays the source of truth; the file is a copy of it (EPOCH-409). What
-a single orchestrator call did (each backup's outcome, or why it stopped before
-any backup) goes to a file the caller names with `--summary-path`; the app
-gives each call its own temporary file, so no call reads another's result.
+The processor creates or updates `workspace.json` atomically while holding the
+workspace lock. Its canonical contract is
+[`workspace-manifest.schema.json`](../packages/contracts/workspace-manifest.schema.json).
+Workspace-owned paths in it are relative to the workspace root, so moving the
+workspace preserves them; the original source path is external provenance and
+remains as recorded by the evidence sidecar. Readers reject a missing, invalid
+or escaping manifest path rather than fall back to a directory convention
+(R18). The orchestrator accepts `--workspace` and optional `--label` values,
+then passes the resolved paths explicitly to stages.
 
-Today the orchestrator and app find these directories by layout. A workspace
-manifest replaces that (R18, EPOCH-427).
+Each run writes its own summary file, so no run touches another's. The database
+stays the source of truth; the file is a copy of it (EPOCH-409). What a single
+orchestrator call did (each backup's outcome, or why it stopped before any
+backup) goes to a file the caller names with `--summary-path`; the app gives
+each call its own temporary file, so no call reads another's result.
 
 ## The database
 
@@ -233,7 +232,7 @@ The contract is in
 
 An iOS backup holds none of the device's crash logs (EPOCH-447). An iPhone pull
 copies them beside the backup with `idevicecrashreport -k` (EPOCH-514), and the
-processor copies them into `crash_reports/<label>/`. Evidence without them, such
+processor copies them to their manifest-declared path. Evidence without them, such
 as a backup imported from elsewhere, has `crash` recorded as skipped, with that
 reason, and the report lists it under Not Examined.
 
@@ -275,4 +274,3 @@ These are settled but not yet built; this page will change when they land.
 | Change | Ticket |
 |---|---|
 | The app reads typed events from the processor and the orchestrator instead of scraping logs | EPOCH-443, EPOCH-445 |
-| A workspace manifest replaces path inference | EPOCH-427 |

@@ -14,6 +14,7 @@ export const CONTRACT_SCHEMAS = [
   'evidence-sidecar.schema.json',
   'normalized-record.schema.json',
   'stage-manifest.schema.json',
+  'workspace-manifest.schema.json',
 ] as const;
 
 /** The package root, found by walking up from this file: it runs from ts/ under

@@ -92,7 +92,8 @@ pnpm --filter @verichron/processor dev -- --source /path/to/backups --workspace 
 # 2. Register the evidence and run every stage: for every prepared backup in the workspace,
 #    or for the backups named (the app's Analyze names the selected ones, EPOCH-530)
 pnpm --filter @verichron/orchestrator investigate -- --workspace ~/verichron-workspace
-pnpm --filter @verichron/orchestrator investigate -- ~/verichron-workspace/decrypted/<label>
+# Analyze selected manifest entries instead:
+pnpm --filter @verichron/orchestrator investigate -- --workspace ~/verichron-workspace --label <label>
 
 # 3. Or drive both from the desktop app
 pnpm --filter @verichron/epoch dev
@@ -110,8 +111,8 @@ The orchestrator reads `DATABASE_URL` or complete `DB_USER`, `DB_PASSWORD`,
 and `DB_NAME` values from `.env` (with optional `DB_HOST` and `DB_PORT`). If
 neither configuration is present, the app, orchestrator, and database
 inspection tool fail before connecting; there is no built-in development
-credential. The report is written by the `reporting` stage to
-`reports/<label>/investigation_report.md`.
+credential. The report is written by the `reporting` stage to the file declared
+in the selected workspace entry in `workspace.json`.
 A database created before EPOCH-489 that still holds mvt results is refused by
 migration 0009; recreate it with the command above.
 A database with runs from before EPOCH-414 is refused the same way by migration 0014,

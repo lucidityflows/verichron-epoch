@@ -27,6 +27,7 @@ from pathlib import Path
 import pytest
 from adapter import SCHEMA_PATH, load_schema, source_types, validate
 from normalized_record import NormalizedRecord, SourceType
+from workspace_manifest import WorkspaceManifest
 
 CONTRACTS_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = CONTRACTS_DIR.parent.parent
@@ -288,3 +289,34 @@ def test_evidence_sidecar_schema_rejects_invalid_sidecars(mutation):
             {**json.loads(SIDECAR_EXAMPLE.read_text()), **mutation},
             json.loads(SIDECAR_SCHEMA.read_text()),
         )
+
+
+# --------------------------------------------------------------------------
+# Workspace manifest (EPOCH-427). The Zod half of this check lives in the
+# processor's workspaceManifest.test.ts.
+# --------------------------------------------------------------------------
+
+WORKSPACE_MANIFEST_SCHEMA = CONTRACTS_DIR / "workspace-manifest.schema.json"
+WORKSPACE_MANIFEST_EXAMPLE = CONTRACTS_DIR / "workspace-manifest.example.json"
+
+
+def test_workspace_manifest_example_matches_the_schema_and_pydantic_model():
+    jsonschema = pytest.importorskip("jsonschema")
+    example = json.loads(WORKSPACE_MANIFEST_EXAMPLE.read_text())
+    schema = json.loads(WORKSPACE_MANIFEST_SCHEMA.read_text())
+    jsonschema.validate(example, schema)
+    manifest = WorkspaceManifest.model_validate(example)
+    assert manifest.model_dump() == example
+    assert set(WorkspaceManifest.model_fields) == set(schema["properties"])
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["sidecar_path", "decrypted_path", "ileapp_output_path"],
+    ids=["sidecar", "decrypt", "ileapp"],
+)
+def test_workspace_manifest_refuses_paths_outside_the_workspace(field):
+    example = json.loads(WORKSPACE_MANIFEST_EXAMPLE.read_text())
+    example["backups"][0][field] = "../outside"
+    with pytest.raises(ValueError):
+        WorkspaceManifest.model_validate(example)

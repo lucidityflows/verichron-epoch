@@ -32,13 +32,19 @@ import pg from 'pg';
 
 import {
   DECRYPT_MARKER,
-  deriveRunSummaryPath,
   ILEAPP_MARKER,
   CRASH_REPORTS_MARKER,
+  createWorkspaceManifestBackup,
+  emptyWorkspaceManifest,
+  findWorkspaceBackupForPath,
+  readWorkspaceManifestSync,
   renderCrashReportsMarker,
   renderDecryptMarker,
   renderIleappMarker,
+  resolveRunSummaryPath,
+  resolveWorkspaceBackup,
   type DecryptParams,
+  type ResolvedWorkspaceBackup,
 } from '@verichron/contracts';
 
 import { createRun, getRunState, hasCompleteRunFor } from './db.js';
@@ -129,6 +135,7 @@ interface Workspace {
   ileappPath: string;
   sidecarPath: string;
   contentRoot: string;
+  target: ResolvedWorkspaceBackup;
 }
 
 function infoPlist(udid: string, name: string): string {
@@ -151,8 +158,10 @@ function makeWorkspace(
   }: { manifest?: string; sourcePath?: string; label?: string; ileapp?: boolean } = {}
 ): Workspace {
   const workspace = path.join(tmp, name);
-  const backupPath = path.join(workspace, 'decrypted', label);
-  const ileappPath = path.join(workspace, 'ileapp', label);
+  const entry = createWorkspaceManifestBackup(label, sourcePath);
+  const target = resolveWorkspaceBackup(workspace, entry);
+  const backupPath = target.decryptedPath;
+  const ileappPath = target.ileappOutputPath;
   mkdirSync(backupPath, { recursive: true });
   writeFileSync(path.join(backupPath, 'Manifest.db'), '');
   writeFileSync(path.join(backupPath, 'Info.plist'), infoPlist(UDID, 'Alice &amp; Bob&apos;s iPhone'));
@@ -164,10 +173,10 @@ function makeWorkspace(
     writeFileSync(path.join(ileappPath, ILEAPP_MARKER), ileappMarker(contentRoot));
   }
 
-  const evidenceDir = path.join(workspace, 'evidence', label);
-  mkdirSync(path.join(evidenceDir, 'manifests'), { recursive: true });
-  writeFileSync(path.join(evidenceDir, 'manifests', `${contentRoot}.sha256`), manifest);
-  const sidecarPath = path.join(evidenceDir, 'sidecar.json');
+  mkdirSync(target.manifestDirectory, { recursive: true });
+  const evidenceManifestPath = path.join(target.manifestDirectory, `${contentRoot}.sha256`);
+  writeFileSync(evidenceManifestPath, manifest);
+  const sidecarPath = target.sidecarPath;
   writeFileSync(
     sidecarPath,
     JSON.stringify({
@@ -175,15 +184,26 @@ function makeWorkspace(
       evidence_name: label,
       algorithm: 'sha256',
       content_root: contentRoot,
-      manifest_path: `evidence/${label}/manifests/${contentRoot}.sha256`,
+      manifest_path: path.relative(workspace, evidenceManifestPath).split(path.sep).join('/'),
       file_count: 1,
       total_bytes: 0,
-      source_path: sourcePath,
+      source_path: target.sourcePath,
       hashed_at: '2026-10-08T00:00:00.000Z',
       tool: { name: 'processor', version: '0.1.0' },
     })
   );
-  return { workspace, backupPath, ileappPath, sidecarPath, contentRoot };
+  const workspaceManifestPath = path.join(workspace, 'workspace.json');
+  const workspaceManifest = existsSync(workspaceManifestPath)
+    ? readWorkspaceManifestSync(workspace)
+    : emptyWorkspaceManifest();
+  writeFileSync(
+    workspaceManifestPath,
+    JSON.stringify({
+      ...workspaceManifest,
+      backups: [...workspaceManifest.backups.filter((backup) => backup.label !== label), entry],
+    })
+  );
+  return { workspace, backupPath, ileappPath, sidecarPath, contentRoot, target };
 }
 
 /** A node stage that records the arguments it was given. */
@@ -213,8 +233,11 @@ function argsOf(stage: StageDefinition): Record<string, string> {
 }
 
 const NO_STAGES: StageSet = { enabled: [], disabled: [] };
-const run = (backupPath: string, stages: StageSet = NO_STAGES) =>
-  runPipelineForBackup(db, backupPath, DSN ?? '', 'python3', stages, { secretPath });
+const run = async (backupPath: string, stages: StageSet = NO_STAGES) => {
+  const target = await findWorkspaceBackupForPath(backupPath);
+  if (!target) throw new Error(`no workspace manifest for ${backupPath}`);
+  return runPipelineForBackup(db, target.entry, DSN ?? '', 'python3', stages, { secretPath });
+};
 
 /** A registered indicator set, as the registry stores one (EPOCH-490); `registeredAt` orders "newest". */
 async function registerSet(name: string, registeredAt: string): Promise<{ setId: string; setHash: string }> {
@@ -295,6 +318,9 @@ describe('pre-flight registration', live, () => {
     // Same backup, source now mounted somewhere else: same content_root.
     const sidecar = JSON.parse(readFileSync(ws.sidecarPath, 'utf8'));
     writeFileSync(ws.sidecarPath, JSON.stringify({ ...sidecar, source_path: '/media/usb-b/BK1' }));
+    const workspaceManifest = JSON.parse(readFileSync(path.join(ws.workspace, 'workspace.json'), 'utf8'));
+    workspaceManifest.backups[0].source_path = '/media/usb-b/BK1';
+    writeFileSync(path.join(ws.workspace, 'workspace.json'), JSON.stringify(workspaceManifest));
     const second = await run(ws.backupPath);
 
     assert.equal(second.skipped, true, 'the evidence already has a complete run, so it is skipped');
@@ -349,7 +375,7 @@ describe('pre-flight registration', live, () => {
     [
       'a sidecar whose manifest does not match its root',
       (ws: Workspace) => {
-        const manifest = path.join(ws.workspace, 'evidence', 'BK1', 'manifests', `${ws.contentRoot}.sha256`);
+        const manifest = path.join(ws.target.manifestDirectory, `${ws.contentRoot}.sha256`);
         writeFileSync(manifest, 'tampered\n');
       },
     ],
@@ -619,7 +645,7 @@ describe('stages and the completeness predicate', live, () => {
     const older = await registerSet('older', '2026-10-01T00:00:00Z');
     await registerSet('newer', '2026-10-15T00:00:00Z');
 
-    const chosen = await runPipelineForBackup(db, ws.backupPath, DSN ?? '', 'python3', stages, {
+    const chosen = await runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', stages, {
       secretPath,
       indicatorSetHash: older.setHash,
     });
@@ -627,7 +653,7 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(argsOf(matcher)['--indicator-set-id'], older.setId);
 
     const runs = await count('pipeline_runs');
-    const unknown = await runPipelineForBackup(db, ws.backupPath, DSN ?? '', 'python3', stages, {
+    const unknown = await runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', stages, {
       secretPath,
       indicatorSetHash: 'f'.repeat(64),
     });
@@ -639,8 +665,7 @@ describe('stages and the completeness predicate', live, () => {
   it("records each stage's declared order, so a run's stages read back in stage.json order, disabled ones in place (EPOCH-414)", async () => {
     const ws = makeWorkspace('stage-order');
     const registration = await registerEvidence(db, {
-      backupPath: ws.backupPath,
-      ileappPath: ws.ileappPath,
+      target: ws.target,
       secretPath,
     });
     const provenance = { contractVersion: 'test', toolVersions: {} };
@@ -930,13 +955,13 @@ describe('stage warnings (EPOCH-420)', live, () => {
 });
 
 describe('per-run summaries (EPOCH-409)', live, () => {
-  const summaryOf = (backupPath: string, runId: string) => deriveRunSummaryPath(backupPath, runId)!;
+  const summaryOf = (target: ResolvedWorkspaceBackup, runId: string) => resolveRunSummaryPath(target, runId);
 
   it('a complete run whose summary went missing gets it back when the backup is skipped', async () => {
     const ws = makeWorkspace('summary-repair', { label: 'A' });
     const stages = { enabled: [recordingStage('ok', 10)], disabled: [] };
     const first = await run(ws.backupPath, stages);
-    const file = summaryOf(ws.backupPath, first.runId!);
+    const file = summaryOf(ws.target, first.runId!);
     // What a failed export after the run was marked complete leaves behind.
     rmSync(file);
 
@@ -948,7 +973,7 @@ describe('per-run summaries (EPOCH-409)', live, () => {
   it("writes each run's summary to its own file, as the database records it", async () => {
     const ws = makeWorkspace('summary-db', { label: 'A' });
     const result = await run(ws.backupPath, { enabled: [recordingStage('ok', 10)], disabled: [] });
-    const file = summaryOf(ws.backupPath, result.runId!);
+    const file = summaryOf(ws.target, result.runId!);
     assert.equal(file, path.join(ws.workspace, 'runs', 'A', `${result.runId}.json`));
     const written = JSON.parse(readFileSync(file, 'utf8'));
     assert.deepEqual(written, await readRunSummary(db, result.runId!));
@@ -964,12 +989,12 @@ describe('per-run summaries (EPOCH-409)', live, () => {
     const b = makeWorkspace('summary-shared', { label: 'B', manifest: 'b'.repeat(64) + '  Manifest.db\n' });
     const stages = { enabled: [recordingStage('ok', 10)], disabled: [] };
     const first = await run(a.backupPath, stages);
-    const before = readFileSync(summaryOf(a.backupPath, first.runId!));
+    const before = readFileSync(summaryOf(a.target, first.runId!));
 
     const other = await run(b.backupPath, stages);
     assert.notEqual(other.runId, first.runId);
-    assert.ok(readFileSync(summaryOf(b.backupPath, other.runId!)).length > 0);
-    assert.deepEqual(readFileSync(summaryOf(a.backupPath, first.runId!)), before);
+    assert.ok(readFileSync(summaryOf(b.target, other.runId!)).length > 0);
+    assert.deepEqual(readFileSync(summaryOf(a.target, first.runId!)), before);
   });
 
   it('a failed run writes its summary too, incomplete, and a rerun gets a file of its own', async () => {
@@ -977,12 +1002,12 @@ describe('per-run summaries (EPOCH-409)', live, () => {
     const failing = recordingStage('fails', 10);
     writeFileSync(path.join(failing.dir, 'stage.mjs'), 'process.exit(3);\n');
     const first = await run(ws.backupPath, { enabled: [failing], disabled: [] });
-    const firstFile = summaryOf(ws.backupPath, first.runId!);
+    const firstFile = summaryOf(ws.target, first.runId!);
     const before = readFileSync(firstFile);
     assert.equal(JSON.parse(before.toString()).state, 'incomplete');
 
     const second = await run(ws.backupPath, { enabled: [failing], disabled: [] });
-    assert.ok(readFileSync(summaryOf(ws.backupPath, second.runId!)).length > 0);
+    assert.ok(readFileSync(summaryOf(ws.target, second.runId!)).length > 0);
     assert.deepEqual(readFileSync(firstFile), before, 'the earlier run keeps its own summary');
     assert.deepEqual(
       readdirSync(path.join(ws.workspace, 'runs', 'A')).sort(),
@@ -997,7 +1022,7 @@ describe('registration in isolation', live, () => {
     // Make the derivative insert fail inside the transaction.
     await db.query(`ALTER TABLE evidence_derivatives ADD CONSTRAINT test_block CHECK (path <> '${ws.backupPath}')`);
     try {
-      await assert.rejects(registerEvidence(db, { backupPath: ws.backupPath, secretPath }));
+      await assert.rejects(registerEvidence(db, { target: ws.target, secretPath }));
       assert.equal(await count('evidence_items'), 0);
       assert.equal(await count('evidence_events'), 0);
       assert.equal(await count('devices'), 0);

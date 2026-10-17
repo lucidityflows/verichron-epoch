@@ -35,7 +35,7 @@ The orchestrator registers the evidence before the run and passes every stage:
 | `--indicator-set-id` | Instead of a derivative, for a stage that reads `indicator_set`: the registered set to check, the newest unless the orchestrator was given one. With none registered, the stage is skipped with the reason. Its facts are filed under the set |
 | `--parser-version` | From `stage.json`, when declared |
 | `--backup-path` | Where the decrypted backup is |
-| `--report-path` | The folder the report stage writes the investigation report to (`<workspace>/reports/<label>/`). Passed to every stage; only the report stage uses it |
+| `--report-path` | The report folder declared in `workspace.json`. Passed to every stage; only the report stage uses it |
 
 Python stages register the identity arguments and `--derivative-path` with
 `db_writer.add_context_args` and build one `IngestContext` with

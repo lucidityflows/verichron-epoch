@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """The iLEAPP bridge: ingests the iLEAPP output the processor produced.
 
-The processor runs iLEAPP over each decrypt and leaves its report at
-<workspace>/ileapp/<label>/, marked complete with .ileapp_ok; the orchestrator
-registers it as an `ileapp_output` derivative and passes its directory here as
---derivative-path (EPOCH-416). This stage only reads that directory: it never
-runs iLEAPP, and never looks anywhere else for output.
+The processor runs iLEAPP over each decrypt and leaves its report at the
+output path declared in workspace.json, marked complete with .ileapp_ok; the
+orchestrator registers it as an `ileapp_output` derivative and passes its
+directory here as --derivative-path (EPOCH-416). This stage only reads that
+directory: it never runs iLEAPP, and never looks anywhere else for output.
 """
 
 from __future__ import annotations

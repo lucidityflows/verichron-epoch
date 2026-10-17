@@ -10,10 +10,8 @@ import { inputsFor, registerEvidence, RegistrationError, type Registration } fro
 import { IndicatorSetError, selectIndicatorSet, type IndicatorSetChoice } from './indicatorSets.js';
 import {
   contractVersion,
-  deriveIleappPath,
-  deriveCrashReportsPath,
-  deriveReportPath,
-  deriveRunSummaryPath,
+  resolveRunSummaryPath,
+  type ResolvedWorkspaceBackup,
   type DerivativeKind,
 } from '@verichron/contracts';
 import { exportRunSummary } from './runSummary.js';
@@ -235,12 +233,13 @@ export interface RunPipelineOptions {
 
 export async function runPipelineForBackup(
   client: Client,
-  backupPath: string,
+  target: ResolvedWorkspaceBackup,
   dbUrl: string,
   pythonBin: string,
   stages: StageSet,
   options: RunPipelineOptions = {}
 ): Promise<BackupRunResult> {
+  const backupPath = target.decryptedPath;
   // Validate, then register, BEFORE touching pipeline_runs: a bad path or an
   // unverifiable sidecar must not leave an orphaned run row (EPOCH-404).
   const validation = await validateBackupPath(backupPath);
@@ -248,15 +247,13 @@ export async function runPipelineForBackup(
     return { success: false, error: validation.reason };
   }
 
-  const reportPath = deriveReportPath(backupPath);
-  const ileappPath = deriveIleappPath(backupPath);
-  const crashReportsPath = deriveCrashReportsPath(backupPath);
+  const reportPath = target.reportPath;
+  const ileappPath = target.ileappOutputPath;
+  const crashReportsPath = target.crashReportsPath;
   let registration: Registration;
   try {
     registration = await registerEvidence(client, {
-      backupPath,
-      ileappPath,
-      crashReportsPath,
+      target,
       secretPath: options.secretPath,
     });
   } catch (err) {
@@ -282,8 +279,8 @@ export async function runPipelineForBackup(
   if (completeRun) {
     // A run marked complete whose summary export then failed (a full disk)
     // would otherwise never get its file: write it now (EPOCH-409).
-    const existing = deriveRunSummaryPath(backupPath, completeRun);
-    if (existing && !(await fsp.stat(existing).catch(() => null))) {
+    const existing = resolveRunSummaryPath(target, completeRun);
+    if (!(await fsp.stat(existing).catch(() => null))) {
       await exportRunSummary(client, completeRun, existing);
     }
     return { success: true, skipped: true, evidenceId: registration.evidenceId };
@@ -292,8 +289,7 @@ export async function runPipelineForBackup(
   const runId = await createRun(client, backupPath, stages, collectProvenance(pythonBin), registration, indicatorSet);
   const results: { stage: string; success: boolean }[] = [];
   // Registration located the workspace, so a backup that reached here has one.
-  const summaryPath = deriveRunSummaryPath(backupPath, runId);
-  if (!summaryPath) throw new Error(`no workspace for ${backupPath}; registration should have refused it`);
+  const summaryPath = resolveRunSummaryPath(target, runId);
 
   try {
     for (const stage of stages.enabled) {

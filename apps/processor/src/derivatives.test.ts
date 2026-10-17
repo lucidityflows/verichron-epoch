@@ -471,7 +471,7 @@ describe('crash logs (EPOCH-514)', () => {
   it('copies them into crash_reports/<label>/ and records their content root and the evidence they came with', async () => {
     writeAcquisition(2, 6);
     const out = await runCli();
-    assert.match(out, /\[crash\]   copied 2 file\(s\) -> crash_reports\/BK1/);
+    assert.ok(out.includes(`[crash]   copied 2 file(s) -> ${copied()}`));
     const marker = readCrashReportsMarker(copied())!;
     assert.ok(marker, 'marker written');
     assert.equal(marker.content_root, readDecryptMarker(decrypted())!.content_root);

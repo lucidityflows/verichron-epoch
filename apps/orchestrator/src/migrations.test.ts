@@ -9,13 +9,19 @@
 
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { promisify } from 'node:util';
 
 import pg from 'pg';
+import {
+  DECRYPT_MARKER,
+  createWorkspaceManifestBackup,
+  emptyWorkspaceManifest,
+  resolveWorkspaceBackup,
+} from '@verichron/contracts';
 
 import { migrationRefusal, MIGRATIONS_DIR, readMigrationStatus } from './migrations.js';
 
@@ -71,9 +77,8 @@ async function setLedger(filenames: string[]): Promise<void> {
   for (const name of filenames) await db.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [name]);
 }
 
-/** Runs the orchestrator on one backup path that doesn't exist; returns its
- * exit code and summary. Its config folder is the test's own, so nothing is
- * written outside the temp dir. */
+/** Runs the orchestrator on a manifest-declared backup; its config folder is
+ * the test's own, so nothing is written outside the temp dir. */
 async function investigate(): Promise<{
   code: number;
   error?: string;
@@ -81,12 +86,19 @@ async function investigate(): Promise<{
   mode: number;
 }> {
   const workspace = mkdtempSync(path.join(tmp, 'ws-'));
-  const backup = path.join(workspace, 'decrypted', 'backup');
+  const entry = createWorkspaceManifestBackup('backup', path.join(tmp, 'source'));
+  const target = resolveWorkspaceBackup(workspace, entry);
+  mkdirSync(target.decryptedPath, { recursive: true });
+  writeFileSync(path.join(target.decryptedPath, DECRYPT_MARKER), 'complete');
+  writeFileSync(
+    path.join(workspace, 'workspace.json'),
+    JSON.stringify({ ...emptyWorkspaceManifest(), backups: [entry] })
+  );
   const main = path.resolve(import.meta.dirname, 'main.ts');
   const summaryPath = path.join(workspace, 'call-summary.json');
   const code = await promisify(execFile)(
     process.execPath,
-    ['--import', 'tsx', main, '--summary-path', summaryPath, backup],
+    ['--import', 'tsx', main, '--workspace', workspace, '--label', entry.label, '--summary-path', summaryPath],
     {
       cwd: import.meta.dirname,
       env: { ...process.env, DATABASE_URL: dbUrl, XDG_CONFIG_HOME: path.join(tmp, 'config') },

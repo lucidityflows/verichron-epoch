@@ -69,6 +69,9 @@ How AI coding agents (Claude, Gemini and others) work in this repository.
   append-only. Preserve existing entries exactly.
 - **Check the diff before writing.** Review it to confirm historical lines and
   records are intact.
+- **Format before committing.** Before committing TypeScript changes, run
+  `pnpm format` for the whole project, then verify with `pnpm format:check`.
+  Do not substitute targeted Prettier invocations for the project formatter.
 
 ## 6. Working with the user
 

@@ -13,11 +13,13 @@
  */
 
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import pg from 'pg';
+import { createWorkspaceManifestBackup, emptyWorkspaceManifest, resolveWorkspaceBackup } from '@verichron/contracts';
 
 import {
   MAX_RECORDS_PAGE as MAX_PAGE,
@@ -42,6 +44,21 @@ const RUN = '33333333-3333-3333-3333-333333333333';
 const REPORT_RUN = '44444444-4444-4444-4444-444444444444';
 const DECRYPT = '55555555-5555-5555-5555-555555555555';
 const UNREGISTERED_RUN = '77777777-7777-7777-7777-777777777777';
+const reportWorkspaceRoot = mkdtempSync(path.join(os.tmpdir(), 'db-reader-workspace-'));
+const oldReportWorkspace = path.join(reportWorkspaceRoot, 'old');
+const movedReportWorkspace = path.join(reportWorkspaceRoot, 'moved');
+
+function writeReportWorkspace(workspace: string) {
+  const entry = createWorkspaceManifestBackup('a', '/evidence/a');
+  entry.decrypted_path = 'decrypt/renamed-a';
+  entry.report_file_path = 'reports/arbitrary-name.md';
+  mkdirSync(workspace, { recursive: true });
+  writeFileSync(
+    path.join(workspace, 'workspace.json'),
+    JSON.stringify({ ...emptyWorkspaceManifest(), backups: [entry] })
+  );
+  return resolveWorkspaceBackup(workspace, entry);
+}
 
 /** 23 records for EVIDENCE: more than several pages at limit 4. Includes NULL
  * times and names, exact ties (decided by id), and two times that differ only
@@ -322,6 +339,7 @@ describe('getForensicRecords', live, () => {
         JSON.stringify(query)
       );
     }
+    rmSync(reportWorkspaceRoot, { recursive: true, force: true });
   });
 });
 
@@ -334,16 +352,18 @@ describe('evidence-scoped helpers', live, () => {
 
 describe('getRunReportLocation', live, () => {
   before(async () => {
+    const oldTarget = writeReportWorkspace(oldReportWorkspace);
+    writeReportWorkspace(movedReportWorkspace);
     await db.query(
       `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
-       VALUES ($1, $2, 'decrypted', '/old/ws/decrypted/a', '{"name": "iphone_backup_decrypt", "version": "0.10.0"}',
+       VALUES ($1, $2, 'decrypted', $3, '{"name": "iphone_backup_decrypt", "version": "0.10.0"}',
                '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('2', 64))`,
-      [DECRYPT, EVIDENCE]
+      [DECRYPT, EVIDENCE, oldTarget.decryptedPath]
     );
     await db.query(
       `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-       VALUES ($1, '/old/ws/decrypted/a', 'test', '{}', $2, $3)`,
-      [REPORT_RUN, EVIDENCE, DECRYPT]
+       VALUES ($1, $4, 'test', '{}', $2, $3)`,
+      [REPORT_RUN, EVIDENCE, DECRYPT, oldTarget.decryptedPath]
     );
     // A run from before evidence registration (EPOCH-404).
     await db.query(
@@ -353,14 +373,24 @@ describe('getRunReportLocation', live, () => {
     );
   });
 
-  it("derives the report folder from the run's decrypt", async () => {
-    assert.equal(await getRunReportLocation(db, REPORT_RUN), '/old/ws/reports/a');
+  it("reads the report path from the run's workspace manifest", async () => {
+    assert.equal(
+      await getRunReportLocation(db, REPORT_RUN),
+      path.join(oldReportWorkspace, 'reports/arbitrary-name.md')
+    );
   });
 
   it('follows a moved workspace, not the run backup_source', async () => {
     // What registration does when the same decrypt is found at a new location.
-    await db.query(`UPDATE evidence_derivatives SET path = '/new/ws/decrypted/a' WHERE derivative_id = $1`, [DECRYPT]);
-    assert.equal(await getRunReportLocation(db, REPORT_RUN), '/new/ws/reports/a');
+    const movedTarget = writeReportWorkspace(movedReportWorkspace);
+    await db.query(`UPDATE evidence_derivatives SET path = $2 WHERE derivative_id = $1`, [
+      DECRYPT,
+      movedTarget.decryptedPath,
+    ]);
+    assert.equal(
+      await getRunReportLocation(db, REPORT_RUN),
+      path.join(movedReportWorkspace, 'reports/arbitrary-name.md')
+    );
   });
 
   it('is null for a run without registered evidence, and for an unknown run', async () => {

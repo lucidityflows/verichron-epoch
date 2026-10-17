@@ -10,7 +10,6 @@ import type {
   BackupProgress,
   CrashReportsResult,
   CrashReportsRetryLookup,
-  CrashReportsRetryTarget,
   DeviceInfo,
   PullOptions,
   BackupStats,
@@ -157,7 +156,7 @@ declare global {
       // no need for a second pair of structurally-equal types.
       startAnalysis: (workspace: string, labels: string[]) => Promise<{ started: boolean }>;
       // EPOCH-308
-      retryRun: (backupSource: string) => Promise<{ started: boolean }>;
+      retryRun: (runId: string) => Promise<{ started: boolean }>;
       // EPOCH-305
       cancelAnalysis: () => Promise<{ cancelled: boolean }>;
       getAnalysisRunStatus: (workspace: string) => Promise<AnalysisRunStatus>;

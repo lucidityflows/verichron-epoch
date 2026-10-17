@@ -1,17 +1,11 @@
-import type {
-  StartPipelineOptions,
-  PipelineLogEntry,
-  AnalysisRunStatus,
-  AnalysisState,
-  PrepareState,
-} from '../../shared/types/window';
+import type { StartPipelineOptions, PipelineLogEntry, AnalysisState, PrepareState } from '../../shared/types/window';
 
 export const pipelineApi = {
   selectBackupDirectory: () => window.epoch.selectBackupDirectory(),
   discoverBackups: (source: string) => window.epoch.discoverBackups(source),
   getPreparedBackups: (workspace?: string) => window.epoch.getPreparedBackups(workspace),
   startPipeline: (source: string, options?: StartPipelineOptions) => window.epoch.startPipeline(source, options),
-  retryRun: (backupSource: string) => window.epoch.retryRun(backupSource),
+  retryRun: (runId: string) => window.epoch.retryRun(runId),
   submitBackupPassword: (password: string) => window.epoch.submitBackupPassword(password),
   onPrepareLog: (callback: (entry: PipelineLogEntry) => void) => window.epoch.onPrepareLog(callback),
   getPrepareState: () => window.epoch.getPrepareState(),

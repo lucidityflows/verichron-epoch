@@ -25,7 +25,7 @@
  * apps/reporting/generate_report.py can't disagree about them (R27).
  */
 
-import { deriveReportPath } from '@verichron/contracts';
+import { findWorkspaceBackupForPath } from '@verichron/contracts';
 import type { Client, Pool, PoolClient } from 'pg';
 
 type Db = Client | PoolClient | Pool;
@@ -155,7 +155,7 @@ export async function getRunEvidence(client: Db, runId: string): Promise<string 
  * derivative's path when its workspace moves, so this follows a moved
  * workspace; the run's `backup_source` keeps the path it started from.
  */
-async function runDecryptedPath(client: Db, runId: string): Promise<string | null> {
+export async function getRunDecryptedPath(client: Db, runId: string): Promise<string | null> {
   const result = await client.query<{ path: string }>(
     `SELECT d.path
        FROM pipeline_runs r
@@ -167,16 +167,18 @@ async function runDecryptedPath(client: Db, runId: string): Promise<string | nul
 }
 
 /**
- * Where a run's report is now: the folder the orchestrator passed every stage
- * as `--report-path`, derived from the run's decrypt with `deriveReportPath`
- * (<workspace>/reports/<label>/, EPOCH-489). Null if the run has no
- * registered evidence or its decrypt is not in a workspace. The decrypt's
+ * Where a run's report is now, as declared by workspace.json. The decrypt's
  * path comes from the database, where registration keeps it current when the
  * workspace moves; the run's `backup_source` goes stale.
  */
 export async function getRunReportLocation(client: Db, runId: string): Promise<string | null> {
-  const decrypted = await runDecryptedPath(client, runId);
-  return decrypted ? (deriveReportPath(decrypted) ?? null) : null;
+  const decrypted = await getRunDecryptedPath(client, runId);
+  if (!decrypted) return null;
+  const workspaceEntry = await findWorkspaceBackupForPath(decrypted);
+  if (!workspaceEntry) {
+    throw new Error(`no workspace manifest contains the registered decrypt for run ${runId}`);
+  }
+  return workspaceEntry.entry.reportFilePath;
 }
 
 /**
