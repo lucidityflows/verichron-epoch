@@ -109,8 +109,8 @@ export class IosBackupSource implements DeviceBackupSource {
   private cancelRequested: boolean | null = null;
   /** True while crash logs are being copied again (EPOCH-519); a pull waits for it. */
   private copyingCrashLogs = false;
-  /** Renderer-safe, short-lived references for devices eligible for a crash-log retry. */
-  private retryDeviceReferences = new Map<string, DeviceInfo>();
+  /** Renderer-safe, short-lived references bound to a backup and its originating device. */
+  private retryTargetReferences = new Map<string, { device: DeviceInfo; backupDir: string }>();
 
   /**
    * Stops the running backup cleanly: SIGINT, as Ctrl+C would, so
@@ -246,8 +246,8 @@ export class IosBackupSource implements DeviceBackupSource {
     }
     const devices = await this.listConnectedDevices();
     const connectedIds = new Set(devices.map((device) => device.id.toUpperCase()));
-    for (const [reference, device] of this.retryDeviceReferences) {
-      if (!connectedIds.has(device.id.toUpperCase())) this.retryDeviceReferences.delete(reference);
+    for (const [reference, { device }] of this.retryTargetReferences) {
+      if (!connectedIds.has(device.id.toUpperCase())) this.retryTargetReferences.delete(reference);
     }
     if (devices.length === 0) return { targets: [], errors: [] };
 
@@ -267,7 +267,7 @@ export class IosBackupSource implements DeviceBackupSource {
             connected.id.toUpperCase() === deviceId.toUpperCase() && path.basename(backupDir) === connected.id
         );
         if (!device || (await crashReportsCopyExists(backupDir))) continue;
-        const deviceRef = this.referenceForDevice(device);
+        const deviceRef = this.referenceForRetryTarget(device, backupDir);
         targets.push({ sourceId: this.id, backupIndex, deviceRef, deviceName: device.name });
       } catch (err) {
         errors.push({
@@ -280,21 +280,26 @@ export class IosBackupSource implements DeviceBackupSource {
   }
 
   async copyCrashReportsAgainByReference(deviceRef: string, backupDir: string): Promise<CrashReportsResult> {
-    const device = this.retryDeviceReferences.get(deviceRef);
-    if (!device) throw new Error('The device reference is no longer available. Refresh the backup list and try again.');
-    return this.copyCrashReportsAgain(device, backupDir);
+    const target = this.retryTargetReferences.get(deviceRef);
+    if (!target) throw new Error('The device reference is no longer available. Refresh the backup list and try again.');
+    if (backupDir !== target.backupDir) {
+      throw new Error(
+        'The backup path does not match the selected retry target. Refresh the backup list and try again.'
+      );
+    }
+    return this.copyCrashReportsAgain(target.device, target.backupDir);
   }
 
-  private referenceForDevice(device: DeviceInfo): string {
-    for (const [reference, existing] of this.retryDeviceReferences) {
-      if (existing.id.toUpperCase() === device.id.toUpperCase()) {
-        this.retryDeviceReferences.set(reference, device);
+  private referenceForRetryTarget(device: DeviceInfo, backupDir: string): string {
+    for (const [reference, existing] of this.retryTargetReferences) {
+      if (existing.backupDir === backupDir && existing.device.id.toUpperCase() === device.id.toUpperCase()) {
+        this.retryTargetReferences.set(reference, { device, backupDir });
         return reference;
       }
     }
 
     const reference = randomUUID();
-    this.retryDeviceReferences.set(reference, device);
+    this.retryTargetReferences.set(reference, { device, backupDir });
     return reference;
   }
 
