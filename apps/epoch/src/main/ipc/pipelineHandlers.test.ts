@@ -19,7 +19,8 @@ const { handlers, spawnMock } = vi.hoisted(() => ({
 }));
 let workspace: string;
 let decryptPath: string;
-let pool: { query: () => Promise<{ rows: Array<{ path: string }> }> };
+let queries: Array<{ sql: string; params: unknown[] }>;
+let pool: { query: (sql: string, params: unknown[]) => Promise<{ rows: Array<{ path: string }> }> };
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -61,7 +62,13 @@ describe('pipeline IPC single-flight', () => {
       path.join(workspace, 'workspace.json'),
       JSON.stringify({ ...emptyWorkspaceManifest(), backups: [entry] })
     );
-    pool = { query: async () => ({ rows: [{ path: decryptPath }] }) };
+    queries = [];
+    pool = {
+      query: async (sql, params) => {
+        queries.push({ sql, params });
+        return { rows: [{ path: decryptPath }] };
+      },
+    };
     registerPipelineHandlers(() => null, '/repo', pool as unknown as Pool);
   });
 
@@ -93,5 +100,30 @@ describe('pipeline IPC single-flight', () => {
       /Cannot start processor while orchestrator is running/
     );
     orchestrator.emit('close', 0);
+  });
+
+  it("closes the retried backup's unfinished run and stage rows when the retry is cancelled", async () => {
+    const orchestrator = childProcess();
+    spawnMock.mockReturnValueOnce(orchestrator);
+    await invoke('epoch:retryRun', 'run-123');
+    queries = [];
+
+    assert.deepEqual(await invoke('epoch:cancelAnalysis'), { cancelled: true });
+    assert.deepEqual(orchestrator.kill.mock.calls, [['SIGTERM']]);
+    orchestrator.emit('close', null);
+
+    await vi.waitFor(() => assert.equal(queries.length, 2));
+    const [stages, runs] = queries;
+    assert.match(stages.sql, /UPDATE pipeline_stage_status/);
+    assert.match(stages.sql, /WHERE backup_source = \$1 AND finished_at IS NULL/);
+    assert.deepEqual(stages.params, [decryptPath, 'cancelled by user']);
+    assert.match(runs.sql, /UPDATE pipeline_runs\s+SET finished_at = now\(\)/);
+    assert.match(runs.sql, /WHERE backup_source = \$1 AND finished_at IS NULL/);
+    assert.deepEqual(runs.params, [decryptPath]);
+
+    const next = childProcess();
+    spawnMock.mockReturnValueOnce(next);
+    await invoke('epoch:retryRun', 'run-123');
+    next.emit('close', 0);
   });
 });
