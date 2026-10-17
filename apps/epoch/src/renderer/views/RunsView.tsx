@@ -14,7 +14,7 @@ import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 import { Button } from '../components/ui/Button';
 import { TerminalLog } from '../components/layout/TerminalLog';
 import { pipelineApi } from '../api/pipeline';
-import { useAnalysisState } from '../hooks/usePipelineState';
+import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { AnalysisStageProgress } from '../features/investigations/AnalysisStageProgress';
@@ -98,6 +98,8 @@ export function RunsView({
   // A retry is an analysis run kept in the main process (EPOCH-487), so it is
   // still shown after leaving this view and coming back.
   const { state: analysis, log: analysisLog } = useAnalysisState();
+  const { state: prepare } = usePrepareState();
+  const pipelineBusy = analysis?.status === 'running' || prepare?.status === 'running';
   const retryingThis = analysis?.kind === 'retry' && analysis.target === selectedRun?.backup_source;
   const retrying = retryingThis && analysis?.status === 'running';
   const retryLog = retryingThis ? analysisLog : [];
@@ -277,7 +279,14 @@ export function RunsView({
         <div className="flex items-center justify-between">
           <h3 className="text-label uppercase tracking-wider text-muted-foreground">Analysis Diagnostics</h3>
           {canRetry && (
-            <Button variant="outline" size="sm" onClick={handleRetry} loading={retrying} loadingText="Retrying…">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRetry}
+              disabled={pipelineBusy}
+              loading={retrying}
+              loadingText="Retrying…"
+            >
               <RefreshCw size="0.875rem" />
               Retry Incomplete Run
             </Button>

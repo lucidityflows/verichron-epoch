@@ -4,15 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prebuild": "pnpm --filter @verichron/contracts build && pnpm --filter @verichron/workspace-lock build",
     "build": "tsc",
+    "preinvestigate": "pnpm --filter @verichron/contracts build && pnpm --filter @verichron/workspace-lock build",
     "investigate": "tsx src/main.ts",
+    "pretypecheck": "pnpm --filter @verichron/workspace-lock build",
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc --project tsconfig.test.json",
-    "pretest": "pnpm --filter @verichron/contracts build",
+    "pretest": "pnpm --filter @verichron/contracts build && pnpm --filter @verichron/workspace-lock build",
     "test": "tsx --test 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@verichron/contracts": "workspace:*",
+    "@verichron/workspace-lock": "workspace:*",
     "ajv": "^8.20.0",
     "pg": "^8.23.0"
   },

@@ -11,20 +11,22 @@
   },
   "scripts": {
     "build:contracts": "pnpm --filter @verichron/contracts build",
-    "prebuild": "pnpm run build:contracts",
+    "prebuild": "pnpm run build:contracts && pnpm --filter @verichron/workspace-lock build",
     "build": "tsc",
-    "prestart": "pnpm run build:contracts",
+    "prestart": "pnpm run build:contracts && pnpm --filter @verichron/workspace-lock build",
     "start": "node dist/main.js",
-    "predev": "pnpm run build:contracts",
+    "predev": "pnpm run build:contracts && pnpm --filter @verichron/workspace-lock build",
     "dev": "tsx src/main.ts",
+    "pretypecheck": "pnpm --filter @verichron/workspace-lock build",
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc --project tsconfig.test.json",
-    "pretest": "pnpm run build:contracts",
+    "pretest": "pnpm run build:contracts && pnpm --filter @verichron/workspace-lock build",
     "test": "tsx --test 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@verichron/contracts": "workspace:*",
-    "@verichron/etl-db-reader": "workspace:*"
+    "@verichron/etl-db-reader": "workspace:*",
+    "@verichron/workspace-lock": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

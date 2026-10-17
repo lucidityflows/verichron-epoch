@@ -4,9 +4,20 @@ import { parseCliConfig } from './cli.js';
 import { discoverStages } from './discovery.js';
 import { migrationRefusal, readMigrationStatus } from './migrations.js';
 import { runPipelineForBackup } from './pipeline.js';
+import { acquireWorkspaceLocks } from '@verichron/workspace-lock';
+import type { CliConfig } from './types.js';
 
 async function main() {
   const cfg = await parseCliConfig();
+  const releaseWorkspaceLocks = await acquireWorkspaceLocks(cfg.workspacePaths, 'orchestrator');
+  try {
+    await run(cfg);
+  } finally {
+    await releaseWorkspaceLocks();
+  }
+}
+
+async function run(cfg: CliConfig) {
   const pythonBin = await preflightPython(cfg.summaryPath);
   if (!pythonBin) {
     process.exitCode = 1;
