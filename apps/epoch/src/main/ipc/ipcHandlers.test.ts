@@ -14,6 +14,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import pg from 'pg';
+import { createWorkspaceManifestBackup, emptyWorkspaceManifest } from '@verichron/contracts';
 import { afterAll, beforeAll, describe, it, vi } from 'vitest';
 
 const { handlers, openPath } = vi.hoisted(() => ({
@@ -53,6 +54,11 @@ function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 
 beforeAll(async () => {
   workspace = mkdtempSync(path.join(os.tmpdir(), 'epoch454-'));
+  const backup = createWorkspaceManifestBackup('b', '/source/b');
+  writeFileSync(
+    path.join(workspace, 'workspace.json'),
+    JSON.stringify({ ...emptyWorkspaceManifest(), backups: [backup] })
+  );
   if (!DSN) return;
   dbName = `epoch_ipc_test_${Date.now()}_${process.pid}`;
   admin = new pg.Client({ connectionString: DSN });
