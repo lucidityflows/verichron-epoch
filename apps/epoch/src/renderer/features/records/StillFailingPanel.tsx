@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import type { ItemFailurePage } from '@verichron/etl-db-reader';
 import { Button } from '../../components/ui/Button';
 import { CopyButton } from '../../components/ui/CopyButton';
 import { Disclosure } from '../../components/ui/Disclosure';
-import { useAnalysisState } from '../../hooks/usePipelineState';
 import { pipelineApi } from '../../api/pipeline';
 import { runsApi } from '../../api/runs';
 import { FailedItems, failedItemsText } from '../investigations/FailedItems';
+import { useRerun } from './useRerun';
 
 interface StillFailingPanelProps {
   runId: string;
@@ -31,11 +31,12 @@ export function StillFailingPanel({
 }: StillFailingPanelProps) {
   const [page, setPage] = useState<ItemFailurePage | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [startError, setStartError] = useState<string | null>(null);
   const [reads, setReads] = useState(0);
-  const { state: analysis } = useAnalysisState();
-  const pipelineBusy = analysis?.status === 'running';
-  const rerunning = pipelineBusy && analysis?.kind === 'retry' && analysis.target === runId;
+  // When this investigation's rerun ends, read the list and the records again.
+  const { start, rerunning, busy, startError } = useRerun(runId, rerun, () => {
+    setReads((n) => n + 1);
+    onRerunFinished?.();
+  });
 
   useEffect(() => {
     let current = true;
@@ -54,26 +55,6 @@ export function StillFailingPanel({
       current = false;
     };
   }, [loadStillFailing, runId, reads]);
-
-  // When this investigation's rerun ends, read the list and the records again.
-  const wasRerunning = useRef(false);
-  useEffect(() => {
-    if (wasRerunning.current && !rerunning) {
-      setReads((n) => n + 1);
-      onRerunFinished?.();
-    }
-    wasRerunning.current = rerunning;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rerunning]);
-
-  const handleRerun = async () => {
-    setStartError(null);
-    try {
-      await rerun(runId);
-    } catch (err) {
-      setStartError(err instanceof Error ? err.message : 'Failed to start the rerun.');
-    }
-  };
 
   if (error) {
     const message = `Could not read which items are still failing: ${error}`;
@@ -105,7 +86,7 @@ export function StillFailingPanel({
           </Disclosure>
           <div className="flex items-center gap-2 shrink-0">
             <CopyButton text={failedItemsText(page, true)} title="Copy list" />
-            <Button variant="outline" size="sm" onClick={handleRerun} loading={rerunning} disabled={pipelineBusy}>
+            <Button variant="outline" size="sm" onClick={start} loading={rerunning} disabled={busy}>
               <RotateCcw size="0.875rem" />
               Rerun
             </Button>

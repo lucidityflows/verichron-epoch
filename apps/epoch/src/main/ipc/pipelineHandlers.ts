@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import { readFile, rm, stat } from 'node:fs/promises';
 import type { Pool } from 'pg';
 import {
+  EvidenceSidecar,
   discoverBackups,
   findWorkspaceBackupForPath,
   readWorkspaceManifestSync,
@@ -14,12 +15,13 @@ import {
   resolveWorkspaceBackup,
   type Backup,
 } from '@verichron/contracts';
-import { getRunDecryptedPath } from '@verichron/etl-db-reader';
+import { getInterruptedEvidence, getRunDecryptedPath } from '@verichron/etl-db-reader';
 import type { PipelineFinishedResult, AnalysisRunStatus, PipelineLogEntry } from '../../shared/types/window';
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
 import { PipelineSingleFlight } from './pipelineSingleFlight';
 import { analysisTargets, orchestratorArgs } from './analysisTargets';
 import { defaultWorkspace, readPreparedBackups } from './preparedBackups';
+import { closeAbandonedRuns, closeRuns, type AppEndedReason } from './runCloseOut';
 
 interface StartPipelineOptions {
   workspace?: string;
@@ -35,54 +37,25 @@ const OUTSIDE_STAGE_TIMEOUT_MS = 5 * 60 * 1000;
 const KILL_GRACE_MS = 5000;
 
 /**
- * EPOCH-305 app-restart reconciliation. The per-run cleanup inside
- * registerPipelineHandlers (markWorkspaceRunsAborted) only fires when this
- * process's own spawned child dies -- it does nothing if the whole Epoch
- * app itself is force-quit or crashes mid-analysis. In that case the
- * orchestrator child dies with the app, but nothing is left alive to close
- * out its pipeline_runs row, so it sits with finished_at IS NULL forever.
- * RunsView derives "in progress" purely from finished_at being null, so
- * that investigation would show as perpetually running with no code path
- * that ever revisits it -- worse than a stuck spinner, since it survives
- * even a full app restart.
+ * EPOCH-435: at app start, closes as abandoned every open run on this host
+ * whose orchestrator process is gone, for example because Epoch was closed or
+ * killed mid-run. Stage rows are left as they were, and run_completeness
+ * reports such a run incomplete on its own (R23). Call it once at
+ * app.whenReady(), before any handler can start a run.
  *
- * Call this once at app.whenReady(), before creating the window or
- * registering IPC handlers that could start a new run. A fresh launch
- * means nothing spawned by this process is legitimately still running
- * yet, so any pipeline_runs row with finished_at IS NULL at that moment is
- * unambiguously stale from a previous session -- there's no live-run case
- * this could misfire against, unlike the workspace-scoped, mid-session
- * cleanup, which does have to worry about that.
- *
- * Unscoped by workspace on purpose: a stale row from ANY prior session
- * needs closing, not just the one Epoch happens to open next.
+ * Best effort: if it fails, those runs stay open until the next sweep (the
+ * next start, or the next run-status check), and startup isn't blocked.
  */
-export async function reconcileStaleRunsOnStartup(dbPool: Pool): Promise<void> {
-  const reason = 'Epoch was restarted while this run was in progress; the previous run never reported completion.';
+export async function closeAbandonedRunsOnStartup(dbPool: Pool): Promise<void> {
   try {
-    const staged = await dbPool.query(
-      `UPDATE pipeline_stage_status
-          SET status = 'failed', error_message = $1, finished_at = now()
-        WHERE status IN ('pending', 'running')
-          AND run_id IN (SELECT run_id FROM pipeline_runs WHERE finished_at IS NULL)`,
-      [reason]
-    );
-    const runs = await dbPool.query(
-      `UPDATE pipeline_runs SET finished_at = now() WHERE finished_at IS NULL RETURNING run_id`
-    );
-    const closedRunCount = runs.rowCount ?? 0;
-    if (closedRunCount > 0) {
+    const closed = await closeAbandonedRuns(dbPool);
+    if (closed.length > 0) {
       console.warn(
-        `[pipelineHandlers] startup reconciliation: closed ${closedRunCount} run(s) and ` +
-          `${staged.rowCount ?? 0} stage row(s) left dangling by a previous session that never finished.`
+        `[pipelineHandlers] closed ${closed.length} run(s) whose orchestrator ended without finishing them.`
       );
     }
   } catch (err) {
-    // Best-effort: if this fails, stale runs stay stale until the next
-    // launch, but startup must not be blocked on it -- the app is still
-    // usable, it just may show an inaccurate "in progress" investigation
-    // until reconciliation succeeds.
-    console.error('[pipelineHandlers] startup reconciliation of dangling pipeline runs failed:', err);
+    console.error('[pipelineHandlers] could not close abandoned runs at startup:', err);
   }
 }
 
@@ -94,12 +67,6 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   // lets epoch:getAnalysisRunStatus tell "still actually running" apart from
   // "nothing tracked, but the DB has a dangling run from a past crash."
   let runningOrchestratorWorkspace: string | null = null;
-  // EPOCH-308: set instead of runningOrchestratorWorkspace when the in-flight
-  // orchestrator invocation is a single-run retry (epoch:retryRun) rather
-  // than a full-workspace analysis (epoch:startAnalysis). The two are
-  // mutually exclusive -- only one is ever non-null, since both paths share
-  // the single-flight guard on runningOrchestratorProcess below.
-  let runningOrchestratorBackupSource: string | null = null;
   let outsideStageTimeoutHandle: NodeJS.Timeout | null = null;
   let orchestratorKillEscalationHandle: NodeJS.Timeout | null = null;
   // Set immediately before *we* kill the process, so the 'close'/'error'
@@ -223,79 +190,25 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   }
 
   /**
-   * EPOCH-305: closes out any pipeline_runs / pipeline_stage_status rows the
-   * orchestrator subprocess left dangling for this workspace when it did not
-   * exit cleanly (crash, timeout, or manual cancel).
-   *
-   * apps/orchestrator/src/main.ts already has markRunFailed() for an
-   * in-process JS exception, but that code never runs if the whole process
-   * is killed or dies outright -- so a run row can be left with
-   * finished_at IS NULL and stage rows stuck 'pending'/'running' forever,
-   * which is indistinguishable from "still genuinely running" the next time
-   * anything queries it (the exact ambiguity EPOCH-305's persistence
-   * criterion is about). Epoch's main process is the one thing that
-   * reliably knows the subprocess is gone, so it takes responsibility for
-   * closing those rows out here.
-   *
-   * Scoped by the exact decrypt paths declared for this workspace
-   * rather than by run_id: the orchestrator creates run rows per backup
-   * internally and never reports their ids back over stdout, so this is the
-   * coarsest-but-correct boundary available without changing that protocol.
-   * Best-effort: a DB failure here doesn't block reporting the real error to
-   * the renderer.
+   * EPOCH-435: ends the runs this call's orchestrator created when it didn't
+   * finish them (a crash, our timeout or a cancel). They are known by id from
+   * its run:created events (EPOCH-443); a run whose event never arrived is
+   * caught by the sweep, once its process is gone. Their stage rows are left as
+   * they were. Best effort: a database failure here doesn't block reporting
+   * the real error to the renderer.
    */
-  async function markWorkspaceRunsAborted(workspace: string, reason: string): Promise<void> {
+  async function closeCallRuns(reason: AppEndedReason, detail: string): Promise<void> {
     try {
-      const manifest = readWorkspaceManifestSync(workspace);
-      const backupSources = manifest.backups.map((entry) => resolveWorkspaceBackup(workspace, entry).decryptedPath);
-      await dbPool.query(
-        `UPDATE pipeline_stage_status
-            SET status = 'failed', error_message = $2, finished_at = now()
-          WHERE status IN ('pending', 'running')
-            AND run_id IN (
-              SELECT run_id FROM pipeline_runs
-               WHERE backup_source = ANY($1::text[]) AND finished_at IS NULL
-            )`,
-        [backupSources, reason]
-      );
-      await dbPool.query(
-        `UPDATE pipeline_runs
-            SET finished_at = now()
-          WHERE backup_source = ANY($1::text[]) AND finished_at IS NULL`,
-        [backupSources]
-      );
+      await closeRuns(dbPool, analysisSession.runIds(), reason, detail);
+      await closeAbandonedRuns(dbPool);
     } catch (err) {
-      console.error('[pipelineHandlers] failed to mark dangling pipeline runs aborted:', err);
+      console.error('[pipelineHandlers] could not close the runs this call left open:', err);
     }
   }
 
-  /**
-   * EPOCH-308 counterpart to markWorkspaceRunsAborted, scoped to one
-   * backup_source instead of a workspace prefix -- used when the
-   * orchestrator invocation that died was a single-run retry
-   * (epoch:retryRun), not a full-workspace epoch:startAnalysis.
-   */
-  async function markSingleRunAborted(backupSource: string, reason: string): Promise<void> {
-    try {
-      await dbPool.query(
-        `UPDATE pipeline_stage_status
-            SET status = 'failed', error_message = $2, finished_at = now()
-          WHERE status IN ('pending', 'running')
-            AND run_id IN (
-              SELECT run_id FROM pipeline_runs
-               WHERE backup_source = $1 AND finished_at IS NULL
-            )`,
-        [backupSource, reason]
-      );
-      await dbPool.query(
-        `UPDATE pipeline_runs
-            SET finished_at = now()
-          WHERE backup_source = $1 AND finished_at IS NULL`,
-        [backupSource]
-      );
-    } catch (err) {
-      console.error('[pipelineHandlers] failed to mark dangling single-run aborted:', err);
-    }
+  /** Why the app ends a call's runs, from how its orchestrator stopped. */
+  function endedReason(termination: 'cancelled' | 'timeout' | null): AppEndedReason {
+    return termination === 'cancelled' ? 'cancelled' : termination === 'timeout' ? 'timeout' : 'crashed';
   }
 
   function clearOrchestratorTimers(): void {
@@ -465,12 +378,11 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
       const workspaceAtFailure = runningOrchestratorWorkspace;
-      runningOrchestratorBackupSource = null;
       runningOrchestratorProcess = null;
       runningOrchestratorWorkspace = null;
       orchestratorTerminationReason = null;
       if (workspaceAtFailure) {
-        void markWorkspaceRunsAborted(workspaceAtFailure, `orchestrator process error: ${err.message}`);
+        void closeCallRuns(endedReason(reason), `orchestrator process error: ${err.message}`);
       }
       void rm(summaryPath, { force: true });
       analysisSession.finish({
@@ -488,7 +400,6 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
       const workspaceAtClose = runningOrchestratorWorkspace;
-      runningOrchestratorBackupSource = null;
       runningOrchestratorProcess = null;
       runningOrchestratorWorkspace = null;
       orchestratorTerminationReason = null;
@@ -507,7 +418,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
             ? `orchestrator stalled outside a stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes`
             : `orchestrator process exited unexpectedly (code ${code})`;
 
-        void markWorkspaceRunsAborted(workspaceAtClose, closeReason)
+        void closeCallRuns(endedReason(reason), closeReason)
           .then(() => readAnalysisSummary(summaryPath))
           .then(({ analysis, error }) => {
             analysisSession.finish({
@@ -586,7 +497,6 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }
     runningOrchestratorProcess = child;
     runningOrchestratorWorkspace = null;
-    runningOrchestratorBackupSource = workspaceTarget.entry.decryptedPath;
     orchestratorTerminationReason = null;
     analysisSession.start('retry', trimmedRunId);
 
@@ -600,13 +510,9 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     child.on('error', (err) => {
       clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
-      const scopedBackupSource = runningOrchestratorBackupSource;
-      runningOrchestratorBackupSource = null;
       runningOrchestratorProcess = null;
       orchestratorTerminationReason = null;
-      if (scopedBackupSource) {
-        void markSingleRunAborted(scopedBackupSource, `orchestrator process error: ${err.message}`);
-      }
+      void closeCallRuns(endedReason(reason), `orchestrator process error: ${err.message}`);
       void rm(summaryPath, { force: true });
       analysisSession.finish({
         success: false,
@@ -622,8 +528,6 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       stderrBuffer.emitPending();
       clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
-      const scopedBackupSource = runningOrchestratorBackupSource ?? workspaceTarget.entry.decryptedPath;
-      runningOrchestratorBackupSource = null;
       runningOrchestratorProcess = null;
       orchestratorTerminationReason = null;
 
@@ -637,7 +541,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
             ? `orchestrator stalled outside a stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes`
             : `orchestrator process exited unexpectedly (code ${code})`;
 
-        void markSingleRunAborted(scopedBackupSource, closeReason)
+        void closeCallRuns(endedReason(reason), closeReason)
           .then(() => readAnalysisSummary(summaryPath))
           .then(({ error }) => {
             analysisSession.finish({
@@ -671,13 +575,12 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   });
 
   /**
-   * EPOCH-305 persistence criterion: lets the renderer ask, for a given
-   * workspace, whether there's a run actually in flight right now (tracked
-   * in this process), a run that was interrupted and never closed out
-   * (a dangling pipeline_runs row from a past crash/cancel/timeout in an
-   * earlier app session), or nothing to report. This is what lets
-   * WorkspaceView reflect an interrupted run honestly on remount instead of
-   * either looking falsely fresh or spinning forever.
+   * EPOCH-305, EPOCH-435: whether a workspace has a run in flight in this
+   * process, or evidence whose latest run was interrupted (it ended cancelled,
+   * stalled, crashed or abandoned, and run_completeness reads it incomplete),
+   * so WorkspaceView neither looks falsely fresh nor spins forever. Runs left
+   * by a process that is gone are closed as abandoned first. The evidence is
+   * found by its content root from the backups' sidecars, never by path.
    */
   ipcMain.handle('epoch:getAnalysisRunStatus', async (_event, workspace: string): Promise<AnalysisRunStatus> => {
     const trimmedWorkspace = (workspace ?? '').trim();
@@ -688,15 +591,18 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }
 
     if (!existsSync(trimmedWorkspace)) return { status: 'idle' };
+    await closeAbandonedRuns(dbPool).catch((err) =>
+      console.error('[pipelineHandlers] could not close abandoned runs:', err)
+    );
     const manifest = readWorkspaceManifestSync(trimmedWorkspace);
-    const backupSources = manifest.backups.map(
-      (entry) => resolveWorkspaceBackup(trimmedWorkspace, entry).decryptedPath
-    );
-    if (backupSources.length === 0) return { status: 'idle' };
-    const result = await dbPool.query(
-      `SELECT 1 FROM pipeline_runs WHERE backup_source = ANY($1::text[]) AND finished_at IS NULL LIMIT 1`,
-      [backupSources]
-    );
-    return { status: (result.rowCount ?? 0) > 0 ? 'interrupted' : 'idle' };
+    const contentRoots: string[] = [];
+    for (const entry of manifest.backups) {
+      const { sidecarPath } = resolveWorkspaceBackup(trimmedWorkspace, entry);
+      // A backup not yet prepared has no sidecar, and no runs.
+      if (!existsSync(sidecarPath)) continue;
+      contentRoots.push(EvidenceSidecar.parse(JSON.parse(await readFile(sidecarPath, 'utf8'))).content_root);
+    }
+    const interrupted = await getInterruptedEvidence(dbPool, contentRoots);
+    return { status: interrupted.length > 0 ? 'interrupted' : 'idle' };
   });
 }

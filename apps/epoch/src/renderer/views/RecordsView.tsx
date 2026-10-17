@@ -5,6 +5,7 @@ import { Badge } from '../components/ui/Badge';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
+import { InterruptedStagesPanel } from '../features/records/InterruptedStagesPanel';
 import { StillFailingPanel } from '../features/records/StillFailingPanel';
 
 interface RecordsViewProps {
@@ -108,7 +109,10 @@ export function RecordsView({
       )}
 
       {selectedRun && evidenceRegistered && runId && (
-        <StillFailingPanel key={runId} runId={runId} onRerunFinished={onRerunFinished} />
+        <>
+          <InterruptedStagesPanel key={`interrupted-${runId}`} runId={runId} onRerunFinished={onRerunFinished} />
+          <StillFailingPanel key={runId} runId={runId} onRerunFinished={onRerunFinished} />
+        </>
       )}
 
       {!selectedRun ? (

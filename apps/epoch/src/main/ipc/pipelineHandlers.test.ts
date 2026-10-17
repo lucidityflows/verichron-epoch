@@ -8,8 +8,10 @@ import pg, { type Pool } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, it, vi } from 'vitest';
 import {
   DECRYPT_MARKER,
+  renderPipelineEvent,
   createWorkspaceManifestBackup,
   emptyWorkspaceManifest,
+  readWorkspaceManifestSync,
   resolveWorkspaceBackup,
 } from '@verichron/contracts';
 
@@ -29,7 +31,7 @@ vi.mock('electron', () => ({
 }));
 vi.mock('child_process', () => ({ spawn: spawnMock }));
 
-import { registerPipelineHandlers } from './pipelineHandlers';
+import { closeAbandonedRunsOnStartup, registerPipelineHandlers } from './pipelineHandlers';
 
 function childProcess() {
   return Object.assign(new EventEmitter(), {
@@ -100,13 +102,18 @@ describe('pipeline IPC single-flight', () => {
 });
 
 /**
- * EPOCH-408: cancelling a retry runs the scoped abort SQL against real Postgres
- * (R33). Needs TEST_DATABASE_URL (a role that may CREATE DATABASE). Skipped
- * locally when unset; ipcHandlers.test.ts fails CI when it is missing.
+ * EPOCH-408, EPOCH-435: cancelling a retry ends the run its orchestrator
+ * created, by id, against real Postgres (R33). Needs TEST_DATABASE_URL (a role
+ * that may CREATE DATABASE). Skipped locally when unset; ipcHandlers.test.ts
+ * fails CI when it is missing.
  */
 describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
   const EVIDENCE = '11111111-1111-1111-1111-111111111111';
+  /** The run the examiner retries: it already ended. */
   const RETRIED = '33333333-3333-3333-3333-333333333333';
+  /** The run the retry's orchestrator creates, reported by its run:created event. */
+  const CREATED = '55555555-5555-5555-5555-555555555555';
+  /** Another backup's run, whose orchestrator on this host is still alive. */
   const OTHER = '44444444-4444-4444-4444-444444444444';
   let admin: pg.Client;
   let db: pg.Pool;
@@ -149,16 +156,21 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
                '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('b', 64))`,
       [EVIDENCE, decryptPath]
     );
-    // The retried backup's unfinished run, and another backup's.
+    // The retried run (ended), the run the retry creates, and another
+    // backup's open run. Both open runs belong to live processes on this host
+    // (this test's own), so only an id can close one.
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-       VALUES ($1, $2, 'test', '{}', $3, $3)`,
-      [RETRIED, decryptPath, EVIDENCE]
+      `INSERT INTO pipeline_runs
+         (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid,
+          started_at, finished_at, ended_reason)
+       VALUES ($1, $2, 'test', '{}', $3, $3, $4, $5, now() - interval '1 hour', now() - interval '50 minutes', 'crashed'),
+              ($6, $2, 'test', '{}', $3, $3, $4, $5, now(), NULL, NULL)`,
+      [RETRIED, decryptPath, EVIDENCE, os.hostname(), process.pid, CREATED]
     );
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions)
-       VALUES ($1, '/other/decrypted/X', 'test', '{}')`,
-      [OTHER]
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid)
+       VALUES ($1, '/other/decrypted/X', 'test', '{}', $2, $3)`,
+      [OTHER, os.hostname(), process.pid]
     );
     await db.query(
       `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, started_at, finished_at) VALUES
@@ -166,7 +178,7 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
          ($1, 'ileapp', 2, 'running', now(), NULL),
          ($1, 'report', 3, 'pending', NULL, NULL),
          ($2, 'crash', 1, 'running', now(), NULL)`,
-      [RETRIED, OTHER]
+      [CREATED, OTHER]
     );
 
     handlers.clear();
@@ -183,10 +195,14 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     rmSync(workspace, { recursive: true, force: true });
   });
 
-  it("closes only the retried backup's unfinished run and stages, then frees the orchestrator", async () => {
+  it('ends the run the retry created, by id, leaves its stage rows and every other run alone, then frees the orchestrator', async () => {
     const orchestrator = childProcess();
     spawnMock.mockReturnValueOnce(orchestrator);
     await invoke('epoch:retryRun', RETRIED);
+    orchestrator.stdout.write(
+      `${renderPipelineEvent({ type: 'run:created', run_id: CREATED, evidence_id: EVIDENCE, derivative_id: EVIDENCE })}\n`
+    );
+    await new Promise((resolve) => setImmediate(resolve));
 
     assert.deepEqual(await invoke('epoch:cancelAnalysis'), { cancelled: true });
     assert.deepEqual(orchestrator.kill.mock.calls, [['SIGTERM']]);
@@ -194,31 +210,123 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
 
     const runs = async () =>
       (
-        await db.query<{ run_id: string; finished: boolean }>(
-          `SELECT run_id, finished_at IS NOT NULL AS finished FROM pipeline_runs ORDER BY run_id`
+        await db.query<{ run_id: string; ended_reason: string | null; ended_detail: string | null }>(
+          `SELECT run_id, ended_reason, ended_detail FROM pipeline_runs ORDER BY run_id`
         )
       ).rows;
-    await vi.waitFor(async () => assert.equal((await runs())[0].finished, true));
+    await vi.waitFor(async () =>
+      assert.equal((await runs()).find((r) => r.run_id === CREATED)?.ended_reason, 'cancelled')
+    );
     assert.deepEqual(await runs(), [
-      { run_id: RETRIED, finished: true },
-      { run_id: OTHER, finished: false },
+      { run_id: RETRIED, ended_reason: 'crashed', ended_detail: null },
+      { run_id: OTHER, ended_reason: null, ended_detail: null },
+      { run_id: CREATED, ended_reason: 'cancelled', ended_detail: 'cancelled by user' },
     ]);
 
     const { rows: stages } = await db.query(
       `SELECT run_id, stage_name, status, error_message, finished_at IS NOT NULL AS finished
          FROM pipeline_stage_status ORDER BY run_id, stage_order`
     );
-    assert.deepEqual(stages, [
-      { run_id: RETRIED, stage_name: 'crash', status: 'succeeded', error_message: null, finished: true },
-      { run_id: RETRIED, stage_name: 'ileapp', status: 'failed', error_message: 'cancelled by user', finished: true },
-      { run_id: RETRIED, stage_name: 'report', status: 'failed', error_message: 'cancelled by user', finished: true },
-      { run_id: OTHER, stage_name: 'crash', status: 'running', error_message: null, finished: false },
-    ]);
+    assert.deepEqual(
+      stages,
+      [
+        { run_id: OTHER, stage_name: 'crash', status: 'running', error_message: null, finished: false },
+        { run_id: CREATED, stage_name: 'crash', status: 'succeeded', error_message: null, finished: true },
+        { run_id: CREATED, stage_name: 'ileapp', status: 'running', error_message: null, finished: false },
+        { run_id: CREATED, stage_name: 'report', status: 'pending', error_message: null, finished: false },
+      ],
+      'stage rows are never rewritten'
+    );
+    const { rows: state } = await db.query(`SELECT state FROM run_completeness WHERE run_id = $1`, [CREATED]);
+    assert.equal(state[0].state, 'incomplete', 'run_completeness says so on its own');
 
     const next = childProcess();
     spawnMock.mockReturnValueOnce(next);
     assert.deepEqual(await invoke('epoch:retryRun', RETRIED), { started: true });
     assert.equal(spawnMock.mock.calls.length, 2);
     next.emit('close', 0);
+  });
+
+  it('ends the run as crashed, with the exit code, when the orchestrator exits unexpectedly', async () => {
+    const CRASHED = '88888888-8888-8888-8888-888888888888';
+    await db.query(
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+       VALUES ($1, $2, 'test', '{}', $3, $3, $4, $5)`,
+      [CRASHED, decryptPath, EVIDENCE, os.hostname(), process.pid]
+    );
+    // The stage it was running when it died.
+    await db.query(
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, started_at)
+       VALUES ($1, 'crash', 1, 'running', now())`,
+      [CRASHED]
+    );
+    const orchestrator = childProcess();
+    spawnMock.mockReturnValueOnce(orchestrator);
+    await invoke('epoch:retryRun', RETRIED);
+    orchestrator.stdout.write(
+      `${renderPipelineEvent({ type: 'run:created', run_id: CRASHED, evidence_id: EVIDENCE, derivative_id: EVIDENCE })}\n`
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    orchestrator.emit('close', 1);
+
+    const ended = async () =>
+      (await db.query(`SELECT ended_reason, ended_detail FROM pipeline_runs WHERE run_id = $1`, [CRASHED])).rows[0];
+    await vi.waitFor(async () => assert.equal((await ended()).ended_reason, 'crashed'));
+    assert.equal((await ended()).ended_detail, 'orchestrator process exited unexpectedly (code 1)');
+  });
+
+  it("reports the workspace interrupted when its evidence's latest run was, found by the sidecar's content root", async () => {
+    const entry = readWorkspaceManifestSync(workspace).backups[0];
+    const { sidecarPath } = resolveWorkspaceBackup(workspace, entry);
+    mkdirSync(path.dirname(sidecarPath), { recursive: true });
+    writeFileSync(
+      sidecarPath,
+      JSON.stringify({
+        schema_version: 1,
+        evidence_name: 'BK',
+        algorithm: 'sha256',
+        content_root: 'b'.repeat(64),
+        manifest_path: 'manifest.txt',
+        file_count: 0,
+        total_bytes: 0,
+        source_path: '/source/BK',
+        hashed_at: '2026-10-17T00:00:00Z',
+        tool: { name: 'test', version: '0' },
+      })
+    );
+    // The latest run of this evidence is the cancelled one above.
+    assert.deepEqual(await invoke('epoch:getAnalysisRunStatus', workspace), { status: 'interrupted' });
+  });
+
+  it("closes as abandoned a run whose orchestrator on this host is gone, and no one else's", async () => {
+    // A real process that has exited (child_process is mocked in this file).
+    const real = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    const dead = real.spawn(process.execPath, ['-e', '']);
+    const deadPid = dead.pid as number;
+    await new Promise((resolve) => dead.on('exit', resolve));
+    const ABANDONED = '66666666-6666-6666-6666-666666666666';
+    const ELSEWHERE = '77777777-7777-7777-7777-777777777777';
+    await db.query(
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid) VALUES
+         ($1, '/x', 'test', '{}', $3, $4),
+         ($2, '/y', 'test', '{}', 'another-host', $4)`,
+      [ABANDONED, ELSEWHERE, os.hostname(), deadPid]
+    );
+
+    await closeAbandonedRunsOnStartup(db as unknown as Pool);
+
+    const { rows } = await db.query(
+      `SELECT run_id, ended_reason, ended_detail FROM pipeline_runs WHERE run_id = ANY($1::uuid[]) ORDER BY run_id`,
+      [[ABANDONED, ELSEWHERE, OTHER]]
+    );
+    assert.deepEqual(rows, [
+      { run_id: OTHER, ended_reason: null, ended_detail: null },
+      {
+        run_id: ABANDONED,
+        ended_reason: 'abandoned',
+        ended_detail: `its orchestrator (process ${deadPid} on ${os.hostname()}) ended without finishing it`,
+      },
+      { run_id: ELSEWHERE, ended_reason: null, ended_detail: null },
+    ]);
   });
 });

@@ -468,7 +468,8 @@ describe('pre-flight registration', live, () => {
   it('known evidence keeps its device even if the device key changes', async () => {
     const ws = makeWorkspace('rekeyed');
     const first = await run(ws.backupPath);
-    await db.query(`UPDATE pipeline_runs SET finished_at = NULL`); // force a re-run
+    // Force a re-run: an unfinished run has no end reason (migration 0017).
+    await db.query(`UPDATE pipeline_runs SET finished_at = NULL, ended_reason = NULL`);
     rmSync(secretPath); // a lost per-install secret: new key for the same phone
     const second = await run(ws.backupPath);
     assert.equal(second.evidenceId, first.evidenceId);
@@ -1144,6 +1145,25 @@ describe('orchestrator events (EPOCH-443)', live, () => {
     assert.ok(lines.indexOf(forgedLine) < lines.findIndex((l) => l.includes('"stage:finished"')));
   });
 
+  it("starts the orchestrator's next line on its own when a stage's output didn't end its last line", async () => {
+    const ws = makeWorkspace('events-unterminated', { label: 'D' });
+    const dir = path.join(tmp, 'stages', 'unterminated');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'stage.mjs'), `process.stdout.write('done');\n`);
+    const unterminated: StageDefinition = {
+      name: 'unterminated',
+      dir,
+      manifest: { entrypoint: 'stage.mjs', runtime: 'node', order: 10, reads: 'decrypted', enabled: true },
+    };
+    const { result, lines } = await captured(() => run(ws.backupPath, { enabled: [unterminated], disabled: [] }));
+    assert.equal(result.success, true, JSON.stringify(result));
+    assert.ok(lines.includes('done'), "the stage's last line is its own");
+    assert.deepEqual(
+      eventsIn(lines).map((e) => e.type),
+      ['run:created', 'stage:started', 'stage:finished', 'run:finished']
+    );
+  });
+
   it('says a refused registration was refused, and creates no run', async () => {
     const ws = makeWorkspace('events-refused', { label: 'B' });
     writeFileSync(
@@ -1176,5 +1196,66 @@ describe('orchestrator events (EPOCH-443)', live, () => {
     const skipped = events[0] as Extract<PipelineEvent, { type: 'run:skipped' }>;
     assert.equal(skipped.evidence_id, first.evidenceId);
     assert.match(skipped.reason, new RegExp(first.runId ?? 'missing'));
+  });
+});
+
+describe('how a run ends (EPOCH-435)', live, () => {
+  it('records the process that ran it, and that it completed', async () => {
+    const ws = makeWorkspace('ends-completed', { label: 'A' });
+    const result = await run(ws.backupPath, { enabled: [recordingStage('only', 10)], disabled: [] });
+    const { rows } = await db.query(
+      `SELECT host, pid, ended_reason, ended_detail, finished_at IS NOT NULL AS finished FROM pipeline_runs WHERE run_id = $1`,
+      [result.runId]
+    );
+    assert.deepEqual(rows, [
+      { host: os.hostname(), pid: process.pid, ended_reason: 'completed', ended_detail: null, finished: true },
+    ]);
+  });
+
+  it("closes a run its own failure stopped as crashed, with the error, and leaves the stage's row as it was", async () => {
+    const ws = makeWorkspace('ends-crashed', { label: 'B' });
+    const target = await findWorkspaceBackupForPath(ws.backupPath);
+    assert.ok(target);
+    // The database refuses the write that would record the stage finished,
+    // as a lost connection would, after the stage has run.
+    const failing = new Proxy(db, {
+      get(real, prop) {
+        if (prop === 'query') {
+          return (sql: unknown, params?: unknown[]) =>
+            typeof sql === 'string' && sql.includes('UPDATE pipeline_stage_status') && params?.[0] === 'succeeded'
+              ? Promise.reject(new Error('connection lost'))
+              : real.query(sql as string, params);
+        }
+        const value = Reflect.get(real, prop);
+        return typeof value === 'function' ? value.bind(real) : value;
+      },
+    });
+    await assert.rejects(
+      runPipelineForBackup(
+        failing,
+        target.entry,
+        DSN ?? '',
+        'python3',
+        { enabled: [recordingStage('midway', 10)], disabled: [] },
+        { secretPath }
+      ),
+      /connection lost/
+    );
+    const { rows: runs } = await db.query(`SELECT run_id, ended_reason, ended_detail FROM pipeline_runs`);
+    assert.deepEqual(
+      runs.map((r) => [r.ended_reason, r.ended_detail]),
+      [['crashed', 'connection lost']]
+    );
+    const { rows: stages } = await db.query(
+      `SELECT stage_name, status, error_message, finished_at FROM pipeline_stage_status WHERE run_id = $1`,
+      [runs[0].run_id]
+    );
+    assert.deepEqual(
+      stages,
+      [{ stage_name: 'midway', status: 'running', error_message: null, finished_at: null }],
+      'never rewritten'
+    );
+    const { rows: state } = await db.query(`SELECT state FROM run_completeness WHERE run_id = $1`, [runs[0].run_id]);
+    assert.equal(state[0].state, 'incomplete', 'run_completeness says so on its own');
   });
 });

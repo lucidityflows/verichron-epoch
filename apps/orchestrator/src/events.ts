@@ -29,7 +29,9 @@ export function relayStageOutput(stage: string): Transform {
     },
     flush(done: TransformCallback) {
       const rest = carry + decoder.end();
-      done(null, rest ? relay(rest) : '');
+      // Ended with a newline, so whatever the orchestrator writes next, an
+      // event included, starts its own line.
+      done(null, rest ? `${relay(rest)}\n` : '');
     },
   });
 }

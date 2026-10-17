@@ -1,5 +1,6 @@
 import { Client } from 'pg';
 import { randomUUID } from 'node:crypto';
+import { hostname } from 'node:os';
 import type { StageSet } from './types.js';
 import { inputsFor, type Registration, type RegisteredDerivatives } from './registration.js';
 
@@ -99,10 +100,12 @@ export async function createRun(
   indicatorSet: { setId: string } | null = null
 ): Promise<string> {
   const runId = randomUUID();
+  // The process running it, so a run left by a process that is gone can be
+  // found and closed as abandoned (EPOCH-435).
   await client.query(
     `INSERT INTO pipeline_runs
-       (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+       (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       runId,
       backupPath,
@@ -110,6 +113,8 @@ export async function createRun(
       provenance.toolVersions,
       registration.evidenceId,
       registration.decryptedDerivativeId,
+      hostname(),
+      process.pid,
     ]
   );
   for (const stage of stages.enabled) {
@@ -161,12 +166,23 @@ export async function markStage(
   );
 }
 
-export async function markRunFailed(client: Client, runId: string, errorMessage: string): Promise<void> {
+/** How a run ended (migration 0017). */
+export type EndedReason = 'completed' | 'cancelled' | 'timeout' | 'crashed' | 'abandoned';
+
+/**
+ * Ends a run: its finish time and why, never its stage rows (EPOCH-435). A
+ * stage that never finished keeps the status it had, so run_completeness
+ * reports the run incomplete on its own.
+ */
+export async function finishRun(client: Client, runId: string, reason: EndedReason, detail?: string): Promise<void> {
   await client.query(
-    `UPDATE pipeline_stage_status
-     SET status = 'failed', error_message = $1, finished_at = now()
-     WHERE run_id = $2 AND status IN ('pending', 'running')`,
-    [errorMessage, runId]
+    `UPDATE pipeline_runs SET finished_at = now(), ended_reason = $2, ended_detail = $3
+      WHERE run_id = $1 AND finished_at IS NULL`,
+    [runId, reason, detail ?? null]
   );
-  await client.query(`UPDATE pipeline_runs SET finished_at = now() WHERE run_id = $1`, [runId]);
+}
+
+/** The orchestrator's own failure mid-run, e.g. a lost database connection. */
+export async function markRunFailed(client: Client, runId: string, errorMessage: string): Promise<void> {
+  await finishRun(client, runId, 'crashed', errorMessage);
 }

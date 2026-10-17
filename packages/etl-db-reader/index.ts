@@ -30,6 +30,8 @@ export type {
   IndicatorMatchRow,
   ItemFailureRow,
   ItemFailurePage,
+  EndedReason,
+  InterruptedStageRow,
 } from './dbReader.js';
 export {
   getPipelineRuns,
@@ -41,6 +43,8 @@ export {
   getIndicatorChecks,
   getStageFailures,
   getStillFailing,
+  getInterruptedEvidence,
+  getInterruptedStages,
   FAILURE_LIMIT,
   MATCH_LIMIT,
   MAX_RECORDS_PAGE,
