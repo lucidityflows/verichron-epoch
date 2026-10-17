@@ -28,6 +28,7 @@ import type { Client } from 'pg';
 import {
   DECRYPT_MARKER,
   EvidenceSidecar,
+  WorkspaceManifestError,
   provenanceKey,
   readDecryptMarker,
   readIleappMarker,
@@ -280,7 +281,17 @@ function verifySidecar(target: ResolvedWorkspaceBackup): VerifiedSidecar {
 
   // The manifest must be the content-addressed one for this very root, inside
   // this label's evidence directory: no path tricks, no swapped files.
-  const manifestPath = resolveWorkspacePath(target.workspace, sidecar.manifest_path);
+  let manifestPath: string;
+  try {
+    manifestPath = resolveWorkspacePath(target.workspace, sidecar.manifest_path);
+  } catch (error) {
+    if (error instanceof WorkspaceManifestError) {
+      throw new RegistrationError(
+        `${target.sidecarPath} has an invalid manifest_path "${sidecar.manifest_path}": ${error.message}`
+      );
+    }
+    throw error;
+  }
   const expectedManifestPath = workspaceEvidenceManifestPath(target, sidecar.content_root);
   if (manifestPath !== expectedManifestPath) {
     throw new RegistrationError(

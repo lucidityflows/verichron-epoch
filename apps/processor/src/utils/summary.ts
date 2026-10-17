@@ -1,5 +1,5 @@
-import * as fsp from 'node:fs/promises';
 import type { Backup } from '@verichron/contracts';
+import { writeFileAtomic } from './fs.js';
 
 /**
  * A short human-readable account of the preparation run, beside the
@@ -32,6 +32,6 @@ export async function writeSummary(
     }
   }
 
-  await fsp.writeFile(summaryPath, parts.join(''));
+  await writeFileAtomic(summaryPath, parts.join(''));
   return summaryPath;
 }

@@ -7,7 +7,7 @@ and Python mirror the JSON schemas, and CI checks that the mirrors match.
 |---|---|
 | `normalized-record.schema.json` | **The canonical fact envelope** and the `source_type` list |
 | `stage-manifest.schema.json` | `stage.json` |
-| `evidence-sidecar.schema.json` | Sidecar path declared for the backup in `workspace.json` |
+| `evidence-sidecar.schema.json` | The evidence sidecar, stored at the backup's `sidecar_path` in `workspace.json` |
 | `workspace-manifest.schema.json` | `workspace.json`, the explicit paths for each backup and the processor summaries |
 | [`EXTRACTOR_CONTRACT.md`](EXTRACTOR_CONTRACT.md) | What every pipeline stage must do |
 | `ts/` | Zod mirrors and TS helpers: `normalizedRecord`, `sourceType`, `evidenceSidecar`, `workspaceManifest`, `derivativeMarker` (completion markers and provenance key), `discoverBackups`, `contractVersion`, `env` |

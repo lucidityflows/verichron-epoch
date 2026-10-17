@@ -37,6 +37,7 @@ import {
   createWorkspaceManifestBackup,
   emptyWorkspaceManifest,
   findWorkspaceBackupForPath,
+  readWorkspaceManifestSync,
   renderCrashReportsMarker,
   renderDecryptMarker,
   renderIleappMarker,
@@ -191,9 +192,16 @@ function makeWorkspace(
       tool: { name: 'processor', version: '0.1.0' },
     })
   );
+  const workspaceManifestPath = path.join(workspace, 'workspace.json');
+  const workspaceManifest = existsSync(workspaceManifestPath)
+    ? readWorkspaceManifestSync(workspace)
+    : emptyWorkspaceManifest();
   writeFileSync(
-    path.join(workspace, 'workspace.json'),
-    JSON.stringify({ ...emptyWorkspaceManifest(), backups: [entry] })
+    workspaceManifestPath,
+    JSON.stringify({
+      ...workspaceManifest,
+      backups: [...workspaceManifest.backups.filter((backup) => backup.label !== label), entry],
+    })
   );
   return { workspace, backupPath, ileappPath, sidecarPath, contentRoot, target };
 }
@@ -367,7 +375,7 @@ describe('pre-flight registration', live, () => {
     [
       'a sidecar whose manifest does not match its root',
       (ws: Workspace) => {
-        const manifest = path.join(ws.workspace, 'evidence', 'BK1', 'manifests', `${ws.contentRoot}.sha256`);
+        const manifest = path.join(ws.target.manifestDirectory, `${ws.contentRoot}.sha256`);
         writeFileSync(manifest, 'tampered\n');
       },
     ],
