@@ -125,6 +125,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _column("pipeline_stage_status", "stage_order"),
         _column("pipeline_stage_status", "stage_order"),
     ),
+    "0015_ingest_immutability_purge.sql": (
+        _relation("ingest_run_links"),
+        _relation("idx_ingest_run_links_run"),
+    ),
 }
 
 

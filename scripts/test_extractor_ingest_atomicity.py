@@ -148,9 +148,14 @@ def test_a_successful_ips_file_is_deduped_not_duplicated(db, tmp_path):
     assert retry.notes == ["good.ips: already ingested; nothing new was written"]
     assert db.record_count() == 1, "dedup must not duplicate evidence"
     assert len(db.ledger()) == 1
-    assert db.ledger()[0]["produced_by_runs"] == [RUN_ID, RETRY_RUN_ID], (
-        "one unit for one evidence item, labeled with both runs that saw it (R7)"
-    )
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT run_id FROM ingest_run_links WHERE ingest_id = %s ORDER BY run_id",
+            (db.ledger()[0]["ingest_id"],),
+        )
+        assert [str(row[0]) for row in cur.fetchall()] == [RUN_ID, RETRY_RUN_ID], (
+            "one unit for one evidence item, linked to both runs that saw it (R7)"
+        )
     assert db.ledger()[0]["parser_version"] == 1, "stamped from the context, not the extractor"
 
 

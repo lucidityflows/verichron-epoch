@@ -51,8 +51,8 @@ def sqlite_supports_upsert_returning() -> bool:
     return sqlite3.sqlite_version_info >= MIN_SQLITE_VERSION
 
 
-# The subset of the migrations (0001 to 0004) that the writers and readers touch,
-# translated to SQLite types. The evidence tables are left out: their foreign
+# The subset of the migrations that the writers and readers touch, translated
+# to SQLite types. The evidence tables are left out: their foreign
 # keys are certified on the real-Postgres test leg (R33), not here. Kept minimal on purpose: adding unused
 # columns here would imply coverage that does not exist.
 SCHEMA = """
@@ -69,8 +69,6 @@ CREATE TABLE ingested_files (
     file_name        TEXT NOT NULL,
     payload_kind     TEXT NOT NULL CHECK (payload_kind IN ('full', 'summary', 'none')),
     raw_payload      TEXT NOT NULL,
-    -- uuid[] in Postgres; a JSON array of strings here (see _translate).
-    produced_by_runs TEXT NOT NULL DEFAULT '[]',
     ingested_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ingest_complete  INTEGER NOT NULL DEFAULT 0,
     record_count     INTEGER,
@@ -83,6 +81,12 @@ CREATE TABLE ingested_files (
         OR
         (ingest_complete = 0 AND record_count IS NULL AND completed_at IS NULL)
     )
+);
+
+CREATE TABLE ingest_run_links (
+    ingest_id INTEGER NOT NULL REFERENCES ingested_files (ingest_id),
+    run_id    TEXT NOT NULL,
+    PRIMARY KEY (ingest_id, run_id)
 );
 
 CREATE TABLE forensic_records (
@@ -133,20 +137,6 @@ def _translate(sql: str) -> str:
     # SQLite has no boolean type; ingest_complete is INTEGER here.
     sql = re.sub(r"=\s*TRUE\b", "= 1", sql)
     sql = re.sub(r"\bNOT ingest_complete\b", "ingest_complete = 0", sql)
-    # produced_by_runs is uuid[] in Postgres and a JSON array here. These are
-    # the three array expressions the writers emit, rewritten one-for-one so
-    # parameter order is unchanged.
-    sql = re.sub(r"ARRAY\[\?::uuid\]", "json_array(?)", sql)
-    sql = re.sub(
-        r"array_append\(produced_by_runs, \?::uuid\)",
-        "json_insert(produced_by_runs, '$[#]', ?)",
-        sql,
-    )
-    sql = re.sub(
-        r"NOT \(\?::uuid = ANY\(produced_by_runs\)\)",
-        "NOT EXISTS (SELECT 1 FROM json_each(produced_by_runs) WHERE value = ?)",
-        sql,
-    )
     sql = sql.replace("::uuid", "")
     sql = re.sub(r"\bWHEN ingested_files\.ingest_complete\b", "WHEN ingested_files.ingest_complete = 1", sql)
     return sql
@@ -291,8 +281,6 @@ class PgDouble:
             out = [dict(row) for row in rows]
         finally:
             self._conn.row_factory = None
-        for row in out:
-            row["produced_by_runs"] = json.loads(row["produced_by_runs"])
         return out
 
     def records(self) -> list[dict[str, Any]]:

@@ -197,7 +197,11 @@ export async function getStageStatus(client: Db, runId: string): Promise<StageSt
          SELECT count(f.ingest_id)::int AS units, coalesce(sum(f.record_count), 0)::int AS records
            FROM ingested_files f
           WHERE f.derivative_id = s.derivative_id
-            AND s.run_id = ANY (f.produced_by_runs)
+            AND EXISTS (
+              SELECT 1 FROM ingest_run_links l
+               WHERE l.ingest_id = f.ingest_id
+                 AND l.run_id = s.run_id
+            )
             AND f.ingest_complete
        ) u
       WHERE s.run_id = $1
