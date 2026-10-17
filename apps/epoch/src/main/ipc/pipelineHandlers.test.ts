@@ -217,7 +217,8 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
 
     const next = childProcess();
     spawnMock.mockReturnValueOnce(next);
-    await invoke('epoch:retryRun', RETRIED);
+    assert.deepEqual(await invoke('epoch:retryRun', RETRIED), { started: true });
+    assert.equal(spawnMock.mock.calls.length, 2);
     next.emit('close', 0);
   });
 });
