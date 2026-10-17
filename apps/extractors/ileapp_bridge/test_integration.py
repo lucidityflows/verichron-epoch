@@ -9,6 +9,7 @@ manifest describing them.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -239,6 +240,26 @@ def test_a_record_count_mismatch_fails_that_artifact_and_leaves_no_partial_inges
     assert "2 row(s) in table safarihistory, but the manifest records 3" in str(result.failures)
     assert [name for name, _ in ledger(db)] == ["_lava_artifacts.db#safaricopy"], "the other artifact still lands"
     assert len(stored(db)) == 2
+
+
+def test_a_failed_artifact_is_named_as_the_ledger_names_it_with_its_hash_once_checked(db, tmp_path, monkeypatch):
+    """EPOCH-432: a table that fails its check has no hash; one that fails
+    while it is written keeps the hash its check computed."""
+    short = dict(SAFARI, record_count=3)
+    other = dict(SAFARI, name="Safari Copy", tablename="safaricopy", module="safariCopy")
+
+    def refuse(unit, records):
+        raise ValueError("row refused")
+
+    monkeypatch.setattr(db_writer.IngestUnit, "write", refuse)
+    result = ingest_report(db, CTX, write_report(tmp_path / "BK1", short, other))
+
+    failures = {f.item: f for f in result.failures}
+    assert set(failures) == {"_lava_artifacts.db#safarihistory", "_lava_artifacts.db#safaricopy"}
+    assert failures["_lava_artifacts.db#safarihistory"].file_hash is None
+    written_hash = failures["_lava_artifacts.db#safaricopy"].file_hash
+    assert written_hash is not None and re.fullmatch(r"[0-9a-f]{64}", written_hash)
+    assert failures["_lava_artifacts.db#safaricopy"].reason == "ValueError: row refused"
 
 
 def test_a_row_that_fails_partway_through_its_unit_writes_nothing_for_that_artifact(db, tmp_path, monkeypatch):

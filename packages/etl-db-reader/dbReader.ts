@@ -213,6 +213,64 @@ export async function getStageStatus(client: Db, runId: string): Promise<StageSt
   return result.rows;
 }
 
+/** One item a stage could not ingest (EPOCH-432). */
+export interface ItemFailureRow {
+  run_id: string;
+  stage_name: string;
+  source_type: string;
+  /** The item's path relative to the derivative the stage read. */
+  item: string;
+  /** Its sha256 when the stage could read it, else null. */
+  file_hash: string | null;
+  reason: string;
+  recorded_at: string;
+}
+
+/** A bounded list of failures: the first FAILURE_LIMIT rows and the true total (R25). */
+export interface ItemFailurePage {
+  rows: ItemFailureRow[];
+  total: number;
+}
+
+/** Failures returned per list; `total` says how many there are in all. */
+export const FAILURE_LIMIT = 500;
+
+const FAILURE_COLUMNS = 'run_id, stage_name, source_type, item, file_hash, reason, recorded_at';
+
+/** The items one stage of one run could not ingest, by item. */
+export async function getStageFailures(client: Db, runId: string, stageName: string): Promise<ItemFailurePage> {
+  const result = await client.query<ItemFailureRow & { total: number }>(
+    `SELECT ${FAILURE_COLUMNS}, count(*) OVER ()::int AS total
+       FROM stage_item_failures
+      WHERE run_id = $1 AND stage_name = $2
+      ORDER BY item, failure_id
+      LIMIT $3`,
+    [runId, stageName, FAILURE_LIMIT]
+  );
+  return pageOf(result.rows);
+}
+
+/**
+ * The evidence's items that are still failing: each failed item's latest
+ * failure, unless a later run completed it (the still_failing_items view,
+ * migration 0016, so the report can ask the same question, R27).
+ */
+export async function getStillFailing(client: Db, evidenceId: string): Promise<ItemFailurePage> {
+  const result = await client.query<ItemFailureRow & { total: number }>(
+    `SELECT ${FAILURE_COLUMNS}, count(*) OVER ()::int AS total
+       FROM still_failing_items
+      WHERE evidence_id = $1
+      ORDER BY stage_name, item
+      LIMIT $2`,
+    [evidenceId, FAILURE_LIMIT]
+  );
+  return pageOf(result.rows);
+}
+
+function pageOf(rows: Array<ItemFailureRow & { total: number }>): ItemFailurePage {
+  return { rows: rows.map(({ total: _total, ...row }) => row), total: rows[0]?.total ?? 0 };
+}
+
 /** Sort keys a caller may ask for (R24: named, allowlisted; never raw SQL). */
 const SORT_COLUMNS = {
   event_time: 'event_time',

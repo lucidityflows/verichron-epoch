@@ -129,8 +129,10 @@ export function runStage(
       config.backupPath,
       ...inputArgs,
     ];
+    // A stage that writes facts also records the items it could not ingest,
+    // labelled with its name (EPOCH-432).
     if (stage.manifest.parserVersion !== undefined)
-      extraArgs.push('--parser-version', String(stage.manifest.parserVersion));
+      extraArgs.push('--parser-version', String(stage.manifest.parserVersion), '--stage-name', stage.name);
     if (config.reportPath) extraArgs.push('--report-path', config.reportPath);
 
     const entrypointPath = path.join(stage.dir, stage.manifest.entrypoint);

@@ -129,6 +129,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _relation("ingest_run_links"),
         _relation("idx_ingest_run_links_run"),
     ),
+    "0016_stage_item_failures.sql": (
+        _relation("stage_item_failures"),
+        _relation("idx_stage_item_failures_evidence"),
+    ),
 }
 
 

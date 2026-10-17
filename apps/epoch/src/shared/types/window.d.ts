@@ -3,6 +3,7 @@ import type {
   ForensicRecordPage,
   ForensicRecordQuery,
   IndicatorCheckRow,
+  ItemFailurePage,
   PipelineRunRow,
   StageStatusRow,
 } from '@verichron/etl-db-reader';
@@ -147,6 +148,9 @@ declare global {
       onPrepareState: (callback: (state: PrepareState) => void) => () => void;
       getPipelineRuns: () => Promise<PipelineRunRow[]>;
       getStageStatus: (runId: string) => Promise<StageStatusRow[]>;
+      // EPOCH-432
+      getStageFailures: (runId: string, stageName: string) => Promise<ItemFailurePage>;
+      getStillFailing: (runId: string) => Promise<ItemFailurePage>;
       getForensicRecords: (runId: string, query?: ForensicRecordQuery) => Promise<ForensicRecordPage>;
       getIndicatorResults: (runId: string) => Promise<IndicatorResults>;
       getReport: (runId: string) => Promise<ReportResult>;

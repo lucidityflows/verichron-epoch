@@ -48,7 +48,9 @@ chosen or parsed by name.
 
 **Warnings (EPOCH-420).** The stage writes notes to stderr. When it succeeds,
 the orchestrator stores that stderr in the stage's `warnings`; if the stage
-fails, stderr is stored as its error message instead.
+fails, stderr is stored as its error message instead. Each artifact that fails
+is recorded as `_lava_artifacts.db#<table>`, with its content hash when its
+check had computed one (EPOCH-432).
 
 **iLEAPP's output is checked, not trusted (R36, EPOCH-511).**
 

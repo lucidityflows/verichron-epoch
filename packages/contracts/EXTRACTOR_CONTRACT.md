@@ -34,6 +34,7 @@ The orchestrator registers the evidence before the run and passes every stage:
 | `--derivative-id`, `--derivative-path` | The derivative this stage reads (`reads` in `stage.json`): its id, and the directory to read. A stage whose derivative isn't registered for the backup fails before it is spawned, unless its absence is a fact (crash logs never acquired): it is then skipped with the reason |
 | `--indicator-set-id` | Instead of a derivative, for a stage that reads `indicator_set`: the registered set to check, the newest unless the orchestrator was given one. With none registered, the stage is skipped with the reason. Its facts are filed under the set |
 | `--parser-version` | From `stage.json`, when declared |
+| `--stage-name` | The stage's name (its directory), passed with `--parser-version`; it labels the items the stage records as failed (EPOCH-432) |
 | `--backup-path` | Where the decrypted backup is |
 | `--report-path` | The report folder declared in `workspace.json`. Passed to every stage; only the report stage uses it |
 
@@ -87,7 +88,14 @@ with ingest(conn, ctx, file_path, source_type=..., payload_kind=..., raw_payload
 - If any row of a file fails, raise inside the unit so **the whole file rolls
   back** and stays retryable. Never commit the rows that survived (EPOCH-417).
 - One bad file must not stop the others. Catch per file, record it with
-  `ETLRunResult.fail(item, reason)`, and continue.
+  `ETLRunResult.fail(item, reason, file_hash)`, and continue. Name the item by
+  its path relative to the derivative read, as the ledger names the unit
+  (`Retired/x.ips`, `_lava_artifacts.db#<table>`), and give its sha256 when
+  it can be read, else `None`.
+- Before exiting, persist the failures with `db_writer.record_failures`, in
+  their own transaction after the per-file units. They are kept in
+  `stage_item_failures`, and the app lists them on the stage and, until a later
+  run completes them, above the evidence's records (EPOCH-432).
 - **Exit non-zero if any file failed (R20).** The orchestrator marks the stage
   `failed`, and the next run retries only the files that failed, since completed
   ones dedup.

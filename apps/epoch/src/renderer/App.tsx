@@ -166,6 +166,12 @@ export const App: React.FC = () => {
             {section === 'records' && (
               <RecordsView
                 selectedRun={!!selectedRun}
+                runId={selectedRun?.run_id ?? null}
+                onRerunFinished={() => {
+                  if (!selectedRun) return;
+                  refreshRun(selectedRun.run_id);
+                  loadRecords(selectedRun);
+                }}
                 records={visibleRecords}
                 loadedCount={records.length}
                 totalCount={recordsTotal}

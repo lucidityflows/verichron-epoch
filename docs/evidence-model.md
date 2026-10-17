@@ -169,6 +169,15 @@ an audit event; facts belong to evidence, not to runs (R7).**
   the derivative it read. A failed stage's stderr is its `error_message`; a
   succeeded stage's stderr is its `warnings` (EPOCH-420), which never change
   the run's state.
+- **Each item a stage could not ingest is kept** (EPOCH-432) in
+  `stage_item_failures`: the run and stage (labels, like run links, with no
+  foreign key), the evidence and derivative, the item's path relative to that
+  derivative, its sha256 when it could be read, and the reason. The table is
+  append-only. The `still_failing_items` view (R27) gives each item's latest
+  failure unless a unit of the same evidence and source type completed after
+  it, with the item's hash or, without one, at the item's path under the
+  unit's derivative. Failing items are visible, not hidden: a rerun retries
+  them, since a failed file leaves no ledger row.
 - **Completeness has one definition (R23):** the `run_completeness` view. A run
   is `running` until it finishes; `incomplete` if any stage failed or was left
   pending or running; otherwise `complete`. A `skipped` (disabled) stage never
@@ -203,9 +212,9 @@ Every fact enters through one door, `ingest()` in `db_writer.py` (R13).
   incomplete unit may still delete its orphaned records. The
   `purge_evidence(evidence_id, reason)` function, owned by a dedicated
   non-login database role, is the only completed-data deletion route: it
-  removes the evidence's facts, run links and ledger rows, then appends an
-  immutable `evidence_events` record with the database actor, timestamp,
-  reason and deletion counts. Evidence registration and custody events remain.
+  removes the evidence's facts, run links, ledger rows and failed items (whose
+  reasons can quote evidence), then appends an immutable `evidence_events`
+  record with the database actor, timestamp, reason and deletion counts. Evidence registration and custody events remain.
 - **A value PostgreSQL can't hold is stored encoded, never altered** (EPOCH-502).
   `jsonb` rejects NUL (U+0000), and JSON has no binary, so such a value is kept
   exactly as `{"$encoded": "<encoding>", "value": "<hex>"}`: `hex` for binary

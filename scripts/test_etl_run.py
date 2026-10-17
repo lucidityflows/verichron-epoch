@@ -68,16 +68,24 @@ def test_exceptions_are_rendered_with_their_type():
     result = ETLRunResult()
     result.fail("history.csv", KeyError("timestamp"))
 
-    label, reason = result.failures[0]
-    assert label == "history.csv"
-    assert reason == "KeyError: 'timestamp'"
+    failure = result.failures[0]
+    assert failure.item == "history.csv"
+    assert failure.reason == "KeyError: 'timestamp'"
 
 
 def test_string_reasons_pass_through():
     result = ETLRunResult()
     result.fail("sms.db", "table locked")
 
-    assert result.failures[0] == ("sms.db", "table locked")
+    assert result.failures[0] == ("sms.db", "table locked", None)
+
+
+def test_a_failure_keeps_the_items_hash_when_known():
+    result = ETLRunResult()
+    result.fail("x.ips", "no JSON metadata line", file_hash="ab" * 32)
+
+    assert result.failures[0].file_hash == "ab" * 32
+    assert result.merge(ETLRunResult()).failures == result.failures
 
 
 def test_merge_combines_both_sides():

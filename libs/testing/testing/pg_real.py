@@ -58,6 +58,7 @@ _TABLES = (
     "indicator_set_files",
     "indicator_sets",
     "indicator_file_contents",
+    "stage_item_failures",
     "ingest_run_links",
     "forensic_records",
     "ingested_files",
@@ -160,6 +161,12 @@ class PgReal:
     def records(self) -> list[dict[str, Any]]:
         return self._dicts(
             "SELECT *, fields::text AS fields, evidence_id::text AS evidence_id FROM forensic_records ORDER BY id"
+        )
+
+    def failures(self) -> list[dict[str, Any]]:
+        return self._dicts(
+            "SELECT *, run_id::text AS run_id, evidence_id::text AS evidence_id, "
+            "derivative_id::text AS derivative_id FROM stage_item_failures ORDER BY failure_id"
         )
 
     def record_count(self, file_hash: str | None = None) -> int:

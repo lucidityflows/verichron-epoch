@@ -1,11 +1,13 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { ChevronDown, ChevronRight, FileText } from 'lucide-react';
-import type { StageStatusRow } from '@verichron/etl-db-reader';
+import type { ItemFailurePage, StageStatusRow } from '@verichron/etl-db-reader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { CopyButton } from '../../components/ui/CopyButton';
 import { Disclosure } from '../../components/ui/Disclosure';
 import { reportsApi } from '../../api/reports';
+import { runsApi } from '../../api/runs';
+import { FailedItems, failedItemsText } from './FailedItems';
 
 /** The report stage, named after its directory as the orchestrator names stages. */
 const REPORT_STAGE = 'reporting';
@@ -81,6 +83,40 @@ function StageOutput({ label, labelClass, text }: { label: string; labelClass: s
   );
 }
 
+type LoadFailures = (runId: string, stageName: string) => Promise<ItemFailurePage>;
+
+/** A failed stage's failed items (EPOCH-432), read once the card is opened. */
+function StageFailures({ stage, loadFailures }: { stage: StageStatusRow; loadFailures: LoadFailures }) {
+  const [page, setPage] = useState<ItemFailurePage | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let current = true;
+    Promise.resolve()
+      .then(() => loadFailures(stage.run_id, stage.stage_name))
+      .then((p) => current && setPage(p))
+      .catch((err) => {
+        console.error('Failed to load failed items:', err);
+        if (current) setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      current = false;
+    };
+  }, [loadFailures, stage.run_id, stage.stage_name]);
+
+  if (error) return <p className="text-data text-danger mt-3">Could not read the failed items: {error}</p>;
+  if (!page || page.total === 0) return null;
+  return (
+    <div className="mt-3">
+      <div className="flex items-start justify-between gap-2">
+        <Disclosure label={`${page.total.toLocaleString()} ${unitNoun(stage, page.total)} failed`}>
+          <FailedItems page={page} />
+        </Disclosure>
+        <CopyButton text={failedItemsText(page.rows)} title="Copy list" />
+      </div>
+    </div>
+  );
+}
+
 /** The status colour (DESIGN.md §9): running is current work, not an alert. */
 function statusColour(stage: StageStatusRow): string {
   if (stage.status === 'succeeded') return 'var(--success)';
@@ -98,7 +134,13 @@ function formatTime(iso: string | null): string {
  * at a glance, and everything else (what it read, what it wrote, exact times,
  * its output) when opened. The whole card opens, by click, Enter or Space.
  */
-export function StageCard({ stage }: { stage: StageStatusRow }) {
+export function StageCard({
+  stage,
+  loadFailures = runsApi.getStageFailures,
+}: {
+  stage: StageStatusRow;
+  loadFailures?: LoadFailures;
+}) {
   const [open, setOpen] = useState(false);
   const durationMs = stageDurationMs(stage);
   const colour = statusColour(stage);
@@ -180,6 +222,8 @@ export function StageCard({ stage }: { stage: StageStatusRow }) {
           {stage.status === 'failed' && stage.error_message && (
             <StageOutput label="Error" labelClass="text-danger" text={stage.error_message} />
           )}
+
+          {stage.status === 'failed' && <StageFailures stage={stage} loadFailures={loadFailures} />}
 
           {warnings && <StageOutput label="Warnings" labelClass="text-flag" text={warnings} />}
 

@@ -29,7 +29,8 @@ from typing import TypedDict
 import psycopg2
 import psycopg2.extras
 import pytest
-from db_writer import IngestContext, compute_file_hash, incomplete_ingests, ingest, write_records
+from db_writer import IngestContext, compute_file_hash, incomplete_ingests, ingest, record_failures, write_records
+from etl_run import ItemFailure
 from normalized_record import NormalizedRecord, SourceType
 from testing.pg_real import BACKENDS, TEST_DATABASE_URL_ENV, PgReal, open_db
 
@@ -893,3 +894,105 @@ def test_a_content_hash_must_be_a_sha256(db, artifact):
     with pytest.raises(ValueError, match="sha256 hex digest"):
         with ingest(db, ctx(), artifact, source_type="ileapp_record", payload_kind="none", content_hash="abc"):
             pass
+
+
+# ==========================================================================
+# Failed items (EPOCH-432)
+# ==========================================================================
+
+
+def staged(run_id: str = RUN_ID, evidence_id: str = EVIDENCE_A) -> IngestContext:
+    return IngestContext(
+        evidence_id=evidence_id,
+        derivative_id=SEEDED_EVIDENCE[evidence_id],
+        run_id=run_id,
+        parser_version=1,
+        stage_name="crash",
+    )
+
+
+def test_record_failures_stamps_each_item_from_the_context_in_one_commit(db):
+    failures = [
+        ItemFailure("Retired/a.ips", "ValueError: no JSON metadata line", "a" * 64),
+        ItemFailure("b.ips", "PermissionError: denied"),
+    ]
+
+    assert record_failures(db, staged(), failures, source_type="crash_report") == 2
+
+    assert db.commits == 1
+    rows = [
+        (
+            r["run_id"],
+            r["stage_name"],
+            r["evidence_id"],
+            r["derivative_id"],
+            r["source_type"],
+            r["item"],
+            r["file_hash"],
+            r["reason"],
+        )
+        for r in db.failures()
+    ]
+    assert rows == [
+        (RUN_ID, "crash", EVIDENCE_A, DERIVATIVE_A, "crash_report", "Retired/a.ips", "a" * 64, failures[0].reason),
+        (RUN_ID, "crash", EVIDENCE_A, DERIVATIVE_A, "crash_report", "b.ips", None, failures[1].reason),
+    ]
+
+
+def test_record_failures_with_nothing_failed_writes_and_commits_nothing(db):
+    assert record_failures(db, staged(), [], source_type="crash_report") == 0
+    assert db.commits == 0
+    assert db.failures() == []
+
+
+def test_record_failures_needs_the_stage_name(db):
+    with pytest.raises(ValueError, match="--stage-name"):
+        record_failures(db, ctx(), [ItemFailure("a.ips", "boom")], source_type="crash_report")
+
+
+@pytest.mark.parametrize("item", ["/abs/a.ips", ""])
+def test_record_failures_refuses_an_item_not_relative_to_its_derivative(db, item):
+    with pytest.raises(ValueError, match="relative to its derivative"):
+        record_failures(db, staged(), [ItemFailure(item, "boom")], source_type="crash_report")
+    assert db.failures() == []
+
+
+def test_record_failures_refuses_a_hash_that_is_not_a_sha256(db):
+    with pytest.raises(ValueError, match="sha256 hex digest"):
+        record_failures(db, staged(), [ItemFailure("a.ips", "boom", "abc")], source_type="crash_report")
+
+
+@pytest.mark.parametrize(
+    "statement", ["UPDATE stage_item_failures SET reason = 'x'", "DELETE FROM stage_item_failures"]
+)
+def test_stage_item_failures_are_append_only_on_postgres(db, statement):
+    postgres_only(db)
+    record_failures(db, staged(), [ItemFailure("a.ips", "boom")], source_type="crash_report")
+
+    with pytest.raises(psycopg2.Error, match="stage_item_failures is append-only"):
+        with db.cursor() as cur:
+            cur.execute(statement)
+    db.rollback()
+    assert len(db.failures()) == 1
+
+
+def test_the_purge_deletes_and_counts_the_evidences_failed_items_only(db):
+    postgres_only(db)
+    record_failures(
+        db, staged(), [ItemFailure("a.ips", "boom"), ItemFailure("b.ips", "bang")], source_type="crash_report"
+    )
+    record_failures(
+        db, staged(evidence_id=EVIDENCE_B), [ItemFailure("c.ips", "other case")], source_type="crash_report"
+    )
+
+    with db.cursor() as cur:
+        cur.execute("SELECT purge_evidence(%s, %s)", (EVIDENCE_A, "privacy request"))
+        cur.execute(
+            "SELECT detail->>'deleted_item_failures' FROM evidence_events WHERE evidence_id = %s AND kind = 'purged'",
+            (EVIDENCE_A,),
+        )
+        counted = cur.fetchone()[0]
+    db.commit()
+
+    assert counted == "2"
+    assert [(r["evidence_id"], r["item"]) for r in db.failures()] == [(EVIDENCE_B, "c.ips")]

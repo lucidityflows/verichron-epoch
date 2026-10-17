@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any
 
 import psycopg2
-from db_writer import IngestContext, add_context_args, context_from_args, ingest
+from db_writer import IngestContext, add_context_args, compute_file_hash, context_from_args, ingest, record_failures
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
 from runtime_env import redact_password, require_database_url
@@ -272,7 +272,13 @@ def run(conn, ctx: IngestContext, crash_reports_path: str) -> ETLRunResult:
                 telemetry["filename"] = file_path.name
                 unit.write_one(telemetry_to_record(telemetry))
         except Exception as e:
-            result.fail(file_path.name, e)
+            # Named relative to the crash logs the stage read, with the
+            # file's hash when it can be read (EPOCH-432).
+            try:
+                file_hash = compute_file_hash(file_path)
+            except OSError:
+                file_hash = None
+            result.fail(file_path.relative_to(root).as_posix(), e, file_hash)
             continue
 
         result.ok()
@@ -302,7 +308,9 @@ def main():
         sys.exit(1)
 
     try:
-        result = run(conn, context_from_args(args), args.derivative_path)
+        ctx = context_from_args(args)
+        result = run(conn, ctx, args.derivative_path)
+        record_failures(conn, ctx, result.failures, source_type=SourceType.CRASH_REPORT.value)
     except Exception as e:
         print(f"[crash] unhandled error: {e}", file=sys.stderr)
         sys.exit(1)
