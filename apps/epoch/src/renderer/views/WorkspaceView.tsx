@@ -28,6 +28,7 @@ import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
 import { analysisShown } from './analysisShown';
 import { analysisSelection, listLabels } from '../../shared/analysisSelection';
 import { devicesApi } from '../api/devices';
+import type { CrashReportsRetryTarget } from '../../shared/types/tools';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { AnalysisStageProgress } from '../features/investigations/AnalysisStageProgress';
 
@@ -57,6 +58,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const [discoveringBackups, setDiscoveringBackups] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
+  const [crashReportsRetryTargets, setCrashReportsRetryTargets] = useState<CrashReportsRetryTarget[]>([]);
+  const [crashReportsRetryError, setCrashReportsRetryError] = useState<string | null>(null);
+  const [retryEligibilityRefreshVersion, setRetryEligibilityRefreshVersion] = useState(0);
 
   const [showOptions, setShowOptions] = useState(false);
   const [workspace, setWorkspace] = useState('');
@@ -189,6 +193,75 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       cancelled = true;
     };
   }, [selectedPath]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let refreshing = false;
+    let lastAvailability: string | null = null;
+    const backupDirs = backups.map((backup) => backup.path);
+    const refreshEligibility = async (force = false) => {
+      if (cancelled || refreshing) return;
+      refreshing = true;
+      try {
+        const sources = await devicesApi.listDeviceBackupSources();
+        const connectedDevices = await Promise.all(sources.map((source) => devicesApi.listConnectedDevices(source.id)));
+        const availability = JSON.stringify(
+          sources.map((source, index) => [source.id, connectedDevices[index].map((device) => device.id).sort()])
+        );
+        const availabilityChanged = availability !== lastAvailability;
+        lastAvailability = availability;
+        if (!force && !availabilityChanged) return;
+
+        if (backupDirs.length === 0) {
+          if (!cancelled) {
+            setCrashReportsRetryTargets([]);
+            setCrashReportsRetryError(null);
+          }
+          return;
+        }
+
+        const lookups = await Promise.all(
+          sources.map((source) => devicesApi.findCrashReportsRetryTargets(source.id, backupDirs))
+        );
+        if (!cancelled) {
+          setCrashReportsRetryTargets(lookups.flatMap((lookup) => lookup.targets));
+          const errors = lookups.flatMap((lookup) =>
+            lookup.errors.map(
+              ({ backupIndex, error }) => `${backups[backupIndex]?.label ?? `Backup ${backupIndex + 1}`}: ${error}`
+            )
+          );
+          setCrashReportsRetryError(
+            errors.length > 0 ? `Some backups could not be checked: ${errors.join('; ')}` : null
+          );
+        }
+      } catch (err) {
+        lastAvailability = null;
+        if (!cancelled) {
+          setCrashReportsRetryTargets([]);
+          setCrashReportsRetryError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        refreshing = false;
+      }
+    };
+
+    const onFocus = () => void refreshEligibility(true);
+    const onVisibilityChange = () => {
+      if (!document.hidden) void refreshEligibility(true);
+    };
+    void refreshEligibility(true);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void refreshEligibility();
+    }, 10_000);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [backups, retryEligibilityRefreshVersion]);
 
   const toggleBackup = (label: string) => {
     setSelectedLabels((prev) => {
@@ -448,7 +521,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
             {!discoveringBackups && backups.length > 0 && (
               <div className="rounded-xl divide-y divide-border/60 max-h-80 overflow-auto bg-surface-raised shadow-inner">
-                {backups.map((b) => {
+                {backups.map((b, backupIndex) => {
                   const progress = runProgress?.byLabel[b.label];
                   const isLive = busy && !!progress;
                   const overall = progress?.overall;
@@ -465,10 +538,32 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       awaitingPassword={isLive && pendingPasswordFor === b.label}
                       lastResult={lastResult}
                       prepared={preparedByLabel.get(b.label)}
+                      crashReportsRetryTarget={crashReportsRetryTargets.find(
+                        (target) => target.backupIndex === backupIndex
+                      )}
+                      onCopyCrashReportsAgain={async (target) => {
+                        try {
+                          const result = await devicesApi.copyDeviceCrashReportsByReference(
+                            target.sourceId,
+                            target.deviceRef,
+                            b.path
+                          );
+                          if (result.outcome !== 'copied') {
+                            throw new Error(result.error ?? 'Crash logs were not copied.');
+                          }
+                        } finally {
+                          setRetryEligibilityRefreshVersion((version) => version + 1);
+                        }
+                      }}
                     />
                   );
                 })}
               </div>
+            )}
+            {crashReportsRetryError && (
+              <p role="alert" className="text-label text-danger mt-3">
+                Could not check whether connected devices have crash logs to copy: {crashReportsRetryError}
+              </p>
             )}
 
             <div className="mt-6 pt-4 border-t border-border/60">

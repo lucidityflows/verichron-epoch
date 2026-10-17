@@ -11,6 +11,8 @@ import type {
 import type {
   BackupProgress,
   CrashReportsResult,
+  CrashReportsRetryLookup,
+  CrashReportsRetryTarget,
   DeviceInfo,
   PullOptions,
   BackupStats,
@@ -125,6 +127,14 @@ const dbApi = {
     ipcRenderer.invoke('epoch:deleteIncompleteBackup', sourceId, destDir, device),
   copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string): Promise<CrashReportsResult> =>
     ipcRenderer.invoke('epoch:copyDeviceCrashReports', sourceId, device, backupDir),
+  copyDeviceCrashReportsByReference: (
+    sourceId: string,
+    deviceRef: string,
+    backupDir: string
+  ): Promise<CrashReportsResult> =>
+    ipcRenderer.invoke('epoch:copyDeviceCrashReportsByReference', sourceId, deviceRef, backupDir),
+  findCrashReportsRetryTargets: (sourceId: string, backupDirs: string[]): Promise<CrashReportsRetryLookup> =>
+    ipcRenderer.invoke('epoch:findCrashReportsRetryTargets', sourceId, backupDirs),
   onDeviceBackupStats: (callback: (stats: BackupStats) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, stats: BackupStats) => callback(stats);
     ipcRenderer.on('epoch:deviceBackupStats', listener);

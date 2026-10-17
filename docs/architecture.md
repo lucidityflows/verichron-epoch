@@ -226,6 +226,11 @@ processor copies them into `crash_reports/<label>/`. Evidence without them, such
 as a backup imported from elsewhere, has `crash` recorded as skipped, with that
 reason, and the report lists it under Not Examined.
 
+For an existing backup's [crash-log retry](decisions.md#crash-log-retry), the
+main process binds the opaque reference to that backup path and its originating
+device. A copy request must match that path before any copy, pull-record write
+or cleanup, and the backup and connected device are checked again before copying.
+
 `indicator_match` checks the newest registered indicator set, or the one given
 to the orchestrator with `--indicator-set <set hash>`. With no set registered it
 is recorded as skipped, with that reason, and the report and the app say that

@@ -84,6 +84,21 @@ async function countFiles(dir: string): Promise<{ files: number; bytes: number }
   return { files, bytes };
 }
 
+/** True if either the copied reports or their completion record already exists. */
+export async function crashReportsCopyExists(backupDir: string): Promise<boolean> {
+  const { dir, record } = crashReportsAcquisitionPaths(backupDir);
+  for (const file of [dir, record]) {
+    try {
+      await fs.lstat(file);
+      return true;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') throw err;
+    }
+  }
+  return false;
+}
+
 /**
  * Copies the device's crash logs beside the backup in `backupDir`
  * (crashReportsAcquisitionPaths) and records how, once the copy has finished.

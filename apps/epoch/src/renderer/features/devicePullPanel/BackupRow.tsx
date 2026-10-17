@@ -3,6 +3,8 @@ import { Smartphone, Circle, Loader2, CheckCircle2, XCircle, KeyRound } from 'lu
 import type { Backup } from '@verichron/contracts';
 import { STAGE_ORDER, STAGE_LABELS, type BackupProgress, type StageName } from '../../../shared/prepareProgress';
 import type { PreparedBackup } from '../../../shared/types/window';
+import type { CrashReportsRetryTarget } from '../../../shared/types/tools';
+import { Button } from '../../components/ui/Button';
 
 interface BackupRowProps {
   backup: Backup;
@@ -20,6 +22,8 @@ interface BackupRowProps {
   lastResult?: 'done' | 'failed';
   /** What the workspace records for this backup (EPOCH-497); undefined when not prepared. */
   prepared?: PreparedBackup;
+  crashReportsRetryTarget?: CrashReportsRetryTarget;
+  onCopyCrashReportsAgain?: (target: CrashReportsRetryTarget) => Promise<void>;
 }
 
 export function BackupRow({
@@ -31,31 +35,110 @@ export function BackupRow({
   awaitingPassword,
   lastResult,
   prepared,
+  crashReportsRetryTarget,
+  onCopyCrashReportsAgain,
 }: BackupRowProps) {
+  const [retryConfirming, setRetryConfirming] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [retryDone, setRetryDone] = useState(false);
+
   if (liveProgress) {
     return <LiveBackupRow backup={backup} progress={liveProgress} awaitingPassword={awaitingPassword} />;
   }
 
   return (
-    <label
-      className={`flex items-center gap-3 px-4 py-3 text-data cursor-pointer select-none transition-colors ${
-        selected ? 'bg-accent/10' : 'hover:bg-surface'
-      } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-    >
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={onToggle}
-        disabled={disabled}
-        className="accent-accent w-4 h-4 rounded cursor-pointer shrink-0"
-      />
-      <Smartphone size="1.125rem" className={`shrink-0 ${selected ? 'text-accent' : 'text-muted-foreground'}`} />
-      <span className="font-mono text-foreground truncate flex-1 font-medium" title={backup.path}>
-        {backup.label}
-      </span>
-      <PreparedState prepared={prepared} />
-      {lastResult === 'failed' && <XCircle size="1.125rem" className="text-danger shrink-0" />}
-    </label>
+    <div>
+      <label
+        className={`flex items-center gap-3 px-4 py-3 text-data cursor-pointer select-none transition-colors ${
+          selected ? 'bg-accent/10' : 'hover:bg-surface'
+        } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+      >
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          disabled={disabled}
+          className="accent-accent w-4 h-4 rounded cursor-pointer shrink-0"
+        />
+        <Smartphone size="1.125rem" className={`shrink-0 ${selected ? 'text-accent' : 'text-muted-foreground'}`} />
+        <span className="font-mono text-foreground truncate flex-1 font-medium" title={backup.path}>
+          {backup.label}
+        </span>
+        <PreparedState prepared={prepared} />
+        {lastResult === 'failed' && <XCircle size="1.125rem" className="text-danger shrink-0" />}
+      </label>
+      {retryDone && (
+        <div className="px-11 pb-3">
+          <p role="status" className="text-label text-success">
+            Crash logs copied. Prepare this backup again to include them in the report.
+          </p>
+        </div>
+      )}
+      {!retryDone && crashReportsRetryTarget && onCopyCrashReportsAgain && (
+        <div className="px-11 pb-3">
+          {retryConfirming ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-label text-flag">
+                Look at {crashReportsRetryTarget.deviceName}: unlock it and keep it connected before copying.
+              </p>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setRetryError(null);
+                    setRetryConfirming(false);
+                  }}
+                  disabled={retrying || disabled}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    setRetrying(true);
+                    setRetryError(null);
+                    try {
+                      await onCopyCrashReportsAgain(crashReportsRetryTarget);
+                      setRetryDone(true);
+                      setRetryConfirming(false);
+                    } catch (err) {
+                      setRetryError(err instanceof Error ? err.message : String(err));
+                    } finally {
+                      setRetrying(false);
+                    }
+                  }}
+                  disabled={retrying || disabled}
+                  loading={retrying}
+                  loadingText="Copying…"
+                >
+                  Copy now
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setRetryError(null);
+                setRetryConfirming(true);
+              }}
+              disabled={disabled}
+            >
+              Copy crash logs from {crashReportsRetryTarget.deviceName}
+            </Button>
+          )}
+          {retryError && (
+            <p role="alert" className="text-label text-danger mt-1">
+              Could not copy crash logs: {retryError}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

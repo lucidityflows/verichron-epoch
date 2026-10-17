@@ -67,6 +67,20 @@ export interface CrashReportsResult {
   locked?: boolean;
 }
 
+/** An existing finished backup whose crash logs can be copied from its connected device. */
+export interface CrashReportsRetryTarget {
+  sourceId: string;
+  backupIndex: number;
+  /** Process-local opaque reference resolved to the device only in the main process. */
+  deviceRef: string;
+  deviceName: string;
+}
+
+export interface CrashReportsRetryLookup {
+  targets: CrashReportsRetryTarget[];
+  errors: Array<{ backupIndex: number; error: string }>;
+}
+
 /** How a running backup is going (EPOCH-466), sent every few seconds. */
 export interface BackupStats {
   startedAt: number;
@@ -151,6 +165,10 @@ export interface DeviceBackupSource {
    * copy that exists.
    */
   copyCrashReportsAgain(device: DeviceInfo, backupDir: string): Promise<CrashReportsResult>;
+  /** Resolves a retry lookup's opaque device reference in the main process before copying. */
+  copyCrashReportsAgainByReference(deviceRef: string, backupDir: string): Promise<CrashReportsResult>;
+  /** Existing finished backups that lack a crash-log copy and have their device connected. */
+  findCrashReportsRetryTargets(backupDirs: string[]): Promise<CrashReportsRetryLookup>;
 }
 
 export type ToolAcquisitionAction =
