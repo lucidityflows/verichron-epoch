@@ -44,7 +44,11 @@ analyze → report**. The orchestrator coordinates the last three.
    The processor and orchestrator take the same exclusive
    `<workspace>/.verichron.lock` for the duration of a run. It records the
    owning process, tool and start time; another run is refused with the holder
-   identified, while a lock whose process has exited can be reclaimed. This
+   identified, while a lock whose process has exited can be reclaimed.
+   An atomically published `.verichron.lock.guard` directory serializes lock
+   creation, stale-owner checks, removal and release. Its unique owner entry
+   allows recovery after a process exits; removing an abandoned guard cannot
+   remove a successor's nonempty guard. This
    protects the decrypted evidence, iLEAPP output and results from changing
    while the orchestrator reads them.
 

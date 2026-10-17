@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { link, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { link, mkdir, readFile, readdir, rename, rm, rmdir, unlink, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
+import { setTimeout } from 'node:timers/promises';
 
 export const WORKSPACE_LOCK_FILE = '.verichron.lock';
 
@@ -59,6 +60,14 @@ async function acquireWorkspaceLock(workspace: string, tool: WorkspaceLockTool):
   await mkdir(workspace, { recursive: true });
   const lockPath = path.join(workspace, WORKSPACE_LOCK_FILE);
 
+  return withLockGuard(lockPath, () => acquireGuardedWorkspaceLock(lockPath, workspace, tool));
+}
+
+async function acquireGuardedWorkspaceLock(
+  lockPath: string,
+  workspace: string,
+  tool: WorkspaceLockTool
+): Promise<ReleaseLock> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const record: WorkspaceLockRecord = {
       id: randomUUID(),
@@ -93,13 +102,14 @@ async function acquireWorkspaceLock(workspace: string, tool: WorkspaceLockTool):
     if (creationError) throw creationError;
 
     if (created) {
-      return async () => {
-        const current = await readLockRecord(lockPath);
-        if (!current || current.id !== record.id) {
-          throw new Error(`The workspace lock at ${lockPath} disappeared or changed before ${tool} released it.`);
-        }
-        await unlink(lockPath);
-      };
+      return () =>
+        withLockGuard(lockPath, async () => {
+          const current = await readLockRecord(lockPath);
+          if (!current || current.id !== record.id) {
+            throw new Error(`The workspace lock at ${lockPath} disappeared or changed before ${tool} released it.`);
+          }
+          await unlink(lockPath);
+        });
     }
 
     const existing = await readLockRecord(lockPath);
@@ -120,6 +130,68 @@ async function acquireWorkspaceLock(workspace: string, tool: WorkspaceLockTool):
   }
 
   throw new Error(`Could not acquire the workspace lock at ${lockPath}: the lock changed repeatedly.`);
+}
+
+async function withLockGuard<T>(lockPath: string, action: () => Promise<T>): Promise<T> {
+  const guardPath = `${lockPath}.guard`;
+  const owner = `${process.pid}.${randomUUID()}`;
+  const temporaryPath = `${guardPath}.${owner}.tmp`;
+  await mkdir(temporaryPath, { mode: 0o700 });
+  try {
+    // Publish a nonempty directory atomically: a live guard is never empty.
+    await mkdir(path.join(temporaryPath, owner));
+    for (;;) {
+      try {
+        await rename(temporaryPath, guardPath);
+        break;
+      } catch (error) {
+        if (!hasErrorCode(error, 'EEXIST') && !hasErrorCode(error, 'ENOTEMPTY')) throw error;
+      }
+
+      let owners: string[];
+      try {
+        owners = await readdir(guardPath);
+      } catch (error) {
+        if (hasErrorCode(error, 'ENOENT')) continue;
+        throw error;
+      }
+      if (owners.length === 0) continue;
+      const match = owners.length === 1 && /^([1-9]\d*)\.[0-9a-f-]{36}$/.exec(owners[0]);
+      if (!match || !Number.isSafeInteger(Number(match[1]))) {
+        throw new Error(`The workspace lock guard at ${guardPath} has invalid ownership metadata.`);
+      }
+      if (!isProcessAlive(Number(match[1]))) {
+        await removeLockGuard(guardPath, owners[0]);
+      } else {
+        await setTimeout(10);
+      }
+    }
+
+    try {
+      return await action();
+    } finally {
+      await removeLockGuard(guardPath, owner);
+    }
+  } finally {
+    await rm(temporaryPath, { recursive: true, force: true });
+  }
+}
+
+async function removeLockGuard(guardPath: string, owner: string): Promise<void> {
+  // A delayed reaper can remove only the dead owner's unique entry. rmdir
+  // refuses a successor's nonempty guard, even if it replaced this directory.
+  try {
+    await rmdir(path.join(guardPath, owner));
+  } catch (error) {
+    if (!hasErrorCode(error, 'ENOENT')) throw error;
+  }
+  try {
+    await rmdir(guardPath);
+  } catch (error) {
+    if (!hasErrorCode(error, 'ENOENT') && !hasErrorCode(error, 'ENOTEMPTY') && !hasErrorCode(error, 'EEXIST')) {
+      throw error;
+    }
+  }
 }
 
 async function readLockRecord(lockPath: string): Promise<WorkspaceLockRecord | null> {
