@@ -474,7 +474,7 @@ describe('pre-flight registration', live, () => {
 });
 
 describe('stages and the completeness predicate', live, () => {
-  it('passes each stage its evidence, the derivative it reads (id and path) and its parser version', async () => {
+  it('passes each stage its evidence, the derivative it reads (id and path), its parser version and its name', async () => {
     const ws = makeWorkspace('args');
     const reader = recordingStage('reader', 10, { parserVersion: 3 });
     const ileappReader = recordingStage('ileapp-reader', 30, { parserVersion: 1, reads: 'ileapp_output' });
@@ -495,6 +495,8 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(argsOf(reader)['--derivative-path'], ws.backupPath);
     assert.equal(argsOf(ileappReader)['--derivative-path'], ws.ileappPath);
     assert.equal(argsOf(report)['--parser-version'], undefined, 'a stage that declares none is passed none');
+    assert.equal(argsOf(reader)['--stage-name'], 'reader', 'a stage that writes facts labels its failures');
+    assert.equal(argsOf(report)['--stage-name'], undefined);
     assert.equal(
       argsOf(report)['--report-path'],
       path.join(ws.workspace, 'reports', 'BK1'),

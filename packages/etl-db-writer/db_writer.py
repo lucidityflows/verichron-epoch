@@ -12,6 +12,7 @@ Owns exactly what the two shared tables need:
                      forensic_records rows for one file, or neither. Units are
                      evidence-scoped (EPOCH-402): see IngestContext.
   - write_record() / write_records() -> validated insert into forensic_records
+  - record_failures() -> the items a stage could not ingest (EPOCH-432)
 
 Deliberately does NOT own:
   - source-format parsing (each extractor's own code)
@@ -62,11 +63,11 @@ from __future__ import annotations
 import hashlib
 import re
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import psycopg2
 import psycopg2.extras
@@ -92,6 +93,17 @@ def compute_file_hash(path: str | Path) -> str:
 PAYLOAD_KINDS = ("full", "summary", "none")
 
 
+class FailedItem(Protocol):
+    """What record_failures reads from each failure: etl_run.ItemFailure's shape."""
+
+    @property
+    def item(self) -> str: ...
+    @property
+    def reason(self) -> str: ...
+    @property
+    def file_hash(self) -> str | None: ...
+
+
 @dataclass(frozen=True)
 class IngestContext:
     """Who an ingest is stamped with: the evidence, the input being read, the
@@ -106,6 +118,9 @@ class IngestContext:
     misattribute what it cannot label (R16). The parser version comes from
     the stage's stage.json, through the orchestrator (EPOCH-404), so there is
     one source for it rather than a constant in each extractor (R2).
+
+    `stage_name` is the orchestrator's name for the stage, which labels the
+    failures it records (EPOCH-432); only `record_failures` needs it.
     """
 
     evidence_id: str
@@ -113,6 +128,7 @@ class IngestContext:
     run_id: str
     parser_version: int
     indicator_set_id: str | None = None
+    stage_name: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("evidence_id", "run_id"):
@@ -146,6 +162,7 @@ def add_context_args(parser) -> None:
     parser.add_argument(
         "--parser-version", required=True, type=int, help="this stage's parserVersion from its stage.json"
     )
+    parser.add_argument("--stage-name", help="the orchestrator's name for this stage, labelling its failures")
 
 
 def context_from_args(args) -> IngestContext:
@@ -155,6 +172,7 @@ def context_from_args(args) -> IngestContext:
         run_id=args.run_id,
         parser_version=args.parser_version,
         indicator_set_id=args.indicator_set_id,
+        stage_name=args.stage_name,
     )
 
 
@@ -487,6 +505,68 @@ def write_records(conn, ingest_id: int, evidence_id: str, records: list[Normaliz
             ],
         )
     return len(records)
+
+
+def record_failures(
+    conn, ctx: IngestContext, failures: Iterable[FailedItem], *, source_type: str, root: str | Path
+) -> int:
+    """Persist the items a stage could not ingest, in one transaction of their
+    own, after its units (EPOCH-432). Each row is stamped from the context
+    (R16): the run, the stage, the evidence and the derivative read. The
+    table is append-only, so a later run that fixes an item adds a completed
+    unit rather than removing the failure; etl-db-reader's getStillFailing
+    tells the two apart.
+
+    An item is named by its path relative to `root`, the directory the stage
+    read; an absolute item, or one that climbs out of `root`, is refused. Each row also keeps `root / item` as
+    `file_path`, built exactly as `ingest()` builds a unit's, so an item with no
+    hash can be matched to the unit that later completes it. Returns the number
+    of rows written; writes and commits nothing when there are none.
+    """
+    if not isinstance(ctx, IngestContext):
+        raise TypeError("record_failures() needs an IngestContext")
+    if not ctx.stage_name:
+        raise ValueError("record_failures() needs the stage name: the orchestrator passes --stage-name")
+    rows = list(failures)
+    for failure in rows:
+        # The stages name items under the directory they read; this only
+        # guards that contract (an absolute path, or `..` out of `root`).
+        parts = Path(failure.item).parts
+        if not failure.item or Path(failure.item).is_absolute() or ".." in parts:
+            raise ValueError(f"a failed item is named relative to its derivative, got {failure.item!r}")
+        if failure.file_hash is not None and not re.fullmatch(r"[0-9a-f]{64}", failure.file_hash):
+            raise ValueError(f"a failed item's hash must be a sha256 hex digest, got {failure.file_hash!r}")
+    if not rows:
+        return 0
+    try:
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_values(
+                cur,
+                """
+                INSERT INTO stage_item_failures
+                    (run_id, stage_name, evidence_id, derivative_id, source_type, item, file_path, file_hash, reason)
+                VALUES %s
+                """,
+                [
+                    (
+                        ctx.run_id,
+                        ctx.stage_name,
+                        ctx.evidence_id,
+                        ctx.derivative_id,
+                        source_type,
+                        failure.item,
+                        str(Path(root) / failure.item),
+                        failure.file_hash,
+                        failure.reason,
+                    )
+                    for failure in rows
+                ],
+            )
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    return len(rows)
 
 
 def incomplete_ingests(conn, evidence_id: str) -> list[tuple[str, str]]:

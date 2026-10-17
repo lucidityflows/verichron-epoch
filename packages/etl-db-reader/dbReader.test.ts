@@ -29,6 +29,8 @@ import {
   getRunReportLocation,
   getStageStatus,
   getIndicatorChecks,
+  getStageFailures,
+  getStillFailing,
   type ForensicRecordQuery,
   type ForensicRecordRow,
   type RecordSortKey,
@@ -554,5 +556,94 @@ describe('getIndicatorChecks', live, () => {
     assert.equal(skipped.summary, null);
     assert.deepEqual(skipped.match_rows, []);
     assert.deepEqual(await getIndicatorChecks(db, EVIDENCE), [], 'another evidence item has no checks');
+  });
+});
+
+describe('failed items and what is still failing (EPOCH-432)', live, () => {
+  const FIRST = '88888888-8888-8888-8888-888888888888';
+  const RERUN = '99999999-0000-0000-0000-000000000000';
+  const OTHER_CASE_RUN = '99999999-1111-0000-0000-000000000000';
+  // Hash letters no other fixture in this file uses (line ~296 completes an 'a'
+  // unit for EVIDENCE), so only these tests' units can fix these failures.
+  const hash = (c: string) => ({ a: '7', b: '8', c: 'c' })[c]!.repeat(64);
+
+  async function fail(run: string, evidence: string, item: string, fileHash: string | null, at: string) {
+    await db.query(
+      `INSERT INTO stage_item_failures
+         (run_id, stage_name, evidence_id, derivative_id, source_type, item, file_path, file_hash, reason, recorded_at)
+       VALUES ($1, 'crash', $2, $2, 'crash_report', $3, '/test/' || $3, $4, 'ValueError: ' || $3, now() - $5::interval)`,
+      [run, evidence, item, fileHash, at]
+    );
+  }
+
+  async function completed(fileHash: string, filePath: string, at: string) {
+    await db.query(
+      `INSERT INTO ingested_files
+         (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
+          payload_kind, raw_payload, ingest_complete, record_count, completed_at)
+       VALUES ($1, $1, $2, 'crash_report', 1, $3, 'x', 'none', '{}', TRUE, 1, now() - $4::interval)`,
+      [OTHER, fileHash, filePath, at]
+    );
+  }
+
+  before(async () => {
+    // The first run fails three of its files. Retired/b.ips completed once,
+    // before it failed (a parser bump), which must not count as fixed.
+    await completed(hash('b'), '/test/Retired/b.ips', '3 hours');
+    await fail(FIRST, OTHER, 'a.ips', hash('a'), '2 hours');
+    await fail(FIRST, OTHER, 'Retired/b.ips', hash('b'), '2 hours');
+    await fail(FIRST, OTHER, 'c.ips', null, '2 hours');
+    // Another evidence item's failure never leaks in.
+    await fail(OTHER_CASE_RUN, EVIDENCE, 'a.ips', hash('a'), '2 hours');
+  });
+
+  it("lists one stage's failed items by item, with the true total", async () => {
+    const page = await getStageFailures(db, FIRST, 'crash');
+    assert.equal(page.total, 3);
+    // Ordered by item in the database's collation, so compared as a set here.
+    assert.deepEqual(
+      page.rows.map((r) => [r.item, r.file_hash, r.reason]).sort(),
+      [
+        ['Retired/b.ips', hash('b'), 'ValueError: Retired/b.ips'],
+        ['a.ips', hash('a'), 'ValueError: a.ips'],
+        ['c.ips', null, 'ValueError: c.ips'],
+      ].sort()
+    );
+    assert.deepEqual(await getStageFailures(db, FIRST, 'ileapp_bridge'), { rows: [], total: 0 });
+  });
+
+  it('counts an item fixed once a later unit has its hash, or without a hash its path', async () => {
+    const items = async () => (await getStillFailing(db, OTHER)).rows.map((r) => r.item).sort();
+    assert.deepEqual(await items(), ['Retired/b.ips', 'a.ips', 'c.ips'].sort());
+
+    // A rerun completes a.ips: two remain.
+    await completed(hash('a'), '/test/a.ips', '1 hour');
+    assert.deepEqual(await items(), ['Retired/b.ips', 'c.ips']);
+    assert.equal((await getStillFailing(db, OTHER)).total, 2);
+
+    // c.ips had no hash; a later unit at the path it failed at fixes it.
+    await completed(hash('c'), '/test/c.ips', '1 hour');
+    assert.deepEqual(await items(), ['Retired/b.ips']);
+
+    // Moving the workspace afterwards updates the derivative's path, never the
+    // fixed paths compared, so nothing fixed comes back.
+    await db.query(`UPDATE evidence_derivatives SET path = '/moved' WHERE derivative_id = $1`, [OTHER]);
+    assert.deepEqual(await items(), ['Retired/b.ips']);
+
+    // The other evidence's a.ips is untouched by this evidence's fix.
+    assert.deepEqual(
+      (await getStillFailing(db, EVIDENCE)).rows.map((r) => r.item),
+      ['a.ips']
+    );
+  });
+
+  it("reports an item's latest failure once, and a fix before that failure doesn't count", async () => {
+    await fail(RERUN, OTHER, 'Retired/b.ips', hash('b'), '30 minutes');
+    const page = await getStillFailing(db, OTHER);
+    assert.deepEqual(
+      page.rows.map((r) => [r.item, r.run_id]),
+      [['Retired/b.ips', RERUN]]
+    );
+    assert.equal(page.total, 1);
   });
 });

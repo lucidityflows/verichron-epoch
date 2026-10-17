@@ -105,6 +105,22 @@ CREATE TABLE forensic_records (
     FOREIGN KEY (ingest_id, evidence_id) REFERENCES ingested_files(ingest_id, evidence_id)
 );
 
+-- 0016: the items a stage could not ingest. Append-only on Postgres; the
+-- trigger is certified on the real-Postgres leg, not here.
+CREATE TABLE stage_item_failures (
+    failure_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id        TEXT NOT NULL,
+    stage_name    TEXT NOT NULL CHECK (trim(stage_name) <> ''),
+    evidence_id   TEXT NOT NULL,
+    derivative_id TEXT,
+    source_type   TEXT NOT NULL,
+    item          TEXT NOT NULL CHECK (item <> '' AND substr(item, 1, 1) <> '/'),
+    file_path     TEXT NOT NULL CHECK (file_path <> ''),
+    file_hash     TEXT,
+    reason        TEXT NOT NULL CHECK (trim(reason) <> ''),
+    recorded_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 0004's read views, same selection rules in SQLite's dialect.
 CREATE VIEW forensic_records_history AS
 SELECT f.id, f.ingest_id, f.evidence_id, i.derivative_id, i.file_hash, i.parser_version,
@@ -287,6 +303,14 @@ class PgDouble:
         self._conn.row_factory = sqlite3.Row
         try:
             rows = self._conn.execute("SELECT * FROM forensic_records ORDER BY id").fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            self._conn.row_factory = None
+
+    def failures(self) -> list[dict[str, Any]]:
+        self._conn.row_factory = sqlite3.Row
+        try:
+            rows = self._conn.execute("SELECT * FROM stage_item_failures ORDER BY failure_id").fetchall()
             return [dict(row) for row in rows]
         finally:
             self._conn.row_factory = None

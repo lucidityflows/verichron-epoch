@@ -26,7 +26,22 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
-from typing import IO
+from typing import IO, NamedTuple
+
+
+class ItemFailure(NamedTuple):
+    """One item a stage could not ingest (EPOCH-432).
+
+    `item` names it, as a path relative to the derivative the stage read once
+    the stage persists it (`Retired/x.ips`, `_lava_artifacts.db#zalochat`).
+    `file_hash` is the item's sha256 when it could be read, else None: the
+    ledger's identity, so a later run's completed unit can be recognised as
+    having fixed it.
+    """
+
+    item: str
+    reason: str
+    file_hash: str | None = None
 
 
 @dataclass
@@ -41,8 +56,8 @@ class ETLRunResult:
     complete writes nothing: it adds zero, and the stage notes it as already
     ingested, so a resumed run never reads as having lost anything.
 
-    `failures` stores structured `(item_label, reason)` pairs rather than
-    pre-joined strings. `fail()` renders `BaseException` arguments as
+    `failures` stores structured `ItemFailure`s rather than pre-joined
+    strings, so a stage can persist them (EPOCH-432). `fail()` renders `BaseException` arguments as
     `f"{type(e).__name__}: {e}"` so the type survives into the stored
     reason and into every rendering of it without each caller having to
     remember to do it themselves.
@@ -50,7 +65,7 @@ class ETLRunResult:
 
     succeeded: int = 0
     failed: int = 0
-    failures: list[tuple[str, str]] = field(default_factory=list)
+    failures: list[ItemFailure] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
     def ok(self, count: int = 1) -> ETLRunResult:
@@ -64,16 +79,17 @@ class ETLRunResult:
         self.succeeded += count
         return self
 
-    def fail(self, item_label: str, error: BaseException | str) -> ETLRunResult:
+    def fail(self, item_label: str, error: BaseException | str, file_hash: str | None = None) -> ETLRunResult:
         """Record one failed item. `item_label` should identify the
         specific item (filename, alert index, table name) so the printed
         error is actionable without re-running with more logging.
 
         `error` may be a plain string (an extractor's own description of
-        what went wrong) or an exception (rendered with its type name)."""
+        what went wrong) or an exception (rendered with its type name).
+        `file_hash` is the item's sha256, when the stage could read it."""
         reason = error if isinstance(error, str) else f"{type(error).__name__}: {error}"
         self.failed += 1
-        self.failures.append((item_label, reason))
+        self.failures.append(ItemFailure(item_label, reason, file_hash))
         return self
 
     def note(self, message: str) -> ETLRunResult:
@@ -138,8 +154,8 @@ class ETLRunResult:
         if self.failures:
             print(f"[{tag}] {len(self.failures)} failure(s):", file=detail_stream)
             shown = self.failures[: self._MAX_ITEMIZED_FAILURES]
-            for label, reason in shown:
-                print(f"[{tag}]   {label}: {reason}", file=detail_stream)
+            for failure in shown:
+                print(f"[{tag}]   {failure.item}: {failure.reason}", file=detail_stream)
             remaining = len(self.failures) - len(shown)
             if remaining > 0:
                 print(f"[{tag}]   ... and {remaining} more (truncated)", file=detail_stream)

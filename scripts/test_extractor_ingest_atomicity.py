@@ -110,6 +110,44 @@ def test_a_previously_failed_ips_file_is_retried_on_the_next_run(db, tmp_path):
     assert db.record_count() == 1
 
 
+def test_three_failing_files_of_ten_record_three_failures_with_reasons(db, tmp_path):
+    """EPOCH-432: what the stage's main() persists. Each failed file is named
+    relative to the crash logs it was read from and carries its hash; the
+    seven good files record nothing."""
+    from db_writer import compute_file_hash, record_failures
+
+    for n in range(7):
+        (tmp_path / f"good{n}.ips").write_text(_valid_ips().replace("SpringBoard", f"proc{n}"))
+    (tmp_path / "Retired").mkdir()
+    bad = [tmp_path / "Retired" / "broken.ips", tmp_path / "empty.ips", tmp_path / "text.ips"]
+    bad[0].write_text("garbage")
+    bad[1].write_text("")
+    bad[2].write_text("[1, 2]\n")
+    staged = IngestContext(
+        evidence_id=EVIDENCE_ID, derivative_id=DERIVATIVE_ID, run_id=RUN_ID, parser_version=1, stage_name="crash"
+    )
+
+    result = crash_main.run(db, staged, str(tmp_path))
+    assert (result.succeeded, result.failed) == (7, 3)
+    assert record_failures(db, staged, result.failures, source_type="crash_report", root=str(tmp_path)) == 3
+
+    rows = sorted((r["item"], r["file_hash"], r["stage_name"], r["source_type"]) for r in db.failures())
+    assert rows == sorted(
+        (p.relative_to(tmp_path).as_posix(), compute_file_hash(p), "crash", "crash_report") for p in bad
+    )
+    reasons = {r["item"]: r["reason"] for r in db.failures()}
+    assert reasons["empty.ips"] == "ValueError: Empty file"
+    assert reasons["Retired/broken.ips"].startswith("ValueError: no JSON metadata line")
+
+    # Each failure's file_path is the one the ledger gives the file once fixed,
+    # so an item with no hash can still be matched to the unit that fixes it.
+    bad[0].write_text(_valid_ips())
+    crash_main.run(db, staged, str(tmp_path))
+    fixed = next(r for r in db.ledger() if r["file_name"] == "broken.ips")
+    failed = next(r for r in db.failures() if r["item"] == "Retired/broken.ips")
+    assert fixed["file_path"] == failed["file_path"]
+
+
 def test_every_real_ips_shape_is_ingested_and_other_device_files_are_counted(db, tmp_path):
     """EPOCH-447: the redacted real fixtures (JSON, text and binary bodies)
     each become one record; the device's other diagnostic files are named in

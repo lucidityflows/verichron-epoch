@@ -66,5 +66,6 @@ The tests use redacted real reports, one per body format
 ([fixtures/README.md](fixtures/README.md)).
 
 Failures are handled per file: an unparseable file is rolled back and retried on
-the next run, while the others commit. The atomicity tests are in
+the next run, while the others commit. Each failed file is recorded with its
+path under the crash logs and its hash (EPOCH-432). The atomicity tests are in
 `scripts/test_extractor_ingest_atomicity.py`.

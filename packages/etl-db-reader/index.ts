@@ -28,6 +28,8 @@ export type {
   IndicatorTypeSummary,
   IndicatorSetSourceRow,
   IndicatorMatchRow,
+  ItemFailureRow,
+  ItemFailurePage,
 } from './dbReader.js';
 export {
   getPipelineRuns,
@@ -37,6 +39,9 @@ export {
   getStageStatus,
   getForensicRecords,
   getIndicatorChecks,
+  getStageFailures,
+  getStillFailing,
+  FAILURE_LIMIT,
   MATCH_LIMIT,
   MAX_RECORDS_PAGE,
 } from './dbReader.js';
