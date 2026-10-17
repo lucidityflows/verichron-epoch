@@ -68,7 +68,8 @@ def print_run(cur, run_id: str, evidence_override: str | None = None) -> None:
     print(f"\n=== ingested_files: evidence {evidence_id} ===")
     cur.execute(
         "SELECT source_type, file_name, parser_version, payload_kind, ingest_complete, "
-        "record_count, %s = ANY(produced_by_runs) AS seen_by_run "
+        "record_count, EXISTS (SELECT 1 FROM ingest_run_links l "
+        "WHERE l.ingest_id = ingested_files.ingest_id AND l.run_id = %s::uuid) AS seen_by_run "
         "FROM ingested_files WHERE evidence_id = %s ORDER BY ingested_at, ingest_id",
         (run_id, evidence_id),
     )

@@ -194,6 +194,18 @@ Every fact enters through one door, `ingest()` in `db_writer.py` (R13).
 - **Each unit declares its payload** (R12): `full`, `summary` or `none`.
 - **Versions are append-only (R8).** Bumping a stage's `parserVersion` re-ingests
   each file as a new unit beside the old one.
+- **Run attribution is append-only (R7).** `ingest_run_links` associates each
+  completed unit with every run that successfully read or deduplicated it.
+  These links are separate from `ingested_files`, so recording a later run never
+  updates a completed ledger row; deleting a run does not delete its links.
+- **Completed units are immutable in PostgreSQL (R9).** Database triggers
+  reject changes to completed ledger rows and their facts. Reclaiming an
+  incomplete unit may still delete its orphaned records. The
+  `purge_evidence(evidence_id, reason)` function, owned by a dedicated
+  non-login database role, is the only completed-data deletion route: it
+  removes the evidence's facts, run links and ledger rows, then appends an
+  immutable `evidence_events` record with the database actor, timestamp,
+  reason and deletion counts. Evidence registration and custody events remain.
 - **A value PostgreSQL can't hold is stored encoded, never altered** (EPOCH-502).
   `jsonb` rejects NUL (U+0000), and JSON has no binary, so such a value is kept
   exactly as `{"$encoded": "<encoding>", "value": "<hex>"}`: `hex` for binary

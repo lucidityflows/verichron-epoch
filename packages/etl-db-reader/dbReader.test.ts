@@ -112,20 +112,24 @@ before(async () => {
 
   // One completed v1 unit holding every row, plus a superseded v0-style
   // history: a completed v1 for a second file that a completed v2 replaces.
-  const unit = await insertUnit(EVIDENCE, 'f'.repeat(64), 1, true);
+  const unit = await insertUnit(EVIDENCE, 'f'.repeat(64), 1);
   for (const [eventTime, sourceType, processName, bundleId] of ROWS) {
     await insertRecord(unit, EVIDENCE, sourceType, eventTime, processName, bundleId);
   }
-  const old = await insertUnit(EVIDENCE, 'e'.repeat(64), 1, true);
+  await completeUnit(unit, ROWS.length);
+  const old = await insertUnit(EVIDENCE, 'e'.repeat(64), 1);
   await insertRecord(old, EVIDENCE, 'crash_report', '2024-02-01 00:00:00+00', 'old_parse', null);
-  const fresh = await insertUnit(EVIDENCE, 'e'.repeat(64), 2, true);
+  await completeUnit(old, 1);
+  const fresh = await insertUnit(EVIDENCE, 'e'.repeat(64), 2);
   await insertRecord(fresh, EVIDENCE, 'crash_report', '2024-02-01 00:00:00+00', 'new_parse', null);
+  await completeUnit(fresh, 1);
   // Incomplete unit: its record must never be read.
-  const stranded = await insertUnit(EVIDENCE, 'd'.repeat(64), 1, false);
+  const stranded = await insertUnit(EVIDENCE, 'd'.repeat(64), 1);
   await insertRecord(stranded, EVIDENCE, 'crash_report', '2024-03-01 00:00:00+00', 'stranded', null);
   // Another evidence item's facts must never leak in.
-  const other = await insertUnit(OTHER, 'f'.repeat(64), 1, true);
+  const other = await insertUnit(OTHER, 'f'.repeat(64), 1);
   await insertRecord(other, OTHER, 'ileapp_record', '2024-01-15 10:31:00+00', 'other_evidence', null);
+  await completeUnit(other, 1);
 });
 
 after(async () => {
@@ -135,17 +139,24 @@ after(async () => {
   await admin.end();
 });
 
-async function insertUnit(evidence: string, fileHash: string, version: number, complete: boolean): Promise<string> {
+async function insertUnit(evidence: string, fileHash: string, version: number): Promise<string> {
   const { rows } = await db.query<{ ingest_id: string }>(
     `INSERT INTO ingested_files
        (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
-        payload_kind, raw_payload, ingest_complete, record_count, completed_at)
-     VALUES ($1, $1, $2, 'crash_report', $3, '/x', 'x', 'none', '{}', $4,
-             CASE WHEN $4 THEN 0 END, CASE WHEN $4 THEN now() END)
+        payload_kind, raw_payload)
+     VALUES ($1, $1, $2, 'crash_report', $3, '/x', 'x', 'none', '{}')
      RETURNING ingest_id`,
-    [evidence, fileHash, version, complete]
+    [evidence, fileHash, version]
   );
   return rows[0].ingest_id;
+}
+
+async function completeUnit(ingestId: string, recordCount: number): Promise<void> {
+  await db.query(
+    `UPDATE ingested_files SET ingest_complete = true, record_count = $2, completed_at = now()
+     WHERE ingest_id = $1`,
+    [ingestId, recordCount]
+  );
 }
 
 async function insertRecord(
@@ -263,8 +274,9 @@ describe('getForensicRecords', live, () => {
         statements += 1;
         if (!completed) {
           completed = true;
-          const unit = await insertUnit(EVIDENCE, 'a'.repeat(64), 1, true);
+          const unit = await insertUnit(EVIDENCE, 'a'.repeat(64), 1);
           await insertRecord(unit, EVIDENCE, 'crash_report', '2024-04-01 00:00:00+00', 'raced_in', null);
+          await completeUnit(unit, 1);
         }
         return result;
       },
@@ -277,8 +289,8 @@ describe('getForensicRecords', live, () => {
 
     const after = await getForensicRecords(db, EVIDENCE, { limit: MAX_PAGE });
     assert.equal(after.total, page.total + 1, 'the raced ingest is visible to the next read');
-    await db.query(`DELETE FROM forensic_records WHERE process_name = 'raced_in'`);
-    await db.query(`DELETE FROM ingested_files WHERE file_hash = repeat('a', 64)`);
+    // The completed unit remains in the throwaway database until the suite
+    // drops it; completed evidence is no longer cleaned up with direct DELETE.
   });
 
   it('an empty page still reports the true total', async () => {
@@ -291,7 +303,7 @@ describe('getForensicRecords', live, () => {
       cursor: Buffer.from(JSON.stringify({ v: null, id: String(Number(last.id) + 10_000) })).toString('base64url'),
     });
     assert.equal(tail.rows.length, 0);
-    assert.equal(tail.total, ROWS.length + 1, 'past the last row, the total is still reported');
+    assert.equal(tail.total, ROWS.length + 2, 'past the last row, the total is still reported');
   });
 
   it('rejects parameters outside the allowlist', async () => {
@@ -377,16 +389,22 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
               generate_series(1, more) AS n`,
       [RUN]
     );
-    // Two complete units this run labelled for the decrypt, one incomplete
-    // unit, and one complete unit only another run labelled.
+    // Two complete units this run linked to the decrypt, one incomplete
+    // unit, and one complete unit linked only to another run.
     await db.query(
-      `INSERT INTO ingested_files
-         (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
-          payload_kind, raw_payload, ingest_complete, record_count, completed_at, produced_by_runs)
-       VALUES ($1, $1, repeat('1', 64), 'crash_report', 1, '/a', 'a', 'none', '{}', TRUE, 3, now(), ARRAY[$2]::uuid[]),
-              ($1, $1, repeat('2', 64), 'crash_report', 1, '/b', 'b', 'none', '{}', TRUE, 4, now(), ARRAY[$2]::uuid[]),
-              ($1, $1, repeat('3', 64), 'crash_report', 1, '/c', 'c', 'none', '{}', FALSE, NULL, NULL, ARRAY[$2]::uuid[]),
-              ($1, $1, repeat('4', 64), 'crash_report', 1, '/d', 'd', 'none', '{}', TRUE, 9, now(), ARRAY[$3]::uuid[])`,
+      `WITH inserted AS (
+         INSERT INTO ingested_files
+           (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
+            payload_kind, raw_payload, ingest_complete, record_count, completed_at)
+         VALUES ($1, $1, repeat('1', 64), 'crash_report', 1, '/a', 'a', 'none', '{}', TRUE, 3, now()),
+                ($1, $1, repeat('2', 64), 'crash_report', 1, '/b', 'b', 'none', '{}', TRUE, 4, now()),
+                ($1, $1, repeat('3', 64), 'crash_report', 1, '/c', 'c', 'none', '{}', FALSE, NULL, NULL),
+                ($1, $1, repeat('4', 64), 'crash_report', 1, '/d', 'd', 'none', '{}', TRUE, 9, now())
+         RETURNING ingest_id, file_hash
+       )
+       INSERT INTO ingest_run_links (ingest_id, run_id)
+       SELECT ingest_id, CASE WHEN file_hash = repeat('4', 64) THEN $3::uuid ELSE $2::uuid END
+       FROM inserted`,
       [EVIDENCE, RUN, UNREGISTERED_RUN]
     );
   });
@@ -470,16 +488,21 @@ describe('getIndicatorChecks', live, () => {
     const { rows: units } = await db.query<{ ingest_id: string }>(
       `INSERT INTO ingested_files
          (evidence_id, indicator_set_id, file_hash, source_type, parser_version, file_path, file_name,
-          payload_kind, raw_payload, produced_by_runs, ingest_complete, record_count, completed_at)
-       VALUES ($1, $2, repeat('9', 64), 'indicator_match', 1, 'indicator_set/x', 'x', 'summary', $3,
-               ARRAY[$4::uuid], true, 1, now())
+          payload_kind, raw_payload)
+       VALUES ($1, $2, repeat('9', 64), 'indicator_match', 1, 'indicator_set/x', 'x', 'summary', $3)
        RETURNING ingest_id`,
-      [OTHER, setId, summary, CHECK_RUN]
+      [OTHER, setId, summary]
     );
+    await db.query(`INSERT INTO ingest_run_links (ingest_id, run_id) VALUES ($1, $2)`, [units[0].ingest_id, CHECK_RUN]);
     await db.query(
       `INSERT INTO forensic_records (ingest_id, evidence_id, source_type, event_time, fields)
        VALUES ($1, $2, 'indicator_match', '2026-03-01T12:00:00Z', '{"match_mode": "exact"}')`,
       [units[0].ingest_id, OTHER]
+    );
+    await db.query(
+      `UPDATE ingested_files SET ingest_complete = true, record_count = 1, completed_at = now()
+       WHERE ingest_id = $1`,
+      [units[0].ingest_id]
     );
 
     const checks = await getIndicatorChecks(db, OTHER);

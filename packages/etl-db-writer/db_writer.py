@@ -225,18 +225,18 @@ class IngestUnit:
 
 
 def _label_run(cur, ctx: IngestContext, ingest_id: int) -> None:
-    """Record this run on the unit's produced_by_runs (R7), once.
+    """Record this run in the unit's append-only audit links (R7), once.
 
     An audit label only: it never decides dedup. Appending only when absent
     keeps a re-run under the same run_id a no-op.
     """
     cur.execute(
         """
-        UPDATE ingested_files
-        SET produced_by_runs = array_append(produced_by_runs, %s::uuid)
-        WHERE ingest_id = %s AND NOT (%s::uuid = ANY(produced_by_runs))
+        INSERT INTO ingest_run_links (ingest_id, run_id)
+        VALUES (%s, %s::uuid)
+        ON CONFLICT (ingest_id, run_id) DO NOTHING
         """,
-        (ctx.run_id, ingest_id, ctx.run_id),
+        (ingest_id, ctx.run_id),
     )
 
 
@@ -279,8 +279,8 @@ def ingest(
       the file has no trace in the ledger and the NEXT run retries it.
     - `already_ingested` is True only when a previous run marked the unit
       complete — never merely because a row exists.
-    - Every attempt that ends cleanly, fresh or dedup hit, adds ctx.run_id to
-      produced_by_runs. A completed unit's other columns are never rewritten.
+    - Every attempt that ends cleanly, fresh or dedup hit, adds an append-only
+      run link. A completed unit's ledger row is never rewritten.
     - An abandoned unit from an earlier crash (row present, not complete) is
       reclaimed: its orphaned records are deleted and it is re-ingested, so a
       retry cannot double-count a partial write.
@@ -320,39 +320,31 @@ def ingest(
         if row is not None and row[1]:
             ingest_id = row[0]
             yield IngestUnit(conn, ctx, file_path, file_hash, ingest_id, already_ingested=True)
-            # A dedup hit still records that this run saw the unit (R7). It is
-            # a no-op when the run is already listed, so re-running the same
-            # run does not churn rows.
+            # A dedup hit still records that this run saw the unit (R7). The
+            # unique key makes a re-run under the same run a no-op.
             with conn.cursor() as cur:
                 _label_run(cur, ctx, ingest_id)
             conn.commit()
             return
 
         with conn.cursor() as cur:
-            # Upsert-and-lock. Returns the row's id and completion state either
-            # way. For a row that is already complete every column keeps its
-            # original value: a finished ingest is immutable audit data.
+            # Upsert-and-lock. The conflict update only refreshes incomplete
+            # rows; a completed conflict is locked but left untouched.
             cur.execute(
                 """
                 INSERT INTO ingested_files
                     (evidence_id, derivative_id, indicator_set_id, file_hash, source_type, parser_version,
-                     file_path, file_name, payload_kind, raw_payload, produced_by_runs)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, ARRAY[%s::uuid])
+                     file_path, file_name, payload_kind, raw_payload)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (evidence_id, file_hash, source_type, parser_version) DO UPDATE SET
-                    derivative_id = CASE WHEN ingested_files.ingest_complete
-                                         THEN ingested_files.derivative_id ELSE EXCLUDED.derivative_id END,
-                    indicator_set_id = CASE WHEN ingested_files.ingest_complete
-                                         THEN ingested_files.indicator_set_id ELSE EXCLUDED.indicator_set_id END,
-                    file_path     = CASE WHEN ingested_files.ingest_complete
-                                         THEN ingested_files.file_path     ELSE EXCLUDED.file_path     END,
-                    file_name     = CASE WHEN ingested_files.ingest_complete
-                                         THEN ingested_files.file_name     ELSE EXCLUDED.file_name     END,
-                    payload_kind  = CASE WHEN ingested_files.ingest_complete
-                                         THEN ingested_files.payload_kind  ELSE EXCLUDED.payload_kind  END,
-                    raw_payload   = CASE WHEN ingested_files.ingest_complete
-                                         THEN ingested_files.raw_payload   ELSE EXCLUDED.raw_payload   END,
-                    ingested_at   = CASE WHEN ingested_files.ingest_complete
-                                         THEN ingested_files.ingested_at   ELSE now()                  END
+                    derivative_id = EXCLUDED.derivative_id,
+                    indicator_set_id = EXCLUDED.indicator_set_id,
+                    file_path     = EXCLUDED.file_path,
+                    file_name     = EXCLUDED.file_name,
+                    payload_kind  = EXCLUDED.payload_kind,
+                    raw_payload   = EXCLUDED.raw_payload,
+                    ingested_at   = now()
+                WHERE ingested_files.ingest_complete = FALSE
                 RETURNING ingest_id, ingest_complete
                 """,
                 (
@@ -366,10 +358,24 @@ def ingest(
                     file_path.name,
                     payload_kind,
                     psycopg2.extras.Json(raw_payload if raw_payload is not None else {}),
-                    ctx.run_id,
                 ),
             )
-            ingest_id, complete = cur.fetchone()
+            row = cur.fetchone()
+            if row is None:
+                # A concurrent attempt completed the conflict row after the
+                # fast-path read. Its completed ledger row must not be updated,
+                # even to values identical to the originals.
+                cur.execute(
+                    """
+                    SELECT ingest_id, ingest_complete FROM ingested_files
+                    WHERE evidence_id = %s AND file_hash = %s AND source_type = %s AND parser_version = %s
+                    """,
+                    unit_key,
+                )
+                row = cur.fetchone()
+                if row is None:
+                    raise RuntimeError("ingest unit disappeared during conflict resolution")
+            ingest_id, complete = row
             already_ingested = bool(complete)
 
             if not already_ingested:

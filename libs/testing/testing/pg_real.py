@@ -38,7 +38,6 @@ first); this module does not create schema.
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 from collections.abc import Iterable, Iterator, Mapping
 from typing import Any
@@ -59,6 +58,7 @@ _TABLES = (
     "indicator_set_files",
     "indicator_sets",
     "indicator_file_contents",
+    "ingest_run_links",
     "forensic_records",
     "ingested_files",
     "pipeline_stage_status",
@@ -152,12 +152,9 @@ class PgReal:
     def ledger(self) -> list[dict[str, Any]]:
         rows = self._dicts(
             "SELECT *, raw_payload::text AS raw_payload, "
-            "array_to_json(produced_by_runs)::text AS produced_by_runs, "
             "evidence_id::text AS evidence_id, derivative_id::text AS derivative_id "
             "FROM ingested_files ORDER BY file_hash, ingest_id"
         )
-        for row in rows:
-            row["produced_by_runs"] = json.loads(row["produced_by_runs"])
         return rows
 
     def records(self) -> list[dict[str, Any]]:

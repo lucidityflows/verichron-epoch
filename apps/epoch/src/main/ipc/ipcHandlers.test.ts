@@ -87,8 +87,8 @@ beforeAll(async () => {
     const { rows } = await pool.query<{ ingest_id: string }>(
       `INSERT INTO ingested_files
          (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
-          payload_kind, raw_payload, ingest_complete, record_count, completed_at)
-       VALUES ($1, $1, repeat($2, 64), 'crash_report', 1, '/x', 'x', 'none', '{}', TRUE, 1, now())
+          payload_kind, raw_payload)
+       VALUES ($1, $1, repeat($2, 64), 'crash_report', 1, '/x', 'x', 'none', '{}')
        RETURNING ingest_id`,
       [evidence, root]
     );
@@ -96,6 +96,11 @@ beforeAll(async () => {
       `INSERT INTO forensic_records (ingest_id, evidence_id, source_type, process_name)
        VALUES ($1, $2, 'crash_report', $3)`,
       [rows[0].ingest_id, evidence, `process_of_${root}`]
+    );
+    await pool.query(
+      `UPDATE ingested_files SET ingest_complete = TRUE, record_count = 1, completed_at = now()
+       WHERE ingest_id = $1`,
+      [rows[0].ingest_id]
     );
   }
   await pool.query(
