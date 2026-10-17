@@ -17,8 +17,9 @@ says so, never an empty one that reads as "nothing found".
 
 ## Run
 
-It runs as part of the pipeline, writing to `<report-path>/investigation_report.md`
-(`<workspace>/reports/<label>/`). To run it by hand:
+It runs as part of the pipeline, writing to
+`<report-path>/investigation_report.md`; the orchestrator obtains the report
+folder from `workspace.json`. To run it by hand:
 
 ```bash
 uv run python apps/reporting/generate_report.py --run-id <run> [--report-path <dir>] [--output <file>]

@@ -3,9 +3,18 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { randomUUID } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import { readFile, rm, stat } from 'node:fs/promises';
 import type { Pool } from 'pg';
-import { discoverBackups, type Backup } from '@verichron/contracts';
+import {
+  discoverBackups,
+  findWorkspaceBackupForPath,
+  readWorkspaceManifestSync,
+  resolveProcessorSummaryPaths,
+  resolveWorkspaceBackup,
+  type Backup,
+} from '@verichron/contracts';
+import { getRunDecryptedPath } from '@verichron/etl-db-reader';
 import type { PipelineFinishedResult, AnalysisRunStatus, PipelineLogEntry } from '../../shared/types/window';
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
 import { PipelineSingleFlight } from './pipelineSingleFlight';
@@ -165,8 +174,9 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
 
   /** The processor's summary.json, if this run wrote it: one left by an earlier run is ignored. */
   async function readPreparationSummary(workspace: string, runStartedAt: number) {
+    const manifest = readWorkspaceManifestSync(workspace);
+    const { json: file } = resolveProcessorSummaryPaths(workspace, manifest);
     try {
-      const file = path.join(workspace, 'summary.json');
       if ((await stat(file)).mtimeMs < runStartedAt) return undefined;
       const raw = await readFile(file, 'utf8');
       const parsed: unknown = JSON.parse(raw);
@@ -174,8 +184,10 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
         return undefined;
       }
       return (parsed as { backups: Array<{ label: string; success: boolean; decrypted: boolean }> }).backups;
-    } catch {
-      return undefined;
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
+      if (error instanceof SyntaxError) return undefined;
+      throw error;
     }
   }
 
@@ -209,10 +221,6 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }
   }
 
-  function backupSourceLikePrefix(workspace: string): string {
-    return `${path.join(workspace, 'decrypted')}${path.sep}%`;
-  }
-
   /**
    * EPOCH-305: closes out any pipeline_runs / pipeline_stage_status rows the
    * orchestrator subprocess left dangling for this workspace when it did not
@@ -228,7 +236,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
    * reliably knows the subprocess is gone, so it takes responsibility for
    * closing those rows out here.
    *
-   * Scoped by workspace (backup_source LIKE '<workspace>/decrypted/%')
+   * Scoped by the exact decrypt paths declared for this workspace
    * rather than by run_id: the orchestrator creates run rows per backup
    * internally and never reports their ids back over stdout, so this is the
    * coarsest-but-correct boundary available without changing that protocol.
@@ -236,23 +244,26 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
    * the renderer.
    */
   async function markWorkspaceRunsAborted(workspace: string, reason: string): Promise<void> {
-    const backupSourcePrefix = backupSourceLikePrefix(workspace);
     try {
+      const manifest = readWorkspaceManifestSync(workspace);
+      const backupSources = manifest.backups.map(
+        (entry) => resolveWorkspaceBackup(workspace, entry).decryptedPath
+      );
       await dbPool.query(
         `UPDATE pipeline_stage_status
             SET status = 'failed', error_message = $2, finished_at = now()
           WHERE status IN ('pending', 'running')
             AND run_id IN (
               SELECT run_id FROM pipeline_runs
-               WHERE backup_source LIKE $1 AND finished_at IS NULL
+               WHERE backup_source = ANY($1::text[]) AND finished_at IS NULL
             )`,
-        [backupSourcePrefix, reason]
+        [backupSources, reason]
       );
       await dbPool.query(
         `UPDATE pipeline_runs
             SET finished_at = now()
-          WHERE backup_source LIKE $1 AND finished_at IS NULL`,
-        [backupSourcePrefix]
+          WHERE backup_source = ANY($1::text[]) AND finished_at IS NULL`,
+        [backupSources]
       );
     } catch (err) {
       console.error('[pipelineHandlers] failed to mark dangling pipeline runs aborted:', err);
@@ -379,6 +390,10 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       stderrBuffer.end();
       void readPreparationSummary(workspacePath, startedAt).then((backups) => {
         prepareSession.finish({ success: code === 0, exitCode: code, workspace: workspacePath, backups });
+      }).catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[pipelineHandlers] could not read processor summary:', message);
+        prepareSession.finish({ success: false, exitCode: code, workspace: workspacePath, error: message });
       });
     });
 
@@ -409,10 +424,10 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }
     const trimmedWorkspace = workspace.trim();
     const releasePipeline = pipelineSingleFlight.reserve('orchestrator');
-    let backupPaths: string[];
+    let selectedLabels: string[];
     let summaryPath: string;
     try {
-      backupPaths = analysisTargets(trimmedWorkspace, Array.isArray(labels) ? labels : []);
+      selectedLabels = analysisTargets(trimmedWorkspace, Array.isArray(labels) ? labels : []);
       summaryPath = newSummaryPath();
     } catch (err) {
       releasePipeline();
@@ -421,7 +436,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
 
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = spawn('pnpm', orchestratorArgs(backupPaths, summaryPath), {
+      child = spawn('pnpm', orchestratorArgs(trimmedWorkspace, selectedLabels, summaryPath), {
         cwd: repoRoot,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -449,6 +464,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
       const workspaceAtFailure = runningOrchestratorWorkspace;
+      runningOrchestratorBackupSource = null;
       runningOrchestratorProcess = null;
       runningOrchestratorWorkspace = null;
       orchestratorTerminationReason = null;
@@ -470,7 +486,8 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       stderrBuffer.emitPending();
       clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
-      const workspaceAtClose = runningOrchestratorWorkspace ?? trimmedWorkspace;
+      const workspaceAtClose = runningOrchestratorWorkspace;
+      runningOrchestratorBackupSource = null;
       runningOrchestratorProcess = null;
       runningOrchestratorWorkspace = null;
       orchestratorTerminationReason = null;
@@ -482,7 +499,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       // already closed out pipeline_runs/pipeline_stage_status itself.
       // Any other outcome -- a crash, our own timeout kill, or a manual
       // cancel -- can leave rows dangling and needs the same cleanup path.
-      if (code !== 0) {
+      if (code !== 0 && workspaceAtClose) {
         const closeReason = cancelled
           ? 'cancelled by user'
           : timedOut
@@ -518,21 +535,29 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
 
   /**
    * EPOCH-308: re-invokes the orchestrator against exactly one previously-
-   * run backup_source instead of the whole workspace. ingest()'s per-file
+   * run evidence item instead of the whole workspace. ingest()'s per-file
    * atomicity and hasCompleteRunFor()'s complete-run check already make
    * this skip already-complete files and retry only what failed or never
    * ran -- no orchestrator or extractor changes required. Shares
    * runningOrchestratorProcess as its single-flight guard, so a retry and a
    * full-workspace analysis can never run concurrently.
    */
-  ipcMain.handle('epoch:retryRun', async (_event, backupSource: string) => {
+  ipcMain.handle('epoch:retryRun', async (_event, runId: string) => {
     if (runningOrchestratorProcess) {
       throw new Error('The orchestrator is already running -- wait for it to finish before starting another.');
     }
-    if (!backupSource || !backupSource.trim()) {
-      throw new Error('A backup source is required.');
+    if (!runId || !runId.trim()) {
+      throw new Error('A run id is required.');
     }
-    const trimmedBackupSource = backupSource.trim();
+    const trimmedRunId = runId.trim();
+    const decryptedPath = await getRunDecryptedPath(dbPool, trimmedRunId);
+    if (!decryptedPath) throw new Error(`Run ${trimmedRunId} has no registered decrypted backup to retry.`);
+    const workspaceTarget = await findWorkspaceBackupForPath(decryptedPath);
+    if (!workspaceTarget) {
+      throw new Error(
+        `No workspace manifest contains the registered decrypt for run ${trimmedRunId}; prepare and register the backup again.`
+      );
+    }
     const summaryPath = newSummaryPath();
     const releasePipeline = pipelineSingleFlight.reserve('orchestrator');
 
@@ -545,9 +570,12 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
           '@verichron/orchestrator',
           'investigate',
           '--',
+          '--workspace',
+          workspaceTarget.workspace,
+          '--label',
+          workspaceTarget.entry.label,
           '--summary-path',
           summaryPath,
-          trimmedBackupSource,
         ],
         { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] }
       );
@@ -556,9 +584,10 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       throw err;
     }
     runningOrchestratorProcess = child;
-    runningOrchestratorBackupSource = trimmedBackupSource;
+    runningOrchestratorWorkspace = null;
+    runningOrchestratorBackupSource = workspaceTarget.entry.decryptedPath;
     orchestratorTerminationReason = null;
-    analysisSession.start('retry', trimmedBackupSource);
+    analysisSession.start('retry', trimmedRunId);
 
     armOutsideStageTimeout();
 
@@ -571,8 +600,8 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
       const scopedBackupSource = runningOrchestratorBackupSource;
-      runningOrchestratorProcess = null;
       runningOrchestratorBackupSource = null;
+      runningOrchestratorProcess = null;
       orchestratorTerminationReason = null;
       if (scopedBackupSource) {
         void markSingleRunAborted(scopedBackupSource, `orchestrator process error: ${err.message}`);
@@ -592,9 +621,9 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       stderrBuffer.emitPending();
       clearOrchestratorTimers();
       const reason = orchestratorTerminationReason;
-      const scopedBackupSource = runningOrchestratorBackupSource ?? trimmedBackupSource;
-      runningOrchestratorProcess = null;
+      const scopedBackupSource = runningOrchestratorBackupSource ?? workspaceTarget.entry.decryptedPath;
       runningOrchestratorBackupSource = null;
+      runningOrchestratorProcess = null;
       orchestratorTerminationReason = null;
 
       const cancelled = reason === 'cancelled';
@@ -657,15 +686,16 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       return { status: 'running' };
     }
 
-    try {
-      const result = await dbPool.query(
-        `SELECT 1 FROM pipeline_runs WHERE backup_source LIKE $1 AND finished_at IS NULL LIMIT 1`,
-        [backupSourceLikePrefix(trimmedWorkspace)]
-      );
-      return { status: (result.rowCount ?? 0) > 0 ? 'interrupted' : 'idle' };
-    } catch (err) {
-      console.error('[pipelineHandlers] could not check analysis run status:', err);
-      return { status: 'idle' };
-    }
+    if (!existsSync(trimmedWorkspace)) return { status: 'idle' };
+    const manifest = readWorkspaceManifestSync(trimmedWorkspace);
+    const backupSources = manifest.backups.map(
+      (entry) => resolveWorkspaceBackup(trimmedWorkspace, entry).decryptedPath
+    );
+    if (backupSources.length === 0) return { status: 'idle' };
+    const result = await dbPool.query(
+      `SELECT 1 FROM pipeline_runs WHERE backup_source = ANY($1::text[]) AND finished_at IS NULL LIMIT 1`,
+      [backupSources]
+    );
+    return { status: (result.rowCount ?? 0) > 0 ? 'interrupted' : 'idle' };
   });
 }

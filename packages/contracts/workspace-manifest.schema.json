@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verichron.local/contracts/workspace-manifest.schema.json",
+  "title": "Verichron workspace manifest",
+  "description": "The explicit paths for evidence and outputs in one workspace.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "backups", "summary_files"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "backups": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/backup"
+      }
+    },
+    "summary_files": {
+      "$ref": "#/$defs/summary_files"
+    }
+  },
+  "$defs": {
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*\\/$).+$"
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "source_path",
+        "sidecar_path",
+        "manifest_directory",
+        "fingerprints_path",
+        "decrypted_path",
+        "results_path",
+        "ileapp_output_path",
+        "crash_reports_path",
+        "report_path",
+        "report_file_path",
+        "run_summaries_path",
+        "ileapp_log_path",
+        "ileapp_modules_path"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!\\.{1,2}$)(?!.*[/\\\\]).+$"
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sidecar_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "manifest_directory": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "fingerprints_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "decrypted_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "results_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "ileapp_output_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "crash_reports_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "report_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "report_file_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "run_summaries_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "ileapp_log_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "ileapp_modules_path": {
+          "$ref": "#/$defs/relative_path"
+        }
+      }
+    },
+    "summary_files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["processor_json_path", "processor_markdown_path"],
+      "properties": {
+        "processor_json_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "processor_markdown_path": {
+          "$ref": "#/$defs/relative_path"
+        }
+      }
+    }
+  }
+}

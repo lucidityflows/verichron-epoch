@@ -1,4 +1,4 @@
-import type { StageInput } from '@verichron/contracts';
+import type { ResolvedWorkspaceBackup, StageInput } from '@verichron/contracts';
 
 export interface StageManifest {
   entrypoint: string;
@@ -25,17 +25,17 @@ export interface StageSet {
 
 export interface RunConfig {
   backupPath: string;
-  /** <workspace>/reports/<label>: where the report stage writes (EPOCH-489). */
+  /** The exact report destination from workspace.json. */
   reportPath?: string;
   ileappPath?: string;
-  /** <workspace>/crash_reports/<label>: the device's crash logs (EPOCH-514). */
+  /** The exact acquired crash-log directory from workspace.json (EPOCH-514). */
   crashReportsPath?: string;
   dbUrl: string;
   pythonBin: string;
 }
 
 export interface CliConfig {
-  backupPaths: string[];
+  targets: ResolvedWorkspaceBackup[];
   workspacePaths: string[];
   dbUrl: string;
   /** Where this call writes its result for the caller (EPOCH-409); none when

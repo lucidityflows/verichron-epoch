@@ -6,9 +6,9 @@ Turns [iLEAPP](https://github.com/abrignoni/iLEAPP)'s results into
 [stage contract](../../../packages/contracts/EXTRACTOR_CONTRACT.md).
 
 The processor runs iLEAPP, not this stage (EPOCH-416): it leaves one report per
-backup at `<workspace>/ileapp/<label>/`, marked with `.ileapp_ok`, and the
-orchestrator registers it and passes its directory as `--derivative-path`.
-This stage reads that directory and nothing else.
+backup at the output path declared in `workspace.json`, marked with
+`.ileapp_ok`, and the orchestrator registers it and passes its directory as
+`--derivative-path`. This stage reads that directory and nothing else.
 
 > **Known issues** are ticketed and ordered under VER-24. Its tests use
 > recorded LAVA output (`test_integration.py`); CI doesn't run the real iLEAPP

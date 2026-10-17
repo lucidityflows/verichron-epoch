@@ -8,7 +8,7 @@ writes or commits.
 |---|---|
 | `getPipelineRuns` | Recent runs, with `state` from `run_completeness` (R23) |
 | `getRunEvidence` | The evidence a run processed |
-| `getRunReportLocation` | Where a run's report is now (`<workspace>/reports/<label>/`), derived from its decrypt; follows a moved workspace |
+| `getRunReportLocation` | The report file path declared in `workspace.json`; follows a moved workspace |
 | `getStageStatus` | A run's stages |
 | `getForensicRecords` | One evidence's facts: keyset-paged, with the true total and a cursor (R25), and only allow-listed sorts and filters |
 

@@ -33,7 +33,7 @@ async function run(cfg: CliConfig) {
     return;
   }
 
-  if (cfg.backupPaths.length === 0) {
+  if (cfg.targets.length === 0) {
     const error = 'No successfully decrypted backups were found in the workspace.';
     console.error(`[orchestrator] ${error}`);
     await writeCallSummary(cfg.summaryPath, [], error);
@@ -58,11 +58,12 @@ async function run(cfg: CliConfig) {
   let failedBackups = 0;
   const analysisResults: AnalysisResult[] = [];
 
-  for (const backupPath of cfg.backupPaths) {
+  for (const target of cfg.targets) {
+    const backupPath = target.decryptedPath;
     try {
       // Registration and the evidence-keyed resume check happen inside, before
       // any run is created (EPOCH-404).
-      const result = await runPipelineForBackup(client, backupPath, cfg.dbUrl, pythonBin, stages, {
+      const result = await runPipelineForBackup(client, target, cfg.dbUrl, pythonBin, stages, {
         indicatorSetHash: cfg.indicatorSetHash,
       });
       if (result.skipped) {

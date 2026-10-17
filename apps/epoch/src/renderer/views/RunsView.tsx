@@ -100,7 +100,7 @@ export function RunsView({
   const { state: analysis, log: analysisLog } = useAnalysisState();
   const { state: prepare } = usePrepareState();
   const pipelineBusy = analysis?.status === 'running' || prepare?.status === 'running';
-  const retryingThis = analysis?.kind === 'retry' && analysis.target === selectedRun?.backup_source;
+  const retryingThis = analysis?.kind === 'retry' && analysis.target === selectedRun?.run_id;
   const retrying = retryingThis && analysis?.status === 'running';
   const retryLog = retryingThis ? analysisLog : [];
   const retryResult = retryingThis && analysis?.status === 'finished' ? analysis.result : null;
@@ -122,7 +122,7 @@ export function RunsView({
     if (!selectedRun || retrying) return;
     setStartError(null);
     try {
-      await pipelineApi.retryRun(selectedRun.backup_source);
+      await pipelineApi.retryRun(selectedRun.run_id);
     } catch (err) {
       setStartError(err instanceof Error ? err.message : 'Failed to start retry.');
     }

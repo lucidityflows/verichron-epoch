@@ -58,10 +58,10 @@ the device separately (EPOCH-514).
   The device's reports change during the day, so the report states how long
   after the backup finished they were copied.
 - **Copied by the processor.** It copies them into
-  `<workspace>/crash_reports/<label>/`, hashes the copy the way a backup is
-  hashed, and writes `.crash_reports_ok` once the copy matches the pull's
-  folder. A folder without the pull's record, or one that changed after the
-  pull, is not used.
+  the crash-report path declared for that label in `workspace.json`, hashes
+  the copy the way a backup is hashed, and writes `.crash_reports_ok` once the
+  copy matches the pull's folder. A folder without the pull's record, or one
+  that changed after the pull, is not used.
 - **Registered with the backup's evidence, with no parent.** They were acquired
   in the same pull, not derived from the backup. Their identity is the tool and
   their content root; when they were copied is recorded but is not part of it.

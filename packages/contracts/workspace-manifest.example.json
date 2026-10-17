@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "backups": [
+    {
+      "label": "BK1",
+      "source_path": "/media/source/BK1",
+      "sidecar_path": "evidence/BK1/sidecar.json",
+      "manifest_directory": "evidence/BK1/manifests",
+      "fingerprints_path": "evidence/BK1/fingerprints.json",
+      "decrypted_path": "decrypted/BK1",
+      "results_path": "results/BK1",
+      "ileapp_output_path": "ileapp/BK1",
+      "crash_reports_path": "crash_reports/BK1",
+      "report_path": "reports/BK1",
+      "report_file_path": "reports/BK1/investigation_report.md",
+      "run_summaries_path": "runs/BK1",
+      "ileapp_log_path": "logs/BK1.ileapp.log",
+      "ileapp_modules_path": "logs/BK1.ileapp-modules.json"
+    }
+  ],
+  "summary_files": {
+    "processor_json_path": "summary.json",
+    "processor_markdown_path": "summary.md"
+  }
+}

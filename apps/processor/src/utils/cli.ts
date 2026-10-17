@@ -103,7 +103,8 @@ function printUsage() {
 
 Options:
   --source <dir>          directory containing backup subdirectories (required)
-  --workspace <dir>        workspace directory for evidence/decrypted/ileapp (default: ~/verichron-workspace)
+  --workspace <dir>        workspace directory; output paths are declared in workspace.json
+                           (default: ~/verichron-workspace)
   --decrypt-python <path>  interpreter for the backup decrypt (default: <repo-root>/tools/decrypt/.venv/bin/python,
                            the pinned environment "mise run setup" creates)
   --decrypt-script <path>  the backup decrypt script (default: <repo-root>/tools/decrypt/decrypt_backup.py)

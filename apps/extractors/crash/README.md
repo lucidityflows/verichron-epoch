@@ -9,7 +9,7 @@ derivative). It follows the
 on the real reference backup, `Manifest.db` listed no file under
 `DiagnosticReports` or `CrashReporter`. Crash logs are copied from the device
 separately: an iPhone pull copies them with `idevicecrashreport -k`, and the
-processor copies them into `crash_reports/<label>/` (EPOCH-514; see
+processor copies them to the path declared in `workspace.json` (EPOCH-514; see
 [docs/evidence-model.md](../../../docs/evidence-model.md#derivatives)).
 EPOCH-515 will read them from full-filesystem extractions. Evidence without
 them has this stage recorded as skipped, with that reason, and the report lists

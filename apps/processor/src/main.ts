@@ -7,15 +7,22 @@ import {
   BACKUP_SEARCH_MAX_DEPTH,
   DECRYPT_MARKER,
   ILEAPP_MARKER,
-  deriveEvidencePath,
+  createWorkspaceManifestBackup,
+  emptyWorkspaceManifest,
   EvidenceSidecar,
+  parseWorkspaceManifest,
   readDecryptMarker,
   readIleappMarker,
   renderDecryptMarker,
   renderIleappMarker,
+  resolveProcessorSummaryPaths,
+  resolveWorkspaceBackup,
+  workspaceEvidenceManifestPath,
   type Backup,
   type RepairProvenance,
   type ToolVersion,
+  type WorkspaceManifest,
+  workspaceManifestPath,
 } from '@verichron/contracts';
 
 import { parseFlags, type Config } from './utils/cli.js';
@@ -88,11 +95,6 @@ async function run(cfg: Config): Promise<void> {
   const ileappTool = await ileappToolVersion(cfg.ileappDir);
   console.log(`[processor] iLEAPP ${ileappTool.version.slice(0, 12)} (${cfg.ileappDir})`);
 
-  const dirs = ['decrypted', 'ileapp', 'crash_reports', 'logs'];
-  for (const d of dirs) {
-    await fsp.mkdir(path.join(cfg.workspace, d), { recursive: true });
-  }
-
   await runBackups(cfg, decryptTool, { decrypt: decryptToolV, ileapp: ileappTool });
 }
 
@@ -113,6 +115,9 @@ async function runBackups(
     );
   }
 
+  const manifest = await updateWorkspaceManifest(cfg, backups);
+  const entries = new Map(manifest.backups.map((entry) => [entry.label, resolveWorkspaceBackup(cfg.workspace, entry)]));
+
   console.log(`found ${backups.length} backup(s):`);
   for (const b of backups) {
     console.log(`  - ${b.label}  (${b.path})`);
@@ -127,12 +132,14 @@ async function runBackups(
   for (const backup of backups) {
     const name = backup.label;
     const src = backup.path;
+    const manifestEntry = entries.get(name);
+    if (!manifestEntry) throw new Error(`workspace manifest has no entry for backup "${name}"`);
     console.log(`=== ${name} ===`);
 
     let contentRoot: string;
     let backupBytes: number;
     try {
-      ({ contentRoot, totalBytes: backupBytes } = await hashBackup(cfg, name, src));
+      ({ contentRoot, totalBytes: backupBytes } = await hashBackup(cfg, manifestEntry, src));
     } catch (err) {
       const message = isNoSpaceError(err)
         ? await explainNoSpace(cfg.workspace)
@@ -144,9 +151,9 @@ async function runBackups(
       continue;
     }
 
-    const decDir = path.join(cfg.workspace, 'decrypted', name);
+    const decDir = manifestEntry.decryptedPath;
     const decMarker = path.join(decDir, DECRYPT_MARKER);
-    const ileDir = path.join(cfg.workspace, 'ileapp', name);
+    const ileDir = manifestEntry.ileappOutputPath;
     let decryptRan = false;
     // The decrypt is reusable only if it was made from the backup as it is
     // now: its marker records the content_root it came from (EPOCH-404).
@@ -183,7 +190,7 @@ async function runBackups(
         );
         await fsp.rm(decDir, { recursive: true, force: true });
         await fsp.rm(ileDir, { recursive: true, force: true });
-        await fsp.rm(path.join(cfg.workspace, 'crash_reports', name), { recursive: true, force: true });
+        await fsp.rm(manifestEntry.crashReportsPath, { recursive: true, force: true });
       }
       // Withdraw every marker that vouches for this decrypt BEFORE touching
       // it. A decrypt that dies part-way (e.g. --force-decrypt over an
@@ -272,7 +279,7 @@ async function runBackups(
       // marker and registration will refuse it.
       let recheck: Awaited<ReturnType<typeof hashTree>>;
       try {
-        recheck = await hashTree(src, { cachePath: deriveEvidencePath(cfg.workspace, name).fingerprints });
+        recheck = await hashTree(src, { cachePath: manifestEntry.fingerprintsPath });
       } catch (err) {
         // e.g. the source drive disconnected after the decrypt finished.
         // The decrypt can't be attributed to a root, so it gets no marker;
@@ -370,20 +377,19 @@ async function runBackups(
       await fsp.rm(ileDir, { recursive: true, force: true });
       try {
         const inputType = ileappInputType(decDir);
-        const logPath = path.join(cfg.workspace, 'logs', `${name}.ileapp.log`);
         await runIleapp({
           python: cfg.ileappPython,
           ileappDir: cfg.ileappDir,
           decryptedDir: decDir,
           inputType,
           outputDir: ileDir,
-          logPath,
-          modulesPath: path.join(cfg.workspace, 'logs', `${name}.ileapp-modules.json`),
+          logPath: manifestEntry.ileappLogPath,
+          modulesPath: manifestEntry.ileappModulesPath,
           moduleTimeoutMs: cfg.ileappModuleTimeoutMs,
         });
         // A plugin that errored is recorded with the output, not treated as a
         // failed run (EPOCH-457): it fails the same way every time.
-        const modules = readModuleOutcomes(ileDir, await fsp.readFile(logPath, 'utf8'));
+        const modules = readModuleOutcomes(ileDir, await fsp.readFile(manifestEntry.ileappLogPath, 'utf8'));
         await writeFileAtomic(
           path.join(ileDir, ILEAPP_MARKER),
           renderIleappMarker(contentRoot, tools.ileapp, { input_type: inputType, modules })
@@ -410,13 +416,13 @@ async function runBackups(
     try {
       const crash = await prepareCrashReports({
         backupPath: src,
-        destDir: path.join(cfg.workspace, 'crash_reports', name),
+        destDir: manifestEntry.crashReportsPath,
         contentRoot,
         force: cfg.force,
       });
       if (crash.status === 'none') console.log(`  [crash]   ${crash.message}`);
       else if (crash.status === 'reused') console.log(`  [crash]   already copied (${crash.files} file(s)), skipping`);
-      else console.log(`  [crash]   copied ${crash.files} file(s) -> crash_reports/${name}`);
+      else console.log(`  [crash]   copied ${crash.files} file(s) -> ${manifestEntry.crashReportsPath}`);
     } catch (err) {
       const message = isNoSpaceError(err)
         ? await explainNoSpace(cfg.workspace, backupBytes)
@@ -429,15 +435,25 @@ async function runBackups(
     console.log();
   }
 
-  const summaryPath = await writeSummary(cfg, backups, failedBackups, repairFailuresByBackup);
-  const backupResults = await Promise.all(
-    backups.map(async (backup) => ({
-      label: backup.label,
-      success: !failedBackups.has(backup.label),
-      decrypted: await pathExists(path.join(cfg.workspace, 'decrypted', backup.label, DECRYPT_MARKER)),
-    }))
+  const summaryPaths = resolveProcessorSummaryPaths(cfg.workspace, manifest);
+  const summaryPath = await writeSummary(
+    summaryPaths.markdown,
+    backups,
+    failedBackups,
+    repairFailuresByBackup
   );
-  await fsp.writeFile(path.join(cfg.workspace, 'summary.json'), JSON.stringify({ backups: backupResults }, null, 2));
+  const backupResults = await Promise.all(
+    backups.map(async (backup) => {
+      const entry = entries.get(backup.label);
+      if (!entry) throw new Error(`workspace manifest has no entry for backup "${backup.label}"`);
+      return {
+        label: backup.label,
+        success: !failedBackups.has(backup.label),
+        decrypted: await pathExists(path.join(entry.decryptedPath, DECRYPT_MARKER)),
+      };
+    })
+  );
+  await writeFileAtomic(summaryPaths.json, JSON.stringify({ backups: backupResults }, null, 2) + '\n');
   console.log('summary written to', summaryPath);
   if (failedBackups.size > 0) {
     console.error(`completed with ${failedBackups.size} backup(s) that need attention`);
@@ -469,24 +485,23 @@ function decryptEnv(): NodeJS.ProcessEnv {
  */
 async function hashBackup(
   cfg: Config,
-  name: string,
+  entry: ReturnType<typeof resolveWorkspaceBackup>,
   src: string
 ): Promise<{ contentRoot: string; totalBytes: number }> {
-  const paths = deriveEvidencePath(cfg.workspace, name);
   const report = throttled(PROGRESS_INTERVAL_MS);
   const result = await hashTree(src, {
-    cachePath: paths.fingerprints,
+    cachePath: entry.fingerprintsPath,
     verify: cfg.verify,
     // Progress the app shows while a large backup is hashed (EPOCH-487).
     onProgress: (bytes, files) => report(() => console.log(`  [hash]    progress ${bytes} bytes, ${files} files`)),
   });
 
-  const manifestPath = paths.manifestFor(result.contentRoot);
+  const manifestPath = workspaceEvidenceManifestPath(entry, result.contentRoot);
   await writeFileAtomic(manifestPath, result.manifest);
 
   const sidecar = EvidenceSidecar.parse({
     schema_version: 1,
-    evidence_name: name,
+    evidence_name: entry.label,
     algorithm: 'sha256',
     content_root: result.contentRoot,
     manifest_path: path.relative(cfg.workspace, manifestPath).split(path.sep).join('/'),
@@ -496,15 +511,56 @@ async function hashBackup(
     hashed_at: new Date().toISOString(),
     tool: { name: 'processor', version: TOOL_VERSION },
   });
-  await writeFileAtomic(paths.sidecar, JSON.stringify(sidecar, null, 2) + '\n');
+  await writeFileAtomic(entry.sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
 
   // Must start with "done": apps/epoch's prepareProgress only completes a step
   // on a "[stage] done..." (or skip) line.
   console.log(
-    `  [hash]    done -> ${paths.sidecar}` +
+    `  [hash]    done -> ${entry.sidecarPath}` +
       ` (${result.fileCount} files, ${result.hashed} hashed, ${result.reused} cached, root ${result.contentRoot})`
   );
   return { contentRoot: result.contentRoot, totalBytes: result.totalBytes };
+}
+
+async function updateWorkspaceManifest(cfg: Config, backups: Backup[]): Promise<WorkspaceManifest> {
+  const file = workspaceManifestPath(cfg.workspace);
+  let current = emptyWorkspaceManifest();
+  try {
+    current = parseWorkspaceManifest(await fsp.readFile(file, 'utf8'), file);
+  } catch (error) {
+    if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')) throw error;
+  }
+
+  const byLabel = new Map(current.backups.map((entry) => [entry.label, entry]));
+  for (const backup of backups) {
+    const existing = byLabel.get(backup.label);
+    byLabel.set(
+      backup.label,
+      existing
+        ? { ...existing, source_path: path.resolve(backup.path) }
+        : createWorkspaceManifestBackup(backup.label, backup.path)
+    );
+  }
+  const updated = parseWorkspaceManifest(
+    JSON.stringify({ ...current, backups: [...byLabel.values()] }),
+    file
+  );
+  await writeFileAtomic(file, JSON.stringify(updated, null, 2) + '\n');
+
+  for (const backup of backups) {
+    const entry = updated.backups.find((candidate) => candidate.label === backup.label);
+    if (!entry) throw new Error(`workspace manifest has no entry for backup "${backup.label}"`);
+    const resolved = resolveWorkspaceBackup(cfg.workspace, entry);
+    for (const directory of [
+      path.dirname(resolved.decryptedPath),
+      path.dirname(resolved.ileappOutputPath),
+      path.dirname(resolved.crashReportsPath),
+      path.dirname(resolved.ileappLogPath),
+    ]) {
+      await fsp.mkdir(directory, { recursive: true });
+    }
+  }
+  return updated;
 }
 
 main();

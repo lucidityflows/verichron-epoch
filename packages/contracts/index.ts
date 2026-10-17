@@ -17,13 +17,24 @@ export { NormalizedRecord } from './ts/normalizedRecord.js';
 export { discoverBackups, BACKUP_SEARCH_MAX_DEPTH } from './ts/discoverBackups.js';
 export type { Backup } from './ts/discoverBackups.js';
 export {
-  deriveReportPath,
-  deriveIleappPath,
-  deriveCrashReportsPath,
-  deriveRunSummaryPath,
-} from './ts/deriveWorkspacePaths.js';
+  WORKSPACE_MANIFEST_NAME,
+  WorkspaceManifest,
+  WorkspaceManifestError,
+  createWorkspaceManifestBackup,
+  emptyWorkspaceManifest,
+  findWorkspaceBackupForPath,
+  parseWorkspaceManifest,
+  readWorkspaceManifest,
+  readWorkspaceManifestSync,
+  resolveProcessorSummaryPaths,
+  resolveRunSummaryPath,
+  resolveWorkspaceBackup,
+  resolveWorkspacePath,
+  workspaceEvidenceManifestPath,
+  workspaceManifestPath,
+} from './ts/workspaceManifest.js';
+export type { ResolvedWorkspaceBackup, WorkspaceManifestBackup } from './ts/workspaceManifest.js';
 export { crashReportsAcquisitionPaths, CrashReportsAcquisition } from './ts/crashReportsAcquisition.js';
-export { deriveEvidencePath } from './ts/deriveEvidencePath.js';
 export { EvidenceSidecar } from './ts/evidenceSidecar.js';
 export { contractVersion, CONTRACT_SCHEMAS } from './ts/contractVersion.js';
 export { indicatorResultsConfig, type IndicatorResultsConfig } from './ts/indicatorResults.js';

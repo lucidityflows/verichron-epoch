@@ -7,10 +7,11 @@ and Python mirror the JSON schemas, and CI checks that the mirrors match.
 |---|---|
 | `normalized-record.schema.json` | **The canonical fact envelope** and the `source_type` list |
 | `stage-manifest.schema.json` | `stage.json` |
-| `evidence-sidecar.schema.json` | `evidence/<label>/sidecar.json` |
+| `evidence-sidecar.schema.json` | Sidecar path declared for the backup in `workspace.json` |
+| `workspace-manifest.schema.json` | `workspace.json`, the explicit paths for each backup and the processor summaries |
 | [`EXTRACTOR_CONTRACT.md`](EXTRACTOR_CONTRACT.md) | What every pipeline stage must do |
-| `ts/` | Zod mirrors and TS helpers: `normalizedRecord`, `sourceType`, `evidenceSidecar`, `derivativeMarker` (completion markers and provenance key), `deriveEvidencePath`, `deriveWorkspacePaths` (report and iLEAPP locations), `discoverBackups`, `contractVersion`, `env` |
-| `python/` | Pydantic mirror (`normalized_record`, `source_type`), the schema `adapter`, and `test_contract_sync.py` |
+| `ts/` | Zod mirrors and TS helpers: `normalizedRecord`, `sourceType`, `evidenceSidecar`, `workspaceManifest`, `derivativeMarker` (completion markers and provenance key), `discoverBackups`, `contractVersion`, `env` |
+| `python/` | Pydantic mirrors (`normalized_record`, `source_type`, `workspace_manifest`), the schema `adapter`, and `test_contract_sync.py` |
 
 ## Changing a contract
 

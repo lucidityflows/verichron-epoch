@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import type { Pool } from 'pg';
-import { beforeEach, describe, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, vi } from 'vitest';
+import { DECRYPT_MARKER, createWorkspaceManifestBackup, emptyWorkspaceManifest, resolveWorkspaceBackup } from '@verichron/contracts';
 
 const { handlers, spawnMock } = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
   spawnMock: vi.fn(),
 }));
+let workspace: string;
+let decryptPath: string;
+let pool: { query: () => Promise<{ rows: Array<{ path: string }> }> };
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -38,30 +45,49 @@ describe('pipeline IPC single-flight', () => {
   beforeEach(() => {
     handlers.clear();
     spawnMock.mockReset();
-    registerPipelineHandlers(() => null, '/repo', {} as Pool);
+    workspace = mkdtempSync(path.join(os.tmpdir(), 'pipeline-handlers-'));
+    const entry = createWorkspaceManifestBackup('BK', '/source/BK');
+    entry.decrypted_path = 'renamed/decrypt/BK';
+    const target = resolveWorkspaceBackup(workspace, entry);
+    decryptPath = target.decryptedPath;
+    mkdirSync(decryptPath, { recursive: true });
+    writeFileSync(path.join(decryptPath, DECRYPT_MARKER), 'complete');
+    writeFileSync(
+      path.join(workspace, 'workspace.json'),
+      JSON.stringify({ ...emptyWorkspaceManifest(), backups: [entry] })
+    );
+    pool = { query: async () => ({ rows: [{ path: decryptPath }] }) };
+    registerPipelineHandlers(() => null, '/repo', pool as unknown as Pool);
   });
+
+  afterEach(() => rmSync(workspace, { recursive: true, force: true }));
 
   it('refuses the orchestrator while the processor runs, and the processor while the orchestrator runs', async () => {
     const processor = childProcess();
     spawnMock.mockReturnValueOnce(processor);
-    await invoke('epoch:startPipeline', '/source', { workspace: '/workspace' });
+    await invoke('epoch:startPipeline', '/source', { workspace });
 
     await assert.rejects(
-      invoke('epoch:startAnalysis', '/workspace', []),
+      invoke('epoch:startAnalysis', workspace, []),
       /Cannot start orchestrator while processor is running/
     );
     await assert.rejects(
-      invoke('epoch:retryRun', '/workspace/decrypted/BK'),
+      invoke('epoch:retryRun', 'run-123'),
       /Cannot start orchestrator while processor is running/
     );
     processor.emit('close', 0);
 
     const orchestrator = childProcess();
     spawnMock.mockReturnValueOnce(orchestrator);
-    await invoke('epoch:retryRun', '/workspace/decrypted/BK');
+    await invoke('epoch:retryRun', 'run-123');
+    const args = spawnMock.mock.calls.at(-1)?.[1] as string[];
+    assert.ok(args.includes('--workspace'));
+    assert.ok(args.includes(workspace));
+    assert.ok(args.includes('--label'));
+    assert.ok(args.includes('BK'));
 
     await assert.rejects(
-      invoke('epoch:startPipeline', '/source', { workspace: '/workspace' }),
+      invoke('epoch:startPipeline', '/source', { workspace }),
       /Cannot start processor while orchestrator is running/
     );
     orchestrator.emit('close', 0);
