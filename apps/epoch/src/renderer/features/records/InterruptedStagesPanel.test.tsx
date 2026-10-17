@@ -66,8 +66,8 @@ describe('InterruptedStagesPanel', () => {
       />
     );
     assert.ok(await screen.findByText('2 stages stopped before they finished'));
-    assert.ok(screen.getByText('crash: Epoch closed while it was running'));
-    assert.ok(screen.getByText('ileapp_bridge: Epoch closed while it was running'));
+    assert.ok(screen.getByText('crash: its orchestrator ended without finishing it'));
+    assert.ok(screen.getByText('ileapp_bridge: its orchestrator ended without finishing it'));
   });
 
   it('reruns the investigation, then reads again when the rerun ends', async () => {

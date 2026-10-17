@@ -190,7 +190,7 @@ describe('StageCard', () => {
       />
     );
     assert.ok(screen.getByText('stopped'));
-    assert.ok(screen.getByText('Not run: Epoch closed while it was running'));
+    assert.ok(screen.getByText('Not run: its orchestrator ended without finishing it'));
   });
 
   it('still shows a stage of a run that is going as running', () => {

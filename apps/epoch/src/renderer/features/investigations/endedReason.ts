@@ -9,7 +9,8 @@ export const ENDED_REASON_PHRASE: Record<Exclude<EndedReason, 'completed'>, stri
   cancelled: 'the run was cancelled',
   timeout: 'the run stalled and was stopped',
   crashed: 'the orchestrator stopped unexpectedly',
-  abandoned: 'Epoch closed while it was running',
+  // Only that the process is gone is recorded, not why (review on PR #125).
+  abandoned: 'its orchestrator ended without finishing it',
 };
 
 /** The phrase for a run that ended without finishing; null for a run still going or completed. */
