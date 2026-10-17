@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { spawn, execFileSync, type ChildProcess } from 'child_process';
 import type {
   BackupProgress,
@@ -108,6 +109,8 @@ export class IosBackupSource implements DeviceBackupSource {
   private cancelRequested: boolean | null = null;
   /** True while crash logs are being copied again (EPOCH-519); a pull waits for it. */
   private copyingCrashLogs = false;
+  /** Renderer-safe, short-lived references for devices eligible for a crash-log retry. */
+  private retryDeviceReferences = new Map<string, DeviceInfo>();
 
   /**
    * Stops the running backup cleanly: SIGINT, as Ctrl+C would, so
@@ -242,14 +245,19 @@ export class IosBackupSource implements DeviceBackupSource {
       return { targets: [], errors: [] };
     }
     const devices = await this.listConnectedDevices();
+    const connectedIds = new Set(devices.map((device) => device.id.toUpperCase()));
+    for (const [reference, device] of this.retryDeviceReferences) {
+      if (!connectedIds.has(device.id.toUpperCase())) this.retryDeviceReferences.delete(reference);
+    }
     if (devices.length === 0) return { targets: [], errors: [] };
 
     const plistutil = trustedToolPath('plistutil');
     if (!plistutil) throw new Error('plistutil is not available -- complete the iPhone tool setup first.');
 
     const targets: CrashReportsRetryTarget[] = [];
-    const errors: string[] = [];
-    for (const backupDir of backupDirs) {
+    const errors: CrashReportsRetryLookup['errors'] = [];
+
+    for (const [backupIndex, backupDir] of backupDirs.entries()) {
       try {
         if ((await incompleteReason(plistutil, backupDir)) !== null) continue;
         const deviceId = await backupDeviceId(plistutil, backupDir);
@@ -259,12 +267,35 @@ export class IosBackupSource implements DeviceBackupSource {
             connected.id.toUpperCase() === deviceId.toUpperCase() && path.basename(backupDir) === connected.id
         );
         if (!device || (await crashReportsCopyExists(backupDir))) continue;
-        targets.push({ sourceId: this.id, backupDir, device });
+        const deviceRef = this.referenceForDevice(device);
+        targets.push({ sourceId: this.id, backupIndex, deviceRef, deviceName: device.name });
       } catch (err) {
-        errors.push(`${path.basename(backupDir)}: ${err instanceof Error ? err.message : String(err)}`);
+        errors.push({
+          backupIndex,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
     return { targets, errors };
+  }
+
+  async copyCrashReportsAgainByReference(deviceRef: string, backupDir: string): Promise<CrashReportsResult> {
+    const device = this.retryDeviceReferences.get(deviceRef);
+    if (!device) throw new Error('The device reference is no longer available. Refresh the backup list and try again.');
+    return this.copyCrashReportsAgain(device, backupDir);
+  }
+
+  private referenceForDevice(device: DeviceInfo): string {
+    for (const [reference, existing] of this.retryDeviceReferences) {
+      if (existing.id.toUpperCase() === device.id.toUpperCase()) {
+        this.retryDeviceReferences.set(reference, device);
+        return reference;
+      }
+    }
+
+    const reference = randomUUID();
+    this.retryDeviceReferences.set(reference, device);
+    return reference;
   }
 
   async checkToolAvailable(): Promise<ToolAvailabilityStatus> {

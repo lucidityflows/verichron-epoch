@@ -60,6 +60,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
   const [crashReportsRetryTargets, setCrashReportsRetryTargets] = useState<CrashReportsRetryTarget[]>([]);
   const [crashReportsRetryError, setCrashReportsRetryError] = useState<string | null>(null);
+  const [retryEligibilityRefreshVersion, setRetryEligibilityRefreshVersion] = useState(0);
 
   const [showOptions, setShowOptions] = useState(false);
   const [workspace, setWorkspace] = useState('');
@@ -224,7 +225,11 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         );
         if (!cancelled) {
           setCrashReportsRetryTargets(lookups.flatMap((lookup) => lookup.targets));
-          const errors = lookups.flatMap((lookup) => lookup.errors);
+          const errors = lookups.flatMap((lookup) =>
+            lookup.errors.map(
+              ({ backupIndex, error }) => `${backups[backupIndex]?.label ?? `Backup ${backupIndex + 1}`}: ${error}`
+            )
+          );
           setCrashReportsRetryError(
             errors.length > 0 ? `Some backups could not be checked: ${errors.join('; ')}` : null
           );
@@ -256,7 +261,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [backups]);
+  }, [backups, retryEligibilityRefreshVersion]);
 
   const toggleBackup = (label: string) => {
     setSelectedLabels((prev) => {
@@ -516,7 +521,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
             {!discoveringBackups && backups.length > 0 && (
               <div className="rounded-xl divide-y divide-border/60 max-h-80 overflow-auto bg-surface-raised shadow-inner">
-                {backups.map((b) => {
+                {backups.map((b, backupIndex) => {
                   const progress = runProgress?.byLabel[b.label];
                   const isLive = busy && !!progress;
                   const overall = progress?.overall;
@@ -533,15 +538,21 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       awaitingPassword={isLive && pendingPasswordFor === b.label}
                       lastResult={lastResult}
                       prepared={preparedByLabel.get(b.label)}
-                      crashReportsRetryTarget={crashReportsRetryTargets.find((target) => target.backupDir === b.path)}
+                      crashReportsRetryTarget={crashReportsRetryTargets.find(
+                        (target) => target.backupIndex === backupIndex
+                      )}
                       onCopyCrashReportsAgain={async (target) => {
-                        const result = await devicesApi.copyDeviceCrashReports(
-                          target.sourceId,
-                          target.device,
-                          target.backupDir
-                        );
-                        if (result.outcome !== 'copied') {
-                          throw new Error(result.error ?? 'Crash logs were not copied.');
+                        try {
+                          const result = await devicesApi.copyDeviceCrashReportsByReference(
+                            target.sourceId,
+                            target.deviceRef,
+                            b.path
+                          );
+                          if (result.outcome !== 'copied') {
+                            throw new Error(result.error ?? 'Crash logs were not copied.');
+                          }
+                        } finally {
+                          setRetryEligibilityRefreshVersion((version) => version + 1);
                         }
                       }}
                     />

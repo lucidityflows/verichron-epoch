@@ -68,16 +68,19 @@ export function BackupRow({
         <PreparedState prepared={prepared} />
         {lastResult === 'failed' && <XCircle size="1.125rem" className="text-danger shrink-0" />}
       </label>
-      {crashReportsRetryTarget && onCopyCrashReportsAgain && (
+      {retryDone && (
         <div className="px-11 pb-3">
-          {retryDone ? (
-            <p role="status" className="text-label text-success">
-              Crash logs copied. Prepare this backup again to include them in the report.
-            </p>
-          ) : retryConfirming ? (
+          <p role="status" className="text-label text-success">
+            Crash logs copied. Prepare this backup again to include them in the report.
+          </p>
+        </div>
+      )}
+      {!retryDone && crashReportsRetryTarget && onCopyCrashReportsAgain && (
+        <div className="px-11 pb-3">
+          {retryConfirming ? (
             <div className="flex items-center justify-between gap-3">
               <p className="text-label text-flag">
-                Look at {crashReportsRetryTarget.device.name}: unlock it and keep it connected before copying.
+                Look at {crashReportsRetryTarget.deviceName}: unlock it and keep it connected before copying.
               </p>
               <div className="flex items-center gap-2 shrink-0">
                 <Button
@@ -125,7 +128,7 @@ export function BackupRow({
               }}
               disabled={disabled}
             >
-              Copy crash logs from {crashReportsRetryTarget.device.name}
+              Copy crash logs from {crashReportsRetryTarget.deviceName}
             </Button>
           )}
           {retryError && (

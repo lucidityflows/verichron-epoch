@@ -6,18 +6,21 @@ import { BackupRow } from './BackupRow';
 
 afterEach(cleanup);
 
+const BACKUP_PATH = '/evidence/backup';
+
 const target: CrashReportsRetryTarget = {
   sourceId: 'ios',
-  backupDir: '/evidence/backup',
-  device: { id: 'UDID-1', name: "Alex's iPhone" },
+  backupIndex: 0,
+  deviceRef: 'opaque-device-ref',
+  deviceName: "Alex's iPhone",
 };
 
 describe('BackupRow crash-log retry', () => {
   it('asks the user to unlock the connected device before starting the copy', async () => {
     let copied = false;
-    render(
+    const view = render(
       <BackupRow
-        backup={{ label: 'backup', path: target.backupDir }}
+        backup={{ label: 'backup', path: BACKUP_PATH }}
         selected
         onToggle={() => undefined}
         disabled={false}
@@ -36,12 +39,16 @@ describe('BackupRow crash-log retry', () => {
     await screen.findByRole('status');
     assert.equal(copied, true);
     assert.ok(screen.getByText(/Prepare this backup again to include them in the report/));
+    view.rerender(
+      <BackupRow backup={{ label: 'backup', path: BACKUP_PATH }} selected onToggle={() => undefined} disabled={false} />
+    );
+    assert.ok(screen.getByText(/Crash logs copied\. Prepare this backup again/));
   });
 
   it('shows retry failures instead of a success-shaped result', async () => {
     render(
       <BackupRow
-        backup={{ label: 'backup', path: target.backupDir }}
+        backup={{ label: 'backup', path: BACKUP_PATH }}
         selected
         onToggle={() => undefined}
         disabled={false}
