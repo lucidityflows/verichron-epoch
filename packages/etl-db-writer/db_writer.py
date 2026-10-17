@@ -518,7 +518,7 @@ def record_failures(
     tells the two apart.
 
     An item is named by its path relative to `root`, the directory the stage
-    read; an absolute item is refused. Each row also keeps `root / item` as
+    read; an absolute item, or one that climbs out of `root`, is refused. Each row also keeps `root / item` as
     `file_path`, built exactly as `ingest()` builds a unit's, so an item with no
     hash can be matched to the unit that later completes it. Returns the number
     of rows written; writes and commits nothing when there are none.
@@ -529,7 +529,10 @@ def record_failures(
         raise ValueError("record_failures() needs the stage name: the orchestrator passes --stage-name")
     rows = list(failures)
     for failure in rows:
-        if not failure.item or failure.item.startswith("/"):
+        # The stages name items under the directory they read; this only
+        # guards that contract (an absolute path, or `..` out of `root`).
+        parts = Path(failure.item).parts
+        if not failure.item or Path(failure.item).is_absolute() or ".." in parts:
             raise ValueError(f"a failed item is named relative to its derivative, got {failure.item!r}")
         if failure.file_hash is not None and not re.fullmatch(r"[0-9a-f]{64}", failure.file_hash):
             raise ValueError(f"a failed item's hash must be a sha256 hex digest, got {failure.file_hash!r}")

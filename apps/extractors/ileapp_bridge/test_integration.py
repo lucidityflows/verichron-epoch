@@ -32,7 +32,7 @@ from ileapp_bridge.lava import (
     read_manifest,
     unix_utc,
 )
-from ileapp_bridge.main import ingest_report
+from ileapp_bridge.main import failure_item, ingest_report
 
 RUN_ID = "dddddddd-0000-0000-0000-000000000000"
 EVIDENCE_ID = "dddd0000-0000-0000-0000-00000000000d"
@@ -260,6 +260,24 @@ def test_a_failed_artifact_is_named_as_the_ledger_names_it_with_its_hash_once_ch
     written_hash = failures["_lava_artifacts.db#safaricopy"].file_hash
     assert written_hash is not None and re.fullmatch(r"[0-9a-f]{64}", written_hash)
     assert failures["_lava_artifacts.db#safaricopy"].reason == "ValueError: row refused"
+
+
+@pytest.mark.parametrize(
+    "table, item",
+    [
+        ("safarihistory", "_lava_artifacts.db#safarihistory"),
+        ("..", "_lava_artifacts.db#.."),
+        ("x/../../outside", "_lava_artifacts.db"),
+        ("x\\..\\outside", "_lava_artifacts.db"),
+        (None, "_lava_artifacts.db"),
+    ],
+)
+def test_a_failed_artifact_is_always_named_under_the_report_directory(table, item):
+    """EPOCH-432 review: a table name with a path separator, or none, can't
+    name a place under the report directory; it is filed under the database."""
+    from types import SimpleNamespace
+
+    assert failure_item(SimpleNamespace(tablename=table)) == item  # type: ignore[arg-type]
 
 
 def test_a_row_that_fails_partway_through_its_unit_writes_nothing_for_that_artifact(db, tmp_path, monkeypatch):

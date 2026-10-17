@@ -25,6 +25,7 @@ try:
     from .lava import (
         DATABASE,
         TOOL,
+        Artifact,
         ArtifactScan,
         LavaOutput,
         RowRead,
@@ -38,6 +39,7 @@ except ImportError:
     from lava import (
         DATABASE,
         TOOL,
+        Artifact,
         ArtifactScan,
         LavaOutput,
         RowRead,
@@ -159,6 +161,17 @@ def _warn_about_incomplete_ingests(conn, evidence_id: str) -> None:
         print(f"[ileapp]   ... and {len(stranded) - 20} more", file=sys.stderr)
 
 
+def failure_item(artifact: Artifact) -> str:
+    """The failed artifact's name, relative to the report directory, as the
+    ledger names its unit (EPOCH-432). A table name that is missing or holds a
+    path separator can't name a place under the report directory, so the
+    failure is filed under the database itself; its reason names the table."""
+    table = artifact.tablename
+    if not table or "/" in table or "\\" in table:
+        return DATABASE
+    return f"{DATABASE}#{table}"
+
+
 def ingest_report(conn, ctx: IngestContext, report_dir: str | Path) -> ETLRunResult:
     """Ingest every artifact in one iLEAPP report. A report that can't be read
     as a whole fails the stage (LavaError); one artifact that can't be read
@@ -171,9 +184,7 @@ def ingest_report(conn, ctx: IngestContext, report_dir: str | Path) -> ETLRunRes
         defects = defects_for(TOOL, output.tool_version)
         result = ETLRunResult()
         for artifact in output.artifacts:
-            # Named as the ledger names the unit, relative to the report
-            # directory the stage read (EPOCH-432).
-            item = f"{DATABASE}#{artifact.tablename}"
+            item = failure_item(artifact)
             scan: ArtifactScan | None = None
             try:
                 scan = scan_artifact(lava_conn, output, artifact, defects)
@@ -182,7 +193,8 @@ def ingest_report(conn, ctx: IngestContext, report_dir: str | Path) -> ETLRunRes
                 # Per-artifact isolation (EXTRACTOR_CONTRACT.md #5); the
                 # failed artifact's unit has rolled back. A table that failed
                 # its check has no content hash.
-                result.fail(item, exc, scan.content_hash if scan else None)
+                reason = exc if item != DATABASE else f"table {artifact.tablename!r}: {type(exc).__name__}: {exc}"
+                result.fail(item, reason, scan.content_hash if scan else None)
         return result
     finally:
         lava_conn.close()

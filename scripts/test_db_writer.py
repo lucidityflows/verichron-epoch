@@ -956,7 +956,7 @@ def test_record_failures_needs_the_stage_name(db):
         record_failures(db, ctx(), [ItemFailure("a.ips", "boom")], source_type="crash_report", root=ROOT)
 
 
-@pytest.mark.parametrize("item", ["/abs/a.ips", ""])
+@pytest.mark.parametrize("item", ["/abs/a.ips", "", "../outside.ips", "Retired/../../outside.ips"])
 def test_record_failures_refuses_an_item_not_relative_to_its_derivative(db, item):
     with pytest.raises(ValueError, match="relative to its derivative"):
         record_failures(db, staged(), [ItemFailure(item, "boom")], source_type="crash_report", root=ROOT)
