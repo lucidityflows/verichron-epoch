@@ -570,8 +570,8 @@ describe('failed items and what is still failing (EPOCH-432)', live, () => {
   async function fail(run: string, evidence: string, item: string, fileHash: string | null, at: string) {
     await db.query(
       `INSERT INTO stage_item_failures
-         (run_id, stage_name, evidence_id, derivative_id, source_type, item, file_hash, reason, recorded_at)
-       VALUES ($1, 'crash', $2, $2, 'crash_report', $3, $4, 'ValueError: ' || $3, now() - $5::interval)`,
+         (run_id, stage_name, evidence_id, derivative_id, source_type, item, file_path, file_hash, reason, recorded_at)
+       VALUES ($1, 'crash', $2, $2, 'crash_report', $3, '/test/' || $3, $4, 'ValueError: ' || $3, now() - $5::interval)`,
       [run, evidence, item, fileHash, at]
     );
   }
@@ -621,8 +621,13 @@ describe('failed items and what is still failing (EPOCH-432)', live, () => {
     assert.deepEqual(await items(), ['Retired/b.ips', 'c.ips']);
     assert.equal((await getStillFailing(db, OTHER)).total, 2);
 
-    // c.ips had no hash; a later unit at its path under the derivative fixes it.
+    // c.ips had no hash; a later unit at the path it failed at fixes it.
     await completed(hash('c'), '/test/c.ips', '1 hour');
+    assert.deepEqual(await items(), ['Retired/b.ips']);
+
+    // Moving the workspace afterwards updates the derivative's path, never the
+    // fixed paths compared, so nothing fixed comes back.
+    await db.query(`UPDATE evidence_derivatives SET path = '/moved' WHERE derivative_id = $1`, [OTHER]);
     assert.deepEqual(await items(), ['Retired/b.ips']);
 
     // The other evidence's a.ips is untouched by this evidence's fix.

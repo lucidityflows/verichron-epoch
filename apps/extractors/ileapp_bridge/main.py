@@ -192,7 +192,7 @@ def process_output_directory(db_url: str, ctx: IngestContext, report_dir: str | 
     conn = psycopg2.connect(db_url)
     try:
         result = ingest_report(conn, ctx, report_dir)
-        record_failures(conn, ctx, result.failures, source_type=SourceType.ILEAPP_RECORD.value)
+        record_failures(conn, ctx, result.failures, source_type=SourceType.ILEAPP_RECORD.value, root=report_dir)
         _warn_about_incomplete_ingests(conn, ctx.evidence_id)
         return result
     finally:

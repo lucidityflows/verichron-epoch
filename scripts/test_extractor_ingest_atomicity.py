@@ -129,7 +129,7 @@ def test_three_failing_files_of_ten_record_three_failures_with_reasons(db, tmp_p
 
     result = crash_main.run(db, staged, str(tmp_path))
     assert (result.succeeded, result.failed) == (7, 3)
-    assert record_failures(db, staged, result.failures, source_type="crash_report") == 3
+    assert record_failures(db, staged, result.failures, source_type="crash_report", root=str(tmp_path)) == 3
 
     rows = sorted((r["item"], r["file_hash"], r["stage_name"], r["source_type"]) for r in db.failures())
     assert rows == sorted(
@@ -138,6 +138,14 @@ def test_three_failing_files_of_ten_record_three_failures_with_reasons(db, tmp_p
     reasons = {r["item"]: r["reason"] for r in db.failures()}
     assert reasons["empty.ips"] == "ValueError: Empty file"
     assert reasons["Retired/broken.ips"].startswith("ValueError: no JSON metadata line")
+
+    # Each failure's file_path is the one the ledger gives the file once fixed,
+    # so an item with no hash can still be matched to the unit that fixes it.
+    bad[0].write_text(_valid_ips())
+    crash_main.run(db, staged, str(tmp_path))
+    fixed = next(r for r in db.ledger() if r["file_name"] == "broken.ips")
+    failed = next(r for r in db.failures() if r["item"] == "Retired/broken.ips")
+    assert fixed["file_path"] == failed["file_path"]
 
 
 def test_every_real_ips_shape_is_ingested_and_other_device_files_are_counted(db, tmp_path):

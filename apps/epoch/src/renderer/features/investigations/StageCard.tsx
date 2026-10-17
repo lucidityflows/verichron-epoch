@@ -111,7 +111,7 @@ function StageFailures({ stage, loadFailures }: { stage: StageStatusRow; loadFai
         <Disclosure label={`${page.total.toLocaleString()} ${unitNoun(stage, page.total)} failed`}>
           <FailedItems page={page} />
         </Disclosure>
-        <CopyButton text={failedItemsText(page.rows)} title="Copy list" />
+        <CopyButton text={failedItemsText(page)} title="Copy list" />
       </div>
     </div>
   );

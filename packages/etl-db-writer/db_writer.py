@@ -507,7 +507,9 @@ def write_records(conn, ingest_id: int, evidence_id: str, records: list[Normaliz
     return len(records)
 
 
-def record_failures(conn, ctx: IngestContext, failures: Iterable[FailedItem], *, source_type: str) -> int:
+def record_failures(
+    conn, ctx: IngestContext, failures: Iterable[FailedItem], *, source_type: str, root: str | Path
+) -> int:
     """Persist the items a stage could not ingest, in one transaction of their
     own, after its units (EPOCH-432). Each row is stamped from the context
     (R16): the run, the stage, the evidence and the derivative read. The
@@ -515,10 +517,11 @@ def record_failures(conn, ctx: IngestContext, failures: Iterable[FailedItem], *,
     unit rather than removing the failure; etl-db-reader's getStillFailing
     tells the two apart.
 
-    An item is named by its path relative to the derivative the stage read;
-    an absolute path is refused, since it would stop matching once the
-    workspace moves. Returns the number of rows written; writes and commits
-    nothing when there are none.
+    An item is named by its path relative to `root`, the directory the stage
+    read; an absolute item is refused. Each row also keeps `root / item` as
+    `file_path`, built exactly as `ingest()` builds a unit's, so an item with no
+    hash can be matched to the unit that later completes it. Returns the number
+    of rows written; writes and commits nothing when there are none.
     """
     if not isinstance(ctx, IngestContext):
         raise TypeError("record_failures() needs an IngestContext")
@@ -538,7 +541,7 @@ def record_failures(conn, ctx: IngestContext, failures: Iterable[FailedItem], *,
                 cur,
                 """
                 INSERT INTO stage_item_failures
-                    (run_id, stage_name, evidence_id, derivative_id, source_type, item, file_hash, reason)
+                    (run_id, stage_name, evidence_id, derivative_id, source_type, item, file_path, file_hash, reason)
                 VALUES %s
                 """,
                 [
@@ -549,6 +552,7 @@ def record_failures(conn, ctx: IngestContext, failures: Iterable[FailedItem], *,
                         ctx.derivative_id,
                         source_type,
                         failure.item,
+                        str(Path(root) / failure.item),
                         failure.file_hash,
                         failure.reason,
                     )

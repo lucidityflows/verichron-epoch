@@ -310,7 +310,9 @@ def main():
     try:
         ctx = context_from_args(args)
         result = run(conn, ctx, args.derivative_path)
-        record_failures(conn, ctx, result.failures, source_type=SourceType.CRASH_REPORT.value)
+        record_failures(
+            conn, ctx, result.failures, source_type=SourceType.CRASH_REPORT.value, root=args.derivative_path
+        )
     except Exception as e:
         print(f"[crash] unhandled error: {e}", file=sys.stderr)
         sys.exit(1)

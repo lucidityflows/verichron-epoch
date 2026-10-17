@@ -901,6 +901,10 @@ def test_a_content_hash_must_be_a_sha256(db, artifact):
 # ==========================================================================
 
 
+#: The directory a stage read, as the orchestrator passes it.
+ROOT = "/ws/crash_reports/BK1"
+
+
 def staged(run_id: str = RUN_ID, evidence_id: str = EVIDENCE_A) -> IngestContext:
     return IngestContext(
         evidence_id=evidence_id,
@@ -917,7 +921,7 @@ def test_record_failures_stamps_each_item_from_the_context_in_one_commit(db):
         ItemFailure("b.ips", "PermissionError: denied"),
     ]
 
-    assert record_failures(db, staged(), failures, source_type="crash_report") == 2
+    assert record_failures(db, staged(), failures, source_type="crash_report", root=ROOT) == 2
 
     assert db.commits == 1
     rows = [
@@ -937,29 +941,31 @@ def test_record_failures_stamps_each_item_from_the_context_in_one_commit(db):
         (RUN_ID, "crash", EVIDENCE_A, DERIVATIVE_A, "crash_report", "Retired/a.ips", "a" * 64, failures[0].reason),
         (RUN_ID, "crash", EVIDENCE_A, DERIVATIVE_A, "crash_report", "b.ips", None, failures[1].reason),
     ]
+    # Where each item was, fixed when written, as ingest() names a unit.
+    assert [r["file_path"] for r in db.failures()] == [f"{ROOT}/Retired/a.ips", f"{ROOT}/b.ips"]
 
 
 def test_record_failures_with_nothing_failed_writes_and_commits_nothing(db):
-    assert record_failures(db, staged(), [], source_type="crash_report") == 0
+    assert record_failures(db, staged(), [], source_type="crash_report", root=ROOT) == 0
     assert db.commits == 0
     assert db.failures() == []
 
 
 def test_record_failures_needs_the_stage_name(db):
     with pytest.raises(ValueError, match="--stage-name"):
-        record_failures(db, ctx(), [ItemFailure("a.ips", "boom")], source_type="crash_report")
+        record_failures(db, ctx(), [ItemFailure("a.ips", "boom")], source_type="crash_report", root=ROOT)
 
 
 @pytest.mark.parametrize("item", ["/abs/a.ips", ""])
 def test_record_failures_refuses_an_item_not_relative_to_its_derivative(db, item):
     with pytest.raises(ValueError, match="relative to its derivative"):
-        record_failures(db, staged(), [ItemFailure(item, "boom")], source_type="crash_report")
+        record_failures(db, staged(), [ItemFailure(item, "boom")], source_type="crash_report", root=ROOT)
     assert db.failures() == []
 
 
 def test_record_failures_refuses_a_hash_that_is_not_a_sha256(db):
     with pytest.raises(ValueError, match="sha256 hex digest"):
-        record_failures(db, staged(), [ItemFailure("a.ips", "boom", "abc")], source_type="crash_report")
+        record_failures(db, staged(), [ItemFailure("a.ips", "boom", "abc")], source_type="crash_report", root=ROOT)
 
 
 @pytest.mark.parametrize(
@@ -967,7 +973,7 @@ def test_record_failures_refuses_a_hash_that_is_not_a_sha256(db):
 )
 def test_stage_item_failures_are_append_only_on_postgres(db, statement):
     postgres_only(db)
-    record_failures(db, staged(), [ItemFailure("a.ips", "boom")], source_type="crash_report")
+    record_failures(db, staged(), [ItemFailure("a.ips", "boom")], source_type="crash_report", root=ROOT)
 
     with pytest.raises(psycopg2.Error, match="stage_item_failures is append-only"):
         with db.cursor() as cur:
@@ -979,10 +985,14 @@ def test_stage_item_failures_are_append_only_on_postgres(db, statement):
 def test_the_purge_deletes_and_counts_the_evidences_failed_items_only(db):
     postgres_only(db)
     record_failures(
-        db, staged(), [ItemFailure("a.ips", "boom"), ItemFailure("b.ips", "bang")], source_type="crash_report"
+        db,
+        staged(),
+        [ItemFailure("a.ips", "boom"), ItemFailure("b.ips", "bang")],
+        source_type="crash_report",
+        root=ROOT,
     )
     record_failures(
-        db, staged(evidence_id=EVIDENCE_B), [ItemFailure("c.ips", "other case")], source_type="crash_report"
+        db, staged(evidence_id=EVIDENCE_B), [ItemFailure("c.ips", "other case")], source_type="crash_report", root=ROOT
     )
 
     with db.cursor() as cur:

@@ -15,6 +15,7 @@ vi.mock('../../hooks/usePipelineState', () => ({
 }));
 
 import { StillFailingPanel } from './StillFailingPanel';
+import { failedItemsText } from '../investigations/FailedItems';
 
 const RUN = '33333333-3333-3333-3333-333333333333';
 
@@ -112,5 +113,19 @@ describe('StillFailingPanel', () => {
     };
     render(<StillFailingPanel runId={RUN} loadStillFailing={load} rerun={vi.fn()} />);
     assert.ok(await screen.findByText('Could not read which items are still failing: connection refused'));
+    assert.ok(screen.getByRole('button', { name: /Copy/ }), 'an error banner carries a Copy button (DESIGN.md §1)');
+  });
+
+  it('copies a cut list with its bound, never as if it were the whole list (R25)', () => {
+    const cut = { ...TWO, total: 600 };
+    assert.equal(
+      failedItemsText(cut, true),
+      [
+        'crash · Retired/x.ips: ValueError: no JSON metadata line',
+        "ileapp_bridge · _lava_artifacts.db#zalochat: ArtifactError: column 'x' missing",
+        'Showing the first 2 of 600.',
+      ].join('\n')
+    );
+    assert.equal(failedItemsText(TWO).split('\n').length, 2, 'a whole list adds no bound');
   });
 });

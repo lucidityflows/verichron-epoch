@@ -115,6 +115,7 @@ CREATE TABLE stage_item_failures (
     derivative_id TEXT,
     source_type   TEXT NOT NULL,
     item          TEXT NOT NULL CHECK (item <> '' AND substr(item, 1, 1) <> '/'),
+    file_path     TEXT NOT NULL CHECK (file_path <> ''),
     file_hash     TEXT,
     reason        TEXT NOT NULL CHECK (trim(reason) <> ''),
     recorded_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

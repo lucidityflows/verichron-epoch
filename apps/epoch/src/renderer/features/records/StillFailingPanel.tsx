@@ -76,9 +76,12 @@ export function StillFailingPanel({
   };
 
   if (error) {
+    const message = `Could not read which items are still failing: ${error}`;
     return (
-      <div className="text-danger bg-danger/10 shadow-elevation-1 border border-danger/30 rounded-lg p-4 text-data mb-5 shrink-0">
-        Could not read which items are still failing: {error}
+      <div className="flex items-start justify-between gap-3 text-danger bg-danger/10 shadow-elevation-1 border border-danger/30 rounded-lg p-4 text-data mb-5 shrink-0">
+        <span>{message}</span>
+        {/* DESIGN.md §1: an error banner carries what's needed to diagnose it elsewhere. */}
+        <CopyButton text={`Forensic Records, reading still-failing items for run ${runId}: ${error}`} />
       </div>
     );
   }
@@ -101,7 +104,7 @@ export function StillFailingPanel({
             <FailedItems page={page} withStage />
           </Disclosure>
           <div className="flex items-center gap-2 shrink-0">
-            <CopyButton text={failedItemsText(page.rows, true)} title="Copy list" />
+            <CopyButton text={failedItemsText(page, true)} title="Copy list" />
             <Button variant="outline" size="sm" onClick={handleRerun} loading={rerunning} disabled={pipelineBusy}>
               <RotateCcw size="0.875rem" />
               Rerun

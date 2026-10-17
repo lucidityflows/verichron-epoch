@@ -93,7 +93,8 @@ with ingest(conn, ctx, file_path, source_type=..., payload_kind=..., raw_payload
   (`Retired/x.ips`, `_lava_artifacts.db#<table>`), and give its sha256 when
   it can be read, else `None`.
 - Before exiting, persist the failures with `db_writer.record_failures`, in
-  their own transaction after the per-file units. They are kept in
+  their own transaction after the per-file units, passing the directory read
+  as `root`. They are kept in
   `stage_item_failures`, and the app lists them on the stage and, until a later
   run completes them, above the evidence's records (EPOCH-432).
 - **Exit non-zero if any file failed (R20).** The orchestrator marks the stage

@@ -172,11 +172,11 @@ an audit event; facts belong to evidence, not to runs (R7).**
 - **Each item a stage could not ingest is kept** (EPOCH-432) in
   `stage_item_failures`: the run and stage (labels, like run links, with no
   foreign key), the evidence and derivative, the item's path relative to that
-  derivative, its sha256 when it could be read, and the reason. The table is
+  derivative and where it was (`file_path`, built as the ledger builds a
+  unit's), its sha256 when it could be read, and the reason. The table is
   append-only. The `still_failing_items` view (R27) gives each item's latest
   failure unless a unit of the same evidence and source type completed after
-  it, with the item's hash or, without one, at the item's path under the
-  unit's derivative. Failing items are visible, not hidden: a rerun retries
+  it, with the item's hash or, without one, its `file_path`. Failing items are visible, not hidden: a rerun retries
   them, since a failed file leaves no ledger row.
 - **Completeness has one definition (R23):** the `run_completeness` view. A run
   is `running` until it finishes; `incomplete` if any stage failed or was left

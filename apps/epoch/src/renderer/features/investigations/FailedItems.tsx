@@ -1,8 +1,18 @@
 import type { ItemFailurePage, ItemFailureRow } from '@verichron/etl-db-reader';
 
-/** One line per item, as copied: `item: reason`, prefixed by its stage when asked. */
-export function failedItemsText(rows: ItemFailureRow[], withStage = false): string {
-  return rows.map((r) => `${withStage ? `${r.stage_name} · ` : ''}${r.item}: ${r.reason}`).join('\n');
+/** The bound of a cut list, in the words the screen uses (R25); null when nothing was cut. */
+function boundText(page: ItemFailurePage): string | null {
+  return page.total > page.rows.length
+    ? `Showing the first ${page.rows.length.toLocaleString()} of ${page.total.toLocaleString()}.`
+    : null;
+}
+
+/** The list as copied: `item: reason` per line, prefixed by its stage when asked,
+ * and ending with the list's bound when it was cut (R25). */
+export function failedItemsText(page: ItemFailurePage, withStage = false): string {
+  const lines = page.rows.map((r: ItemFailureRow) => `${withStage ? `${r.stage_name} · ` : ''}${r.item}: ${r.reason}`);
+  const bound = boundText(page);
+  return (bound ? [...lines, bound] : lines).join('\n');
 }
 
 /**
@@ -24,11 +34,7 @@ export function FailedItems({ page, withStage = false }: { page: ItemFailurePage
           </li>
         ))}
       </ul>
-      {page.total > page.rows.length && (
-        <p className="text-data text-muted-foreground mt-2">
-          Showing the first {page.rows.length.toLocaleString()} of {page.total.toLocaleString()}.
-        </p>
-      )}
+      {boundText(page) && <p className="text-data text-muted-foreground mt-2">{boundText(page)}</p>}
     </div>
   );
 }

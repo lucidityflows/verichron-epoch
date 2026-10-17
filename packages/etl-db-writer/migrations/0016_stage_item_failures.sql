@@ -9,10 +9,11 @@
 -- `Retired/x.ips` or `_lava_artifacts.db#zalochat`). `file_hash` is the item's
 -- sha256, the ledger's own identity (R6), when the item could be read; it is
 -- NULL when it could not (an unopenable file, an artifact table that failed its
--- check). An item is still failing until a later completed unit of the same
--- evidence and source type has its hash, or, without a hash, sits at the same
--- path relative to its derivative (decided 2026-10-17; read side in
--- etl-db-reader's getStillFailing).
+-- check). `file_path` is where the item was, built as the ledger builds a
+-- unit's file_path (the directory the stage read, joined with `item`), and like
+-- it never changes. An item is still failing until a later completed unit of
+-- the same evidence and source type has its hash, or, without a hash, has its
+-- file_path (decided 2026-10-17; the still_failing_items view below).
 --
 -- Append-only (R9): reasons can quote evidence content, so like the ledger the
 -- rows carry their own evidence_id and only purge_evidence deletes them.
@@ -30,6 +31,7 @@ CREATE TABLE stage_item_failures (
     derivative_id UUID,
     source_type   TEXT NOT NULL,
     item          TEXT NOT NULL,
+    file_path     TEXT NOT NULL CHECK (file_path <> ''),
     file_hash     TEXT,
     reason        TEXT NOT NULL,
     recorded_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -129,12 +131,15 @@ CREATE INDEX idx_stage_item_failures_run ON stage_item_failures (run_id, stage_n
 -- The evidence's items that are still failing (R27: the app and the report
 -- ask the same question). For each item a stage of the evidence failed, its
 -- latest failure, unless a unit of the same evidence and source type completed
--- after it: with the item's hash when the failure has one, else at the item's
--- path under that unit's derivative. A parser_version bump that newly fails an
--- item stays failing, since its earlier completion came before the failure.
+-- after it: with the item's hash when the failure has one, else with its
+-- file_path. Both paths are fixed when written, so moving the workspace after a
+-- fix never brings an item back; a move between the failure and the fix can
+-- miss the match until a later run completes the item. A parser_version bump
+-- that newly fails an item stays failing, since its earlier completion came
+-- before the failure.
 CREATE VIEW still_failing_items AS
 SELECT latest.failure_id, latest.evidence_id, latest.run_id, latest.stage_name, latest.derivative_id,
-       latest.source_type, latest.item, latest.file_hash, latest.reason, latest.recorded_at
+       latest.source_type, latest.item, latest.file_path, latest.file_hash, latest.reason, latest.recorded_at
 FROM (
     SELECT DISTINCT ON (s.evidence_id, s.stage_name, s.item) s.*
     FROM public.stage_item_failures s
@@ -143,14 +148,13 @@ FROM (
 WHERE NOT EXISTS (
     SELECT 1
     FROM public.ingested_files f
-    LEFT JOIN public.evidence_derivatives d ON d.derivative_id = f.derivative_id
     WHERE f.evidence_id = latest.evidence_id
       AND f.source_type = latest.source_type
       AND f.ingest_complete
       AND f.completed_at > latest.recorded_at
       AND CASE
               WHEN latest.file_hash IS NOT NULL THEN f.file_hash = latest.file_hash
-              ELSE f.file_path = d.path || '/' || latest.item
+              ELSE f.file_path = latest.file_path
           END
 );
 

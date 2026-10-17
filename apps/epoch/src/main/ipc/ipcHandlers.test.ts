@@ -163,9 +163,10 @@ describe.skipIf(live)('database handlers', () => {
 
   it("reads a stage's failed items, and the run's evidence's still-failing items (EPOCH-432)", async () => {
     await pool.query(
-      `INSERT INTO stage_item_failures (run_id, stage_name, evidence_id, derivative_id, source_type, item, reason)
-       VALUES ($1, 'crash', $2, $2, 'crash_report', 'Retired/x.ips', 'ValueError: no JSON metadata line'),
-              ($1, 'crash', $3, $3, 'crash_report', 'other.ips', 'ValueError: another case')`,
+      `INSERT INTO stage_item_failures
+         (run_id, stage_name, evidence_id, derivative_id, source_type, item, file_path, reason)
+       VALUES ($1, 'crash', $2, $2, 'crash_report', 'Retired/x.ips', '/c/Retired/x.ips', 'ValueError: no JSON metadata line'),
+              ($1, 'crash', $3, $3, 'crash_report', 'other.ips', '/c/other.ips', 'ValueError: another case')`,
       [RUN, EVIDENCE, OTHER]
     );
     // Ordered in the database's collation, so compared as a set.
