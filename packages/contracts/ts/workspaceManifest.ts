@@ -5,19 +5,25 @@ import { z } from 'zod';
 
 export const WORKSPACE_MANIFEST_NAME = 'workspace.json';
 
-const relativeWorkspacePath = z.string().min(1).refine(
-  (value) =>
-    !value.includes('\\') &&
-    !path.posix.isAbsolute(value) &&
-    !path.win32.isAbsolute(value) &&
-    path.win32.parse(value).root === '' &&
-    value.split('/').every((part) => part !== '' && part !== '.' && part !== '..'),
-  'must be a normalized path relative to the workspace'
-);
+const relativeWorkspacePath = z
+  .string()
+  .min(1)
+  .refine(
+    (value) =>
+      !value.includes('\\') &&
+      !path.posix.isAbsolute(value) &&
+      !path.win32.isAbsolute(value) &&
+      path.win32.parse(value).root === '' &&
+      value.split('/').every((part) => part !== '' && part !== '.' && part !== '..'),
+    'must be a normalized path relative to the workspace'
+  );
 
 const workspaceManifestBackupSchema = z
   .object({
-    label: z.string().min(1).refine((value) => value !== '.' && value !== '..' && !value.includes('/') && !value.includes('\\')),
+    label: z
+      .string()
+      .min(1)
+      .refine((value) => value !== '.' && value !== '..' && !value.includes('/') && !value.includes('\\')),
     source_path: z.string().min(1),
     sidecar_path: relativeWorkspacePath,
     manifest_directory: relativeWorkspacePath,

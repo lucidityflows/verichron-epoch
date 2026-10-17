@@ -98,17 +98,7 @@ async function investigate(): Promise<{
   const summaryPath = path.join(workspace, 'call-summary.json');
   const code = await promisify(execFile)(
     process.execPath,
-    [
-      '--import',
-      'tsx',
-      main,
-      '--workspace',
-      workspace,
-      '--label',
-      entry.label,
-      '--summary-path',
-      summaryPath,
-    ],
+    ['--import', 'tsx', main, '--workspace', workspace, '--label', entry.label, '--summary-path', summaryPath],
     {
       cwd: import.meta.dirname,
       env: { ...process.env, DATABASE_URL: dbUrl, XDG_CONFIG_HOME: path.join(tmp, 'config') },

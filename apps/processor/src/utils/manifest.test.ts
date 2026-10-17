@@ -14,11 +14,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import {
-  createWorkspaceManifestBackup,
-  EvidenceSidecar,
-  resolveWorkspaceBackup,
-} from '@verichron/contracts';
+import { createWorkspaceManifestBackup, EvidenceSidecar, resolveWorkspaceBackup } from '@verichron/contracts';
 
 import { writeFileAtomic } from './fs.js';
 import {

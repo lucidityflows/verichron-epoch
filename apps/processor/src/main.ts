@@ -436,12 +436,7 @@ async function runBackups(
   }
 
   const summaryPaths = resolveProcessorSummaryPaths(cfg.workspace, manifest);
-  const summaryPath = await writeSummary(
-    summaryPaths.markdown,
-    backups,
-    failedBackups,
-    repairFailuresByBackup
-  );
+  const summaryPath = await writeSummary(summaryPaths.markdown, backups, failedBackups, repairFailuresByBackup);
   const backupResults = await Promise.all(
     backups.map(async (backup) => {
       const entry = entries.get(backup.label);
@@ -541,10 +536,7 @@ async function updateWorkspaceManifest(cfg: Config, backups: Backup[]): Promise<
         : createWorkspaceManifestBackup(backup.label, backup.path)
     );
   }
-  const updated = parseWorkspaceManifest(
-    JSON.stringify({ ...current, backups: [...byLabel.values()] }),
-    file
-  );
+  const updated = parseWorkspaceManifest(JSON.stringify({ ...current, backups: [...byLabel.values()] }), file);
   await writeFileAtomic(file, JSON.stringify(updated, null, 2) + '\n');
 
   for (const backup of backups) {

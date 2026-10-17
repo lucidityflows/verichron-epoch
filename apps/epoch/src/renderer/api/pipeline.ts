@@ -1,9 +1,4 @@
-import type {
-  StartPipelineOptions,
-  PipelineLogEntry,
-  AnalysisState,
-  PrepareState,
-} from '../../shared/types/window';
+import type { StartPipelineOptions, PipelineLogEntry, AnalysisState, PrepareState } from '../../shared/types/window';
 
 export const pipelineApi = {
   selectBackupDirectory: () => window.epoch.selectBackupDirectory(),

@@ -68,10 +68,7 @@ describe('readPreparedBackups', () => {
     backup(ws, 'BK2', ROOT_A, null, backups); // decrypted, no iLEAPP output
     backup(ws, 'BK3', ROOT_A, ROOT_B, backups); // iLEAPP output from other evidence
     backup(ws, 'BK4', null, null, backups); // a folder with no decrypt marker
-    writeFileSync(
-      path.join(ws, 'workspace.json'),
-      JSON.stringify({ ...emptyWorkspaceManifest(), backups })
-    );
+    writeFileSync(path.join(ws, 'workspace.json'), JSON.stringify({ ...emptyWorkspaceManifest(), backups }));
     const result = readPreparedBackups(ws);
     assert.deepEqual(
       result.map((b) => [b.label, b.state]),

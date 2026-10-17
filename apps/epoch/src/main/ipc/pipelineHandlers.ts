@@ -246,9 +246,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   async function markWorkspaceRunsAborted(workspace: string, reason: string): Promise<void> {
     try {
       const manifest = readWorkspaceManifestSync(workspace);
-      const backupSources = manifest.backups.map(
-        (entry) => resolveWorkspaceBackup(workspace, entry).decryptedPath
-      );
+      const backupSources = manifest.backups.map((entry) => resolveWorkspaceBackup(workspace, entry).decryptedPath);
       await dbPool.query(
         `UPDATE pipeline_stage_status
             SET status = 'failed', error_message = $2, finished_at = now()
@@ -388,13 +386,15 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       pendingPasswordResolve = null;
       stdoutBuffer.end();
       stderrBuffer.end();
-      void readPreparationSummary(workspacePath, startedAt).then((backups) => {
-        prepareSession.finish({ success: code === 0, exitCode: code, workspace: workspacePath, backups });
-      }).catch((err) => {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error('[pipelineHandlers] could not read processor summary:', message);
-        prepareSession.finish({ success: false, exitCode: code, workspace: workspacePath, error: message });
-      });
+      void readPreparationSummary(workspacePath, startedAt)
+        .then((backups) => {
+          prepareSession.finish({ success: code === 0, exitCode: code, workspace: workspacePath, backups });
+        })
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error('[pipelineHandlers] could not read processor summary:', message);
+          prepareSession.finish({ success: false, exitCode: code, workspace: workspacePath, error: message });
+        });
     });
 
     return { started: true, workspace: workspacePath };

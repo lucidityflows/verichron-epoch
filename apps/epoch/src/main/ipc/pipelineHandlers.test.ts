@@ -6,7 +6,12 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Pool } from 'pg';
 import { afterEach, beforeEach, describe, it, vi } from 'vitest';
-import { DECRYPT_MARKER, createWorkspaceManifestBackup, emptyWorkspaceManifest, resolveWorkspaceBackup } from '@verichron/contracts';
+import {
+  DECRYPT_MARKER,
+  createWorkspaceManifestBackup,
+  emptyWorkspaceManifest,
+  resolveWorkspaceBackup,
+} from '@verichron/contracts';
 
 const { handlers, spawnMock } = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
@@ -71,10 +76,7 @@ describe('pipeline IPC single-flight', () => {
       invoke('epoch:startAnalysis', workspace, []),
       /Cannot start orchestrator while processor is running/
     );
-    await assert.rejects(
-      invoke('epoch:retryRun', 'run-123'),
-      /Cannot start orchestrator while processor is running/
-    );
+    await assert.rejects(invoke('epoch:retryRun', 'run-123'), /Cannot start orchestrator while processor is running/);
     processor.emit('close', 0);
 
     const orchestrator = childProcess();

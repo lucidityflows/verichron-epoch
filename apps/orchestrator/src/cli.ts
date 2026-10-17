@@ -108,7 +108,10 @@ export async function parseCliConfig(): Promise<CliConfig> {
   return { targets, workspacePaths: [workspace], dbUrl, summaryPath, indicatorSetHash };
 }
 
-export async function workspaceTargets(workspace: string, requestedLabels?: string[]): Promise<ReturnType<typeof resolveWorkspaceBackup>[]> {
+export async function workspaceTargets(
+  workspace: string,
+  requestedLabels?: string[]
+): Promise<ReturnType<typeof resolveWorkspaceBackup>[]> {
   let manifest;
   try {
     manifest = await readWorkspaceManifest(workspace);

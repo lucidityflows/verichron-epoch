@@ -4,11 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 
-import {
-  DECRYPT_MARKER,
-  createWorkspaceManifestBackup,
-  emptyWorkspaceManifest,
-} from '@verichron/contracts';
+import { DECRYPT_MARKER, createWorkspaceManifestBackup, emptyWorkspaceManifest } from '@verichron/contracts';
 import { workspaceTargets } from './cli.js';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'orchestrator-workspace-'));
@@ -38,7 +34,10 @@ describe('workspaceTargets', () => {
   it('selects only the labels requested by the caller', async () => {
     const workspace = writeWorkspace('selected');
     const targets = await workspaceTargets(workspace, ['BK1']);
-    assert.deepEqual(targets.map((target) => target.label), ['BK1']);
+    assert.deepEqual(
+      targets.map((target) => target.label),
+      ['BK1']
+    );
   });
 
   it('refuses missing manifest entries and incomplete selected backups', async () => {
