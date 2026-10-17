@@ -35,6 +35,7 @@ import {
   requireWorkspaceBytes,
   requireWorkspaceSpace,
 } from './utils/workspaceSpace.js';
+import { acquireWorkspaceLocks } from '@verichron/workspace-lock';
 
 /** Recorded in each evidence sidecar. ../package.json resolves from both src/ (tsx) and dist/. */
 const TOOL_VERSION: string = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -49,7 +50,12 @@ const MAX_PASSWORD_ATTEMPTS = 3;
 async function main() {
   const cfg = parseFlags();
   try {
-    await run(cfg);
+    const releaseWorkspaceLocks = await acquireWorkspaceLocks([cfg.workspace], 'processor');
+    try {
+      await run(cfg);
+    } finally {
+      await releaseWorkspaceLocks();
+    }
   } catch (err) {
     console.error('error:', err instanceof Error ? err.message : err);
     process.exit(1);

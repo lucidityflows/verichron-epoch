@@ -373,6 +373,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   }, [analysisWorkspace]);
 
   const busy = isStarting || isRunning;
+  const orchestratorRunning = analysis?.status === 'running';
+  const processorActionsDisabled = busy || orchestratorRunning;
 
   const completedBackups = finishResult?.backups?.filter((backup) => backup.success && backup.decrypted);
   const failedBackups = finishResult?.backups?.filter((backup) => !backup.success);
@@ -481,14 +483,19 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                 {selectedAllPrepared && !busy ? (
                   // Done already: preparing again is a secondary choice, and
                   // Analyze is the next step (EPOCH-497).
-                  <Button variant="outline" onClick={() => handleStartPipeline(true)} className="shrink-0">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleStartPipeline(true)}
+                    disabled={orchestratorRunning}
+                    className="shrink-0"
+                  >
                     <RotateCcw size="1rem" />
                     Prepare Again{selectedLabels.size > 1 ? ` (${selectedLabels.size})` : ''}
                   </Button>
                 ) : (
                   <Button
                     onClick={() => handleStartPipeline()}
-                    disabled={discoveringBackups || selectedLabels.size === 0}
+                    disabled={discoveringBackups || selectedLabels.size === 0 || orchestratorRunning}
                     loading={busy}
                     loadingText={isStarting ? 'Starting…' : 'Running…'}
                     className="shrink-0"
@@ -533,7 +540,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       backup={b}
                       selected={selectedLabels.has(b.label)}
                       onToggle={() => toggleBackup(b.label)}
-                      disabled={busy}
+                      disabled={processorActionsDisabled}
                       liveProgress={isLive ? progress : undefined}
                       awaitingPassword={isLive && pendingPasswordFor === b.label}
                       lastResult={lastResult}
@@ -567,7 +574,12 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             )}
 
             <div className="mt-6 pt-4 border-t border-border/60">
-              <Button variant="ghost" size="sm" onClick={() => setShowOptions((v) => !v)} disabled={busy}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowOptions((v) => !v)}
+                disabled={processorActionsDisabled}
+              >
                 {showOptions ? <ChevronDown size="0.9rem" /> : <ChevronRight size="0.9rem" />}
                 Advanced Settings
               </Button>
@@ -581,7 +593,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       type="text"
                       value={workspace}
                       onChange={(e) => setWorkspace(e.target.value)}
-                      disabled={busy}
+                      disabled={processorActionsDisabled}
                       placeholder="Use the default workspace"
                       className="bg-inset border border-border/80 focus:border-accent focus:outline-none rounded-lg px-4 py-2 text-data font-mono text-foreground placeholder:text-muted-foreground/60 disabled:opacity-50 transition-colors"
                     />
@@ -591,7 +603,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       type="checkbox"
                       checked={forceDecrypt}
                       onChange={(e) => setForceDecrypt(e.target.checked)}
-                      disabled={busy}
+                      disabled={processorActionsDisabled}
                       className="accent-accent w-4 h-4 rounded"
                     />
                     <span className="text-foreground/90">
@@ -683,7 +695,10 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                   </ul>
                 </div>
               )}
-              <Button onClick={handleStartAnalysis} disabled={selection.included.length === 0}>
+              <Button
+                onClick={handleStartAnalysis}
+                disabled={selection.included.length === 0 || isRunning || orchestratorRunning}
+              >
                 <Microscope size="1rem" />
                 {selection.included.length > 1
                   ? `Analyze and Create ${selection.included.length} Investigations`
@@ -780,7 +795,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                     variant="outline"
                     size="sm"
                     onClick={handleStartAnalysis}
-                    disabled={selection.included.length === 0}
+                    disabled={selection.included.length === 0 || isRunning || orchestratorRunning}
                     className="mt-3"
                   >
                     <RotateCcw size="0.875rem" />

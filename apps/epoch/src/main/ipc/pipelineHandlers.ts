@@ -8,6 +8,7 @@ import type { Pool } from 'pg';
 import { discoverBackups, type Backup } from '@verichron/contracts';
 import type { PipelineFinishedResult, AnalysisRunStatus, PipelineLogEntry } from '../../shared/types/window';
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
+import { PipelineSingleFlight } from './pipelineSingleFlight';
 import { analysisTargets, orchestratorArgs } from './analysisTargets';
 import { defaultWorkspace, readPreparedBackups } from './preparedBackups';
 
@@ -79,6 +80,7 @@ export async function reconcileStaleRunsOnStartup(dbPool: Pool): Promise<void> {
 export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | null, repoRoot: string, dbPool: Pool) {
   let runningProcessor: ChildProcessWithoutNullStreams | null = null;
   let runningOrchestratorProcess: ChildProcessWithoutNullStreams | null = null;
+  const pipelineSingleFlight = new PipelineSingleFlight();
   // Which workspace the currently-tracked orchestrator invocation is for --
   // lets epoch:getAnalysisRunStatus tell "still actually running" apart from
   // "nothing tracked, but the DB has a dangling run from a past crash."
@@ -345,7 +347,14 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     if (options?.forceDecrypt) args.push('--force-decrypt');
     if (options?.only && options.only.length > 0) args.push('--only', options.only.join(','));
 
-    const child = spawn('pnpm', args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] });
+    const releasePipeline = pipelineSingleFlight.reserve('processor');
+    let child: ChildProcessWithoutNullStreams;
+    try {
+      child = spawn('pnpm', args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] });
+    } catch (err) {
+      releasePipeline();
+      throw err;
+    }
     runningProcessor = child;
     pendingPasswordResolve = null;
     const startedAt = Date.now();
@@ -363,6 +372,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     });
 
     child.on('close', (code) => {
+      releasePipeline();
       runningProcessor = null;
       pendingPasswordResolve = null;
       stdoutBuffer.end();
@@ -398,13 +408,27 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
       throw new Error('An analysis workspace is required.');
     }
     const trimmedWorkspace = workspace.trim();
-    const backupPaths = analysisTargets(trimmedWorkspace, Array.isArray(labels) ? labels : []);
-    const summaryPath = newSummaryPath();
+    const releasePipeline = pipelineSingleFlight.reserve('orchestrator');
+    let backupPaths: string[];
+    let summaryPath: string;
+    try {
+      backupPaths = analysisTargets(trimmedWorkspace, Array.isArray(labels) ? labels : []);
+      summaryPath = newSummaryPath();
+    } catch (err) {
+      releasePipeline();
+      throw err;
+    }
 
-    const child = spawn('pnpm', orchestratorArgs(backupPaths, summaryPath), {
-      cwd: repoRoot,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    let child: ChildProcessWithoutNullStreams;
+    try {
+      child = spawn('pnpm', orchestratorArgs(backupPaths, summaryPath), {
+        cwd: repoRoot,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      releasePipeline();
+      throw err;
+    }
     runningOrchestratorProcess = child;
     runningOrchestratorWorkspace = trimmedWorkspace;
     orchestratorTerminationReason = null;
@@ -441,6 +465,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     });
 
     child.on('close', (code) => {
+      releasePipeline();
       stdoutBuffer.emitPending();
       stderrBuffer.emitPending();
       clearOrchestratorTimers();
@@ -509,12 +534,27 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }
     const trimmedBackupSource = backupSource.trim();
     const summaryPath = newSummaryPath();
+    const releasePipeline = pipelineSingleFlight.reserve('orchestrator');
 
-    const child = spawn(
-      'pnpm',
-      ['--filter', '@verichron/orchestrator', 'investigate', '--', '--summary-path', summaryPath, trimmedBackupSource],
-      { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] }
-    );
+    let child: ChildProcessWithoutNullStreams;
+    try {
+      child = spawn(
+        'pnpm',
+        [
+          '--filter',
+          '@verichron/orchestrator',
+          'investigate',
+          '--',
+          '--summary-path',
+          summaryPath,
+          trimmedBackupSource,
+        ],
+        { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+    } catch (err) {
+      releasePipeline();
+      throw err;
+    }
     runningOrchestratorProcess = child;
     runningOrchestratorBackupSource = trimmedBackupSource;
     orchestratorTerminationReason = null;
@@ -547,6 +587,7 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     });
 
     child.on('close', (code) => {
+      releasePipeline();
       stdoutBuffer.emitPending();
       stderrBuffer.emitPending();
       clearOrchestratorTimers();

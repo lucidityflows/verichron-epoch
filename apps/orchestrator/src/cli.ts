@@ -87,7 +87,8 @@ export async function parseCliConfig(): Promise<CliConfig> {
   const indicatorSetHash = values['indicator-set'];
 
   if (values.workspace) {
-    const decryptedDir = path.join(values.workspace, 'decrypted');
+    const workspace = path.resolve(values.workspace);
+    const decryptedDir = path.join(workspace, 'decrypted');
     let entries;
     try {
       entries = await fsp.readdir(decryptedDir, { withFileTypes: true });
@@ -106,12 +107,17 @@ export async function parseCliConfig(): Promise<CliConfig> {
       if (markerExists) backupPaths.push(dir);
     }
     backupPaths.sort();
-    return { backupPaths, dbUrl, summaryPath, indicatorSetHash };
+    return { backupPaths, workspacePaths: [workspace], dbUrl, summaryPath, indicatorSetHash };
   }
 
   if (positionals.length === 0) {
     printUsage();
     process.exit(1);
   }
-  return { backupPaths: positionals, dbUrl, summaryPath, indicatorSetHash };
+  const workspacePaths = workspacePathsForBackupPaths(positionals);
+  return { backupPaths: positionals, workspacePaths, dbUrl, summaryPath, indicatorSetHash };
+}
+
+export function workspacePathsForBackupPaths(backupPaths: string[]): string[] {
+  return [...new Set(backupPaths.map((backupPath) => path.resolve(backupPath, '..', '..')))].sort();
 }

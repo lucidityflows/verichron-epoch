@@ -41,6 +41,13 @@ analyze → report**. The orchestrator coordinates the last three.
 
    Each output is a **derivative**: a separate product of the evidence, which
    itself is never altered. Each carries a marker recording what produced it.
+   The processor and orchestrator take the same exclusive
+   `<workspace>/.verichron.lock` for the duration of a run. It records the
+   owning process, tool and start time; another run is refused with the holder
+   identified, while a lock whose process has exited can be reclaimed. This
+   protects the decrypted evidence, iLEAPP output and results from changing
+   while the orchestrator reads them.
+
 3. **Extract (ETL, `apps/extractors/*`).** The orchestrator verifies the
    evidence and markers, registers the evidence, its device and derivatives, and
    decides whether a run is needed. It then runs the stages in `stage.json` order

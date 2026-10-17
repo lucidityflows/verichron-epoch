@@ -184,6 +184,8 @@ TEST_DATABASE_URL=postgresql://.../verichron_test uv run pytest
 
 pnpm --filter @verichron/processor test             # TypeScript (node:test via tsx)
 pnpm --filter @verichron/processor typecheck:tests  # Includes *.test.ts
+pnpm --filter @verichron/workspace-lock test
+pnpm --filter @verichron/workspace-lock typecheck:tests
 pnpm --filter @verichron/etl-db-reader typecheck:tests
 pnpm --filter @verichron/orchestrator typecheck:tests
 pnpm --filter @verichron/orchestrator test           # real-Postgres tests need TEST_DATABASE_URL
