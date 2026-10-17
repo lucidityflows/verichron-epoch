@@ -64,6 +64,14 @@ export {
   canonicalJson,
   provenanceKey,
 } from './ts/derivativeMarker.js';
+export {
+  PIPELINE_EVENT_PREFIX,
+  PipelineEvent,
+  parsePipelineEventLine,
+  renderPipelineEvent,
+  type ParsedPipelineLine,
+  type PipelineEventBody,
+} from './ts/pipelineEvent.js';
 export { SourceType, isSourceType } from './ts/sourceType';
 export type { SourceType as SourceTypeValue } from './ts/sourceType';
 export { loadRootEnv, resolveDatabaseUrl } from './ts/env.js';

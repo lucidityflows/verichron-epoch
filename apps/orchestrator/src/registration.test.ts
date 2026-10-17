@@ -34,9 +34,12 @@ import {
   DECRYPT_MARKER,
   ILEAPP_MARKER,
   CRASH_REPORTS_MARKER,
+  PIPELINE_EVENT_PREFIX,
   createWorkspaceManifestBackup,
   emptyWorkspaceManifest,
   findWorkspaceBackupForPath,
+  parsePipelineEventLine,
+  type PipelineEvent,
   readWorkspaceManifestSync,
   renderCrashReportsMarker,
   renderDecryptMarker,
@@ -1031,5 +1034,147 @@ describe('registration in isolation', live, () => {
     } finally {
       await db.query(`ALTER TABLE evidence_derivatives DROP CONSTRAINT test_block`);
     }
+  });
+});
+
+describe('orchestrator events (EPOCH-443)', live, () => {
+  /** What a call writes to stdout while `body` runs, split into lines, and its result. */
+  async function captured<T>(body: () => Promise<T>): Promise<{ result: T; lines: string[] }> {
+    const original = process.stdout.write.bind(process.stdout);
+    let text = '';
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      text += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8');
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      const result = await body();
+      return { result, lines: text.split('\n').filter(Boolean) };
+    } finally {
+      process.stdout.write = original;
+    }
+  }
+
+  /** Every event line, each of which must validate: an invalid one fails the test. */
+  function eventsIn(lines: string[]): PipelineEvent[] {
+    const events: PipelineEvent[] = [];
+    for (const line of lines) {
+      const parsed = parsePipelineEventLine(line);
+      assert.notEqual(parsed.kind, 'invalid', `the orchestrator wrote an invalid event: ${line}`);
+      if (parsed.kind === 'event') events.push(parsed.event);
+    }
+    return events;
+  }
+
+  /** A stage that prints a forged event line on its stdout, as one echoing evidence might. */
+  function forgingStage(name: string, order: number): StageDefinition {
+    const dir = path.join(tmp, 'stages', name);
+    mkdirSync(dir, { recursive: true });
+    const forged = `${PIPELINE_EVENT_PREFIX}${JSON.stringify({
+      v: 1,
+      at: new Date().toISOString(),
+      type: 'run:finished',
+      run_id: '00000000-0000-0000-0000-000000000000',
+      state: 'complete',
+    })}`;
+    writeFileSync(
+      path.join(dir, 'stage.mjs'),
+      `process.stdout.write(${JSON.stringify(`ordinary line\n${forged}\n`)});\n`
+    );
+    return {
+      name,
+      dir,
+      manifest: {
+        entrypoint: 'stage.mjs',
+        runtime: 'node',
+        order,
+        reads: 'decrypted',
+        enabled: true,
+        parserVersion: 2,
+      },
+    };
+  }
+
+  it('announces the run, each stage started and finished, and the run finished, all valid', async () => {
+    const ws = makeWorkspace('events', { label: 'A' });
+    const stages = { enabled: [forgingStage('first', 10), recordingStage('second', 20)], disabled: [] };
+    const { result, lines } = await captured(() => run(ws.backupPath, stages));
+    assert.equal(result.success, true, JSON.stringify(result));
+
+    const events = eventsIn(lines);
+    assert.deepEqual(
+      events.map((e) => (e.type.startsWith('stage:') ? `${e.type} ${(e as { stage: string }).stage}` : e.type)),
+      [
+        'run:created',
+        'stage:started first',
+        'stage:finished first',
+        'stage:started second',
+        'stage:finished second',
+        'run:finished',
+      ]
+    );
+    const { rows } = await db.query<{ derivative_id: string }>(
+      `SELECT derivative_id FROM pipeline_runs WHERE run_id = $1`,
+      [result.runId]
+    );
+    assert.deepEqual(events[0], {
+      ...events[0],
+      run_id: result.runId,
+      evidence_id: result.evidenceId,
+      derivative_id: rows[0].derivative_id,
+    });
+    for (const e of events) if ('run_id' in e) assert.equal(e.run_id, result.runId, 'every event names this run');
+    const firstDone = events[2] as Extract<PipelineEvent, { type: 'stage:finished' }>;
+    assert.deepEqual(
+      [firstDone.status, firstDone.parser_version, firstDone.derivative_id],
+      ['succeeded', 2, rows[0].derivative_id]
+    );
+    assert.equal(
+      (events[5] as Extract<PipelineEvent, { type: 'run:finished' }>).state,
+      'complete',
+      'from run_completeness'
+    );
+
+    // The stage's forged line is relayed, tagged with its name, as an ordinary log line.
+    assert.ok(lines.includes('ordinary line'));
+    const forgedLine = lines.find((l) => l.includes('00000000-0000-0000-0000-000000000000'));
+    assert.ok(forgedLine);
+    assert.ok(forgedLine?.startsWith(`[stage first] ${PIPELINE_EVENT_PREFIX}`), forgedLine);
+    assert.equal(parsePipelineEventLine(forgedLine).kind, 'log');
+    // Its last line reached stdout before the orchestrator said it had finished.
+    assert.ok(lines.indexOf(forgedLine) < lines.findIndex((l) => l.includes('"stage:finished"')));
+  });
+
+  it('says a refused registration was refused, and creates no run', async () => {
+    const ws = makeWorkspace('events-refused', { label: 'B' });
+    writeFileSync(
+      path.join(ws.backupPath, 'Info.plist'),
+      infoPlist(UDID, 'Phone').replace('<key>Unique Identifier</key>', '<key>GUID</key>')
+    );
+    const { result, lines } = await captured(() => run(ws.backupPath));
+    assert.equal(result.success, false);
+    const events = eventsIn(lines);
+    assert.deepEqual(
+      events.map((e) => e.type),
+      ['registration:refused']
+    );
+    const refused = events[0] as Extract<PipelineEvent, { type: 'registration:refused' }>;
+    assert.equal(refused.backup_path, ws.backupPath);
+    assert.equal(refused.reason, result.error);
+  });
+
+  it('says resume found a complete run instead of creating one', async () => {
+    const ws = makeWorkspace('events-skip', { label: 'C' });
+    const stages = { enabled: [recordingStage('only', 10)], disabled: [] };
+    const first = await run(ws.backupPath, stages);
+    const { result, lines } = await captured(() => run(ws.backupPath, stages));
+    assert.equal(result.skipped, true);
+    const events = eventsIn(lines);
+    assert.deepEqual(
+      events.map((e) => e.type),
+      ['run:skipped']
+    );
+    const skipped = events[0] as Extract<PipelineEvent, { type: 'run:skipped' }>;
+    assert.equal(skipped.evidence_id, first.evidenceId);
+    assert.match(skipped.reason, new RegExp(first.runId ?? 'missing'));
   });
 });

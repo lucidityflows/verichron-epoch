@@ -36,6 +36,7 @@ manifest. The database comes from `DATABASE_URL` or `DB_*` in `.env`.
 | `src/discovery.ts` | Finding and validating `stage.json` files |
 | `src/registration.ts` | Evidence, device-key and derivative registration |
 | `src/pipeline.ts` | Per-backup flow, stage subprocesses, stage arguments |
+| `src/events.ts` | Writing [events](../../docs/architecture.md#orchestrator-events) to stdout, and relaying stage output so it can't pass for one |
 | `src/db.ts` | Run creation, stage status, the resume check |
 | `src/main.ts` | Entry point; writes the call's result to `--summary-path`, if given |
 | `src/runSummary.ts` | Exports each run's summary from the database to its manifest-declared summary directory |
@@ -45,11 +46,3 @@ manifest. The database comes from `DATABASE_URL` or `DB_*` in `.env`.
 ```bash
 pnpm --filter @verichron/orchestrator test     # needs TEST_DATABASE_URL (a throwaway database)
 ```
-
-**Known issues:**
-
-| Issue | Ticket |
-|---|---|
-| Discovery checks `stage.json` by hand instead of against the schema | EPOCH-444 |
-| Run ids aren't reported to the app | EPOCH-443 |
-| The database URL is passed to stages on the command line | EPOCH-423 |

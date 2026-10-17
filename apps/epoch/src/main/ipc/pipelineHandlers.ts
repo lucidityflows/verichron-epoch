@@ -161,7 +161,8 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   function makeOrchestratorStreamBuffer(stream: PipelineLogEntry['stream']) {
     const splitter = new LineSplitter();
     const emit = (line: string) => {
-      sendToRenderer('epoch:orchestratorLog', analysisSession.line(stream, line));
+      const entry = analysisSession.line(stream, line);
+      if (entry) sendToRenderer('epoch:orchestratorLog', entry);
       armOutsideStageTimeout();
     };
     const onChunk = (chunk: Buffer) => splitter.push(chunk).forEach(emit);

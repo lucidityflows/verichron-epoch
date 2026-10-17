@@ -17,6 +17,7 @@
     "ts/discoverBackups.ts",
     "ts/normalizedRecord.ts",
     "ts/normalizedRecord.d.ts",
-    "ts/env.ts"
+    "ts/env.ts",
+    "ts/pipelineEvent.ts"
   ]
 }
