@@ -3,6 +3,7 @@ import type {
   ForensicRecordPage,
   ForensicRecordQuery,
   IndicatorCheckRow,
+  InterruptedStageRow,
   ItemFailurePage,
   PipelineRunRow,
   StageStatusRow,
@@ -62,16 +63,16 @@ export interface PipelineLogEntry {
 }
 
 /**
- * EPOCH-305: what epoch:getAnalysisRunStatus reports for a workspace.
- *   'idle'        -- nothing tracked as running, and no dangling
- *                     pipeline_runs row (finished_at IS NULL) for it.
+ * EPOCH-305, EPOCH-435: what epoch:getAnalysisRunStatus reports for a workspace.
+ *   'idle'        -- nothing tracked as running, and no evidence of the
+ *                     workspace whose latest run was interrupted.
  *   'running'     -- the main process still has this workspace's
  *                     orchestrator subprocess tracked as in flight.
- *   'interrupted' -- nothing is currently running, but a past run for
- *                     this workspace never closed out cleanly (crash,
- *                     app restart mid-run, or a cleanup that hasn't
- *                     landed yet). The renderer should present this as a
- *                     failed/aborted run, not a fresh one.
+ *   'interrupted' -- nothing is currently running, but the latest run of
+ *                     some evidence in this workspace ended without
+ *                     finishing (cancelled, stalled, crashed, or abandoned
+ *                     when Epoch closed mid-run). The renderer should
+ *                     present this as a failed/aborted run, not a fresh one.
  */
 export interface AnalysisRunStatus {
   status: 'idle' | 'running' | 'interrupted';
@@ -151,6 +152,8 @@ declare global {
       // EPOCH-432
       getStageFailures: (runId: string, stageName: string) => Promise<ItemFailurePage>;
       getStillFailing: (runId: string) => Promise<ItemFailurePage>;
+      // EPOCH-561
+      getInterruptedStages: (runId: string) => Promise<InterruptedStageRow[]>;
       getForensicRecords: (runId: string, query?: ForensicRecordQuery) => Promise<ForensicRecordPage>;
       getIndicatorResults: (runId: string) => Promise<IndicatorResults>;
       getReport: (runId: string) => Promise<ReportResult>;

@@ -110,14 +110,14 @@ beforeAll(async () => {
     );
   }
   await pool.query(
-    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-     VALUES ($1, $2, 'test', '{}', $3, $3)`,
+    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+     VALUES ($1, $2, 'test', '{}', $3, $3, 'test-host', 1)`,
     [RUN, path.join(workspace, 'decrypted', 'b'), EVIDENCE]
   );
   // A run from before evidence registration (EPOCH-404).
   await pool.query(
-    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions)
-     VALUES ($1, '/legacy/decrypted/a', 'test', '{}')`,
+    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid)
+     VALUES ($1, '/legacy/decrypted/a', 'test', '{}', 'test-host', 1)`,
     [UNREGISTERED_RUN]
   );
 
@@ -185,6 +185,11 @@ describe.skipIf(live)('database handlers', () => {
       'its evidence only (R7)'
     );
     assert.deepEqual(await invoke('epoch:getStillFailing', UNREGISTERED_RUN), { rows: [], total: 0 });
+  });
+
+  it("reads the run's evidence's interrupted stages, and none for a run without evidence (EPOCH-561)", async () => {
+    assert.deepEqual(await invoke('epoch:getInterruptedStages', RUN), []);
+    assert.deepEqual(await invoke('epoch:getInterruptedStages', UNREGISTERED_RUN), []);
   });
 
   it('lists runs with their status from run_completeness', async () => {

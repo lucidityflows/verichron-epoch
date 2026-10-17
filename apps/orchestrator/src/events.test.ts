@@ -72,19 +72,25 @@ describe('the stage-output relay', () => {
   }
 
   it('passes ordinary lines through unchanged, across chunk boundaries and split characters', async () => {
-    const bytes = Buffer.from('a line\nnoté\nlast, without a newline', 'utf8');
+    const bytes = Buffer.from('a line\nnoté\nlast\n', 'utf8');
     const split = bytes.indexOf(Buffer.from('é')) + 1; // inside the two-byte é
-    assert.equal(
-      await relayed([bytes.subarray(0, split), bytes.subarray(split)]),
-      'a line\nnoté\nlast, without a newline'
-    );
+    assert.equal(await relayed([bytes.subarray(0, split), bytes.subarray(split)]), 'a line\nnoté\nlast\n');
+  });
+
+  it("ends a stage's last line when the stage didn't, so the next line starts on its own (EPOCH-435)", async () => {
+    assert.equal(await relayed([Buffer.from('a line\ndone')]), 'a line\ndone\n');
+    assert.equal(await relayed([]), '', 'a stage that printed nothing adds nothing');
   });
 
   it("tags a stage's line that starts with the event prefix, so it can't pass for an event", async () => {
     const forged = renderPipelineEvent({ type: 'run:finished', run_id: RUN, state: 'complete' }, AT);
     const text = await relayed([Buffer.from(`before\n${forged}\n${forged}`)]);
     const lines = text.split('\n');
-    assert.deepEqual(lines, ['before', `[stage crash] ${forged}`, `[stage crash] ${forged}`]);
+    assert.deepEqual(
+      lines,
+      ['before', `[stage crash] ${forged}`, `[stage crash] ${forged}`, ''],
+      'the last line is ended'
+    );
     for (const line of lines) assert.notEqual(parsePipelineEventLine(line).kind, 'event');
   });
 });

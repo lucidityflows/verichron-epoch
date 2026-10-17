@@ -69,6 +69,7 @@ const dbApi = {
   getStageFailures: (runId: string, stageName: string) =>
     ipcRenderer.invoke('epoch:getStageFailures', runId, stageName),
   getStillFailing: (runId: string) => ipcRenderer.invoke('epoch:getStillFailing', runId),
+  getInterruptedStages: (runId: string) => ipcRenderer.invoke('epoch:getInterruptedStages', runId),
   getForensicRecords: (runId: string, query?: ForensicRecordQuery) =>
     ipcRenderer.invoke('epoch:getForensicRecords', runId, query),
   getIndicatorResults: (runId: string) => ipcRenderer.invoke('epoch:getIndicatorResults', runId),

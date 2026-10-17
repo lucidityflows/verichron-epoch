@@ -111,8 +111,8 @@ class PgReal:
                     )
                 for run_id in run_ids:
                     cur.execute(
-                        "INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions) "
-                        "VALUES (%s, %s, 'pytest', '{}'::jsonb)",
+                        "INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid) "
+                        "VALUES (%s, %s, 'pytest', '{}'::jsonb, 'pytest-host', 1)",
                         (run_id, "pytest"),
                     )
             self._conn.commit()

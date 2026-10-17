@@ -5,7 +5,7 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { Client } from 'pg';
 import type { StageDefinition, StageSet, RunConfig } from './types.js';
-import { createRun, findCompleteRunFor, markStage, markRunFailed, type RunProvenance } from './db.js';
+import { createRun, findCompleteRunFor, finishRun, markStage, markRunFailed, type RunProvenance } from './db.js';
 import { inputsFor, registerEvidence, RegistrationError, type Registration } from './registration.js';
 import { IndicatorSetError, selectIndicatorSet, type IndicatorSetChoice } from './indicatorSets.js';
 import {
@@ -364,7 +364,7 @@ export async function runPipelineForBackup(
       results.push({ stage: stage.name, success: outcome.status !== 'failed' });
     }
 
-    await client.query(`UPDATE pipeline_runs SET finished_at = now() WHERE run_id = $1`, [runId]);
+    await finishRun(client, runId, 'completed');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await markRunFailed(client, runId, message);

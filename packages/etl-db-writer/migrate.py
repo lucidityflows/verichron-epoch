@@ -133,6 +133,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _relation("stage_item_failures"),
         _relation("idx_stage_item_failures_evidence"),
     ),
+    "0017_run_liveness.sql": (
+        _column("pipeline_runs", "host"),
+        _relation("interrupted_stages"),
+    ),
 }
 
 

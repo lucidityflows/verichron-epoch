@@ -8,6 +8,7 @@ import {
   getIndicatorChecks,
   getStageFailures,
   getStillFailing,
+  getInterruptedStages,
   type ForensicRecordPage,
   type ItemFailurePage,
   type ForensicRecordQuery,
@@ -55,6 +56,18 @@ export function registerDbHandlers(dbPool: Pool) {
     try {
       const evidenceId = await getRunEvidence(dbPool, runId);
       return evidenceId ? await getStillFailing(dbPool, evidenceId) : NO_FAILURES;
+    } catch (err) {
+      console.error('DB error:', err);
+      throw err;
+    }
+  });
+
+  // The selected run's evidence's fact-writing stages whose latest attempt was
+  // interrupted, so recorded none of the items they failed (EPOCH-561, R7).
+  ipcMain.handle('epoch:getInterruptedStages', async (_event, runId: string) => {
+    try {
+      const evidenceId = await getRunEvidence(dbPool, runId);
+      return evidenceId ? await getInterruptedStages(dbPool, evidenceId) : [];
     } catch (err) {
       console.error('DB error:', err);
       throw err;

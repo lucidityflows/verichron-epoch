@@ -43,6 +43,10 @@ export interface PipelineRunRow {
   /** From the run_completeness view: the ONE completeness predicate (R23,
    * EPOCH-404). Read this; never re-derive it from stage rows. */
   state: 'running' | 'incomplete' | 'complete';
+  /** How the run ended (migration 0017, EPOCH-435); null while it runs. */
+  ended_reason: EndedReason | null;
+  /** What was known about why, e.g. the orchestrator's own error for a crash. */
+  ended_detail: string | null;
   /** The device's name, as registered with the evidence; null without evidence. */
   device_label: string | null;
   /** How many of the run's stages are in each status, for a one-line summary
@@ -53,6 +57,9 @@ export interface PipelineRunRow {
 }
 
 export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
+
+/** How a run ended (migration 0017). The last four mean it didn't finish. */
+export type EndedReason = 'completed' | 'cancelled' | 'timeout' | 'crashed' | 'abandoned';
 
 export interface StageStatusRow {
   run_id: string;
@@ -76,6 +83,11 @@ export interface StageStatusRow {
    * ingested by an earlier run counts too, since this run saw it. */
   units: number;
   records: number;
+  /** How the stage's run ended (EPOCH-435): a stage still pending or running
+   * on a run that ended stopped there, and never finished. */
+  run_ended_reason: EndedReason | null;
+  /** When the stage's run ended; null while it runs. */
+  run_finished_at: string | null;
 }
 
 /**
@@ -110,7 +122,7 @@ const RECORD_COLUMNS = `id, ingest_id, evidence_id, derivative_id, file_hash, pa
 export async function getPipelineRuns(client: Db, limit = 100): Promise<PipelineRunRow[]> {
   const result = await client.query<PipelineRunRow>(
     `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id,
-            r.contract_version, r.tool_versions, c.state, d.label AS device_label,
+            r.contract_version, r.tool_versions, c.state, r.ended_reason, r.ended_detail, d.label AS device_label,
             s.stage_counts, s.stages_with_warnings
        FROM pipeline_runs r
        JOIN run_completeness c USING (run_id)
@@ -189,7 +201,7 @@ export async function getRunReportLocation(client: Db, runId: string): Promise<s
  * The order has one owner (R2); no list of stage names lives here.
  */
 export async function getStageStatus(client: Db, runId: string): Promise<StageStatusRow[]> {
-  const result = await client.query<StageStatusRow>(
+  const result = await client.query<Omit<StageStatusRow, 'run_ended_reason' | 'run_finished_at'>>(
     `SELECT s.run_id, s.stage_name, s.stage_order, s.status, s.error_message, s.warnings, s.started_at, s.finished_at,
             s.parser_version, s.derivative_id, d.kind AS derivative_kind, d.tool AS derivative_tool,
             u.units, u.records
@@ -209,6 +221,67 @@ export async function getStageStatus(client: Db, runId: string): Promise<StageSt
       WHERE s.run_id = $1
       ORDER BY s.stage_order, s.stage_name`,
     [runId]
+  );
+  // The run's end in a query of its own: a statement that reads facts never
+  // also reaches them through pipeline_runs (R7, scripts/test_evidence_reads.py).
+  const run = await client.query<{ ended_reason: EndedReason | null; finished_at: string | null }>(
+    `SELECT ended_reason, finished_at FROM pipeline_runs WHERE run_id = $1`,
+    [runId]
+  );
+  const end = run.rows[0] ?? { ended_reason: null, finished_at: null };
+  return result.rows.map((row) => ({ ...row, run_ended_reason: end.ended_reason, run_finished_at: end.finished_at }));
+}
+
+/**
+ * The evidence, among these content roots (from the backups' sidecars), whose
+ * latest run was interrupted: it ended cancelled, stalled, crashed or
+ * abandoned, and run_completeness reads it incomplete (EPOCH-435). Found by
+ * content, never by path.
+ */
+export async function getInterruptedEvidence(client: Db, contentRoots: string[]): Promise<string[]> {
+  if (contentRoots.length === 0) return [];
+  const result = await client.query<{ evidence_id: string }>(
+    `SELECT latest.evidence_id
+       FROM (
+         SELECT DISTINCT ON (r.evidence_id) r.evidence_id, c.state, r.ended_reason
+           FROM pipeline_runs r
+           JOIN run_completeness c USING (run_id)
+           JOIN evidence_items e ON e.evidence_id = r.evidence_id
+          WHERE e.content_root = ANY($1::text[])
+          ORDER BY r.evidence_id, r.started_at DESC, r.run_id DESC
+       ) latest
+      WHERE latest.state = 'incomplete'
+        AND latest.ended_reason IN ('cancelled', 'timeout', 'crashed', 'abandoned')
+      ORDER BY latest.evidence_id`,
+    [contentRoots]
+  );
+  return result.rows.map((row) => row.evidence_id);
+}
+
+/** A fact-writing stage whose latest attempt for the evidence was interrupted (EPOCH-561). */
+export interface InterruptedStageRow {
+  stage_name: string;
+  run_id: string;
+  /** The stage's status when its run ended: it never finished. */
+  status: 'pending' | 'running';
+  ended_reason: Exclude<EndedReason, 'completed'>;
+  ended_detail: string | null;
+  finished_at: string;
+}
+
+/**
+ * The evidence's fact-writing stages whose latest attempt was interrupted,
+ * from the interrupted_stages view (migration 0017), which the report can ask
+ * too (R27). Such a stage recorded none of the items it failed. At most one
+ * row per stage, so the list is bounded by the stages there are.
+ */
+export async function getInterruptedStages(client: Db, evidenceId: string): Promise<InterruptedStageRow[]> {
+  const result = await client.query<InterruptedStageRow>(
+    `SELECT stage_name, run_id, status, ended_reason, ended_detail, finished_at
+       FROM interrupted_stages
+      WHERE evidence_id = $1
+      ORDER BY stage_name`,
+    [evidenceId]
   );
   return result.rows;
 }

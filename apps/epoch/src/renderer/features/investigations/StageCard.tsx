@@ -8,6 +8,7 @@ import { Disclosure } from '../../components/ui/Disclosure';
 import { reportsApi } from '../../api/reports';
 import { runsApi } from '../../api/runs';
 import { FailedItems, failedItemsText } from './FailedItems';
+import { interruptionPhrase, stoppedStage } from './endedReason';
 
 /** The report stage, named after its directory as the orchestrator names stages. */
 const REPORT_STAGE = 'reporting';
@@ -15,8 +16,10 @@ const REPORT_STAGE = 'reporting';
 const OUTPUT_PREVIEW_LINES = 5;
 
 export function stageDurationMs(stage: StageStatusRow): number | null {
-  if (!stage.started_at || !stage.finished_at) return null;
-  return new Date(stage.finished_at).getTime() - new Date(stage.started_at).getTime();
+  // A stage its run ended under ran until the run ended (EPOCH-435).
+  const end = stage.finished_at ?? (stoppedStage(stage) ? stage.run_finished_at : null);
+  if (!stage.started_at || !end) return null;
+  return new Date(end).getTime() - new Date(stage.started_at).getTime();
 }
 
 export function formatDuration(ms: number): string {
@@ -48,6 +51,9 @@ function unitNoun(stage: StageStatusRow, count: number): string {
 
 /** The card's one line while closed: what the stage produced, or why not. */
 function summary(stage: StageStatusRow): string {
+  // A stage its run ended under never finished, whatever its row still says (EPOCH-435).
+  const stopped = stoppedStage(stage) ? interruptionPhrase(stage.run_ended_reason) : null;
+  if (stopped) return stage.status === 'pending' ? `Not run: ${stopped}` : `Stopped: ${stopped}`;
   if (stage.status === 'failed') return 'Failed';
   if (stage.status === 'skipped') return stage.error_message ? `Skipped: ${stage.error_message}` : 'Skipped';
   if (stage.status === 'running') return 'Running…';
@@ -119,6 +125,7 @@ function StageFailures({ stage, loadFailures }: { stage: StageStatusRow; loadFai
 
 /** The status colour (DESIGN.md §9): running is current work, not an alert. */
 function statusColour(stage: StageStatusRow): string {
+  if (stoppedStage(stage)) return 'var(--flag)';
   if (stage.status === 'succeeded') return 'var(--success)';
   if (stage.status === 'running') return 'var(--accent)';
   if (stage.status === 'failed') return 'var(--danger)';
@@ -144,6 +151,7 @@ export function StageCard({
   const [open, setOpen] = useState(false);
   const durationMs = stageDurationMs(stage);
   const colour = statusColour(stage);
+  const stopped = stoppedStage(stage);
   const read = describeRead(stage);
   // A succeeded stage's notes (EPOCH-420): it still succeeded, but said something.
   const warnings = stage.status === 'succeeded' && stage.warnings ? stage.warnings : null;
@@ -171,7 +179,7 @@ export function StageCard({
     >
       <div className="flex items-center gap-2">
         <h4 className="font-display text-label flex-1 truncate">{stage.stage_name}</h4>
-        <Badge variant={stage.status}>{stage.status}</Badge>
+        {stopped ? <Badge variant="flag">stopped</Badge> : <Badge variant={stage.status}>{stage.status}</Badge>}
         {open ? (
           <ChevronDown size="1rem" className="text-muted-foreground shrink-0" aria-hidden />
         ) : (
@@ -214,6 +222,13 @@ export function StageCard({
               {formatTime(stage.finished_at)}
             </dd>
           </dl>
+
+          {stopped && stage.status === 'running' && (
+            <p className="text-data text-flag mt-3">
+              This stage never finished: {interruptionPhrase(stage.run_ended_reason)}. A rerun retries what it
+              didn&apos;t complete.
+            </p>
+          )}
 
           {stage.status === 'skipped' && stage.error_message && (
             <p className="text-data text-muted-foreground mt-3">Skipped: {stage.error_message}</p>

@@ -31,6 +31,8 @@ import {
   getIndicatorChecks,
   getStageFailures,
   getStillFailing,
+  getInterruptedEvidence,
+  getInterruptedStages,
   type ForensicRecordQuery,
   type ForensicRecordRow,
   type RecordSortKey,
@@ -124,8 +126,8 @@ before(async () => {
     );
   }
   await db.query(
-    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-     VALUES ($1, 'test', 'test', '{}', $2, $2)`,
+    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+     VALUES ($1, 'test', 'test', '{}', $2, $2, 'test-host', 1)`,
     [RUN, EVIDENCE]
   );
 
@@ -363,14 +365,14 @@ describe('getRunReportLocation', live, () => {
       [DECRYPT, EVIDENCE, oldTarget.decryptedPath]
     );
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-       VALUES ($1, $4, 'test', '{}', $2, $3)`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+       VALUES ($1, $4, 'test', '{}', $2, $3, 'test-host', 1)`,
       [REPORT_RUN, EVIDENCE, DECRYPT, oldTarget.decryptedPath]
     );
     // A run from before evidence registration (EPOCH-404).
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions)
-       VALUES ($1, '/legacy/decrypted/a', 'test', '{}')`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid)
+       VALUES ($1, '/legacy/decrypted/a', 'test', '{}', 'test-host', 1)`,
       [UNREGISTERED_RUN]
     );
   });
@@ -506,8 +508,8 @@ describe('getIndicatorChecks', live, () => {
       [SKIPPED_RUN, 'skipped', null, '2026-10-14T10:00:00Z', 'No indicator set is registered.'],
     ]) {
       await db.query(
-        `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-         VALUES ($1, 'test', 'test', '{}', $2, $2)`,
+        `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+         VALUES ($1, 'test', 'test', '{}', $2, $2, 'test-host', 1)`,
         [run, OTHER]
       );
       await db.query(
@@ -645,5 +647,81 @@ describe('failed items and what is still failing (EPOCH-432)', live, () => {
       [['Retired/b.ips', RERUN]]
     );
     assert.equal(page.total, 1);
+  });
+});
+
+describe('interrupted runs and stages (EPOCH-435, EPOCH-561)', live, () => {
+  const INTERRUPTED = 'aaaaaaaa-0000-0000-0000-000000000001';
+  const LATER = 'aaaaaaaa-0000-0000-0000-000000000002';
+  const GOING = 'aaaaaaaa-0000-0000-0000-000000000003';
+
+  async function runOf(runId: string, startedIn: string, end: { at: string; reason: string } | null) {
+    await db.query(
+      `INSERT INTO pipeline_runs
+         (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid,
+          started_at, finished_at, ended_reason)
+       VALUES ($1, 'test', 'test', '{}', $2, $2, 'test-host', 1, now() + $3::interval,
+               now() + $4::interval, $5)`,
+      [runId, OTHER, startedIn, end?.at ?? null, end?.reason ?? null]
+    );
+  }
+
+  async function stagesOf(runId: string, rows: Array<[string, number | null, string]>) {
+    for (const [name, parserVersion, status] of rows) {
+      await db.query(
+        `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, parser_version)
+         VALUES ($1, $2, 10, $3, $4)`,
+        [runId, name, status, parserVersion]
+      );
+    }
+  }
+
+  before(async () => {
+    // A run of the other evidence that stalled: two fact-writing stages
+    // unfinished, the report (writes no facts) and a skipped stage aside.
+    await runOf(INTERRUPTED, '1 hour', { at: '2 hours', reason: 'timeout' });
+    await stagesOf(INTERRUPTED, [
+      ['crash', 1, 'running'],
+      ['ileapp_bridge', 5, 'pending'],
+      ['reporting', null, 'pending'],
+      ['indicator_match', 1, 'skipped'],
+      // Failed before the run stalled: it recorded its items, so it isn't interrupted.
+      ['failed_stage', 1, 'failed'],
+    ]);
+  });
+
+  it('names the evidence whose latest run was interrupted, found by content root', async () => {
+    assert.deepEqual(await getInterruptedEvidence(db, ['c'.repeat(64), 'b'.repeat(64)]), [OTHER]);
+    assert.deepEqual(await getInterruptedEvidence(db, []), []);
+  });
+
+  it("gives each stage its run's end, and each run its end reason", async () => {
+    const crash = (await getStageStatus(db, INTERRUPTED)).find((s) => s.stage_name === 'crash')!;
+    assert.equal(crash.status, 'running', 'never rewritten');
+    assert.equal(crash.run_ended_reason, 'timeout');
+    assert.ok(crash.run_finished_at);
+    const run = (await getPipelineRuns(db)).find((r) => r.run_id === INTERRUPTED)!;
+    assert.deepEqual([run.state, run.ended_reason], ['incomplete', 'timeout']);
+  });
+
+  it('lists the fact-writing stages whose latest attempt was interrupted, until a later attempt finishes them', async () => {
+    const names = async () =>
+      (await getInterruptedStages(db, OTHER)).map((s) => [s.stage_name, s.status, s.ended_reason]);
+    assert.deepEqual(await names(), [
+      ['crash', 'running', 'timeout'],
+      ['ileapp_bridge', 'pending', 'timeout'],
+    ]);
+
+    // A later run finishes crash: only ileapp_bridge is still interrupted, and
+    // the evidence's latest run is complete.
+    await runOf(LATER, '3 hours', { at: '4 hours', reason: 'completed' });
+    await stagesOf(LATER, [['crash', 1, 'succeeded']]);
+    assert.deepEqual(await names(), [['ileapp_bridge', 'pending', 'timeout']]);
+    assert.deepEqual(await getInterruptedEvidence(db, ['c'.repeat(64)]), []);
+
+    // A run still going is the latest attempt, and its end isn't known yet.
+    await runOf(GOING, '5 hours', null);
+    await stagesOf(GOING, [['ileapp_bridge', 5, 'running']]);
+    assert.deepEqual(await names(), []);
   });
 });

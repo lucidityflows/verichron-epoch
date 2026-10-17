@@ -178,6 +178,17 @@ an audit event; facts belong to evidence, not to runs (R7).**
   failure unless a unit of the same evidence and source type completed after
   it, with the item's hash or, without one, its `file_path`. Failing items are visible, not hidden: a rerun retries
   them, since a failed file leaves no ledger row.
+- **How a run ends is recorded** (EPOCH-435, migration 0017).
+  - **What a run records:**
+    - `host` and `pid`: the orchestrator process that created the run.
+    - Once it ends, `ended_reason`: `completed`, `cancelled`, `timeout`, `crashed` or `abandoned`. It is set exactly when `finished_at` is.
+    - `ended_detail`: what was known about why.
+  - **Who closes a run the orchestrator didn't finish:**
+    - The orchestrator closes its own run as `crashed`, with its error.
+    - The app closes a call's runs by ID, from their `run:created` events: as `cancelled` on a cancel, `timeout` when stalled, or `crashed` when the process died.
+    - The app's sweep, at start and before reporting a workspace's status, closes as `abandoned` every open run on this host whose process is gone. It leaves runs on other hosts alone.
+  - **Stage rows are never rewritten.** A stage that never finished keeps its status. On an ended run it reads as stopped, and the run is incomplete.
+  - **Interrupted stages:** the `interrupted_stages` view (R27) gives each evidence's fact-writing stages whose latest attempt ended this way. Such a stage recorded none of the items it failed (EPOCH-561).
 - **Completeness has one definition (R23):** the `run_completeness` view. A run
   is `running` until it finishes; `incomplete` if any stage failed or was left
   pending or running; otherwise `complete`. A `skipped` (disabled) stage never

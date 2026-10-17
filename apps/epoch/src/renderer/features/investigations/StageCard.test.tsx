@@ -28,6 +28,8 @@ function stage(overrides: Partial<StageStatusRow>): StageStatusRow {
     derivative_tool: { name: 'iphone_backup_decrypt', version: '0.10.0' },
     units: 3,
     records: 12,
+    run_ended_reason: null,
+    run_finished_at: null,
     ...overrides,
   } as StageStatusRow;
 }
@@ -156,5 +158,44 @@ describe('StageCard', () => {
     render(<StageCard stage={stage({ status: 'failed' })} loadFailures={loadFailures} />);
     fireEvent.click(card());
     assert.ok(await screen.findByText('Could not read the failed items: connection refused'));
+  });
+
+  it('shows a stage its run ended under as stopped, with why and how long it ran, never as running (EPOCH-435)', () => {
+    render(
+      <StageCard
+        stage={stage({
+          status: 'running',
+          started_at: '2026-10-13T20:00:00.000Z',
+          finished_at: null,
+          run_ended_reason: 'cancelled',
+          run_finished_at: '2026-10-13T20:02:04.000Z',
+        })}
+        loadFailures={NO_FAILURES}
+      />
+    );
+    assert.ok(screen.getByText('stopped'));
+    assert.equal(screen.queryByText('running'), null);
+    assert.ok(screen.getByText('Stopped: the run was cancelled · 2 min 4 s'));
+    fireEvent.click(card());
+    assert.ok(
+      screen.getByText("This stage never finished: the run was cancelled. A rerun retries what it didn't complete.")
+    );
+  });
+
+  it('says a pending stage its run ended under was not run, and why', () => {
+    render(
+      <StageCard
+        stage={stage({ status: 'pending', started_at: null, finished_at: null, run_ended_reason: 'abandoned' })}
+        loadFailures={NO_FAILURES}
+      />
+    );
+    assert.ok(screen.getByText('stopped'));
+    assert.ok(screen.getByText('Not run: its orchestrator ended without finishing it'));
+  });
+
+  it('still shows a stage of a run that is going as running', () => {
+    render(<StageCard stage={stage({ status: 'running', finished_at: null, run_ended_reason: null })} />);
+    assert.ok(screen.getByText('Running…'));
+    assert.equal(screen.queryByText('stopped'), null);
   });
 });
