@@ -493,10 +493,7 @@ describe('getIndicatorChecks', live, () => {
        RETURNING ingest_id`,
       [OTHER, setId, summary]
     );
-    await db.query(
-      `INSERT INTO ingest_run_links (ingest_id, run_id) VALUES ($1, $2)`,
-      [units[0].ingest_id, CHECK_RUN]
-    );
+    await db.query(`INSERT INTO ingest_run_links (ingest_id, run_id) VALUES ($1, $2)`, [units[0].ingest_id, CHECK_RUN]);
     await db.query(
       `INSERT INTO forensic_records (ingest_id, evidence_id, source_type, event_time, fields)
        VALUES ($1, $2, 'indicator_match', '2026-03-01T12:00:00Z', '{"match_mode": "exact"}')`,
