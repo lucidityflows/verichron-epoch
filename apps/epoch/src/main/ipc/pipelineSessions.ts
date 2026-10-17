@@ -1,5 +1,7 @@
 import { StringDecoder } from 'node:string_decoder';
 
+import { parsePipelineEventLine } from '@verichron/contracts';
+
 import { applyPrepareLogLine, initPrepareProgress } from '../../shared/prepareProgress';
 import type { AnalysisState, PipelineFinishedResult, PipelineLogEntry, PrepareState } from '../../shared/types/window';
 
@@ -132,6 +134,8 @@ export class AnalysisSession {
   };
   private readonly log = new LogBuffer();
   private readonly notifier: Notifier<AnalysisState>;
+  /** The runs this call's orchestrator created, from its run:created events (EPOCH-443). */
+  private createdRuns: string[] = [];
 
   constructor(send: (state: AnalysisState) => void) {
     this.notifier = new Notifier<AnalysisState>(send, () => ({ ...this.state, log: [] }));
@@ -139,22 +143,43 @@ export class AnalysisSession {
 
   start(kind: 'workspace' | 'retry', target: string, now = Date.now()): void {
     this.log.clear();
+    this.createdRuns = [];
     this.state = { status: 'running', kind, target, startedAt: now, currentStage: null, result: null };
     this.notifier.now();
   }
 
-  line(stream: PipelineLogEntry['stream'], text: string, now = Date.now()): PipelineLogEntry {
+  /**
+   * One line of the orchestrator's output. An event (EPOCH-443) updates the
+   * state and is not a log line, so it returns null; the orchestrator prints
+   * its own human line beside each. A prefixed line that isn't a valid event
+   * is never trusted: it is kept in the log as text and changes nothing.
+   * Only stdout carries events.
+   */
+  line(stream: PipelineLogEntry['stream'], text: string, now = Date.now()): PipelineLogEntry | null {
     if (stream === 'stdout') {
-      const started = /^\[orchestrator\] stage started: (.+)$/.exec(text);
-      if (started) {
-        this.state = { ...this.state, currentStage: { name: started[1], startedAt: now } };
-        this.notifier.soon();
-      } else if (/^\[orchestrator\] stage finished: (.+)$/.test(text)) {
-        this.state = { ...this.state, currentStage: null };
-        this.notifier.soon();
+      const parsed = parsePipelineEventLine(text);
+      if (parsed.kind === 'event') {
+        const event = parsed.event;
+        if (event.type === 'run:created') {
+          this.createdRuns.push(event.run_id);
+        } else if (event.type === 'stage:started') {
+          this.state = { ...this.state, currentStage: { name: event.stage, startedAt: now } };
+          this.notifier.soon();
+        } else if (event.type === 'stage:finished') {
+          this.state = { ...this.state, currentStage: null };
+          this.notifier.soon();
+        }
+        return null;
       }
+      if (parsed.kind === 'invalid')
+        console.warn(`[pipelineSessions] ignored an invalid orchestrator event: ${parsed.error}`);
     }
     return this.log.add(stream, text);
+  }
+
+  /** The runs the current or last call's orchestrator created, in order. */
+  runIds(): string[] {
+    return [...this.createdRuns];
   }
 
   finish(result: PipelineFinishedResult): void {

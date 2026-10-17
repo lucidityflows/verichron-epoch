@@ -172,6 +172,18 @@ Languages split by role: TypeScript runs the control plane (app, processor,
 orchestrator); Python parses, writes facts and renders the report. They meet
 only at process boundaries (a stage is a subprocess) and in the database.
 
+### Orchestrator events
+
+The orchestrator tells its caller what it is doing in typed events
+(EPOCH-443), defined once in `packages/contracts/ts/pipelineEvent.ts`.
+- **Format:** each event is one stdout line, `@@verichron ` followed by JSON, validated before it is written.
+- **The events:**
+  - `run:created`, `run:skipped` and `run:finished`; a finished run's state is read from `run_completeness` (R23);
+  - `stage:started` and `stage:finished`;
+  - `registration:refused`.
+- **Stage output:** the orchestrator relays a stage's stdout line by line, and tags any line that starts with the prefix with the stage's name. No stage, and no value it echoes from the evidence, can pass for an event.
+- **The app:** its main process reads the events with the same contract and doesn't trust an invalid one. It takes the running stage and the runs a call created from them, never from the human log lines printed beside them. Event lines are not shown in the log.
+
 ## The workspace
 
 The processor creates one workspace per batch of backups. Each backup is a
@@ -273,4 +285,4 @@ These are settled but not yet built; this page will change when they land.
 
 | Change | Ticket |
 |---|---|
-| The app reads typed events from the processor and the orchestrator instead of scraping logs | EPOCH-443, EPOCH-445 |
+| The app reads typed events from the processor instead of scraping its logs; the orchestrator's are built (EPOCH-443) | EPOCH-445 |

@@ -15,6 +15,7 @@ import {
   type DerivativeKind,
 } from '@verichron/contracts';
 import { exportRunSummary } from './runSummary.js';
+import { emitEvent, relayStageOutput } from './events.js';
 
 async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!backupPath || backupPath.startsWith('-')) {
@@ -160,7 +161,16 @@ export function runStage(
       resolve(outcome);
     };
 
-    child.stdout?.pipe(process.stdout);
+    // Line by line, so a stage's output can't pass for an event (EPOCH-443).
+    // The outcome waits for the relay to drain, so a stage's last line is
+    // written before its stage:finished event.
+    const relay = relayStageOutput(stage.name);
+    let relayDrained = false;
+    relay.once('end', () => {
+      relayDrained = true;
+    });
+    child.stdout?.pipe(relay).pipe(process.stdout, { end: false });
+    const afterRelay = (then: () => void) => (relayDrained ? then() : relay.once('end', then));
     // Decoded as a stream, so a UTF-8 character split across two chunks
     // survives intact into error_message or warnings.
     child.stderr?.setEncoding('utf8');
@@ -184,7 +194,7 @@ export function runStage(
       ]
         .filter(Boolean)
         .join('\n');
-      finish({ status: timedOut || code !== 0 ? 'failed' : 'succeeded', stderr: details });
+      afterRelay(() => finish({ status: timedOut || code !== 0 ? 'failed' : 'succeeded', stderr: details }));
     });
   });
 }
@@ -233,6 +243,16 @@ export interface RunPipelineOptions {
   indicatorSetHash?: string;
 }
 
+/** `run:finished` with the run's state as run_completeness says it (R23). */
+async function emitRunFinished(client: Client, runId: string): Promise<void> {
+  const { rows } = await client.query<{ state: 'running' | 'incomplete' | 'complete' }>(
+    `SELECT state FROM run_completeness WHERE run_id = $1`,
+    [runId]
+  );
+  if (!rows[0]) throw new Error(`run ${runId} has no run_completeness row`);
+  emitEvent({ type: 'run:finished', run_id: runId, state: rows[0].state });
+}
+
 export async function runPipelineForBackup(
   client: Client,
   target: ResolvedWorkspaceBackup,
@@ -246,6 +266,7 @@ export async function runPipelineForBackup(
   // unverifiable sidecar must not leave an orphaned run row (EPOCH-404).
   const validation = await validateBackupPath(backupPath);
   if (!validation.ok) {
+    emitEvent({ type: 'registration:refused', backup_path: backupPath, reason: validation.reason });
     return { success: false, error: validation.reason };
   }
 
@@ -259,7 +280,10 @@ export async function runPipelineForBackup(
       secretPath: options.secretPath,
     });
   } catch (err) {
-    if (err instanceof RegistrationError) return { success: false, error: err.message };
+    if (err instanceof RegistrationError) {
+      emitEvent({ type: 'registration:refused', backup_path: backupPath, reason: err.message });
+      return { success: false, error: err.message };
+    }
     throw err;
   }
 
@@ -285,10 +309,21 @@ export async function runPipelineForBackup(
     if (!(await fsp.stat(existing).catch(() => null))) {
       await exportRunSummary(client, completeRun, existing);
     }
+    emitEvent({
+      type: 'run:skipped',
+      evidence_id: registration.evidenceId,
+      reason: `a complete run (${completeRun}) already covers this evidence with the stages enabled now`,
+    });
     return { success: true, skipped: true, evidenceId: registration.evidenceId };
   }
 
   const runId = await createRun(client, backupPath, stages, collectProvenance(pythonBin), registration, indicatorSet);
+  emitEvent({
+    type: 'run:created',
+    run_id: runId,
+    evidence_id: registration.evidenceId,
+    derivative_id: registration.decryptedDerivativeId,
+  });
   const results: { stage: string; success: boolean }[] = [];
   // Registration located the workspace, so a backup that reached here has one.
   const summaryPath = resolveRunSummaryPath(target, runId);
@@ -297,6 +332,7 @@ export async function runPipelineForBackup(
     for (const stage of stages.enabled) {
       await markStage(client, runId, stage.name, 'running');
       process.stdout.write(`[orchestrator] stage started: ${stage.name}\n`);
+      emitEvent({ type: 'stage:started', run_id: runId, stage: stage.name });
       const outcome = await runStage(
         stage,
         { backupPath, reportPath, ileappPath, crashReportsPath, dbUrl, pythonBin },
@@ -317,6 +353,14 @@ export async function runPipelineForBackup(
       } else {
         await markStage(client, runId, stage.name, 'failed', outcome.stderr || 'unknown error');
       }
+      emitEvent({
+        type: 'stage:finished',
+        run_id: runId,
+        stage: stage.name,
+        status: outcome.status,
+        parser_version: stage.manifest.parserVersion ?? null,
+        derivative_id: inputsFor(stage, registration, indicatorSet).derivativeId,
+      });
       results.push({ stage: stage.name, success: outcome.status !== 'failed' });
     }
 
@@ -324,9 +368,14 @@ export async function runPipelineForBackup(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await markRunFailed(client, runId, message);
+    // Best effort: the run's own error is the one to report, not this one's.
+    await emitRunFinished(client, runId).catch((eventErr: unknown) =>
+      console.error(`[orchestrator] could not report run ${runId} finished:`, eventErr)
+    );
     await exportRunSummary(client, runId, summaryPath);
     throw err;
   }
+  await emitRunFinished(client, runId);
   // EPOCH-409: each run's summary in its own file, so no run touches another's.
   await exportRunSummary(client, runId, summaryPath);
   return { runId, results, evidenceId: registration.evidenceId, success: results.every((result) => result.success) };

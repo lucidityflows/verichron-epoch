@@ -3,7 +3,8 @@
  * process, so New Investigation can be left and opened again mid-run.
  */
 import assert from 'node:assert/strict';
-import { describe, it } from 'vitest';
+import { PIPELINE_EVENT_PREFIX, renderPipelineEvent, type PipelineEventBody } from '@verichron/contracts';
+import { describe, it, vi } from 'vitest';
 
 import { applyPrepareLogLine, initPrepareProgress } from '../../shared/prepareProgress';
 import type { PrepareState } from '../../shared/types/window';
@@ -118,20 +119,74 @@ describe('AnalysisSession', () => {
     assert.equal(analysis.snapshot().log.length, 1);
   });
 
-  it('tracks stage start time from orchestrator lifecycle lines and clears it at completion', () => {
+  const RUN = '33333333-3333-3333-3333-333333333333';
+  const event = (body: PipelineEventBody) => renderPipelineEvent(body);
+
+  it('tracks the running stage from orchestrator events and clears it at completion (EPOCH-443)', () => {
     const analysis = new AnalysisSession(() => {});
     analysis.start('workspace', '/w', 1000);
-    analysis.line('stdout', '[orchestrator] stage started: ileapp_bridge', 2500);
+    assert.equal(
+      analysis.line('stdout', event({ type: 'stage:started', run_id: RUN, stage: 'ileapp_bridge' }), 2500),
+      null
+    );
     assert.deepEqual(analysis.snapshot().currentStage, { name: 'ileapp_bridge', startedAt: 2500 });
     assert.equal(analysis.hasActiveStage(), true);
 
-    analysis.line('stdout', '[orchestrator] stage finished: ileapp_bridge', 3500);
+    analysis.line(
+      'stdout',
+      event({
+        type: 'stage:finished',
+        run_id: RUN,
+        stage: 'ileapp_bridge',
+        status: 'succeeded',
+        parser_version: 5,
+        derivative_id: RUN,
+      }),
+      3500
+    );
     assert.equal(analysis.snapshot().currentStage, null);
     assert.equal(analysis.hasActiveStage(), false);
 
-    analysis.line('stdout', '[orchestrator] stage started: reporting', 4000);
+    analysis.line('stdout', event({ type: 'stage:started', run_id: RUN, stage: 'reporting' }), 4000);
     analysis.finish({ success: false });
     assert.equal(analysis.snapshot().currentStage, null);
+    assert.equal(analysis.snapshot().log.length, 0, 'events are not log lines');
+  });
+
+  it('takes nothing from human text, only from events', () => {
+    const analysis = new AnalysisSession(() => {});
+    analysis.start('workspace', '/w', 1000);
+    analysis.line('stdout', '[orchestrator] stage started: ileapp_bridge', 2500);
+    assert.equal(analysis.snapshot().currentStage, null);
+    assert.equal(analysis.snapshot().log.length, 1, 'kept as a log line');
+  });
+
+  it('never trusts a prefixed line that is not a valid event: it stays text and changes nothing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const analysis = new AnalysisSession(() => {});
+    analysis.start('workspace', '/w', 1000);
+    const forged = `${PIPELINE_EVENT_PREFIX}{"v":1,"type":"run:created","run_id":"${RUN}"}`;
+    const entry = analysis.line('stdout', forged, 2500);
+    assert.equal(entry?.line, forged);
+    assert.deepEqual(analysis.runIds(), []);
+    assert.equal(warn.mock.calls.length, 1);
+    // A stage's line the orchestrator tagged is ordinary text too.
+    analysis.line('stdout', `[stage crash] ${event({ type: 'stage:started', run_id: RUN, stage: 'x' })}`, 2600);
+    assert.equal(analysis.snapshot().currentStage, null);
+    warn.mockRestore();
+  });
+
+  it('records the runs a call created, and forgets them when the next call starts', () => {
+    const analysis = new AnalysisSession(() => {});
+    analysis.start('workspace', '/w', 1000);
+    const other = '44444444-4444-4444-4444-444444444444';
+    for (const run_id of [RUN, other]) {
+      analysis.line('stdout', event({ type: 'run:created', run_id, evidence_id: run_id, derivative_id: run_id }));
+    }
+    analysis.line('stderr', event({ type: 'run:created', run_id: RUN, evidence_id: RUN, derivative_id: RUN }));
+    assert.deepEqual(analysis.runIds(), [RUN, other], 'only stdout carries events');
+    analysis.start('retry', RUN, 2000);
+    assert.deepEqual(analysis.runIds(), []);
   });
 });
 
