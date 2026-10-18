@@ -111,3 +111,4 @@ export { ProcessorSummary } from './ts/processorSummary.js';
 export { SourceType, isSourceType } from './ts/sourceType';
 export type { SourceType as SourceTypeValue } from './ts/sourceType';
 export { loadRootEnv, resolveDatabaseUrl } from './ts/env.js';
+export { safeTestDatabaseUrl, unsafeTestDatabase } from './ts/testDatabase.js';

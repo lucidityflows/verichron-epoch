@@ -23,7 +23,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import psycopg2
 import pytest
-from testing.pg_real import TEST_DATABASE_URL_ENV
+from testing.pg_real import TEST_DATABASE_URL_ENV, safe_test_database_url
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MIGRATE_PY = REPO_ROOT / "packages" / "etl-db-writer" / "migrate.py"
@@ -45,7 +45,7 @@ migrate = _load_migrate()
 @pytest.fixture
 def scratch_db():
     """A brand-new database, as initdb would see it, dropped afterwards."""
-    dsn = os.environ.get(TEST_DATABASE_URL_ENV)
+    dsn = safe_test_database_url()
     if not dsn:
         if os.environ.get("CI"):
             pytest.fail(f"{TEST_DATABASE_URL_ENV} must be set in CI")

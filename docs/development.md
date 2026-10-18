@@ -175,7 +175,13 @@ There are two test tiers, and both run in CI (R33):
   SQLite-backed stand-in that runs the same test bodies.
 - **Real Postgres:** the same bodies against PostgreSQL, enabled by
   `TEST_DATABASE_URL`. It **truncates tables**, so point it at a throwaway
-  database, never your dev one.
+  database, never your dev one. Both test setups refuse a URL whose database
+  is the one `.env` names, or isn't named as a test database (`verichron_test`,
+  `verichron_ci`): `conftest.py` stops pytest before any test runs, and the
+  TypeScript suites throw (`safeTestDatabaseUrl` in `packages/contracts`).
+  A URL pointed at the dev database emptied it on 2026-10-18. Prepare the test
+  database as CI does: `migrate.py` and `provision_roles.py` with
+  `ADMIN_DATABASE_URL` at it, and a test login of its own in `DB_APP_USER`.
 
 ```bash
 mise run lint

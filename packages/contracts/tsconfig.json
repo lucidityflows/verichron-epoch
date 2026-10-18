@@ -22,6 +22,7 @@
     "ts/taskLog.ts",
     "ts/sanitize.ts",
     "ts/deviceIdentifiers.ts",
-    "ts/processorSummary.ts"
+    "ts/processorSummary.ts",
+    "ts/testDatabase.ts"
   ]
 }

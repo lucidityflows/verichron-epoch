@@ -33,14 +33,22 @@ from TEST_DATABASE_URL only, never DATABASE_URL, so a developer whose .env
 points DATABASE_URL at a dev database with real evidence in it cannot wipe it
 by running pytest. Migrations must already be applied (CI runs migrate.py
 first); this module does not create schema.
+
+TEST_DATABASE_URL itself is checked too (`unsafe_test_database`): its
+database must be named as a test one, and must not be the database `.env`
+names. On 2026-10-18 a TEST_DATABASE_URL pointed at the dev database emptied
+it; the repository's conftest.py now refuses to start such a run.
 """
 
 from __future__ import annotations
 
 import hashlib
 import os
+import re
 from collections.abc import Iterable, Iterator, Mapping
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import psycopg2
 import psycopg2.extras
@@ -48,6 +56,54 @@ import psycopg2.extras
 from .pg_double import PgDouble, sqlite_supports_upsert_returning
 
 TEST_DATABASE_URL_ENV = "TEST_DATABASE_URL"
+
+#: A test database says so in its name: verichron_test, epoch_test, verichron_ci.
+_TEST_NAME = re.compile(r"(?:^|[^a-z0-9])(?:test|ci)(?:[^a-z0-9]|$)")
+
+
+def _database_name(dsn: str) -> str:
+    """The database a URL or a libpq keyword string names."""
+    if "://" in dsn:
+        return urlsplit(dsn).path.lstrip("/")
+    match = re.search(r"(?:^|\s)dbname\s*=\s*'?([^'\s]+)", dsn)
+    return match.group(1) if match else ""
+
+
+def _dev_database_name() -> str | None:
+    """The database the repository's .env names for the app, if it names one."""
+    if os.environ.get("DB_NAME"):
+        return os.environ["DB_NAME"]
+    env = Path(__file__).resolve().parents[3] / ".env"
+    if env.is_file():
+        for line in env.read_text().splitlines():
+            key, _, value = line.partition("=")
+            if key.strip() == "DB_NAME":
+                return value.strip().strip("'\"")
+    return None
+
+
+def unsafe_test_database(dsn: str) -> str | None:
+    """Why `dsn` must not be used for tests that TRUNCATE, or None when it may."""
+    name = _database_name(dsn)
+    if not name:
+        return "it names no database"
+    if name == _dev_database_name():
+        return f'its database "{name}" is the one .env names for the app'
+    if not _TEST_NAME.search(name.lower()):
+        return f'its database "{name}" is not named as a test database (for example verichron_test)'
+    return None
+
+
+def safe_test_database_url() -> str | None:
+    """TEST_DATABASE_URL when it is set and safe to empty; it raises when it is set and isn't."""
+    dsn = os.environ.get(TEST_DATABASE_URL_ENV)
+    if not dsn:
+        return None
+    reason = unsafe_test_database(dsn)
+    if reason:
+        raise RuntimeError(f"{TEST_DATABASE_URL_ENV} refused: {reason}. These tests empty the tables they use.")
+    return dsn
+
 
 #: Truncated before every test, then re-seeded with the rows the foreign keys
 #: need. TRUNCATE does not fire evidence_events' row-level UPDATE/DELETE
@@ -210,7 +266,7 @@ def open_db(
             pytest.skip("test double needs SQLite >= 3.35 for UPSERT ... RETURNING")
         conn: PgDouble | PgReal = PgDouble()
     else:
-        dsn = os.environ.get(TEST_DATABASE_URL_ENV)
+        dsn = safe_test_database_url()
         if not dsn:
             if os.environ.get("CI"):
                 pytest.fail(f"{TEST_DATABASE_URL_ENV} must be set in CI for the postgres test backend")

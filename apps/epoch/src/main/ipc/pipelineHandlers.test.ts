@@ -1,3 +1,4 @@
+import { safeTestDatabaseUrl } from '@verichron/contracts';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
@@ -43,7 +44,8 @@ function childProcess() {
   });
 }
 
-const DSN = process.env.TEST_DATABASE_URL;
+// Refused unless it names a test database: these tests empty the tables they use (EPOCH-570).
+const DSN = safeTestDatabaseUrl();
 const MIGRATIONS = path.resolve(__dirname, '../../../../../packages/etl-db-writer/migrations');
 
 function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {

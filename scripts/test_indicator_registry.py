@@ -21,7 +21,7 @@ import pytest
 from indicator_loader import load_set
 from indicator_set import LoadedSet
 from indicator_sets import register_set
-from testing.pg_real import TEST_DATABASE_URL_ENV
+from testing.pg_real import TEST_DATABASE_URL_ENV, safe_test_database_url
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WRITER = REPO_ROOT / "packages" / "etl-db-writer" / "indicator_sets.py"
@@ -31,7 +31,7 @@ AS_OF = datetime(2026, 10, 15, tzinfo=UTC)
 
 @pytest.fixture
 def conn():
-    dsn = os.environ.get(TEST_DATABASE_URL_ENV)
+    dsn = safe_test_database_url()
     if not dsn:
         if os.environ.get("CI"):
             pytest.fail(f"{TEST_DATABASE_URL_ENV} must be set in CI")

@@ -8,6 +8,7 @@
  * when unset; fails in CI. Run: pnpm --filter @verichron/orchestrator test
  */
 
+import { safeTestDatabaseUrl } from '@verichron/contracts';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -58,7 +59,8 @@ import { deviceKey, loadDeviceSecret, readPlistStrings, registerEvidence, Regist
 import { setOutputMode } from './events.js';
 import type { StageDefinition, StageSet } from './types.js';
 
-const DSN = process.env.TEST_DATABASE_URL;
+// Refused unless it names a test database: these tests empty the tables they use (EPOCH-570).
+const DSN = safeTestDatabaseUrl();
 const MIGRATIONS = path.resolve(import.meta.dirname, '../../../packages/etl-db-writer/migrations');
 const UDID = '00008030-001A2B3C4D5E6F70';
 const DECRYPT = { name: 'iphone_backup_decrypt', version: '0.10.0' };
