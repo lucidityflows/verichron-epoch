@@ -7,9 +7,9 @@ evidence and tool versions that produced it. Indicator (IOC) checks use the
 project's own matching on extracted facts, against a recorded, hashed indicator
 set, and state the set, its age and what was not checked (EPOCH-490 to 493).
 
-It is designed to behave like a careful lab technician, not a scanner: never
-to lose, misattribute or over-claim evidence, and always to say what it did not
-do.
+It is designed to work like a careful lab technician, not a scanner: to tie
+every fact to the evidence it came from, to claim no more than that evidence
+shows, and to state what it did not examine.
 
 > **Status:** pre-release. The first target is an air-gapped **Lab build**
 > ([decision](docs/decisions.md#product-and-builds)). Open work is tracked in
