@@ -50,6 +50,13 @@ describe('pythonEnvironmentDigest', () => {
     );
   });
 
+  it('stops an interpreter that does not answer in time, and says so', async () => {
+    const python = interpreter('stalled', 'exec sleep 30');
+    const started = Date.now();
+    await assert.rejects(pythonEnvironmentDigest(python, 200), /stalled.*did not answer within 0 s and was stopped/);
+    assert.ok(Date.now() - started < 10_000, 'it did not wait for the interpreter');
+  });
+
   it('fails on output that is not a list of name==version', async () => {
     const python = interpreter('odd', 'echo "hello"');
     await assert.rejects(pythonEnvironmentDigest(python), /listed its environment in an unexpected form/);

@@ -28,18 +28,34 @@ export function environmentDigest(items: string[]): string {
   return createHash('sha256').update(sorted.join('\n')).digest('hex');
 }
 
-/** The digest of the environment `python` runs in. Fails if it can't be read: every run records it. */
-export async function pythonEnvironmentDigest(python: string): Promise<string> {
+/** How long listing an environment may take; it takes well under a second. */
+export const ENVIRONMENT_TIMEOUT_MS = 60_000;
+
+/**
+ * The digest of the environment `python` runs in. Fails if it can't be read,
+ * or isn't listed within `timeoutMs` (the interpreter is then killed): every
+ * run records it, and nothing is processed until it has.
+ */
+export async function pythonEnvironmentDigest(python: string, timeoutMs = ENVIRONMENT_TIMEOUT_MS): Promise<string> {
   const output = await new Promise<string>((resolve, reject) => {
     let out = '';
     let err = '';
     const child = spawn(python, ['-I', '-c', LIST_ENVIRONMENT], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error(`it did not answer within ${Math.round(timeoutMs / 1000)} s and was stopped`));
+    }, timeoutMs);
     child.stdout.on('data', (chunk) => (out += chunk));
     child.stderr.on('data', (chunk) => (err += chunk));
-    child.on('error', reject);
-    child.on('close', (code) =>
-      code === 0 ? resolve(out) : reject(new Error(`exit code ${code}${err.trim() ? `: ${err.trim()}` : ''}`))
-    );
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve(out);
+      else reject(new Error(`exit code ${code}${err.trim() ? `: ${err.trim()}` : ''}`));
+    });
   }).catch((error: unknown) => {
     throw new Error(
       `could not list the Python environment of ${python} (${error instanceof Error ? error.message : error}); ` +

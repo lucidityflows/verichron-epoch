@@ -32,17 +32,15 @@ def test_a_decrypt_names_its_library_and_environment():
     ]
 
 
-def test_a_tool_without_its_own_environment_names_none():
+def test_output_recorded_without_an_environment_names_none():
+    # A decrypt finished before tools recorded their environment is kept as it
+    # was (EPOCH-439), so its row has none; the line adds nothing for it.
     row = {
-        "kind": "crash_reports",
-        "path": "/ws/crash_reports/BK1",
-        "tool": {"name": "idevicecrashreport", "version": "1.4.0"},
-        "params": {
-            "acquired_at": "2026-10-15T01:00:00.000Z",
-            "backup_finished_at": "2026-10-15T00:59:57.000Z",
-            "files": 1,
-            "bytes": 1,
-            "reports_root": "c" * 64,
-        },
+        "kind": "ileapp_output",
+        "path": "/ws/ileapp/BK1",
+        "tool": {"name": "iLEAPP", "version": "24ba13daf37d" + "0" * 28},
+        "params": {"input_type": "fs"},
     }
-    assert "environment" not in describe_derivative(row)[0]
+    assert describe_derivative(row) == [
+        "- **iLEAPP output** (`/ws/ileapp/BK1`): produced by iLEAPP 24ba13daf37d, read as `fs`"
+    ]
