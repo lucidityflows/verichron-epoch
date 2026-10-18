@@ -41,9 +41,17 @@ describe('time display (EPOCH-559)', () => {
   });
 
   it('refuses a time with no UTC offset, rather than reading it in the host zone (R11)', () => {
-    expect(() => formatDateTime('2026-10-15T12:00:00')).toThrow(/no UTC offset/);
-    expect(() => formatDateTime('2026-10-15 12:00:00')).toThrow(/no UTC offset/);
-    expect(() => isoWithOffset('2026-10-15T12:00:00')).toThrow(/no UTC offset/);
+    expect(() => formatDateTime('2026-10-15T12:00:00')).toThrow(/UTC offset/);
+    expect(() => formatDateTime('2026-10-15 12:00:00')).toThrow(/UTC offset/);
+    expect(() => isoWithOffset('2026-10-15T12:00:00')).toThrow(/UTC offset/);
+  });
+
+  it('refuses loose text that Date would accept, and reads the full ISO forms', () => {
+    expect(() => formatDateTime('2026-10-15 12:00-05')).toThrow(/ISO 8601 with seconds/);
+    expect(() => formatDateTime('Oct 15 2026 12:00:00 Z')).toThrow(/ISO 8601 with seconds/);
+    expect(() => formatDateTime(' 2026-10-15T12:00:00Z')).toThrow(/ISO 8601 with seconds/);
+    expect(formatDateTime('2026-10-15 15:48:04.123456+00')).toBe('2026-10-15 15:48:04 UTC');
+    expect(formatDateTime('2026-10-15T10:48:04+0530')).toBe('2026-10-15 05:18:04 UTC');
   });
 
   it('keeps a recorded calendar date on its day, with no zone, in every zone', () => {

@@ -35,8 +35,13 @@ export interface TimeParts {
 
 /** A recorded calendar date with no time of day: "2026-10-15". */
 const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
-/** Text that says its own offset: "…Z", "…+00" (PostgreSQL), "…-05:00". */
-const HAS_OFFSET = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/i;
+/**
+ * A full ISO 8601 date and time with seconds and its own offset:
+ * "2026-10-15T15:48:04Z", "2026-10-15 15:48:04.123456+00" (PostgreSQL),
+ * "…-05:00". The whole shape is checked, because `Date` also accepts loose
+ * text such as "2026-10-15 12:00-05" or "Oct 15 2026 12:00:00 Z".
+ */
+const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)$/i;
 
 const isCalendarDate = (time: TimeValue): time is string => typeof time === 'string' && CALENDAR_DATE.test(time);
 
@@ -44,7 +49,9 @@ function toDate(time: TimeValue): Date {
   if (typeof time === 'string') {
     // Without an offset, the host's zone would be assumed: a guessed time (R11).
     if (CALENDAR_DATE.test(time)) throw new Error(`a calendar date has no time of day: ${time}`);
-    if (!HAS_OFFSET.test(time.trim())) throw new Error(`not a readable time (no UTC offset): ${time}`);
+    if (!ISO_WITH_OFFSET.test(time)) {
+      throw new Error(`not a readable time (needs ISO 8601 with seconds and a UTC offset): ${time}`);
+    }
   }
   const date = time instanceof Date ? time : new Date(time);
   if (Number.isNaN(date.getTime())) {

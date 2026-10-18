@@ -382,7 +382,9 @@ changed.
 "Investigations States and Rules"). The shared `StatusChip` is a rounded pill
 in `text-label`, with its state written out, so colour is never the only
 signal. `stageChip()` derives the state from the stage's recorded status and
-why its run ended, never from text.
+why its run ended, never from text. The views adopt it in U3 (Investigations,
+including the stage card) and U4; until then the stage card still shows its
+raw status.
 
 | Chip | Role | Shown when | Fill, text | Contrast on background / surface / raised |
 |---|---|---|---|---|
@@ -472,7 +474,10 @@ only how they are shown.
   to another day: `2026-10-15`. The reader returns a `DATE` as its text
   (`readerTypes` in `packages/etl-db-reader`); the driver's default would make
   it the host's local midnight.
-- **A time with no UTC offset is refused,** not read in the host's zone.
+- **A time with no UTC offset is refused,** not read in the host's zone. Text
+  must be full ISO 8601 with seconds and an offset (PostgreSQL's
+  `2026-10-15 15:48:04+00` included); looser text that `Date` would accept is
+  refused too.
 - **Copied or exported times keep their milliseconds** when there are any
   (`2026-10-08T00:36:36.400Z`).
 - **A missing time reads `no time recorded`.** It is never guessed.
