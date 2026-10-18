@@ -7,6 +7,7 @@
  */
 
 import type { IndicatorCheckRow, IndicatorSetSourceRow } from '@verichron/etl-db-reader';
+import { formatDate } from '../../../shared/time';
 
 export const TYPE_LABELS: Record<string, string> = {
   domain: 'Domain',
@@ -36,6 +37,7 @@ const NOT_LOADED: Record<string, string> = {
 };
 
 const count = (n: number | string) => Number(n).toLocaleString('en-US');
+/** The UTC day, for counting days between two times. */
 const day = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
 /** Types in one fixed order (the database doesn't keep a JSON object's key order). */
@@ -58,12 +60,12 @@ export function ageWhenChecked(check: IndicatorCheckRow): number | null {
 export function setLine(check: IndicatorCheckRow): string {
   const downloaded = check.sources.map((s) => s.downloaded_on).filter((d): d is string => !!d);
   const when = downloaded.length
-    ? `fetched ${downloaded.sort().at(-1)!.slice(0, 10)}`
-    : `registered ${check.set_registered_at ? day(check.set_registered_at) : 'on an unknown date'}`;
+    ? `fetched ${formatDate(downloaded.sort().at(-1)!)}`
+    : `registered ${check.set_registered_at ? formatDate(check.set_registered_at) : 'on an unknown date'}`;
   const line = `Set: ${check.set_name}, ${when} (${(check.set_hash ?? '').slice(0, 12)}).`;
   const age = ageWhenChecked(check);
   if (age === null || !check.newest_indicator) return `${line} It holds no indicator this check could load.`;
-  return `${line} Newest indicator ${day(check.newest_indicator)}: ${age} day(s) old when checked.`;
+  return `${line} Newest indicator ${formatDate(check.newest_indicator)}: ${age} day(s) old when checked.`;
 }
 
 export function staleLine(check: IndicatorCheckRow, staleAfterDays: number): string | null {

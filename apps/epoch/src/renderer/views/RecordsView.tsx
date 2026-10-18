@@ -3,6 +3,7 @@ import { Database, FileQuestion, Filter, MousePointerClick } from 'lucide-react'
 import type { ForensicRecordRow } from '@verichron/etl-db-reader';
 import { Badge } from '../components/ui/Badge';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
+import { DateTime } from '../components/ui/DateTime';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
 import { InterruptedStagesPanel } from '../features/records/InterruptedStagesPanel';
@@ -34,11 +35,7 @@ function buildColumns(): DataTableColumn<ForensicRecordRow>[] {
       id: 'event_time',
       header: 'Event Time',
       accessorFn: (row) => row.event_time,
-      cell: ({ row }) => (
-        <span className={cellMono}>
-          {row.original.event_time ? new Date(row.original.event_time).toLocaleString() : '—'}
-        </span>
-      ),
+      cell: ({ row }) => <DateTime value={row.original.event_time} className={cellMono} />,
       meta: { width: 'minmax(11rem, 1.2fr)' },
     },
     {

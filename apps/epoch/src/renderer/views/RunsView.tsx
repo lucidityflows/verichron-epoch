@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 import { Button } from '../components/ui/Button';
+import { DateTime } from '../components/ui/DateTime';
 import { TerminalLog } from '../components/layout/TerminalLog';
 import { pipelineApi } from '../api/pipeline';
 import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
@@ -66,10 +67,6 @@ function stageSummary(counts: PipelineRunRow['stage_counts']): string {
     if (counts[status] > 0) parts.push(`${counts[status]} ${status}`);
   }
   return parts.join(', ');
-}
-
-function formatTimestamp(iso: string): string {
-  return new Date(iso).toLocaleString();
 }
 
 interface RunsViewProps {
@@ -185,12 +182,7 @@ export function RunsView({
       header: 'Started',
       meta: { width: 'minmax(11rem, 0.7fr)' },
       cell: ({ row }) => (
-        <span
-          className="font-mono tabular-nums tracking-tight text-muted-foreground"
-          title={new Date(row.original.started_at).toISOString()}
-        >
-          {formatTimestamp(row.original.started_at)}
-        </span>
+        <DateTime value={row.original.started_at} className="tabular-nums tracking-tight text-muted-foreground" />
       ),
     },
     {
@@ -199,12 +191,7 @@ export function RunsView({
       meta: { width: 'minmax(11rem, 0.7fr)' },
       cell: ({ row }) =>
         row.original.finished_at ? (
-          <span
-            className="font-mono tabular-nums tracking-tight text-muted-foreground"
-            title={new Date(row.original.finished_at).toISOString()}
-          >
-            {formatTimestamp(row.original.finished_at)}
-          </span>
+          <DateTime value={row.original.finished_at} className="tabular-nums tracking-tight text-muted-foreground" />
         ) : (
           <span className="text-accent">In progress</span>
         ),

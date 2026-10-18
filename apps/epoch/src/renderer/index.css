@@ -118,4 +118,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Keyboard focus is the accent, on everything that can take it (EPOCH-558,
+     DESIGN.md §9: accent is interactive and current). Without this, focus was
+     the browser's default outline. Inputs keep their own accent border. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 }
