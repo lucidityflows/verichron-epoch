@@ -3,6 +3,7 @@ import { type AnalysisResult, preflightPython, writeCallSummary } from './callSu
 import { parseCliConfig } from './cli.js';
 import { discoverStages } from './discovery.js';
 import { migrationRefusal, readMigrationStatus } from './migrations.js';
+import { log } from './events.js';
 import { runPipelineForBackup } from './pipeline.js';
 import { acquireWorkspaceLocks } from '@verichron/workspace-lock';
 import type { CliConfig } from './types.js';
@@ -27,7 +28,7 @@ async function run(cfg: CliConfig) {
 
   if (stages.enabled.length === 0) {
     const error = 'No enabled stages were found under apps/extractors/ or apps/reporting/, so there is nothing to run.';
-    console.error(`[orchestrator] ${error}`);
+    log('error', error);
     await writeCallSummary(cfg.summaryPath, [], error);
     process.exitCode = 1;
     return;
@@ -35,7 +36,7 @@ async function run(cfg: CliConfig) {
 
   if (cfg.targets.length === 0) {
     const error = 'No successfully decrypted backups were found in the workspace.';
-    console.error(`[orchestrator] ${error}`);
+    log('error', error);
     await writeCallSummary(cfg.summaryPath, [], error);
     process.exitCode = 1;
     return;
@@ -49,7 +50,7 @@ async function run(cfg: CliConfig) {
   const refusal = migrationRefusal(await readMigrationStatus(client));
   if (refusal) {
     await client.end();
-    console.error(`[orchestrator] ${refusal}`);
+    log('error', refusal);
     await writeCallSummary(cfg.summaryPath, [], refusal);
     process.exitCode = 1;
     return;
@@ -81,7 +82,8 @@ async function run(cfg: CliConfig) {
         error: result.error, // Captures pre-flight validation failures
       });
     } catch (err) {
-      console.error(`[orchestrator] failure for ${backupPath}:`, err);
+      // Named by its label: the backup's path is not the log's business (docs/event-log.md §6.6).
+      log('error', `analysis of ${target.label} failed: ${err instanceof Error ? err.message : String(err)}`);
       failedBackups += 1;
       analysisResults.push({
         backupPath,
@@ -98,6 +100,6 @@ async function run(cfg: CliConfig) {
 }
 
 main().catch((err) => {
-  console.error('[orchestrator] fatal error:', err);
+  log('error', `Analyze stopped: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
 });

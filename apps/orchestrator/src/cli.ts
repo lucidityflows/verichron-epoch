@@ -10,6 +10,7 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { CliConfig } from './types.js';
 import { REPO_ROOT } from './discovery.js';
+import { log, setOutputMode } from './events.js';
 import { loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
 
 export function printUsage() {
@@ -65,7 +66,8 @@ export async function resolvePythonBin(repoRoot = REPO_ROOT): Promise<string> {
     );
   }
 
-  console.log(`[orchestrator] validated Python ${version}: ${venvPython}`);
+  // Its version identifies it; its path is not the log's business (docs/event-log.md §6.6).
+  log('debug', `validated Python ${version}`);
   return venvPython;
 }
 
@@ -75,8 +77,6 @@ export async function parseCliConfig(): Promise<CliConfig> {
   // Filter out standalone '--' tokens injected by pnpm script forwarding
   const cleanArgs = process.argv.slice(2).filter((arg) => arg !== '--');
 
-  console.error('[orchestrator] cleaned argv:', cleanArgs);
-
   const { values, positionals } = parseArgs({
     args: cleanArgs,
     options: {
@@ -85,9 +85,15 @@ export async function parseCliConfig(): Promise<CliConfig> {
       'summary-path': { type: 'string' },
       // The indicator set to check, by set hash; the newest registered set when omitted (EPOCH-491).
       'indicator-set': { type: 'string' },
+      // Typed events, as the app runs it, or human text on the command line (EPOCH-570).
+      output: { type: 'string', default: 'text' },
     },
     allowPositionals: true,
   });
+  if (values.output !== 'text' && values.output !== 'events') {
+    throw new Error(`invalid --output "${values.output}" (expected "text" or "events")`);
+  }
+  setOutputMode(values.output);
   const dbUrl = resolveDatabaseUrl();
   const summaryPath = values['summary-path'];
   const indicatorSetHash = values['indicator-set'];

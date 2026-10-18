@@ -126,8 +126,9 @@ describe('AnalysisSession', () => {
     const analysis = new AnalysisSession(() => {});
     analysis.start('workspace', '/w', 1000);
     assert.equal(
-      analysis.line('stdout', event({ type: 'stage:started', run_id: RUN, stage: 'ileapp_bridge' }), 2500),
-      null
+      analysis.line('stdout', event({ type: 'stage:started', run_id: RUN, stage: 'ileapp_bridge' }), 2500)?.line,
+      'ileapp_bridge started',
+      'an event is shown as its sentence (EPOCH-570)'
     );
     assert.deepEqual(analysis.snapshot().currentStage, { name: 'ileapp_bridge', startedAt: 2500 });
     assert.equal(analysis.hasActiveStage(), true);
@@ -150,7 +151,11 @@ describe('AnalysisSession', () => {
     analysis.line('stdout', event({ type: 'stage:started', run_id: RUN, stage: 'reporting' }), 4000);
     analysis.finish({ success: false });
     assert.equal(analysis.snapshot().currentStage, null);
-    assert.equal(analysis.snapshot().log.length, 0, 'events are not log lines');
+    assert.deepEqual(
+      analysis.snapshot().log.map((entry) => entry.line),
+      ['ileapp_bridge started', 'ileapp_bridge finished', 'reporting started'],
+      'never the raw event line'
+    );
   });
 
   it('takes nothing from human text, only from events', () => {

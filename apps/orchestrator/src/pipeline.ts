@@ -15,7 +15,7 @@ import {
   type DerivativeKind,
 } from '@verichron/contracts';
 import { exportRunSummary } from './runSummary.js';
-import { emitEvent, relayStageOutput } from './events.js';
+import { currentOutputMode, emitEvent, log, relayStageOutput } from './events.js';
 
 async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!backupPath || backupPath.startsWith('-')) {
@@ -162,21 +162,31 @@ export function runStage(
     };
 
     // Line by line, so a stage's output can't pass for an event (EPOCH-443).
-    // The outcome waits for the relay to drain, so a stage's last line is
-    // written before its stage:finished event.
-    const relay = relayStageOutput(stage.name);
-    let relayDrained = false;
-    relay.once('end', () => {
-      relayDrained = true;
-    });
-    child.stdout?.pipe(relay).pipe(process.stdout, { end: false });
-    const afterRelay = (then: () => void) => (relayDrained ? then() : relay.once('end', then));
+    // Its stderr is relayed too, for the task log (EPOCH-570), as well as
+    // kept for error_message or warnings. The outcome waits for both relays
+    // to drain, so a stage's last line is written before its stage:finished.
+    const outRelay = relayStageOutput(stage.name, 'stdout');
+    const errRelay = relayStageOutput(stage.name, 'stderr');
+    let drained = 0;
+    const waiting: (() => void)[] = [];
+    for (const relay of [outRelay, errRelay]) {
+      relay.once('end', () => {
+        drained += 1;
+        if (drained === 2) waiting.splice(0).forEach((then) => then());
+      });
+    }
+    child.stdout?.pipe(outRelay).pipe(process.stdout, { end: false });
+    // Events go to stdout; on the command line a stage's stderr stays on stderr.
+    errRelay.pipe(currentOutputMode() === 'events' ? process.stdout : process.stderr, { end: false });
+    const afterRelay = (then: () => void) => (drained === 2 ? then() : waiting.push(then));
     // Decoded as a stream, so a UTF-8 character split across two chunks
     // survives intact into error_message or warnings.
     child.stderr?.setEncoding('utf8');
     child.stderr?.on('data', (text: string) => {
       stderr += text;
+      errRelay.write(text);
     });
+    child.stderr?.on('end', () => errRelay.end());
     timeoutHandle = setTimeout(() => {
       if (process.platform === 'win32' && (child.exitCode !== null || child.signalCode !== null)) return;
       timedOut = true;
@@ -241,6 +251,22 @@ export interface RunPipelineOptions {
   secretPath?: string;
   /** The indicator set to check, by set hash; the newest registered one when omitted (EPOCH-491). */
   indicatorSetHash?: string;
+}
+
+/**
+ * Why a stage failed or was skipped, for its stage:finished event: a skip's
+ * own reason, or the last line a failed stage wrote to stderr (a Python
+ * error's last line names it), or its stop reason. The whole text is in its
+ * relayed output and in pipeline_stage_status.error_message.
+ */
+function stageReason(outcome: StageOutcome): { reason?: string } {
+  if (outcome.status === 'skipped') return outcome.reason ? { reason: outcome.reason } : {};
+  if (outcome.status !== 'failed') return {};
+  const lines = outcome.stderr
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return { reason: lines.at(-1) ?? 'the stage failed without saying why' };
 }
 
 /** `run:finished` with the run's state as run_completeness says it (R23). */
@@ -331,7 +357,6 @@ export async function runPipelineForBackup(
   try {
     for (const stage of stages.enabled) {
       await markStage(client, runId, stage.name, 'running');
-      process.stdout.write(`[orchestrator] stage started: ${stage.name}\n`);
       emitEvent({ type: 'stage:started', run_id: runId, stage: stage.name });
       const outcome = await runStage(
         stage,
@@ -340,7 +365,6 @@ export async function runPipelineForBackup(
         registration,
         indicatorSet
       );
-      process.stdout.write(`[orchestrator] stage finished: ${stage.name}\n`);
 
       if (outcome.status === 'skipped') {
         // Nothing failed, and nothing was examined: the reason says which
@@ -360,6 +384,7 @@ export async function runPipelineForBackup(
         status: outcome.status,
         parser_version: stage.manifest.parserVersion ?? null,
         derivative_id: inputsFor(stage, registration, indicatorSet).derivativeId,
+        ...stageReason(outcome),
       });
       results.push({ stage: stage.name, success: outcome.status !== 'failed' });
     }
@@ -370,7 +395,10 @@ export async function runPipelineForBackup(
     await markRunFailed(client, runId, message);
     // Best effort: the run's own error is the one to report, not this one's.
     await emitRunFinished(client, runId).catch((eventErr: unknown) =>
-      console.error(`[orchestrator] could not report run ${runId} finished:`, eventErr)
+      log(
+        'error',
+        `could not report run ${runId} finished: ${eventErr instanceof Error ? eventErr.message : String(eventErr)}`
+      )
     );
     await exportRunSummary(client, runId, summaryPath);
     throw err;

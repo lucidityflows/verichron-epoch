@@ -42,5 +42,8 @@ export function orchestratorArgs(workspace: string, labels: string[], summaryPat
     ...labels.flatMap((label) => ['--label', label]),
     '--summary-path',
     summaryPath,
+    // Typed events only (EPOCH-570): the app reads them, never the text.
+    '--output',
+    'events',
   ];
 }

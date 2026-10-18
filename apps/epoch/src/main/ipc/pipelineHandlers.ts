@@ -488,6 +488,8 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
           workspaceTarget.entry.label,
           '--summary-path',
           summaryPath,
+          '--output',
+          'events',
         ],
         { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] }
       );

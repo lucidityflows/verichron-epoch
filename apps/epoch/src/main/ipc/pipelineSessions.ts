@@ -1,6 +1,6 @@
 import { StringDecoder } from 'node:string_decoder';
 
-import { parsePipelineEventLine } from '@verichron/contracts';
+import { eventMessage, parsePipelineEventLine } from '@verichron/contracts';
 
 import { applyPrepareLogLine, initPrepareProgress } from '../../shared/prepareProgress';
 import type { AnalysisState, PipelineFinishedResult, PipelineLogEntry, PrepareState } from '../../shared/types/window';
@@ -169,7 +169,9 @@ export class AnalysisSession {
           this.state = { ...this.state, currentStage: null };
           this.notifier.soon();
         }
-        return null;
+        // With --output events every line is an event; shown as its sentence
+        // until the task log replaces this buffer (EPOCH-570).
+        return this.log.add(stream, eventMessage(event));
       }
       if (parsed.kind === 'invalid')
         console.warn(`[pipelineSessions] ignored an invalid orchestrator event: ${parsed.error}`);

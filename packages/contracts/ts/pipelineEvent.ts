@@ -48,8 +48,14 @@ export const PipelineEvent = z.discriminatedUnion('type', [
       status: z.enum(['succeeded', 'failed', 'skipped']),
       parser_version: z.number().int().positive().nullable(),
       derivative_id: id.nullable(),
+      /** Why it failed (required) or was skipped: the last line of what it wrote to stderr, or its stop reason. */
+      reason: z.string().min(1).optional(),
     })
-    .strict(),
+    .strict()
+    .refine((e) => e.status !== 'failed' || e.reason !== undefined, {
+      message: 'a stage that failed says why',
+      path: ['reason'],
+    }),
   z
     .object({
       ...envelope,
@@ -246,7 +252,8 @@ export function eventMessage(event: PipelineEventBody): string {
     case 'stage:started':
       return `${event.stage} started`;
     case 'stage:finished':
-      return `${event.stage} ${event.status === 'succeeded' ? 'finished' : event.status}`;
+      if (event.status === 'succeeded') return `${event.stage} finished`;
+      return `${event.stage} ${event.status}${event.reason ? `: ${event.reason}` : ''}`;
     case 'run:finished':
       return event.state === 'complete' ? 'Analysis complete' : `Analysis ${event.state}`;
     case 'registration:refused':

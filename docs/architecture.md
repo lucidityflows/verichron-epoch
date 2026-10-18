@@ -172,6 +172,8 @@ Languages split by role: TypeScript runs the control plane (app, processor,
 orchestrator); Python parses, writes facts and renders the report. They meet
 only at process boundaries (a stage is a subprocess) and in the database.
 
+<a id="orchestrator-events"></a>
+
 ### Events and the task log
 
 The orchestrator (EPOCH-443) and the processor (EPOCH-445) tell their caller
@@ -184,8 +186,9 @@ output as a levelled, sanitized log; [event-log.md](event-log.md) describes it.
   - `run:created`, `run:skipped` and `run:finished`; a finished run's state is read from `run_completeness` (R23);
   - `stage:started` and `stage:finished`;
   - `registration:refused`.
-- **Stage output:** the orchestrator relays a stage's stdout line by line, and tags any line that starts with the prefix with the stage's name. No stage, and no value it echoes from the evidence, can pass for an event.
-- **The app:** its main process reads the events with the same contract and doesn't trust an invalid one. It takes the running stage and the runs a call created from them, never from the human log lines printed beside them. Event lines are not shown in the log.
+- **Output modes:** with `--output events`, how the app runs the orchestrator and the processor, stdout carries only events. With `--output text`, the command line's default, the same events are written as human lines, in the same wording.
+- **Stage output:** the orchestrator relays a stage's stdout and stderr line by line, each line a `stage:output` event, the line a field inside it. No stage, and no value it echoes from the evidence, can pass for an event. A failed stage's `stage:finished` gives its reason: the last line it wrote to stderr, or its stop reason.
+- **The app:** its main process reads the events with the same contract and doesn't trust an invalid one, or one from the other program. It takes the running stage and the runs a call created from them, never from text.
 
 ## The workspace
 

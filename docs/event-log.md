@@ -274,7 +274,8 @@ A field or detail is added to the log only together with a row here.
 The events below extend the existing `PipelineEvent` union (EPOCH-443): one contract, one prefix and one parser.
 - **`log {level, message, label?, step?}`:** every line the processor or orchestrator writes for itself.
 - **`stage:output {stage, stream, line}`:** a stage's line, relayed by the orchestrator.
-  - This replaces today's `[stage x]` tagging. Only `emitEvent` writes events, so a stage still can't pass for one.
+  - Both its stdout and its stderr are relayed. This replaces the earlier `[stage x]` tagging: the line is a field inside the event, so a stage can't pass for an event.
+- **`stage:finished`** gains `reason`: required when the stage failed, and given when it was skipped. A failure's reason is the last line the stage wrote to stderr (a Python error's last line names it), or its stop reason. The whole text is in its relayed output and in `pipeline_stage_status.error_message`.
 - **The processor's events (EPOCH-445):**
   - `prepare:backups {labels}`
   - `backup:step {label, step: hash|decrypt|repair|ileapp|crash, status: started|done|skipped|error, reason?, detail?}`. A failed step must give its reason; a finished one may say what it found (`detail`, e.g. its file count and root hash).
@@ -299,8 +300,9 @@ The events below extend the existing `PipelineEvent` union (EPOCH-443): one cont
 ### 8.3 Orchestrator
 
 - Its own lines become `log` events, and stage output becomes `stage:output`.
-- It no longer prints its argument list. The app's header records the labels and options as fields.
-- A failed stage gets an `error` entry with the reason it records in `pipeline_stage_status.error_message`.
+- It no longer prints its argument list or its interpreter's path. The app's header records the labels and options as fields.
+- A failed stage's `stage:finished` is its one `error`, with its reason (§8.1).
+- Registration reads Info.plist with the contract's reader (`readPlistValues`), the same one the sanitizer uses.
 
 ### 8.4 App
 

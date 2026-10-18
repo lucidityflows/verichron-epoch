@@ -1,4 +1,5 @@
 import * as fsp from 'node:fs/promises';
+import { log } from './events.js';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,7 +60,7 @@ async function loadStageFromDir(dir: string, name: string): Promise<StageDefinit
   try {
     raw = await fsp.readFile(manifestPath, 'utf-8');
   } catch {
-    console.warn(`[orchestrator] ${dir} has no stage.json — skipping, not treated as a stage.`);
+    log('warn', `${path.relative(REPO_ROOT, dir)} has no stage.json — skipping, not treated as a stage.`);
     return null;
   }
 
@@ -122,13 +123,12 @@ export async function discoverStages(roots: StageRoots = REPO_ROOTS): Promise<St
   }
 
   stages.sort((a, b) => a.manifest.order - b.manifest.order);
-  console.log(
-    `[orchestrator] discovered ${stages.length} enabled stage(s): ${stages.map((s) => `${s.name}(${s.manifest.order})`).join(', ')}`
+  log(
+    'debug',
+    `discovered ${stages.length} enabled stage(s): ${stages.map((s) => `${s.name}(${s.manifest.order})`).join(', ')}`
   );
   if (disabled.length > 0) {
-    console.log(
-      `[orchestrator] ${disabled.length} disabled stage(s), recorded as skipped: ${disabled.map((s) => s.name).join(', ')}`
-    );
+    log('info', `${disabled.length} disabled stage(s), recorded as skipped: ${disabled.map((s) => s.name).join(', ')}`);
   }
   return { enabled: stages, disabled };
 }
