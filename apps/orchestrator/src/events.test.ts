@@ -8,9 +8,14 @@ import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
 import { after, describe, it } from 'node:test';
 
-import { PIPELINE_EVENT_PREFIX, parsePipelineEventLine, renderPipelineEvent } from '@verichron/contracts';
+import {
+  PIPELINE_EVENT_PREFIX,
+  STAGE_REPORT_PREFIX,
+  parsePipelineEventLine,
+  renderPipelineEvent,
+} from '@verichron/contracts';
 
-import { emitEvent, relayStageOutput, setOutputMode } from './events.js';
+import { emitEvent, relayStageOutput, setOutputMode, stageReportEvent } from './events.js';
 
 const RUN = '33333333-3333-3333-3333-333333333333';
 const AT = new Date('2026-10-17T22:00:00.000Z');
@@ -119,5 +124,56 @@ describe('the stage-output relay', () => {
       ],
       'every line, the unended last one included, is its own stage:output event'
     );
+  });
+});
+
+describe('stage reports (EPOCH-570)', () => {
+  after(() => setOutputMode('text'));
+  const reportLine = (body: object) => `${STAGE_REPORT_PREFIX}${JSON.stringify(body)}`;
+
+  it("reads a stage's report as its stage:log, naming the stage the orchestrator ran", () => {
+    assert.deepEqual(
+      stageReportEvent('indicator_match', reportLine({ v: 1, level: 'info', message: 'x', index: 1, total: 9 })),
+      {
+        type: 'stage:log',
+        stage: 'indicator_match',
+        level: 'info',
+        message: 'x',
+        index: 1,
+        total: 9,
+      }
+    );
+    assert.equal(
+      stageReportEvent('crash', reportLine({ v: 1, level: 'info', message: 'x', stage: 'reporting' })),
+      null,
+      'a stage never names itself'
+    );
+    assert.equal(stageReportEvent('crash', reportLine({ v: 1, level: 'loud', message: 'x' })), null);
+    assert.equal(
+      stageReportEvent('crash', reportLine({ v: 1, level: 'info', message: 'x', review: true })),
+      null,
+      "the event's own rules apply: a note for review is a warn"
+    );
+    assert.equal(stageReportEvent('crash', 'plain output'), null);
+  });
+
+  it('relays a report as its event, and an unreadable one as output with a warning', async () => {
+    setOutputMode('events');
+    const relay = relayStageOutput('crash', 'stdout');
+    let text = '';
+    relay.on('data', (chunk: Buffer | string) => (text += chunk.toString()));
+    const ended = new Promise((resolve) => relay.on('end', resolve));
+    relay.end(
+      Buffer.from(
+        `${reportLine({ v: 1, level: 'warn', message: 'kept for review', review: true })}\n${reportLine({ v: 1 })}\n`
+      )
+    );
+    await ended;
+    const events = text
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => parsePipelineEventLine(line, 'orchestrator'))
+      .map((p) => (p.kind === 'event' ? p.event.type : p.kind));
+    assert.deepEqual(events, ['stage:log', 'stage:output', 'log']);
   });
 });

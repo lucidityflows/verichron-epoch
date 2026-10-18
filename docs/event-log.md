@@ -107,6 +107,8 @@ Each level has a fixed meaning. A typed event gets its level from `eventLevel()`
 | `info` | a milestone an examiner wants in the bar | task started or finished; a backup started; a step done or skipped as already done; the password requested |
 | `debug` | detail | progress ticks, tool versions, all raw tool and stage output |
 
+**For review** is how the log shows a `warn` that is not a problem with the run but something in the evidence worth an examiner's look: an impossible or future time, a value stored encoded or corrected for a tool defect, an indicator match (owner, 2026-10-18). A stage marks it when it reports it (`review`). A real problem, such as a database repair could not recover, is shown as a Warning.
+
 **Raw output is `debug` because of where it comes from.** iLEAPP, the decrypt tool, sqlite3 and stage scripts write free text that we don't control.
 - Their failures reach the log as the processor's or orchestrator's own `error`, with the step and the reason.
 - The raw text stays available under Debug Detail. This is a fixed rule by source, not a guess.
@@ -274,6 +276,11 @@ A field or detail is added to the log only together with a row here.
 
 The events below extend the existing `PipelineEvent` union (EPOCH-443): one contract, one prefix and one parser.
 - **`log {level, message, label?, step?}`:** every line the processor or orchestrator writes for itself.
+- **`stage:log {stage, level, message, review?, index?, total?}`:** what a stage reported it did (EPOCH-570), at the level it chose.
+  - A stage reports with `stage_report.report()` (contracts' Python package): one line on stdout after `@@verichron-stage `. The orchestrator reads it and names the stage itself, so no stage can report as another. A line that doesn't read as a report stays the stage's output, and a warning says so.
+  - The shared stage runner (`etl_run`) reports a stage's result ("44,619 record(s) written", or its own sentence, such as "no match against mvt-indicators") and each of its notes by kind. A note is `info` (what the stage did or covered), `review` or `warning`. Only `review` and `warning` notes go to stderr, which is stored as a succeeded stage's warnings (EPOCH-420), so a clean stage no longer reads as one with warnings.
+  - `index` and `total` give a line's place, such as the 3rd of 9 indicator types.
+  - Analysis stages have plain names (`STAGE_NAMES`): Reading crash logs, Reading device activity, Checking indicators, Writing the report.
 - **`stage:output {stage, stream, line}`:** a stage's line, relayed by the orchestrator.
   - Both its stdout and its stderr are relayed. This replaces the earlier `[stage x]` tagging: the line is a field inside the event, so a stage can't pass for an event.
 - **`stage:finished`** gains `reason`: required when the stage failed, and given when it was skipped. A failure's reason is the last line the stage wrote to stderr (a Python error's last line names it), or its stop reason. The whole text is in its relayed output and in `pipeline_stage_status.error_message`.
@@ -320,6 +327,10 @@ The events below extend the existing `PipelineEvent` union (EPOCH-443): one cont
 ## 9. Display
 
 The drawer's appearance is a pattern in [DESIGN.md](../apps/epoch/DESIGN.md); this is what it shows.
+
+- **Two views, toggled (owner, 2026-10-18):**
+  - **Summary**, the default: `info`, `warn` and `error` entries, in plain sentences. Only a warning, an error or a note for review carries a word tag (Warning, Error, For review). Progress collapses to one live line per step.
+  - **Full log:** every entry, debug included, each with its time and level, for diagnosis.
 
 - **Line:** `15:21:03Z  INFO   message`.
   - The time comes from `formatLogTime`. The level is written in text and also shown in colour: `error` danger, `warn` flag, `info` foreground, `debug` muted.

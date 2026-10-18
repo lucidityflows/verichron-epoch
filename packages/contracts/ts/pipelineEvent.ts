@@ -14,6 +14,14 @@ import { z } from 'zod';
  */
 export const PIPELINE_EVENT_PREFIX = '@@verichron ';
 
+/**
+ * A stage's report of what it did (EPOCH-570): one prefixed JSON line on its
+ * stdout, written by `stage_report.report()` in the contracts' Python package.
+ * The orchestrator reads it as a `stage:log` event and names the stage
+ * itself. Keep the two sides in step.
+ */
+export const STAGE_REPORT_PREFIX = '@@verichron-stage ';
+
 /** UUIDs as PostgreSQL stores them; z.uuid() would also check the RFC version bits. */
 const id = z.guid();
 const envelope = { v: z.literal(1), at: z.iso.datetime({ offset: true }) };
@@ -87,6 +95,25 @@ export const PipelineEvent = z.discriminatedUnion('type', [
     .strict(),
 
   // The orchestrator.
+  /** What a stage reported it did, at the level it chose (EPOCH-570). */
+  z
+    .object({
+      ...envelope,
+      type: z.literal('stage:log'),
+      stage: text,
+      level: LogLevel,
+      message: text,
+      /** Something in the evidence worth an examiner's look: "For review". */
+      review: z.literal(true).optional(),
+      index: z.number().int().positive().optional(),
+      total: z.number().int().positive().optional(),
+    })
+    .strict()
+    .refine((e) => !e.review || e.level === 'warn', { message: 'a note for review is a warn', path: ['review'] })
+    .refine((e) => (e.index === undefined) === (e.total === undefined) && (e.index ?? 0) <= (e.total ?? 0), {
+      message: 'index and total go together, index within total',
+      path: ['index'],
+    }),
   /** One line of a stage's own output, relayed as written. */
   z
     .object({ ...envelope, type: z.literal('stage:output'), stage: text, stream: outputStream, line: z.string() })
@@ -173,6 +200,7 @@ export const EVENT_PRODUCERS: Record<PipelineEventType, readonly ('orchestrator'
   'registration:refused': ['orchestrator'],
   log: ['orchestrator', 'processor'],
   'stage:output': ['orchestrator'],
+  'stage:log': ['orchestrator'],
   'prepare:backups': ['processor'],
   'backup:step': ['processor'],
   'hash:progress': ['processor'],
@@ -183,6 +211,28 @@ export const EVENT_PRODUCERS: Record<PipelineEventType, readonly ('orchestrator'
   'backup:finished': ['processor'],
   'prepare:finished': ['processor'],
 };
+
+/** A stage's report line as the stage writes it; the orchestrator adds the stage and the time. */
+export const StageReport = z
+  .object({
+    v: z.literal(1),
+    level: LogLevel,
+    message: text,
+    review: z.literal(true).optional(),
+    index: z.number().int().positive().optional(),
+    total: z.number().int().positive().optional(),
+  })
+  .strict();
+export type StageReport = z.infer<typeof StageReport>;
+
+/** What each analysis stage is called where an examiner reads it; another stage keeps its name. */
+export const STAGE_NAMES: Record<string, string> = {
+  crash: 'Reading crash logs',
+  ileapp_bridge: 'Reading device activity',
+  indicator_match: 'Checking indicators',
+  reporting: 'Writing the report',
+};
+export const stageName = (stage: string): string => STAGE_NAMES[stage] ?? stage;
 
 /** What each step is called where an examiner reads it. */
 export const PREPARE_STEP_NAMES: Record<PrepareStep, string> = {
@@ -220,6 +270,8 @@ export function eventMessage(event: PipelineEventBody): string {
     case 'stage:output':
     case 'tool:output':
       return event.line;
+    case 'stage:log':
+      return `${stageName(event.stage)}${event.index ? ` (${event.index} of ${event.total})` : ''}: ${event.message}`;
     case 'prepare:backups':
       return `Found ${plural(event.labels.length, 'backup')}: ${event.labels.join(', ')}`;
     case 'backup:step': {
@@ -250,10 +302,12 @@ export function eventMessage(event: PipelineEventBody): string {
     case 'run:skipped':
       return `Not analyzed again: ${event.reason}`;
     case 'stage:started':
-      return `${event.stage} started`;
+      return stageName(event.stage);
     case 'stage:finished':
-      if (event.status === 'succeeded') return `${event.stage} finished`;
-      return `${event.stage} ${event.status}${event.reason ? `: ${event.reason}` : ''}`;
+      if (event.status === 'succeeded') return `${stageName(event.stage)}: done`;
+      if (event.status === 'skipped')
+        return `${stageName(event.stage)}: skipped${event.reason ? `, ${event.reason}` : ''}`;
+      return `${stageName(event.stage)} failed${event.reason ? `: ${event.reason}` : ''}`;
     case 'run:finished':
       return event.state === 'complete' ? 'Analysis complete' : `Analysis ${event.state}`;
     case 'registration:refused':
@@ -270,6 +324,7 @@ export function eventMessage(event: PipelineEventBody): string {
 export function eventLevel(event: PipelineEventBody): LogLevel {
   switch (event.type) {
     case 'log':
+    case 'stage:log':
       return event.level;
     case 'stage:finished':
       return event.status === 'failed' ? 'error' : 'info';

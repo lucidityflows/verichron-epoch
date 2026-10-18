@@ -111,6 +111,9 @@ def test_matches_are_facts_that_lead_back_to_the_fact_and_its_evidence(db, tmp_p
     )
 
     result = run(db, ctx_for(set_id), set_id)
+    # A match is for review in the task log (EPOCH-570), and the summary says how many.
+    assert any(n.kind == "review" and "match(es) against" in n for n in result.notes)
+    assert result.summary is not None and "match(es) against" in result.summary
     assert (result.succeeded, result.failed) == (2, 0)
 
     found = matches(db)
@@ -179,6 +182,12 @@ def test_no_match_is_never_written_without_what_was_not_checked(db, tmp_path: Pa
     }
     assert any(n.startswith("ip: 1 indicator(s) not checked") for n in result.notes)
     assert any(n.startswith("not read:") for n in result.notes)
+    # EPOCH-570: each type's line is information with its place, and a clean
+    # check is no warning: its result is the stage's summary, not a note.
+    typed = [n for n in result.notes if n.index is not None]
+    assert [(n.index, n.total) for n in typed] == [(1, 3), (2, 3), (3, 3)]
+    assert {n.kind for n in result.notes} == {"info"}
+    assert result.summary.startswith("no match against ")
 
 
 def test_only_indicator_equality_is_ever_stored_as_a_match(db, tmp_path: Path) -> None:

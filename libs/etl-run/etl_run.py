@@ -26,7 +26,39 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
-from typing import IO, NamedTuple
+from typing import IO, Literal, NamedTuple
+
+from stage_report import report
+
+NoteKind = Literal["info", "review", "warning"]
+
+
+class Note(str):
+    """A note, which reads as its text, with its kind (EPOCH-570):
+
+    - `info`: what the stage did or covered ("already ingested", files it does
+      not read). Reported, not stored as a warning.
+    - `review`: something in the evidence worth a look (an impossible time, a
+      value corrected for a tool defect): "For review". Stored as the stage's
+      warnings (EPOCH-420).
+    - `warning`: a problem with the run that left something unchecked. Stored
+      as a warning too.
+    """
+
+    kind: NoteKind
+    index: int | None
+    total: int | None
+
+    def __new__(cls, text: str, kind: NoteKind = "info", index: int | None = None, total: int | None = None) -> Note:
+        if kind not in ("info", "review", "warning"):
+            raise ValueError(f"not a note kind: {kind!r}")
+        if (index is None) != (total is None):
+            raise ValueError("index and total go together")
+        note = super().__new__(cls, text)
+        note.kind = kind
+        note.index = index
+        note.total = total
+        return note
 
 
 class ItemFailure(NamedTuple):
@@ -66,7 +98,10 @@ class ETLRunResult:
     succeeded: int = 0
     failed: int = 0
     failures: list[ItemFailure] = field(default_factory=list)
-    notes: list[str] = field(default_factory=list)
+    notes: list[Note] = field(default_factory=list)
+    # The stage's result as one sentence, when it is not the records it wrote
+    # (an indicator check's matches); print_summary reports it (EPOCH-570).
+    summary: str | None = None
 
     def ok(self, count: int = 1) -> ETLRunResult:
         """Record `count` items that completed successfully.
@@ -92,13 +127,15 @@ class ETLRunResult:
         self.failures.append(ItemFailure(item_label, reason, file_hash))
         return self
 
-    def note(self, message: str) -> ETLRunResult:
-        """Record an informational message that should be surfaced but
-        must NOT affect exit_code — e.g. an optional input file simply
-        wasn't present for this backup.
-        Distinct from fail(): a note is expected-and-handled, not a
-        partial failure of the stage."""
-        self.notes.append(message)
+    def note(
+        self, message: str, kind: NoteKind = "info", *, index: int | None = None, total: int | None = None
+    ) -> ETLRunResult:
+        """Record a message that should be surfaced but must NOT affect
+        exit_code — e.g. an optional input file simply wasn't present for
+        this backup. Distinct from fail(): a note is expected-and-handled,
+        not a partial failure of the stage. Its `kind` decides how the task
+        log shows it and whether it is stored as a warning (see `Note`)."""
+        self.notes.append(Note(message, kind, index, total))
         return self
 
     def merge(self, other: ETLRunResult) -> ETLRunResult:
@@ -116,6 +153,7 @@ class ETLRunResult:
             failed=self.failed + other.failed,
             failures=[*self.failures, *other.failures],
             notes=[*self.notes, *other.notes],
+            summary=self.summary or other.summary,
         )
 
     @property
@@ -134,22 +172,36 @@ class ETLRunResult:
     _MAX_ITEMIZED_FAILURES = 20
 
     def print_summary(self, tag: str, stream: IO[str] | None = None) -> None:
-        """Prints the run summary and, if anything needs attention, the
-        detail behind it.
+        """Reports the run's result and its notes to the task log
+        (EPOCH-570), and prints the detail behind anything that needs
+        attention.
 
         `tag` is the extractor's bracketed log prefix (e.g. "crash",
-        "ileapp_bridge").
+        "ileapp_bridge"). `summary`, when set, replaces the records-written
+        sentence.
 
-        By default the one-line summary goes to stdout and everything
-        else (notes, itemized failures) goes to stderr.
+        On stdout: the reports. On stderr, which
+        the orchestrator stores as a succeeded stage's warnings (EPOCH-420):
+        each note for review and each warning, and the itemized failures.
         """
         summary_stream = stream if stream is not None else sys.stdout
         detail_stream = stream if stream is not None else sys.stderr
 
-        print(f"[{tag}] wrote {self.succeeded} record(s), {self.failed} unit(s) failed", file=summary_stream)
+        failed = f", {self.failed:,} unit(s) failed" if self.failed else ""
+        report("info", self.summary or f"{self.succeeded:,} record(s) written{failed}", stream=summary_stream)
 
-        for msg in self.notes:
-            print(f"[{tag}]   {msg}", file=detail_stream)
+        for note in self.notes:
+            kind = getattr(note, "kind", "info")
+            place = {"index": note.index, "total": note.total} if getattr(note, "index", None) else {}
+            if kind == "review":
+                report("warn", note, review=True, stream=summary_stream, **place)
+            elif kind == "warning":
+                report("warn", note, stream=summary_stream, **place)
+            else:
+                report("info", note, stream=summary_stream, **place)
+            # Stored as a warning only when it is one, or is for review.
+            if kind != "info":
+                print(f"[{tag}]   {note}", file=detail_stream)
 
         if self.failures:
             print(f"[{tag}] {len(self.failures)} failure(s):", file=detail_stream)

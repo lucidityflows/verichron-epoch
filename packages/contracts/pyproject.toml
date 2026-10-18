@@ -21,7 +21,7 @@ dependencies = [
 # same reason. conftest.py and test_contract_sync.py are pytest's concern,
 # not something other packages import, so they're left out.
 [tool.setuptools]
-py-modules = ["normalized_record", "adapter", "source_type", "tool_defects", "stored_value", "indicator_field_map", "indicator_set", "workspace_manifest"]
+py-modules = ["normalized_record", "adapter", "source_type", "tool_defects", "stored_value", "indicator_field_map", "indicator_set", "workspace_manifest", "stage_report"]
 
 [tool.setuptools.package-dir]
 "" = "python"

@@ -87,6 +87,7 @@ function stepOf(event: PipelineEvent): string | null {
     case 'stage:started':
     case 'stage:finished':
     case 'stage:output':
+    case 'stage:log':
       return event.stage;
     default:
       return null;
