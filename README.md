@@ -3,16 +3,23 @@
 Verichron Epoch is a forensic workbench for iOS devices. It takes an encrypted
 iTunes/Finder backup, decrypts and verifies it, runs extractors over it, and
 produces a report an examiner can defend: every fact is traceable to the exact
-evidence and tool versions that produced it. Indicator (IOC) checks are not
-available until the project's own matching on extracted facts returns
-(EPOCH-490 to 493); until then the report names them as not examined.
+evidence and tool versions that produced it. Indicator (IOC) checks use the
+project's own matching on extracted facts, against a recorded, hashed indicator
+set, and state the set, its age and what was not checked (EPOCH-490 to 493).
 
-It behaves like a careful lab technician, not a scanner: it never loses,
-misattributes or over-claims evidence, and it always says what it did not do.
+It is designed to work like a careful lab technician, not a scanner: to tie
+every fact to the evidence it came from, to claim no more than that evidence
+shows, and to state what it did not examine.
 
 > **Status:** pre-release. The first target is an air-gapped **Lab build**
 > ([decision](docs/decisions.md#product-and-builds)). Open work is tracked in
 > Linear (project prefix `EPOCH-`).
+
+> **Licence:** Verichron Epoch is proprietary software of Verichron Inc. The
+> source is public so it can be read; this is not an open-source release, and
+> no licence is granted ([LICENSE](LICENSE)). Outside contributions are not
+> accepted ([CONTRIBUTING.md](CONTRIBUTING.md)). Third-party components keep
+> their own licences.
 
 ## How it fits together
 
@@ -31,8 +38,9 @@ Read [docs/architecture.md](docs/architecture.md) for the full picture.
 | [docs/architecture.md](docs/architecture.md) | The components, how data flows, and where each piece lives |
 | [docs/evidence-model.md](docs/evidence-model.md) | How evidence, derivatives, runs and facts are identified and related |
 | [docs/indicator-field-map.md](docs/indicator-field-map.md) | Which facts can supply which indicator types, and which types no backup supplies |
-| [docs/rules.md](docs/rules.md) | The architecture rules (R1–R35) every change must respect |
+| [docs/rules.md](docs/rules.md) | The architecture rules (R1–R36) every change must respect |
 | [docs/decisions.md](docs/decisions.md) | Settled decisions and why they were made |
+| [docs/claims.md](docs/claims.md) | Every public claim, its evidence and whether it may be made |
 | [docs/development.md](docs/development.md) | Setting up, running the pipeline, testing, CI |
 | [docs/roadmap.md](docs/roadmap.md) | How the public roadmap is published from Linear, and what may appear on it |
 | [packages/contracts/EXTRACTOR_CONTRACT.md](packages/contracts/EXTRACTOR_CONTRACT.md) | What every pipeline stage must do |
