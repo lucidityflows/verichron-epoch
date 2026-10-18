@@ -314,6 +314,7 @@ export function RunsView({
         !error &&
         runs.length > 0 && <span className="font-mono text-label text-muted-foreground">{runs.length}</span>
       }
+      scroll="contained"
       className="overflow-hidden"
     >
       {error ? (

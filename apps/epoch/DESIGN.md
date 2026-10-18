@@ -205,9 +205,17 @@ content edge or the title (EPOCH-464).
   width at `max-w-4xl` (896px) but stays left-aligned, so the left edge
   matches every other view. Views are never centered.
 - **Height:** the content below the header is a flex column that fills the
-  remaining height (`flex-1 min-h-0`). A view with a virtualized table passes
-  `overflow-hidden` and gives the table `flex-1 min-h-0`, so the table's
-  scrollport is bounded by the layout, never by a `calc(100vh - …)` constant.
+  remaining height. A view either scrolls with the page or holds a table that
+  scrolls inside it, and says which (`scroll`):
+  - `page` (the default: New Investigation, Indicator Matches, Reports) fills
+    the window when its content is short and grows with it when long, so the
+    shell's 32px gutter always follows the last card. It must not shrink to the
+    window (`min-h-0`): its content would spill past its box and end flush at
+    the window's edge (found 2026-10-18, the Analyze card on New Investigation).
+  - `contained` (Investigations, Forensic Records) is held to the window
+    (`flex-1 min-h-0`). It passes `overflow-hidden` and gives the table
+    `flex-1 min-h-0`, so the table's scrollport is bounded by the layout, never
+    by a `calc(100vh - …)` constant.
 - **No data:** every state with nothing to show (nothing selected, still
   loading, nothing found, evidence not registered) is an `EmptyState`
   (`components/ui/EmptyState.tsx`): centered in the space it fills, its icon
