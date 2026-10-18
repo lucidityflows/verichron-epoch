@@ -20,6 +20,8 @@
     "ts/env.ts",
     "ts/pipelineEvent.ts",
     "ts/taskLog.ts",
-    "ts/sanitize.ts"
+    "ts/sanitize.ts",
+    "ts/deviceIdentifiers.ts",
+    "ts/processorSummary.ts"
   ]
 }

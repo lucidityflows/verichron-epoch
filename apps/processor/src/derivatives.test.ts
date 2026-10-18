@@ -8,7 +8,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -25,9 +25,13 @@ import { after, before, describe, it } from 'node:test';
 
 import {
   crashReportsAcquisitionPaths,
+  parsePipelineEventLine,
   readCrashReportsMarker,
   readDecryptMarker,
   readIleappMarker,
+  ProcessorSummary,
+  type PipelineEvent,
+  type PrepareStep,
 } from '@verichron/contracts';
 
 import { environmentDigest } from './utils/environment.js';
@@ -137,6 +141,18 @@ printf '%s' '${JSON.stringify({ modules: STUB_MODULES })}' > "$7/$9/_lava_data.l
 
 after(() => rmSync(tmp, { recursive: true, force: true }));
 
+/**
+ * One run of the CLI as the app runs it (`--output events`, EPOCH-445): the
+ * events it emitted, in order. Its stdout must be events and nothing else;
+ * any other line fails the test. The assertions below read events, never
+ * human text, so rewording a line changes nothing here.
+ */
+interface Run {
+  events: PipelineEvent[];
+  /** stderr, for a failure message; nothing is asserted on it. */
+  stderr: string;
+}
+
 function runCli(
   extraArgs: string[] = [],
   stubMode = '',
@@ -144,7 +160,7 @@ function runCli(
   typed: string[] = [],
   keepStdinOpen = false,
   timeoutMs?: number
-): Promise<string> {
+): Promise<Run> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
@@ -166,6 +182,8 @@ function runCli(
         ileappDir,
         '--ileapp-python',
         ileappPython,
+        '--output',
+        'events',
         ...extraArgs,
       ],
       {
@@ -173,28 +191,34 @@ function runCli(
         env: { ...process.env, STUB_DECRYPT: stubMode, STUB_ILEAPP: '', STUB_PASSWORDS: passwordLog, ...extraEnv },
       }
     );
-    // With `typed`, one answer per password prompt, typed when the prompt
-    // appears, as the app does; stdin closes after the last. Without, a
+    // With `typed`, one answer per password:required event, written when the
+    // event arrives, as the app does; stdin closes after the last. Without, a
     // single "pw" for every backup (the processor reuses it).
-    let out = '';
+    const events: PipelineEvent[] = [];
+    const stray: string[] = [];
+    let stderr = '';
+    let carry = '';
     let prompts = 0;
     const answer = () => {
-      if (typed.length === 0) return;
-      const seen = out.match(/password for \S+: /g)?.length ?? 0;
+      const seen = events.filter((e) => e.type === 'password:required').length;
       for (; prompts < seen && prompts < typed.length; prompts++) {
         child.stdin.write(`${typed[prompts]}\n`);
         if (prompts === typed.length - 1 && !keepStdinOpen) child.stdin.end();
       }
     };
+    const read = (line: string) => {
+      const parsed = parsePipelineEventLine(line, 'processor');
+      if (parsed.kind === 'event') events.push(parsed.event);
+      else stray.push(line);
+    };
     if (typed.length === 0) child.stdin.end('pw\n');
     child.stdout.on('data', (c) => {
-      out += c;
+      const parts = (carry + c).split('\n');
+      carry = parts.pop() ?? '';
+      parts.forEach(read);
       answer();
     });
-    child.stderr.on('data', (c) => {
-      out += c;
-      answer();
-    });
+    child.stderr.on('data', (c) => (stderr += c));
     child.on('error', reject);
     child.stdin.on('error', () => undefined);
     // A bound for tests that guard against the processor not exiting: past
@@ -204,14 +228,30 @@ function runCli(
         ? undefined
         : setTimeout(() => {
             child.kill('SIGKILL');
-            reject(new Error(`the processor was still running after ${timeoutMs} ms:\n${out}`));
+            reject(new Error(`the processor was still running after ${timeoutMs} ms:\n${stderr}`));
           }, timeoutMs);
     child.on('close', () => {
       clearTimeout(timer);
-      resolve(out);
+      if (carry) read(carry);
+      if (stray.length > 0) reject(new Error(`stdout carried lines that are not events:\n${stray.join('\n')}`));
+      else resolve({ events, stderr });
     });
   });
 }
+
+/** The step events for one backup and step. */
+const steps = (run: Run, label: string, step: PrepareStep) =>
+  run.events.filter(
+    (e): e is Extract<PipelineEvent, { type: 'backup:step' }> =>
+      e.type === 'backup:step' && e.label === label && e.step === step
+  );
+const stepStatus = (run: Run, label: string, step: PrepareStep) => steps(run, label, step).map((e) => e.status);
+/** Why a step failed, or undefined when it didn't. */
+const stepError = (run: Run, label: string, step: PrepareStep) =>
+  steps(run, label, step).find((e) => e.status === 'error')?.reason;
+const logMessages = (run: Run) => run.events.flatMap((e) => (e.type === 'log' ? [e.message] : []));
+const finished = (run: Run) => run.events.find((e) => e.type === 'prepare:finished');
+const anyReason = (run: Run) => run.events.flatMap((e) => (e.type === 'backup:step' && e.reason ? [e.reason] : []));
 
 const decrypted = () => path.join(workspace, 'decrypted', 'BK1');
 const ileapp = () => path.join(workspace, 'ileapp', 'BK1');
@@ -227,8 +267,8 @@ describe('decrypt provenance', () => {
 
   it('reuses a decrypt made from the unchanged backup', async () => {
     const before = readDecryptMarker(decrypted());
-    const out = await runCli();
-    assert.match(out, /\[decrypt\] already done, skipping/);
+    const run = await runCli();
+    assert.deepEqual(stepStatus(run, 'BK1', 'decrypt'), ['skipped']);
     assert.deepEqual(readDecryptMarker(decrypted()), before);
   });
 
@@ -236,8 +276,8 @@ describe('decrypt provenance', () => {
     const before = readDecryptMarker(decrypted())!;
     writeFileSync(path.join(source, 'BK1', 'version.txt'), 'v2');
 
-    const out = await runCli();
-    assert.match(out, /backup changed since its last decrypt/);
+    const run = await runCli();
+    assert.ok(logMessages(run).some((m) => /backup changed since its last decrypt/.test(m)));
     const after = readDecryptMarker(decrypted())!;
     assert.notEqual(after.content_root, before.content_root);
     assert.ok(readdirSync(decrypted()).includes('from-v2.txt'));
@@ -247,9 +287,29 @@ describe('decrypt provenance', () => {
 
   it('a forced re-decrypt that fails part-way leaves no marker vouching for the copy', async () => {
     assert.ok(readDecryptMarker(decrypted()), 'precondition: a valid decrypt exists');
-    const out = await runCli(['--force-decrypt'], 'fail');
-    assert.match(out, /\[decrypt\] error/);
-    assert.match(out, /\[decrypt\] error: the decrypt failed: incomplete: 1 of 2 files written/);
+    const run = await runCli(['--force-decrypt'], 'fail');
+    assert.equal(stepError(run, 'BK1', 'decrypt'), 'the decrypt failed: incomplete: 1 of 2 files written');
+    assert.equal(
+      run.events.filter((e) => e.type === 'password:required' && e.label === 'BK1').length,
+      1,
+      'a failure that is not a wrong password is not asked again'
+    );
+    const {
+      v: _v,
+      at: _at,
+      ...backupFinished
+    } = run.events.find((e) => e.type === 'backup:finished' && e.label === 'BK1')!;
+    assert.deepEqual(
+      backupFinished,
+      {
+        type: 'backup:finished',
+        label: 'BK1',
+        success: false,
+        failed_step: 'decrypt',
+        reason: 'the decrypt failed: incomplete: 1 of 2 files written',
+      },
+      'the failed backup names its step and reason'
+    );
     assert.equal(readDecryptMarker(decrypted()), null, 'registration will refuse this copy');
     assert.equal(readIleappMarker(ileapp()), null, 'iLEAPP output built on it is withdrawn too');
 
@@ -258,28 +318,38 @@ describe('decrypt provenance', () => {
   });
 
   it('reports ENOSPC with workspace capacity and leaves the decrypt incomplete', async () => {
-    const out = await runCli(['--force-decrypt', '--only', 'BK1'], 'enospc');
+    const run = await runCli(['--force-decrypt', '--only', 'BK1'], 'enospc');
     assert.match(
-      out,
-      /\[decrypt\] error: Prepare Evidence ran out of workspace space in .*GB free; this backup needs an estimated .*GB/
+      stepError(run, 'BK1', 'decrypt') ?? '',
+      /^Prepare Evidence ran out of workspace space in .*GB free; this backup needs an estimated .*GB/
     );
+    // summary.json says why, with the workspace's location reduced to its root (EPOCH-570).
+    const summary = ProcessorSummary.parse(JSON.parse(readFileSync(path.join(workspace, 'summary.json'), 'utf8')));
+    const bk1 = summary.backups.find((b) => b.label === 'BK1')!;
+    assert.equal(bk1.failed_step, 'decrypt');
+    assert.match(bk1.reason ?? '', /^Prepare Evidence ran out of workspace space in <workspace>/);
+    assert.ok(!readFileSync(path.join(workspace, 'summary.md'), 'utf8').includes(workspace), 'summary.md too');
     assert.equal(readDecryptMarker(decrypted()), null);
     assert.equal(readIleappMarker(ileapp()), null);
   });
 
   it('a backup that changes while being decrypted gets no marker', async () => {
-    const out = await runCli(['--force-decrypt'], 'mutate');
-    assert.match(out, /backup changed while it was being decrypted/);
+    const run = await runCli(['--force-decrypt'], 'mutate');
+    assert.match(stepError(run, 'BK1', 'decrypt') ?? '', /backup changed while it was being decrypted/);
     assert.equal(readDecryptMarker(decrypted()), null);
   });
 
   it('a source that disappears after decrypting fails that backup, and the rest still run', async () => {
     // BK1's last decrypt was refused (previous test), so this run re-decrypts it.
-    const out = await runCli([], 'unplug');
-    assert.match(out, /\[decrypt\] error: could not re-check the backup after decrypting/);
+    const run = await runCli([], 'unplug');
+    assert.match(stepError(run, 'BK1', 'decrypt') ?? '', /^could not re-check the backup after decrypting/);
     assert.equal(readDecryptMarker(decrypted()), null, 'an unattributable decrypt gets no marker');
-    assert.match(out, /=== BK2 ===/);
-    assert.match(out, /summary written to/, 'the run finished instead of crashing on the first failure');
+    assert.deepEqual(stepStatus(run, 'BK2', 'hash'), ['started', 'done']);
+    assert.deepEqual(
+      finished(run)?.failed_labels,
+      ['BK1'],
+      'the run finished instead of crashing on the first failure'
+    );
   });
 });
 
@@ -308,10 +378,11 @@ describe('the decrypt tool (EPOCH-489)', () => {
 
   it('passes the password only in BACKUP_PASSWORD, never on the command line', async () => {
     rmSync(passwordLog, { force: true });
-    await runCli(['--force-decrypt', '--only', 'BK1'], '', {}, ['correct horse']);
+    const run = await runCli(['--force-decrypt', '--only', 'BK1'], '', {}, ['correct horse']);
     const [args, password] = readFileSync(passwordLog, 'utf8').trim().split(' | ');
     assert.equal(password, 'correct horse');
     assert.doesNotMatch(args, /correct horse/);
+    assert.ok(!JSON.stringify(run.events).includes('correct horse'), 'no event carries the password (EPOCH-445)');
   });
 
   it('never passes on a BACKUP_PASSWORD the processor itself inherited', async () => {
@@ -322,52 +393,78 @@ describe('the decrypt tool (EPOCH-489)', () => {
 
   it('asks again after a wrong password, recognised by the exit code', async () => {
     rmSync(passwordLog, { force: true });
-    const out = await runCli(['--force-decrypt', '--only', 'BK1'], 'wrong-once', {}, ['wrong', 'right']);
-    assert.match(out, /incorrect password for BK1 -- try again \(2\/3\)/);
-    assert.match(out, /\[decrypt\] done/);
+    const run = await runCli(['--force-decrypt', '--only', 'BK1'], 'wrong-once', {}, ['wrong', 'right']);
+    assert.deepEqual(
+      run.events.flatMap((e) => (e.type === 'password:required' ? [[e.label, e.attempt, e.max]] : [])),
+      [
+        ['BK1', 1, 3],
+        ['BK1', 2, 3],
+      ]
+    );
+    assert.ok(logMessages(run).includes('the password was wrong; asking again (2 of 3)'));
+    assert.deepEqual(stepStatus(run, 'BK1', 'decrypt'), ['started', 'done']);
     assert.equal(readFileSync(passwordLog, 'utf8').trim().split('\n').length, 2, 'one decrypt per password');
   });
 
   it('stops a decrypt that writes nothing for the stall limit, with everything it started', async () => {
     const started = Date.now();
-    const out = await runCli(['--force-decrypt', '--only', 'BK1', '--decrypt-stall-timeout', '1s'], 'hang');
+    const run = await runCli(['--force-decrypt', '--only', 'BK1', '--decrypt-stall-timeout', '1s'], 'hang');
     assert.ok(Date.now() - started < 30_000, 'the stalled decrypt and its child were stopped');
-    assert.match(out, /\[decrypt\] error: the decrypt failed: the decrypt wrote nothing for 1 s, so it was stopped/);
+    assert.equal(
+      stepError(run, 'BK1', 'decrypt'),
+      'the decrypt failed: the decrypt wrote nothing for 1 s, so it was stopped'
+    );
     assert.equal(readDecryptMarker(decrypted()), null, 'no marker vouches for it');
     await runCli(['--only', 'BK1']);
     assert.ok(readDecryptMarker(decrypted()), 'a clean re-run restores it');
   });
 
+  it('reports a password prompt whose stdin closed, and still finishes the run', async () => {
+    // Two backups, a password for each asked separately, and only one answer:
+    // the second prompt finds stdin closed instead of waiting on it forever.
+    const run = await runCli(['--force-decrypt', '--different-passwords'], '', {}, ['pw'], false, 30_000);
+    assert.equal(
+      stepError(run, 'BK2', 'decrypt'),
+      'could not read the password: stdin closed before a password was entered'
+    );
+    assert.deepEqual(finished(run)?.failed_labels, ['BK2'], 'the run finishes and writes its summary');
+  });
+
   it('exits when its work is done while stdin stays open, as the app keeps it (EPOCH-489)', async () => {
     // The app writes each password to stdin and never closes it. Before the
     // fix the processor finished, wrote its summary, and then never exited.
-    const out = await runCli(['--force-decrypt', '--only', 'BK1'], '', {}, ['pw'], true, 30_000);
-    assert.match(out, /summary written to/);
+    const run = await runCli(['--force-decrypt', '--only', 'BK1'], '', {}, ['pw'], true, 30_000);
+    assert.deepEqual(finished(run)?.failed_labels, []);
   });
 
   it('a new decrypt tool version keeps the decrypt it made', async () => {
     const before = readDecryptMarker(decrypted())!;
-    const out = await runCli([], '', { STUB_DECRYPT_VERSION: '0.11.0' });
-    assert.match(out, /\[decrypt\] already done, skipping/);
+    const run = await runCli([], '', { STUB_DECRYPT_VERSION: '0.11.0' });
+    assert.deepEqual(stepStatus(run, 'BK1', 'decrypt'), ['skipped']);
     assert.deepEqual(readDecryptMarker(decrypted()), before, 'a decrypt records the version that made it');
   });
 
   it('refuses a decrypt tool whose version it cannot read', async () => {
-    const out = await runCli([], '', { STUB_DECRYPT_VERSION: '' });
-    assert.match(out, /could not read the decrypt tool's version/);
+    const run = await runCli([], '', { STUB_DECRYPT_VERSION: '' });
+    assert.ok(
+      run.events.some(
+        (e) => e.type === 'log' && e.level === 'error' && /could not read the decrypt tool's version/.test(e.message)
+      ),
+      'the reason it stopped is an error event'
+    );
   });
 });
 
 describe('iLEAPP output (EPOCH-416)', () => {
   it('gives an output with no module list no marker, and says which file (EPOCH-457)', async () => {
-    const out = await runCli(['--force'], '', { STUB_ILEAPP: 'nolist' });
-    assert.match(out, /could not read iLEAPP's module list from .*_lava_data\.lava/);
+    const run = await runCli(['--force'], '', { STUB_ILEAPP: 'nolist' });
+    assert.match(stepError(run, 'BK1', 'ileapp') ?? '', /could not read iLEAPP's module list from .*_lava_data\.lava/);
     assert.equal(readIleappMarker(ileapp()), null, 'no marker vouches for it');
   });
 
   it('runs iLEAPP into ileapp/<label>/ and records the decrypt it read and the iLEAPP commit', async () => {
-    const out = await runCli();
-    assert.match(out, /\[ileapp\]  (done|already done)/);
+    const run = await runCli();
+    assert.ok(['done', 'skipped'].includes(stepStatus(run, 'BK1', 'ileapp').at(-1)!));
     const marker = readIleappMarker(ileapp())!;
     assert.ok(marker, 'marker written');
     assert.equal(marker.content_root, readDecryptMarker(decrypted())!.content_root);
@@ -391,7 +488,19 @@ describe('iLEAPP output (EPOCH-416)', () => {
       },
       'the decrypt has a top-level Manifest.db; the plugin error is recorded with the output'
     );
-    assert.match(out, /plugin errored: zalo_messages \(ZaloChats\): list index out of range/);
+    assert.ok(
+      run.events.some(
+        (e) =>
+          e.type === 'log' &&
+          e.level === 'warn' &&
+          e.message === 'plugin errored: zalo_messages (ZaloChats): list index out of range'
+      ),
+      'a plugin error is a warning, not a failure'
+    );
+    assert.ok(
+      run.events.some((e) => e.type === 'tool:output' && e.tool === 'ileapp' && e.line.includes('zalo_messages')),
+      "iLEAPP's own lines are relayed as its output"
+    );
     assert.equal(
       readFileSync(path.join(ileapp(), 'input-type'), 'utf8').trim(),
       'itunes',
@@ -401,8 +510,8 @@ describe('iLEAPP output (EPOCH-416)', () => {
 
   it('reuses current output', async () => {
     const before = readIleappMarker(ileapp());
-    const out = await runCli();
-    assert.match(out, /\[ileapp\]  already done, skipping/);
+    const run = await runCli();
+    assert.deepEqual(stepStatus(run, 'BK1', 'ileapp'), ['skipped']);
     assert.deepEqual(readIleappMarker(ileapp()), before);
   });
 
@@ -410,26 +519,29 @@ describe('iLEAPP output (EPOCH-416)', () => {
     writeFileSync(path.join(ileapp(), 'stale-file'), 'from the old report');
     writeFileSync(path.join(ileappDir, 'ileapp.py'), '# stub, revised\n');
     ileappGit('commit', '-q', '-am', 'revise');
-    const out = await runCli();
-    assert.match(out, /\[ileapp\]  re-running: iLEAPP changed/);
+    const run = await runCli();
+    assert.ok(logMessages(run).some((m) => m.startsWith('re-running: iLEAPP changed')));
     assert.equal(readIleappMarker(ileapp())!.tool.version, ileappGit('rev-parse', 'HEAD'));
     assert.ok(!existsSync(path.join(ileapp(), 'stale-file')), 'the old report was removed, not merged into');
   });
 
   it('a changed iLEAPP environment runs it again, and records the environment it ran in (EPOCH-439)', async () => {
-    const out = await runCli([], '', { STUB_ILEAPP_ENV: '2' });
-    assert.match(out, /\[ileapp\]  re-running: iLEAPP's environment changed/);
+    const run = await runCli([], '', { STUB_ILEAPP_ENV: '2' });
+    assert.ok(logMessages(run).includes("re-running: iLEAPP's environment changed since the last run"));
     assert.equal(readIleappMarker(ileapp())!.tool.environment, stubEnvironment('2'));
     const back = await runCli();
-    assert.match(back, /\[ileapp\]  re-running: iLEAPP's environment changed/, 'and back again');
+    assert.ok(
+      logMessages(back).includes("re-running: iLEAPP's environment changed since the last run"),
+      'and back again'
+    );
     assert.equal(readIleappMarker(ileapp())!.tool.environment, stubEnvironment('1'));
   });
 
   it('refuses an iLEAPP checkout with local changes', async () => {
     writeFileSync(path.join(ileappDir, 'local-edit.py'), '');
     try {
-      const out = await runCli();
-      assert.match(out, /has local changes/);
+      const run = await runCli();
+      assert.ok(run.events.some((e) => e.type === 'log' && e.level === 'error' && /has local changes/.test(e.message)));
     } finally {
       rmSync(path.join(ileappDir, 'local-edit.py'));
     }
@@ -437,21 +549,24 @@ describe('iLEAPP output (EPOCH-416)', () => {
 
   it('stops an iLEAPP run past its timeout, and no marker vouches for it', async () => {
     const started = Date.now();
-    const out = await runCli(['--force', '--ileapp-module-timeout', '1s'], '', { STUB_ILEAPP: 'hang' });
+    const run = await runCli(['--force', '--ileapp-module-timeout', '1s'], '', { STUB_ILEAPP: 'hang' });
     assert.ok(Date.now() - started < 30_000, 'the hung iLEAPP and its children were killed');
-    assert.match(out, /\[ileapp\] error: iLEAPP's setup ran past the 1 s limit and was stopped before any module ran/);
+    assert.match(
+      stepError(run, 'BK1', 'ileapp') ?? '',
+      /^iLEAPP's setup ran past the 1 s limit and was stopped before any module ran/
+    );
     assert.equal(readIleappMarker(ileapp()), null);
     assert.ok(readDecryptMarker(decrypted()), 'the decrypt is unaffected');
-    assert.match(out, /backup\(s\) that need attention/);
+    assert.ok(finished(run)?.failed_labels.includes('BK1'));
   });
 
   it('a failed or empty iLEAPP run leaves no marker', async () => {
     const failed = await runCli(['--force'], '', { STUB_ILEAPP: 'fail' });
-    assert.match(failed, /\[ileapp\] error: iLEAPP exited with code 1/);
+    assert.equal(stepError(failed, 'BK1', 'ileapp'), 'iLEAPP exited with code 1');
     assert.equal(readIleappMarker(ileapp()), null);
 
     const empty = await runCli(['--force'], '', { STUB_ILEAPP: 'none' });
-    assert.match(empty, /\[ileapp\] error: iLEAPP exited cleanly but wrote no report/);
+    assert.match(stepError(empty, 'BK1', 'ileapp') ?? '', /^iLEAPP exited cleanly but wrote no report/);
     assert.equal(readIleappMarker(ileapp()), null);
 
     await runCli();
@@ -480,8 +595,8 @@ describe('crash logs (EPOCH-514)', () => {
   });
 
   it('says so when the pull acquired none', async () => {
-    const out = await runCli();
-    assert.match(out, /\[crash\]   no crash logs were acquired with this backup/);
+    const run = await runCli();
+    assert.match(steps(run, 'BK1', 'crash')[0]?.reason ?? '', /no crash logs were acquired with this backup/);
     assert.equal(readCrashReportsMarker(copied()), null);
   });
 
@@ -489,15 +604,20 @@ describe('crash logs (EPOCH-514)', () => {
     mkdirSync(path.join(pulled().dir, 'Retired'), { recursive: true });
     writeFileSync(path.join(pulled().dir, 'a.ips'), 'aaaa');
     writeFileSync(path.join(pulled().dir, 'Retired', 'b.ips'), 'bb');
-    const out = await runCli();
-    assert.match(out, /has no acquisition record \(the copy didn't finish\), so it is not used/);
+    const run = await runCli();
+    assert.ok(
+      anyReason(run).some((r) => /has no acquisition record \(the copy didn't finish\), so it is not used/.test(r))
+    );
     assert.equal(readCrashReportsMarker(copied()), null);
   });
 
   it('copies them into crash_reports/<label>/ and records their content root and the evidence they came with', async () => {
     writeAcquisition(2, 6);
-    const out = await runCli();
-    assert.ok(out.includes(`[crash]   copied 2 file(s) -> ${copied()}`));
+    const run = await runCli();
+    assert.deepEqual(
+      steps(run, 'BK1', 'crash').map((e) => [e.status, e.detail]),
+      [['done', 'copied 2 file(s)']]
+    );
     const marker = readCrashReportsMarker(copied())!;
     assert.ok(marker, 'marker written');
     assert.equal(marker.content_root, readDecryptMarker(decrypted())!.content_root);
@@ -511,16 +631,55 @@ describe('crash logs (EPOCH-514)', () => {
 
   it('reuses an unchanged copy', async () => {
     const before = readCrashReportsMarker(copied());
-    const out = await runCli();
-    assert.match(out, /\[crash\]   already copied \(2 file\(s\)\), skipping/);
+    const run = await runCli();
+    assert.deepEqual(
+      steps(run, 'BK1', 'crash').map((e) => [e.status, e.reason]),
+      [['skipped', 'already copied (2 file(s))']]
+    );
     assert.deepEqual(readCrashReportsMarker(copied()), before);
   });
 
   it('refuses crash logs that changed after the pull, and that backup needs attention', async () => {
     writeFileSync(path.join(pulled().dir, 'added-later.ips'), 'x');
-    const out = await runCli();
-    assert.match(out, /\[crash\] error: .* holds 3 file\(s\), 7 bytes, but the pull copied 2 file\(s\), 6 bytes/);
-    assert.match(out, /completed with \d+ backup\(s\) that need attention/);
+    const run = await runCli();
+    assert.match(
+      stepError(run, 'BK1', 'crash') ?? '',
+      /holds 3 file\(s\), 7 bytes, but the pull copied 2 file\(s\), 6 bytes/
+    );
+    assert.ok(finished(run)?.failed_labels.includes('BK1'));
     rmSync(path.join(pulled().dir, 'added-later.ips'));
+  });
+});
+
+describe('text output (EPOCH-445)', () => {
+  it('writes the same events as human lines on the command line, and no event lines', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        path.resolve(import.meta.dirname, 'main.ts'),
+        '--source',
+        source,
+        '--workspace',
+        workspace,
+        '--decrypt-python',
+        stub,
+        '--decrypt-script',
+        path.join(tmp, 'decrypt_backup.py'),
+        '--sqlite-bin',
+        '/nonexistent/sqlite3',
+        '--ileapp-dir',
+        ileappDir,
+        '--ileapp-python',
+        ileappPython,
+        '--only',
+        'BK2',
+      ],
+      { input: 'pw\n', encoding: 'utf8', env: { ...process.env, STUB_DECRYPT: '', STUB_ILEAPP: '' } }
+    );
+    assert.ok(!result.stdout.includes('@@verichron'), 'no event lines in text mode');
+    assert.match(result.stdout, /\[BK2\] \[hash\] Checking the backup files: done/);
+    assert.match(result.stdout, /Prepare Evidence finished/);
   });
 });

@@ -190,7 +190,7 @@ The identifier formats were checked on 2026-10-18 against the Info.plist of the 
 
 **Markers:**
 - A marker names the evidence by its dated label, as the board asks.
-- The name a marker uses is an input to the sanitizer, which refuses a name containing one of the device's identifiers. A backup stored directly in a folder named by its UDID (the Finder layout) would otherwise have its UDID as its label. The app chooses the name for that case (EPOCH-570).
+- The name a marker uses is an input to the sanitizer, which refuses a name containing one of the device's identifiers. A backup stored directly in a folder named by its UDID (the Finder layout) would otherwise have its UDID as its label. Such a backup is named by device model · iOS version · backup date from its Info.plist, with a counter when two would read the same (owner, 2026-10-18; `deviceIdentifierSources` in `packages/contracts`).
 - It says what was removed and stays unambiguous within the workspace. The examiner can map it back through the workspace's own records.
 
 **If identifiers can't be read:** when a backup's Info.plist can't be read, its folder name (the UDID) is still replaced. A `warn` entry says that the other identifiers for that label could not be read.
@@ -277,7 +277,7 @@ The events below extend the existing `PipelineEvent` union (EPOCH-443): one cont
   - This replaces today's `[stage x]` tagging. Only `emitEvent` writes events, so a stage still can't pass for one.
 - **The processor's events (EPOCH-445):**
   - `prepare:backups {labels}`
-  - `backup:step {label, step: hash|decrypt|repair|ileapp|crash, status: started|done|skipped|error, reason?}`. A failed step must give its reason.
+  - `backup:step {label, step: hash|decrypt|repair|ileapp|crash, status: started|done|skipped|error, reason?, detail?}`. A failed step must give its reason; a finished one may say what it found (`detail`, e.g. its file count and root hash).
   - `hash:progress {label, bytes, files}`, `decrypt:progress {label, bytes, total}` and `ileapp:module {label, index, total, module}`, all at debug.
   - `password:required {label, attempt, max}`. It has no field for a password, and the contract refuses one.
   - `tool:output {tool: decrypt|ileapp|sqlite3, stream, line, label?}`: a line from a tool the processor runs.
@@ -290,10 +290,10 @@ The events below extend the existing `PipelineEvent` union (EPOCH-443): one cont
 
 - **One logger.** Every `console.log` and `console.error` goes through it.
   - With `--output events` (how the app runs it), stdout carries events only.
-  - With `--output text`, the default for the command line, it writes today's human lines, which are free to change from now on.
+  - With `--output text`, the default for the command line, it writes the same events as human lines. Both use `eventMessage()` in the contract, so the command line and the app read the same words, and the text is free to change.
 - Tool output is wrapped as `tool:output` with the tool's name.
 - Tool lines report a tool's version, never its path.
-- `summary.json` gains `failed_step` and `reason` per backup, sanitized.
+- `summary.json` gains `failed_step` and `reason` per backup, sanitized, and is validated against `ProcessorSummary` in the contract before it is written. `summary.md` says the same in words.
 - `prepareProgress.ts`'s regular expressions and `PASSWORD_PROMPT_RE` are deleted. The app consumes events.
 
 ### 8.3 Orchestrator

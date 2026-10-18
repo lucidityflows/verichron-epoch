@@ -97,6 +97,8 @@ export const PipelineEvent = z.discriminatedUnion('type', [
       status: z.enum(['started', 'done', 'skipped', 'error']),
       /** Why it was skipped or failed; required for an error. */
       reason: text.optional(),
+      /** What a finished step found, e.g. its file count and root hash. */
+      detail: text.optional(),
     })
     .strict()
     .refine((e) => e.status !== 'error' || e.reason !== undefined, {
@@ -176,13 +178,89 @@ export const EVENT_PRODUCERS: Record<PipelineEventType, readonly ('orchestrator'
   'prepare:finished': ['processor'],
 };
 
+/** What each step is called where an examiner reads it. */
+export const PREPARE_STEP_NAMES: Record<PrepareStep, string> = {
+  hash: 'Checking the backup files',
+  decrypt: 'Decrypting',
+  repair: 'Repairing damaged databases',
+  ileapp: 'Reading device activity with iLEAPP',
+  crash: 'Copying crash logs',
+};
+
+/** "58.4 GB", "312.0 MB": decimal units, as the board shows sizes. */
+export function formatBytes(bytes: number): string {
+  for (const [unit, size] of [
+    ['GB', 1e9],
+    ['MB', 1e6],
+    ['KB', 1e3],
+  ] as const) {
+    if (bytes >= size) return `${(bytes / size).toFixed(1)} ${unit}`;
+  }
+  return `${bytes} bytes`;
+}
+
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+const plural = (n: number, word: string) => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`;
+
+/**
+ * The sentence an event is shown as: one wording, used by the app's log and
+ * by the producers' own text output (docs/event-log.md §8). The label and
+ * step are shown beside it, so they are not repeated in it.
+ */
+export function eventMessage(event: PipelineEventBody): string {
+  switch (event.type) {
+    case 'log':
+      return event.message;
+    case 'stage:output':
+    case 'tool:output':
+      return event.line;
+    case 'prepare:backups':
+      return `Found ${plural(event.labels.length, 'backup')}: ${event.labels.join(', ')}`;
+    case 'backup:step': {
+      const name = PREPARE_STEP_NAMES[event.step];
+      if (event.status === 'started') return name;
+      if (event.status === 'done') return `${name}: done${event.detail ? ` (${event.detail})` : ''}`;
+      if (event.status === 'skipped') return `${name}: skipped${event.reason ? `, ${event.reason}` : ''}`;
+      return `${name} failed: ${event.reason}`;
+    }
+    case 'hash:progress':
+      return `Checked ${plural(event.files, 'file')} (${formatBytes(event.bytes)})`;
+    case 'decrypt:progress':
+      return `Decrypted ${formatBytes(event.bytes)} of ${formatBytes(event.total)}`;
+    case 'ileapp:module':
+      return `Module ${event.index} of ${event.total}: ${event.module}`;
+    case 'password:required':
+      return `Waiting for the backup password (attempt ${event.attempt} of ${event.max})`;
+    case 'backup:finished':
+      return event.success ? 'Prepared' : `Not prepared: ${lowerFirst(PREPARE_STEP_NAMES[event.failed_step!])} failed`;
+    case 'prepare:finished':
+      return event.failed_labels.length === 0
+        ? 'Prepare Evidence finished'
+        : `Prepare Evidence finished: ${plural(event.failed_labels.length, 'backup')} ${
+            event.failed_labels.length === 1 ? 'needs' : 'need'
+          } attention`;
+    case 'run:created':
+      return 'Analysis started';
+    case 'run:skipped':
+      return `Not analyzed again: ${event.reason}`;
+    case 'stage:started':
+      return `${event.stage} started`;
+    case 'stage:finished':
+      return `${event.stage} ${event.status === 'succeeded' ? 'finished' : event.status}`;
+    case 'run:finished':
+      return event.state === 'complete' ? 'Analysis complete' : `Analysis ${event.state}`;
+    case 'registration:refused':
+      return `Not analyzed: ${event.reason}`;
+  }
+}
+
 /**
  * An event's level, from its type and status alone, never its text
  * (docs/event-log.md §5). A failure is one `error`, where it happened; the
  * summaries after it (a failed backup, an incomplete run) are `info`, so the
  * error count is the number of failures.
  */
-export function eventLevel(event: PipelineEvent): LogLevel {
+export function eventLevel(event: PipelineEventBody): LogLevel {
   switch (event.type) {
     case 'log':
       return event.level;

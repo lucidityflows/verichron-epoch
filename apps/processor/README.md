@@ -30,9 +30,18 @@ pnpm --filter @verichron/processor dev -- --source <dir-of-backups> --workspace 
 ```
 
 It prompts for the backup password on stdin, and passes it to the decrypt only
-in `BACKUP_PASSWORD` (R30). The desktop app relays that prompt to its UI. A
-wrong password (the decrypt's exit code 3) is asked for again, up to three
-times.
+in `BACKUP_PASSWORD` (R30). A wrong password (the decrypt's exit code 3) is
+asked for again, up to three times; any other decrypt failure is not. A
+prompt whose stdin closes is reported as that backup's decrypt error.
+
+**Output (EPOCH-445).** With `--output events`, how the app runs it, stdout
+carries only typed events (`packages/contracts/ts/pipelineEvent.ts`): each
+step's start and outcome with its reason, progress, `password:required` (the
+app then writes the password to stdin), the tools' own lines, and every other
+line as a `log` event with its level. The app saves them as the task's log
+([docs/event-log.md](../../docs/event-log.md)). With `--output text`, the
+default, the same events are written as human lines in the same wording. That
+text is free to change: nothing parses it.
 
 | Option | Meaning |
 |---|---|
@@ -50,6 +59,7 @@ times.
 | `--verify` | Re-read every byte when hashing, ignoring the stat cache |
 | `--only <names>` | Process only these backup labels |
 | `--different-passwords` | Prompt per backup instead of reusing one password |
+| `--output <text\|events>` | Human lines (default), or one typed event per line, as the app reads them |
 
 Each step is skipped when its output is current. Current means the output's
 marker names this backup's content root and, for iLEAPP output, this iLEAPP
@@ -72,7 +82,8 @@ that ran.
 | `src/utils/repair.ts` | SQLite quick-check and `.recover`, returning repair provenance |
 | `src/utils/resolver.ts` | Reading the `sqlite3` version |
 | `src/utils/prompt.ts` | Password prompt |
-| `src/utils/summary.ts` | The manifest-declared processor summary |
+| `src/utils/report.ts` | Every line the processor writes: typed events, or the same as human text |
+| `src/utils/summary.ts` | The manifest-declared processor summary, with each failed backup's step and reason, sanitized |
 
 ## Test
 
@@ -84,13 +95,6 @@ The tests drive the real CLI against stub decrypt, `sqlite3` and iLEAPP
 executables. `decrypt_backup.py` itself is checked on a real backup (EPOCH-489);
 there is no synthetic encrypted backup to test it against.
 
-**Known issue:** the app reads this tool's progress by parsing its log lines
-(EPOCH-445). The lines it reads are:
-
-| Line | Meaning |
-|---|---|
-| `=== <backup> ===` | A backup starts |
-| `[<step>] done …`, `[<step>] already done, skipping`, `[<step>] error: …` | A step ends |
-| `[hash] progress <bytes> bytes, <files> files` | Hashing, every few seconds |
-| `[decrypt] progress <bytes> of <total> bytes` | Decrypting, every few seconds |
-| `[ileapp] module <n> of <total>: <name>` | An iLEAPP module starts |
+The CLI tests run it as the app does (`--output events`) and assert the event
+sequence, never its text; stdout carrying anything but valid events fails
+them.

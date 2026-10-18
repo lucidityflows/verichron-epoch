@@ -8,6 +8,7 @@ import { lineReader } from './lines.js';
 import { DECRYPT_MARKER, type RepairProvenance } from '@verichron/contracts';
 import { sqliteVersion } from './resolver.js';
 import type { Config } from './cli.js';
+import type { LogLevel } from '@verichron/contracts';
 
 const SQLITE_MAGIC = Buffer.from('SQLite format 3\0', 'ascii');
 
@@ -20,7 +21,11 @@ let sqliteToolVersion: string | null = null;
  * it did as the decrypt's repair provenance (EPOCH-406); paths are relative
  * to decDir.
  */
-export async function repairDecrypted(cfg: Config, decDir: string): Promise<RepairProvenance> {
+export async function repairDecrypted(
+  cfg: Config,
+  decDir: string,
+  log: (level: LogLevel, message: string) => void
+): Promise<RepairProvenance> {
   if (!sqliteChecked) {
     sqliteChecked = true;
     sqliteToolVersion = await sqliteVersion(cfg.sqliteBin);
@@ -44,7 +49,7 @@ export async function repairDecrypted(cfg: Config, decDir: string): Promise<Repa
     const ok = await sqliteQuickCheck(cfg.sqliteBin, p);
     if (ok) continue;
 
-    console.log(`  [repair]  malformed DB detected: ${path.relative(decDir, p)}`);
+    log('info', `damaged database found: ${path.relative(decDir, p)}`);
     try {
       // Recorded the moment the copy exists, so a later failure (rename,
       // side-file cleanup) can't leave a preserved original unaccounted for.
@@ -53,25 +58,25 @@ export async function repairDecrypted(cfg: Config, decDir: string): Promise<Repa
       );
       const okNow = await sqliteQuickCheck(cfg.sqliteBin, p);
       if (okNow) {
-        console.log(
-          `  [repair]  recovered: ${path.relative(decDir, p)}` +
+        log(
+          'info',
+          `recovered: ${path.relative(decDir, p)}` +
             (applyWarnings
               ? ` (${applyWarnings} — typically harmless: SQLite's own bookkeeping tables, not your data)`
               : '')
         );
         repaired++;
       } else {
-        console.warn(
-          `  [repair]  WARNING: ran .recover on ${path.relative(decDir, p)} but it still fails quick_check ` +
-            `(some data may be permanently lost; original preserved as .corrupt-<timestamp>)` +
+        log(
+          'warn',
+          `${path.relative(decDir, p)} still fails SQLite's quick check after recovery: some data may be ` +
+            `permanently lost; the original is kept as .corrupt-<timestamp>` +
             (applyWarnings ? ` [${applyWarnings}]` : '')
         );
         failedFiles.push(path.relative(decDir, p));
       }
     } catch (err) {
-      console.error(
-        `  [repair]  ERROR recovering ${path.relative(decDir, p)}:${err instanceof Error ? err.message : err}`
-      );
+      log('warn', `could not recover ${path.relative(decDir, p)}: ${err instanceof Error ? err.message : err}`);
       failedFiles.push(path.relative(decDir, p));
     }
   }

@@ -68,10 +68,13 @@ export {
   EVENT_PRODUCERS,
   LogLevel,
   PIPELINE_EVENT_PREFIX,
+  PREPARE_STEP_NAMES,
   PipelineEvent,
   PrepareStep,
   PrepareTool,
   eventLevel,
+  eventMessage,
+  formatBytes,
   parsePipelineEventLine,
   renderPipelineEvent,
   type EventProducer,
@@ -99,6 +102,8 @@ export {
   type SanitizerNotice,
   type WorkstationRoots,
 } from './ts/sanitize.js';
+export { deviceIdentifierSources, readPlistValues } from './ts/deviceIdentifiers.js';
+export { ProcessorSummary } from './ts/processorSummary.js';
 export { SourceType, isSourceType } from './ts/sourceType';
 export type { SourceType as SourceTypeValue } from './ts/sourceType';
 export { loadRootEnv, resolveDatabaseUrl } from './ts/env.js';

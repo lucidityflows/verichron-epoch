@@ -33,7 +33,11 @@ export async function withDecryptProgress<T>(
   decDir: string,
   backupBytes: number,
   decrypt: (signal: AbortSignal) => Promise<T>,
-  { intervalMs = PROGRESS_INTERVAL_MS, stallMs }: { intervalMs?: number; stallMs?: number } = {}
+  {
+    onProgress,
+    intervalMs = PROGRESS_INTERVAL_MS,
+    stallMs,
+  }: { onProgress: (bytes: number) => void; intervalMs?: number; stallMs?: number }
 ): Promise<T> {
   const startedMs = Date.now();
   const stall = new AbortController();
@@ -45,7 +49,7 @@ export async function withDecryptProgress<T>(
     measuring = true;
     void writtenSince(decDir, startedMs)
       .then((bytes) => {
-        console.log(`  [decrypt] progress ${bytes} of ${backupBytes} bytes`);
+        onProgress(bytes);
         if (bytes > lastBytes) {
           lastBytes = bytes;
           lastGrowthMs = Date.now();

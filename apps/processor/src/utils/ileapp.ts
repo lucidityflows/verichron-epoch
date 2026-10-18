@@ -74,6 +74,12 @@ export interface IleappRun {
   modulesPath: string;
   /** How long one phase (setup, one module, or the report) may run. */
   moduleTimeoutMs: number;
+  /** Each line iLEAPP writes, as written. */
+  onOutput: (stream: 'stdout' | 'stderr', line: string) => void;
+  /** The module iLEAPP has started, for the app's progress (EPOCH-487). */
+  onModule: (module: { index: number; total: number; name: string }) => void;
+  /** Something that went wrong without failing the run. */
+  onWarning: (message: string) => void;
 }
 
 /** One iLEAPP module's run, as written to `modulesPath`. */
@@ -316,16 +322,15 @@ export async function runIleapp(opts: IleappRun): Promise<void> {
       // stopped and this backup fails.
       logStream.on('error', (err) => stop(new Error(`could not write the iLEAPP log ${opts.logPath}: ${err.message}`)));
 
-      const onLine = (line: string) => {
-        process.stdout.write(line + '\n');
+      const onLine = (stream: 'stdout' | 'stderr') => (line: string) => {
+        opts.onOutput(stream, line);
         if (progress.line(line, Date.now())) {
           restartLimit();
           const current = progress.current();
-          // The processor's own progress line, read by the app (EPOCH-487).
-          if (current) console.log(`  [ileapp]  module ${current.index} of ${current.total}: ${current.name}`);
+          if (current) opts.onModule({ index: current.index, total: current.total, name: current.name });
         }
       };
-      const readers = [lineReader(onLine), lineReader(onLine)];
+      const readers = [lineReader(onLine('stdout')), lineReader(onLine('stderr'))];
       [child.stdout, child.stderr].forEach((stream, i) =>
         stream.on('data', (chunk: Buffer) => {
           if (!logStream.destroyed) logStream.write(chunk);
@@ -355,9 +360,7 @@ export async function runIleapp(opts: IleappRun): Promise<void> {
         resolve(opts.modulesPath),
         JSON.stringify(progress.summary(Date.now(), opts.moduleTimeoutMs), null, 2) + '\n'
       )
-      .catch((err) =>
-        console.error(`  [ileapp]  could not write module timings to ${opts.modulesPath}: ${err.message}`)
-      );
+      .catch((err) => opts.onWarning(`could not write module timings to ${opts.modulesPath}: ${err.message}`));
   }
   if (stopReason) throw stopReason;
   if (!fs.existsSync(outputDir)) {

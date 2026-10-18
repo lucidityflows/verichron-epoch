@@ -3,8 +3,10 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
+import type { OutputMode } from './report.js';
+
 // src/utils/ and dist/utils/ are both four levels below the repository root.
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
+export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 /**
  * The backup decrypt, from its own pinned environment, tools/decrypt
@@ -35,6 +37,8 @@ export interface Config {
   verify: boolean;
   only: string;
   samePass: boolean;
+  /** Typed events for the app, or human text for the command line (EPOCH-445). */
+  output: OutputMode;
 }
 
 export function parseFlags(): Config {
@@ -60,6 +64,7 @@ export function parseFlags(): Config {
       verify: { type: 'boolean', default: false },
       only: { type: 'string', default: '' },
       'different-passwords': { type: 'boolean', default: false },
+      output: { type: 'string', default: 'text' },
       help: { type: 'boolean', default: false },
     },
   });
@@ -72,6 +77,12 @@ export function parseFlags(): Config {
   if (!values.source) {
     console.error('error: --source is required');
     printUsage();
+    process.exit(2);
+  }
+
+  const output = values.output as string;
+  if (output !== 'text' && output !== 'events') {
+    console.error(`error: invalid --output: "${output}" (expected "text" or "events")`);
     process.exit(2);
   }
 
@@ -95,6 +106,7 @@ export function parseFlags(): Config {
     verify: values.verify as boolean,
     only: values.only as string,
     samePass: !(values['different-passwords'] as boolean),
+    output,
   };
 }
 
@@ -123,6 +135,7 @@ Options:
   --verify                 re-hash every file for the evidence manifest, ignoring the stat cache
   --only <names>           comma-separated list of backup dir names to process (default: all found)
   --different-passwords    prompt separately for each backup instead of reusing one password
+  --output <text|events>   human lines (default), or one typed event per line, as the app reads them
   --help                   show this help`);
 }
 

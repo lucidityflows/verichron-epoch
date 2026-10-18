@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   discoverBackups,
+  deviceIdentifierSources,
+  ProcessorSummary,
+  Sanitizer,
   BACKUP_SEARCH_MAX_DEPTH,
   DECRYPT_MARKER,
   ILEAPP_MARKER,
@@ -19,13 +23,14 @@ import {
   resolveWorkspaceBackup,
   workspaceEvidenceManifestPath,
   type Backup,
+  type PrepareStep,
   type RepairProvenance,
   type ToolVersion,
   type WorkspaceManifest,
   workspaceManifestPath,
 } from '@verichron/contracts';
 
-import { parseFlags, type Config } from './utils/cli.js';
+import { parseFlags, REPO_ROOT, type Config } from './utils/cli.js';
 import { pathExists, writeFileAtomic, writeMarker } from './utils/fs.js';
 import { PROGRESS_INTERVAL_MS, throttled, withDecryptProgress } from './utils/progress.js';
 import { ileappInputType, ileappToolVersion, readModuleOutcomes, runIleapp } from './utils/ileapp.js';
@@ -34,7 +39,8 @@ import { hashTree } from './utils/manifest.js';
 import { repairDecrypted } from './utils/repair.js';
 import { prepareCrashReports } from './utils/crashReports.js';
 import { promptPassword } from './utils/prompt.js';
-import { writeSummary } from './utils/summary.js';
+import { Reporter } from './utils/report.js';
+import { writeSummary, type BackupFailure } from './utils/summary.js';
 import {
   explainNoSpace,
   estimatedIleappBytes,
@@ -56,20 +62,21 @@ const MAX_PASSWORD_ATTEMPTS = 3;
 
 async function main() {
   const cfg = parseFlags();
+  const report = new Reporter(cfg.output);
   try {
     const releaseWorkspaceLocks = await acquireWorkspaceLocks([cfg.workspace], 'processor');
     try {
-      await run(cfg);
+      await run(cfg, report);
     } finally {
       await releaseWorkspaceLocks();
     }
   } catch (err) {
-    console.error('error:', err instanceof Error ? err.message : err);
+    report.log('error', `Prepare Evidence stopped: ${err instanceof Error ? err.message : err}`);
     process.exit(1);
   }
 }
 
-async function run(cfg: Config): Promise<void> {
+async function run(cfg: Config, report: Reporter): Promise<void> {
   const decryptTool: DecryptTool = { python: cfg.decryptPython, script: cfg.decryptScript };
   if (!(await pathExists(cfg.decryptPython))) {
     throw new Error(
@@ -80,7 +87,7 @@ async function run(cfg: Config): Promise<void> {
     throw new Error(`the decrypt script was not found at ${cfg.decryptScript}; pass --decrypt-script`);
   }
   const decryptToolV = await decryptToolVersion(decryptTool);
-  console.log(`[processor] decrypt: ${decryptToolV.name} ${decryptToolV.version}`);
+  report.log('debug', `Decrypt tool: ${decryptToolV.name} ${decryptToolV.version}`);
 
   if (!(await pathExists(cfg.ileappPython))) {
     throw new Error(
@@ -93,9 +100,10 @@ async function run(cfg: Config): Promise<void> {
     );
   }
   const ileappTool = await ileappToolVersion(cfg.ileappDir, cfg.ileappPython);
-  console.log(`[processor] iLEAPP ${ileappTool.version.slice(0, 12)} (${cfg.ileappDir})`);
+  // Its version identifies it; its folder is not the log's business (docs/event-log.md §6.6).
+  report.log('debug', `iLEAPP: ${ileappTool.version.slice(0, 12)}`);
 
-  await runBackups(cfg, decryptTool, { decrypt: decryptToolV, ileapp: ileappTool });
+  await runBackups(cfg, report, decryptTool, { decrypt: decryptToolV, ileapp: ileappTool });
 }
 
 /**
@@ -112,6 +120,7 @@ function ileappChange(previous: ToolVersion, current: ToolVersion): string | nul
 
 async function runBackups(
   cfg: Config,
+  report: Reporter,
   decryptTool: DecryptTool,
   tools: { decrypt: ToolVersion; ileapp: ToolVersion }
 ): Promise<void> {
@@ -130,340 +139,402 @@ async function runBackups(
   const manifest = await updateWorkspaceManifest(cfg, backups);
   const entries = new Map(manifest.backups.map((entry) => [entry.label, resolveWorkspaceBackup(cfg.workspace, entry)]));
 
-  console.log(`found ${backups.length} backup(s):`);
-  for (const b of backups) {
-    console.log(`  - ${b.label}  (${b.path})`);
-  }
-  console.log();
+  report.event({ type: 'prepare:backups', labels: backups.map((b) => b.label) });
 
   let cachedPassword = '';
   let haveCached = false;
   const repairFailuresByBackup = new Map<string, string[]>();
-  const failedBackups = new Set<string>();
+  // The first step that failed for each backup, and why. Every failure is
+  // reported once, where it happened (docs/event-log.md §5).
+  const failures = new Map<string, BackupFailure>();
+  const fail = (label: string, step: PrepareStep, reason: string) => {
+    report.step(label, step, 'error', { reason });
+    if (!failures.has(label)) failures.set(label, { step, reason });
+  };
 
   for (const backup of backups) {
     const name = backup.label;
     const src = backup.path;
     const manifestEntry = entries.get(name);
     if (!manifestEntry) throw new Error(`workspace manifest has no entry for backup "${name}"`);
-    console.log(`=== ${name} ===`);
-
-    let contentRoot: string;
-    let backupBytes: number;
+    report.step(name, 'hash', 'started');
+    // Every backup ends with backup:finished, however its steps went; only an
+    // error that stops the whole run skips it (the run then reports that error).
+    let stopped = false;
     try {
-      ({ contentRoot, totalBytes: backupBytes } = await hashBackup(cfg, manifestEntry, src));
-    } catch (err) {
-      const message = isNoSpaceError(err)
-        ? await explainNoSpace(cfg.workspace)
-        : err instanceof Error
-          ? err.message
-          : String(err);
-      console.error(`  [hash] error: ${message}`);
-      failedBackups.add(name);
-      continue;
-    }
-
-    const decDir = manifestEntry.decryptedPath;
-    const decMarker = path.join(decDir, DECRYPT_MARKER);
-    const ileDir = manifestEntry.ileappOutputPath;
-    let decryptRan = false;
-    // The decrypt is reusable only if it was made from the backup as it is
-    // now: its marker records the content_root it came from (EPOCH-404).
-    const previousDecrypt = readDecryptMarker(decDir);
-    const decryptIsCurrent = previousDecrypt?.content_root === contentRoot;
-    const previousIleapp = readIleappMarker(ileDir);
-    const ileappIsCurrent =
-      previousIleapp?.content_root === contentRoot && ileappChange(previousIleapp.tool, tools.ileapp) === null;
-    if (!cfg.forceDecrypt && decryptIsCurrent) {
-      console.log('  [decrypt] already done, skipping');
-      if (cfg.force || !ileappIsCurrent) {
-        try {
-          await requireWorkspaceBytes(cfg.workspace, estimatedIleappBytes(backupBytes));
-        } catch (err) {
-          console.error(`  [ileapp] error: ${err instanceof Error ? err.message : err}`);
-          failedBackups.add(name);
-          continue;
-        }
-      }
-    } else {
+      let contentRoot: string;
+      let backupBytes: number;
       try {
-        await requireWorkspaceSpace(cfg.workspace, backupBytes);
+        ({ contentRoot, totalBytes: backupBytes } = await hashBackup(cfg, report, manifestEntry, src));
       } catch (err) {
-        console.error(`  [decrypt] error: ${err instanceof Error ? err.message : err}`);
-        failedBackups.add(name);
+        const message = isNoSpaceError(err)
+          ? await explainNoSpace(cfg.workspace)
+          : err instanceof Error
+            ? err.message
+            : String(err);
+        fail(name, 'hash', message);
         continue;
       }
-      if (!decryptIsCurrent && (await pathExists(decDir))) {
-        // A decrypt (and everything built on it) from a different version
-        // of this backup, or with no provenance: remove it all so no stale
-        // file can survive into the new decrypt.
-        console.log(
-          '  [decrypt] the backup changed since its last decrypt; clearing the stale decrypt, iLEAPP output and crash logs'
-        );
-        await fsp.rm(decDir, { recursive: true, force: true });
-        await fsp.rm(ileDir, { recursive: true, force: true });
-        await fsp.rm(manifestEntry.crashReportsPath, { recursive: true, force: true });
-      }
-      // Withdraw every marker that vouches for this decrypt BEFORE touching
-      // it. A decrypt that dies part-way (e.g. --force-decrypt over an
-      // existing copy) must not leave a valid marker in front of half-written
-      // files; only a decrypt that completes recreates them below.
-      await fsp.rm(decMarker, { force: true });
-      await fsp.rm(path.join(ileDir, ILEAPP_MARKER), { force: true });
-      // The decrypt tool writes only into an empty folder, so a decrypt that
-      // runs again starts from nothing; no file of an earlier one survives.
-      await fsp.rm(decDir, { recursive: true, force: true });
-      // Bounded retry loop: a wrong password re-prompts up to
-      // MAX_PASSWORD_ATTEMPTS times before this backup is given up on and
-      // recorded as failed. Any non-password decrypt failure breaks out
-      // immediately -- see isWrongPasswordError's gate below.
-      let decrypted = false;
 
-      for (let attempt = 1; attempt <= MAX_PASSWORD_ATTEMPTS && !decrypted; attempt++) {
-        let pw: string;
-        if (cfg.samePass && haveCached && attempt === 1) {
-          pw = cachedPassword;
-        } else {
-          if (attempt > 1) {
-            console.error(
-              `  [decrypt] incorrect password for ${name} -- try again (${attempt}/${MAX_PASSWORD_ATTEMPTS})`
-            );
-          }
+      const decDir = manifestEntry.decryptedPath;
+      const decMarker = path.join(decDir, DECRYPT_MARKER);
+      const ileDir = manifestEntry.ileappOutputPath;
+      let decryptRan = false;
+      // The decrypt is reusable only if it was made from the backup as it is
+      // now: its marker records the content_root it came from (EPOCH-404).
+      const previousDecrypt = readDecryptMarker(decDir);
+      const decryptIsCurrent = previousDecrypt?.content_root === contentRoot;
+      const previousIleapp = readIleappMarker(ileDir);
+      const ileappIsCurrent =
+        previousIleapp?.content_root === contentRoot && ileappChange(previousIleapp.tool, tools.ileapp) === null;
+      if (!cfg.forceDecrypt && decryptIsCurrent) {
+        report.step(name, 'decrypt', 'skipped', { reason: 'already done' });
+        if (cfg.force || !ileappIsCurrent) {
           try {
-            // Prompt text left byte-for-byte identical to before this
-            // change -- apps/epoch's pipelineHandlers.ts matches this
-            // exact "password for <name>: " shape via PASSWORD_PROMPT_RE
-            // to relay the prompt to the renderer over IPC. The
-            // attempt-count message above is a separate console.error
-            // line, not part of the matched string, so it can't corrupt
-            // that relay.
-            pw = await promptPassword(`  password for ${name}: `);
+            await requireWorkspaceBytes(cfg.workspace, estimatedIleappBytes(backupBytes));
           } catch (err) {
-            console.error(`  [decrypt] error reading password: ${err instanceof Error ? err.message : err}`);
-            break;
+            fail(name, 'ileapp', err instanceof Error ? err.message : String(err));
+            continue;
           }
-          if (cfg.samePass) {
-            cachedPassword = pw;
-            haveCached = true;
+        }
+      } else {
+        report.step(name, 'decrypt', 'started');
+        try {
+          await requireWorkspaceSpace(cfg.workspace, backupBytes);
+        } catch (err) {
+          fail(name, 'decrypt', err instanceof Error ? err.message : String(err));
+          continue;
+        }
+        if (!decryptIsCurrent && (await pathExists(decDir))) {
+          // A decrypt (and everything built on it) from a different version
+          // of this backup, or with no provenance: remove it all so no stale
+          // file can survive into the new decrypt.
+          report.log(
+            'info',
+            'the backup changed since its last decrypt; clearing the stale decrypt, iLEAPP output and crash logs',
+            { label: name, step: 'decrypt' }
+          );
+          await fsp.rm(decDir, { recursive: true, force: true });
+          await fsp.rm(ileDir, { recursive: true, force: true });
+          await fsp.rm(manifestEntry.crashReportsPath, { recursive: true, force: true });
+        }
+        // Withdraw every marker that vouches for this decrypt BEFORE touching
+        // it. A decrypt that dies part-way (e.g. --force-decrypt over an
+        // existing copy) must not leave a valid marker in front of half-written
+        // files; only a decrypt that completes recreates them below.
+        await fsp.rm(decMarker, { force: true });
+        await fsp.rm(path.join(ileDir, ILEAPP_MARKER), { force: true });
+        // The decrypt tool writes only into an empty folder, so a decrypt that
+        // runs again starts from nothing; no file of an earlier one survives.
+        await fsp.rm(decDir, { recursive: true, force: true });
+        // Bounded retry loop: a wrong password re-prompts up to
+        // MAX_PASSWORD_ATTEMPTS times before this backup is given up on and
+        // recorded as failed. Any non-password decrypt failure breaks out
+        // immediately -- see isWrongPasswordError's gate below.
+        let decrypted = false;
+
+        for (let attempt = 1; attempt <= MAX_PASSWORD_ATTEMPTS && !decrypted; attempt++) {
+          let pw: string;
+          if (cfg.samePass && haveCached && attempt === 1) {
+            pw = cachedPassword;
+          } else {
+            if (attempt > 1) {
+              report.log('warn', `the password was wrong; asking again (${attempt} of ${MAX_PASSWORD_ATTEMPTS})`, {
+                label: name,
+                step: 'decrypt',
+              });
+            }
+            try {
+              // The app asks on this event and writes the answer to stdin; the
+              // event never carries the password (EPOCH-445).
+              report.event({ type: 'password:required', label: name, attempt, max: MAX_PASSWORD_ATTEMPTS });
+              pw = await promptPassword(`  password for ${name}: `, (text) => report.promptText(text));
+            } catch (err) {
+              fail(name, 'decrypt', `could not read the password: ${err instanceof Error ? err.message : err}`);
+              break;
+            }
+            if (cfg.samePass) {
+              cachedPassword = pw;
+              haveCached = true;
+            }
+          }
+
+          try {
+            await withDecryptProgress(
+              decDir,
+              backupBytes,
+              (signal) =>
+                decryptBackup({
+                  tool: decryptTool,
+                  env: decryptEnv(),
+                  src,
+                  dest: decDir,
+                  password: pw,
+                  signal,
+                  onOutput: (stream, line) => report.tool('decrypt', stream, line, name),
+                }),
+              {
+                stallMs: cfg.decryptStallTimeoutMs,
+                onProgress: (bytes) =>
+                  report.event({ type: 'decrypt:progress', label: name, bytes, total: backupBytes }),
+              }
+            );
+            decrypted = true;
+          } catch (err) {
+            // Never keep retrying every later backup with a password we
+            // just proved wrong for this one.
+            if (cfg.samePass) haveCached = false;
+
+            const wrongPassword = isWrongPasswordError(err);
+            const message = isNoSpaceError(err)
+              ? await explainNoSpace(cfg.workspace, backupBytes)
+              : err instanceof Error
+                ? err.message
+                : String(err);
+
+            if (wrongPassword && attempt < MAX_PASSWORD_ATTEMPTS) {
+              continue; // loop re-prompts on the next iteration
+            }
+
+            fail(
+              name,
+              'decrypt',
+              wrongPassword
+                ? `the password was wrong ${attempt} time(s), so this backup was given up on: ${message}`
+                : message
+            );
+            // Only a wrong password is worth another attempt; anything else
+            // (a full disk, a tool error) would fail the same way again.
+            break;
           }
         }
 
-        try {
-          await withDecryptProgress(
-            decDir,
-            backupBytes,
-            (signal) =>
-              decryptBackup({ tool: decryptTool, env: decryptEnv(), src, dest: decDir, password: pw, signal }),
-            { stallMs: cfg.decryptStallTimeoutMs }
-          );
-          decrypted = true;
-        } catch (err) {
-          // Never keep retrying every later backup with a password we
-          // just proved wrong for this one.
-          if (cfg.samePass) haveCached = false;
+        if (!decrypted) continue; // move to the next backup; this one is recorded in failures
 
-          const wrongPassword = isWrongPasswordError(err);
+        // The marker attributes this decrypt to `contentRoot`, hashed before
+        // the decrypt read the source. Confirm the source still hashes to it
+        // (cheap: unchanged files hit the stat cache); if the backup changed
+        // in between, the decrypt may be of a different version, so it gets no
+        // marker and registration will refuse it.
+        let recheck: Awaited<ReturnType<typeof hashTree>>;
+        try {
+          recheck = await hashTree(src, { cachePath: manifestEntry.fingerprintsPath });
+        } catch (err) {
+          // e.g. the source drive disconnected after the decrypt finished.
+          // The decrypt can't be attributed to a root, so it gets no marker;
+          // this backup is failed and the rest still run, as with the first hash.
+          fail(
+            name,
+            'decrypt',
+            `could not re-check the backup after decrypting: ${
+              isNoSpaceError(err)
+                ? await explainNoSpace(cfg.workspace, backupBytes)
+                : err instanceof Error
+                  ? err.message
+                  : String(err)
+            }`
+          );
+          continue;
+        }
+        if (recheck.contentRoot !== contentRoot) {
+          fail(name, 'decrypt', 'the backup changed while it was being decrypted; re-run to re-hash and re-decrypt it');
+          continue;
+        }
+
+        decryptRan = true;
+        report.step(name, 'decrypt', 'done');
+      }
+
+      // The repair pass is part of the decrypt: the decrypt marker, written
+      // only once both finish, records what repair did (EPOCH-406). A reused
+      // decrypt was repaired when it was made, and its marker says how.
+      if (!decryptRan) {
+        report.step(name, 'repair', 'skipped', { reason: 'already done' });
+        const repair = previousDecrypt!.params.repair;
+        if (repair.status === 'ran') repairFailuresByBackup.set(name, repair.failed_files);
+      } else {
+        report.step(name, 'repair', 'started');
+        let repair: RepairProvenance;
+        try {
+          repair = await repairDecrypted(cfg, decDir, (level, message) =>
+            report.log(level, message, { label: name, step: 'repair' })
+          );
+        } catch (err) {
+          // No marker: registration refuses a decrypt whose repair never finished.
           const message = isNoSpaceError(err)
             ? await explainNoSpace(cfg.workspace, backupBytes)
             : err instanceof Error
               ? err.message
               : String(err);
-
-          if (wrongPassword && attempt < MAX_PASSWORD_ATTEMPTS) {
-            continue; // loop re-prompts on the next iteration
-          }
-
-          console.error(
-            `  [decrypt] ${
-              wrongPassword ? `incorrect password after ${attempt} attempt(s), giving up` : 'error'
-            }: ${message}`
-          );
-          failedBackups.add(name);
+          fail(name, 'repair', message);
+          continue;
         }
-      }
-
-      if (!decrypted) continue; // move to the next backup; this one is recorded in failedBackups
-
-      // The marker attributes this decrypt to `contentRoot`, hashed before
-      // the decrypt read the source. Confirm the source still hashes to it
-      // (cheap: unchanged files hit the stat cache); if the backup changed
-      // in between, the decrypt may be of a different version, so it gets no
-      // marker and registration will refuse it.
-      let recheck: Awaited<ReturnType<typeof hashTree>>;
-      try {
-        recheck = await hashTree(src, { cachePath: manifestEntry.fingerprintsPath });
-      } catch (err) {
-        // e.g. the source drive disconnected after the decrypt finished.
-        // The decrypt can't be attributed to a root, so it gets no marker;
-        // this backup is failed and the rest still run, as with the first hash.
-        console.error(
-          `  [decrypt] error: could not re-check the backup after decrypting: ${
-            isNoSpaceError(err)
-              ? await explainNoSpace(cfg.workspace, backupBytes)
-              : err instanceof Error
-                ? err.message
-                : String(err)
-          }`
-        );
-        failedBackups.add(name);
-        continue;
-      }
-      if (recheck.contentRoot !== contentRoot) {
-        console.error(
-          '  [decrypt] error: the backup changed while it was being decrypted; re-run to re-hash and re-decrypt it'
-        );
-        failedBackups.add(name);
-        continue;
-      }
-
-      decryptRan = true;
-      console.log('  [decrypt] done');
-    }
-
-    // The repair pass is part of the decrypt: the decrypt marker, written
-    // only once both finish, records what repair did (EPOCH-406). A reused
-    // decrypt was repaired when it was made, and its marker says how.
-    if (!decryptRan) {
-      console.log('  [repair]  already done, skipping');
-      const repair = previousDecrypt!.params.repair;
-      if (repair.status === 'ran') repairFailuresByBackup.set(name, repair.failed_files);
-    } else {
-      let repair: RepairProvenance;
-      try {
-        repair = await repairDecrypted(cfg, decDir);
-      } catch (err) {
-        // No marker: registration refuses a decrypt whose repair never finished.
-        const message = isNoSpaceError(err)
-          ? await explainNoSpace(cfg.workspace, backupBytes)
-          : err instanceof Error
-            ? err.message
-            : String(err);
-        console.error(`  [repair] error: ${message}`);
-        failedBackups.add(name);
-        continue;
-      }
-      if (repair.status === 'skipped') {
-        console.log(`  [repair]  skipped (${repair.reason}; pass --sqlite-bin or install sqlite3)`);
-      } else {
-        const failed = repair.failed_files.length;
-        if (repair.repaired === 0 && failed === 0) {
-          console.log(`  [repair]  done, no malformed DBs found (scanned ${repair.scanned} candidate file(s))`);
+        if (repair.status === 'skipped') {
+          report.step(name, 'repair', 'skipped', { reason: `${repair.reason}; pass --sqlite-bin or install sqlite3` });
         } else {
-          console.log(
-            `  [repair]  done, repaired ${repair.repaired} DB(s)${
-              failed > 0 ? `, ${failed} could not be fully recovered` : ''
-            } (scanned ${repair.scanned} candidate file(s))`
-          );
-          if (failed > 0) failedBackups.add(name);
+          const failed = repair.failed_files.length;
+          const checked = `${repair.scanned} database(s) checked`;
+          if (failed > 0) {
+            fail(
+              name,
+              'repair',
+              `${failed} damaged database(s) could not be fully recovered (${repair.repaired} repaired, ${checked}); ` +
+                "iLEAPP's results for this backup may be missing data from them"
+            );
+          } else {
+            report.step(name, 'repair', 'done', {
+              detail:
+                repair.repaired === 0 ? `no damaged databases, ${checked}` : `${repair.repaired} repaired, ${checked}`,
+            });
+          }
+          repairFailuresByBackup.set(name, repair.failed_files);
         }
-        repairFailuresByBackup.set(name, repair.failed_files);
+        try {
+          await writeFileAtomic(decMarker, renderDecryptMarker(contentRoot, tools.decrypt, { repair }));
+        } catch (err) {
+          if (!isNoSpaceError(err)) throw err;
+          fail(name, 'repair', await explainNoSpace(cfg.workspace, backupBytes));
+          continue;
+        }
       }
-      try {
-        await writeFileAtomic(decMarker, renderDecryptMarker(contentRoot, tools.decrypt, { repair }));
-      } catch (err) {
-        if (!isNoSpaceError(err)) throw err;
-        console.error(`  [repair] error: ${await explainNoSpace(cfg.workspace, backupBytes)}`);
-        failedBackups.add(name);
-        continue;
-      }
-    }
 
-    // iLEAPP's output is current only if made from this backup's decrypt by
-    // this iLEAPP commit (EPOCH-416). Otherwise it is removed and made again:
-    // iLEAPP writes a fresh report folder and never updates one in place.
-    const ileappStaleBecause = !previousIleapp
-      ? null
-      : previousIleapp.content_root !== contentRoot
-        ? 'the backup changed'
-        : ileappChange(previousIleapp.tool, tools.ileapp);
-    if (!cfg.force && !decryptRan && previousIleapp && ileappStaleBecause === null) {
-      console.log('  [ileapp]  already done, skipping');
-    } else {
-      if (ileappStaleBecause && !decryptRan)
-        console.log(`  [ileapp]  re-running: ${ileappStaleBecause} since the last run`);
-      // Marker first, then the directory: no marker ever vouches for a
-      // report that is being removed or rewritten.
-      await fsp.rm(path.join(ileDir, ILEAPP_MARKER), { force: true });
-      await fsp.rm(ileDir, { recursive: true, force: true });
+      // iLEAPP's output is current only if made from this backup's decrypt by
+      // this iLEAPP commit (EPOCH-416). Otherwise it is removed and made again:
+      // iLEAPP writes a fresh report folder and never updates one in place.
+      const ileappStaleBecause = !previousIleapp
+        ? null
+        : previousIleapp.content_root !== contentRoot
+          ? 'the backup changed'
+          : ileappChange(previousIleapp.tool, tools.ileapp);
+      if (!cfg.force && !decryptRan && previousIleapp && ileappStaleBecause === null) {
+        report.step(name, 'ileapp', 'skipped', { reason: 'already done' });
+      } else {
+        if (ileappStaleBecause && !decryptRan)
+          report.log('info', `re-running: ${ileappStaleBecause} since the last run`, { label: name, step: 'ileapp' });
+        report.step(name, 'ileapp', 'started');
+        // Marker first, then the directory: no marker ever vouches for a
+        // report that is being removed or rewritten.
+        await fsp.rm(path.join(ileDir, ILEAPP_MARKER), { force: true });
+        await fsp.rm(ileDir, { recursive: true, force: true });
+        try {
+          const inputType = ileappInputType(decDir);
+          await runIleapp({
+            python: cfg.ileappPython,
+            ileappDir: cfg.ileappDir,
+            decryptedDir: decDir,
+            inputType,
+            outputDir: ileDir,
+            logPath: manifestEntry.ileappLogPath,
+            modulesPath: manifestEntry.ileappModulesPath,
+            moduleTimeoutMs: cfg.ileappModuleTimeoutMs,
+            onOutput: (stream, line) => report.tool('ileapp', stream, line, name),
+            onModule: (m) =>
+              report.event({ type: 'ileapp:module', label: name, index: m.index, total: m.total, module: m.name }),
+            onWarning: (message) => report.log('warn', message, { label: name, step: 'ileapp' }),
+          });
+          // A plugin that errored is recorded with the output, not treated as a
+          // failed run (EPOCH-457): it fails the same way every time.
+          const modules = readModuleOutcomes(ileDir, await fsp.readFile(manifestEntry.ileappLogPath, 'utf8'));
+          await writeFileAtomic(
+            path.join(ileDir, ILEAPP_MARKER),
+            renderIleappMarker(contentRoot, tools.ileapp, { input_type: inputType, modules })
+          );
+          // A plugin's error is recorded with the output (EPOCH-457), so it is a warning, not a failure.
+          for (const e of modules.errors)
+            report.log('warn', `plugin errored: ${e.artifact} (${e.module}): ${e.error ?? 'no error text logged'}`, {
+              label: name,
+              step: 'ileapp',
+            });
+          report.step(name, 'ileapp', 'done', {
+            detail:
+              `${modules.complete} of ${modules.total} modules completed, ` +
+              `${modules.no_files_found.length} found no files, ${modules.errors.length} errored`,
+          });
+        } catch (err) {
+          const message = isNoSpaceError(err)
+            ? await explainNoSpace(cfg.workspace, backupBytes)
+            : err instanceof Error
+              ? err.message
+              : String(err);
+          fail(name, 'ileapp', message);
+        }
+      }
+
+      // The device's crash logs, if the pull acquired them beside this backup
+      // (EPOCH-514). An iOS backup holds none itself (EPOCH-447).
       try {
-        const inputType = ileappInputType(decDir);
-        await runIleapp({
-          python: cfg.ileappPython,
-          ileappDir: cfg.ileappDir,
-          decryptedDir: decDir,
-          inputType,
-          outputDir: ileDir,
-          logPath: manifestEntry.ileappLogPath,
-          modulesPath: manifestEntry.ileappModulesPath,
-          moduleTimeoutMs: cfg.ileappModuleTimeoutMs,
+        const crash = await prepareCrashReports({
+          backupPath: src,
+          destDir: manifestEntry.crashReportsPath,
+          contentRoot,
+          force: cfg.force,
         });
-        // A plugin that errored is recorded with the output, not treated as a
-        // failed run (EPOCH-457): it fails the same way every time.
-        const modules = readModuleOutcomes(ileDir, await fsp.readFile(manifestEntry.ileappLogPath, 'utf8'));
-        await writeFileAtomic(
-          path.join(ileDir, ILEAPP_MARKER),
-          renderIleappMarker(contentRoot, tools.ileapp, { input_type: inputType, modules })
-        );
-        for (const e of modules.errors)
-          console.log(`  [ileapp]  plugin errored: ${e.artifact} (${e.module}): ${e.error ?? 'no error text logged'}`);
-        console.log(
-          `  [ileapp]  done -> ${ileDir} (${modules.complete} of ${modules.total} modules completed, ` +
-            `${modules.no_files_found.length} found no files, ${modules.errors.length} errored)`
-        );
+        if (crash.status === 'none') report.step(name, 'crash', 'skipped', { reason: crash.message });
+        else if (crash.status === 'reused')
+          report.step(name, 'crash', 'skipped', { reason: `already copied (${crash.files} file(s))` });
+        else report.step(name, 'crash', 'done', { detail: `copied ${crash.files} file(s)` });
       } catch (err) {
         const message = isNoSpaceError(err)
           ? await explainNoSpace(cfg.workspace, backupBytes)
           : err instanceof Error
             ? err.message
             : String(err);
-        console.error(`  [ileapp] error: ${message}`);
-        failedBackups.add(name);
+        fail(name, 'crash', message);
+      }
+    } catch (err) {
+      stopped = true;
+      throw err;
+    } finally {
+      if (!stopped) {
+        const failure = failures.get(name);
+        report.event(
+          failure
+            ? {
+                type: 'backup:finished',
+                label: name,
+                success: false,
+                failed_step: failure.step,
+                reason: failure.reason,
+              }
+            : { type: 'backup:finished', label: name, success: true }
+        );
       }
     }
-
-    // The device's crash logs, if the pull acquired them beside this backup
-    // (EPOCH-514). An iOS backup holds none itself (EPOCH-447).
-    try {
-      const crash = await prepareCrashReports({
-        backupPath: src,
-        destDir: manifestEntry.crashReportsPath,
-        contentRoot,
-        force: cfg.force,
-      });
-      if (crash.status === 'none') console.log(`  [crash]   ${crash.message}`);
-      else if (crash.status === 'reused') console.log(`  [crash]   already copied (${crash.files} file(s)), skipping`);
-      else console.log(`  [crash]   copied ${crash.files} file(s) -> ${manifestEntry.crashReportsPath}`);
-    } catch (err) {
-      const message = isNoSpaceError(err)
-        ? await explainNoSpace(cfg.workspace, backupBytes)
-        : err instanceof Error
-          ? err.message
-          : String(err);
-      console.error(`  [crash] error: ${message}`);
-      failedBackups.add(name);
-    }
-    console.log();
   }
 
+  // The summaries are shared like the log, so what they say is sanitized
+  // the same way (docs/event-log.md §6.4).
+  const sanitizer = Sanitizer.create(deviceIdentifierSources(backups), {
+    workspace: path.resolve(cfg.workspace),
+    source: path.resolve(cfg.source),
+    app: REPO_ROOT,
+    temp: os.tmpdir(),
+    home: os.homedir(),
+    user: os.userInfo().username,
+  });
+  const sanitize = (text: string) => sanitizer.sanitize(text);
   const summaryPaths = resolveProcessorSummaryPaths(cfg.workspace, manifest);
-  const summaryPath = await writeSummary(summaryPaths.markdown, backups, failedBackups, repairFailuresByBackup);
-  const backupResults = await Promise.all(
-    backups.map(async (backup) => {
-      const entry = entries.get(backup.label);
-      if (!entry) throw new Error(`workspace manifest has no entry for backup "${backup.label}"`);
-      return {
-        label: backup.label,
-        success: !failedBackups.has(backup.label),
-        decrypted: await pathExists(path.join(entry.decryptedPath, DECRYPT_MARKER)),
-      };
-    })
-  );
-  await writeFileAtomic(summaryPaths.json, JSON.stringify({ backups: backupResults }, null, 2) + '\n');
-  console.log('summary written to', summaryPath);
-  if (failedBackups.size > 0) {
-    console.error(`completed with ${failedBackups.size} backup(s) that need attention`);
-    process.exitCode = 1;
-  }
+  const summaryPath = await writeSummary(summaryPaths.markdown, backups, failures, repairFailuresByBackup, sanitize);
+  const summary = ProcessorSummary.parse({
+    backups: await Promise.all(
+      backups.map(async (backup) => {
+        const entry = entries.get(backup.label);
+        if (!entry) throw new Error(`workspace manifest has no entry for backup "${backup.label}"`);
+        const failure = failures.get(backup.label);
+        return {
+          label: backup.label,
+          success: !failure,
+          decrypted: await pathExists(path.join(entry.decryptedPath, DECRYPT_MARKER)),
+          failed_step: failure?.step ?? null,
+          reason: failure ? sanitize(failure.reason) : null,
+        };
+      })
+    ),
+  });
+  await writeFileAtomic(summaryPaths.json, JSON.stringify(summary, null, 2) + '\n');
+  report.log('debug', `summary written to ${summaryPath}`);
+  report.event({ type: 'prepare:finished', failed_labels: [...failures.keys()] });
+  if (failures.size > 0) process.exitCode = 1;
 }
 
 /**
@@ -490,15 +561,17 @@ function decryptEnv(): NodeJS.ProcessEnv {
  */
 async function hashBackup(
   cfg: Config,
+  report: Reporter,
   entry: ReturnType<typeof resolveWorkspaceBackup>,
   src: string
 ): Promise<{ contentRoot: string; totalBytes: number }> {
-  const report = throttled(PROGRESS_INTERVAL_MS);
+  const every = throttled(PROGRESS_INTERVAL_MS);
   const result = await hashTree(src, {
     cachePath: entry.fingerprintsPath,
     verify: cfg.verify,
     // Progress the app shows while a large backup is hashed (EPOCH-487).
-    onProgress: (bytes, files) => report(() => console.log(`  [hash]    progress ${bytes} bytes, ${files} files`)),
+    onProgress: (bytes, files) =>
+      every(() => report.event({ type: 'hash:progress', label: entry.label, bytes, files })),
   });
 
   const manifestPath = workspaceEvidenceManifestPath(entry, result.contentRoot);
@@ -518,12 +591,9 @@ async function hashBackup(
   });
   await writeFileAtomic(entry.sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
 
-  // Must start with "done": apps/epoch's prepareProgress only completes a step
-  // on a "[stage] done..." (or skip) line.
-  console.log(
-    `  [hash]    done -> ${entry.sidecarPath}` +
-      ` (${result.fileCount} files, ${result.hashed} hashed, ${result.reused} cached, root ${result.contentRoot})`
-  );
+  report.step(entry.label, 'hash', 'done', {
+    detail: `${result.fileCount} files, ${result.hashed} hashed, ${result.reused} cached, root ${result.contentRoot}`,
+  });
   return { contentRoot: result.contentRoot, totalBytes: result.totalBytes };
 }
 
