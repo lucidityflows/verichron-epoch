@@ -12,7 +12,7 @@ db_peek = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(db_peek)
 
 DATABASE_CONFIG_ERROR = (
-    "Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME."
+    "Database configuration is required: set DATABASE_URL, or all of DB_APP_USER, DB_APP_PASSWORD, and DB_NAME."
 )
 
 

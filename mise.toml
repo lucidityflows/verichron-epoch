@@ -27,6 +27,13 @@ run = "scripts/bootstrap-dev.sh --check"
 description = "Check prerequisites, then install every environment from the lockfiles"
 run = "scripts/bootstrap-dev.sh"
 
+[tasks.db]
+description = "Apply migrations, then create or update the runtime login (EPOCH-562)"
+run = [
+  "uv run python packages/etl-db-writer/migrate.py",
+  "uv run python packages/etl-db-writer/provision_roles.py",
+]
+
 [tasks.lint]
 description = "Lint, format-check and type-check first-party Python"
 run = [

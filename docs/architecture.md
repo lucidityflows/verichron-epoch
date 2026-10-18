@@ -271,13 +271,18 @@ switch ([decisions](decisions.md#product-and-builds)).
 ## Database configuration
 
 **Built — R28 (EPOCH-424):** database configuration fails closed unless
-`DATABASE_URL` or complete `DB_*` credentials are supplied; see
+`DATABASE_URL` or complete `DB_APP_*` credentials are supplied; see
 [the configuration rules](rules.md#configuration-and-security).
+
+**Built — roles (EPOCH-562):**
+- **The schema owner:** `verichron_epoch_schema_owner`, a non-login role, owns every table, view, sequence and trigger function. `migrate.py` gives each new object to it after every run.
+- **The runtime:** the app and its stages connect as a login that holds only `verichron_epoch_runtime`. That role reads everything and writes only what the writers write, and it purges only through `purge_evidence`. It cannot TRUNCATE, disable a trigger, change privileges or become an owner, so the immutability triggers (R9) hold against the running application.
+- **Who runs migrations:** the administrative identity, a superuser, which the app never uses. On the Lab build's bundled server, these roles are provisioned by EPOCH-477.
 
 **Built — R30 (EPOCH-423):** the URL never travels on a command line. The
 orchestrator resolves it once and gives each stage `DATABASE_URL` in its
 environment; stages read it with `runtime_env.require_database_url()`, and
-`migrate.py` and `db_peek.py` read `.env` themselves.
+`migrate.py`, `provision_roles.py` and `db_peek.py` read `.env` themselves.
 
 ## Changes already decided
 
