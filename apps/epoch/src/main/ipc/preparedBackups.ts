@@ -1,8 +1,13 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { readDecryptMarker, readIleappMarker } from '@verichron/contracts';
+import {
+  readDecryptMarker,
+  readIleappMarker,
+  readWorkspaceManifestSync,
+  resolveWorkspaceBackup,
+} from '@verichron/contracts';
 
 import type { PreparedBackup } from '../../shared/types/window';
 
@@ -21,21 +26,18 @@ export function defaultWorkspace(): string {
  * iLEAPP output. Only reads files; nothing is changed.
  */
 export function readPreparedBackups(workspace: string): PreparedBackup[] {
-  const decryptedRoot = path.join(workspace, 'decrypted');
-  if (!existsSync(decryptedRoot)) return [];
-  const labels = readdirSync(decryptedRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
+  if (!existsSync(workspace)) return [];
+  const manifest = readWorkspaceManifestSync(workspace);
 
   const result: PreparedBackup[] = [];
-  for (const label of labels) {
-    const decrypt = readDecryptMarker(path.join(decryptedRoot, label));
+  for (const item of manifest.backups) {
+    const entry = resolveWorkspaceBackup(workspace, item);
+    const decrypt = readDecryptMarker(entry.decryptedPath);
     if (!decrypt) continue;
-    const ileapp = readIleappMarker(path.join(workspace, 'ileapp', label));
+    const ileapp = readIleappMarker(entry.ileappOutputPath);
     const current = ileapp !== null && ileapp.content_root === decrypt.content_root;
     result.push({
-      label,
+      label: entry.label,
       state: current ? 'prepared' : 'partial',
       preparedAt: current ? ileapp.completed_at : decrypt.completed_at,
     });

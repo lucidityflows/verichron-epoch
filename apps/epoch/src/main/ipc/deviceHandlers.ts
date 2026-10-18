@@ -131,6 +131,26 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
   );
 
   ipcMain.handle(
+    'epoch:copyDeviceCrashReportsByReference',
+    async (_event, sourceId: string, deviceRef: string, backupDir: string) => {
+      if (pull.running()) throw new Error('A device backup is running; wait for it to finish.');
+      const source = getDeviceBackupSource(sourceId);
+      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+      return source.copyCrashReportsAgainByReference(deviceRef, backupDir);
+    }
+  );
+
+  ipcMain.handle('epoch:findCrashReportsRetryTargets', async (_event, sourceId: string, backupDirs: unknown) => {
+    if (!Array.isArray(backupDirs) || !backupDirs.every((backupDir) => typeof backupDir === 'string')) {
+      throw new Error('Backup paths must be a list of strings.');
+    }
+    if (pull.running()) return { targets: [], errors: [] };
+    const source = getDeviceBackupSource(sourceId);
+    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    return source.findCrashReportsRetryTargets(backupDirs);
+  });
+
+  ipcMain.handle(
     'epoch:pullDeviceBackup',
     async (_event, sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) => {
       if (!options?.password || options.password.trim() === '') {

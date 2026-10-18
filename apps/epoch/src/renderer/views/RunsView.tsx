@@ -14,9 +14,10 @@ import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 import { Button } from '../components/ui/Button';
 import { TerminalLog } from '../components/layout/TerminalLog';
 import { pipelineApi } from '../api/pipeline';
-import { useAnalysisState } from '../hooks/usePipelineState';
+import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { ViewLayout } from '../components/layout/ViewLayout';
+import { AnalysisStageProgress } from '../features/investigations/AnalysisStageProgress';
 import { EmptyState } from '../components/ui/EmptyState';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/Tooltip';
@@ -97,7 +98,9 @@ export function RunsView({
   // A retry is an analysis run kept in the main process (EPOCH-487), so it is
   // still shown after leaving this view and coming back.
   const { state: analysis, log: analysisLog } = useAnalysisState();
-  const retryingThis = analysis?.kind === 'retry' && analysis.target === selectedRun?.backup_source;
+  const { state: prepare } = usePrepareState();
+  const pipelineBusy = analysis?.status === 'running' || prepare?.status === 'running';
+  const retryingThis = analysis?.kind === 'retry' && analysis.target === selectedRun?.run_id;
   const retrying = retryingThis && analysis?.status === 'running';
   const retryLog = retryingThis ? analysisLog : [];
   const retryResult = retryingThis && analysis?.status === 'finished' ? analysis.result : null;
@@ -119,7 +122,7 @@ export function RunsView({
     if (!selectedRun || retrying) return;
     setStartError(null);
     try {
-      await pipelineApi.retryRun(selectedRun.backup_source);
+      await pipelineApi.retryRun(selectedRun.run_id);
     } catch (err) {
       setStartError(err instanceof Error ? err.message : 'Failed to start retry.');
     }
@@ -276,7 +279,14 @@ export function RunsView({
         <div className="flex items-center justify-between">
           <h3 className="text-label uppercase tracking-wider text-muted-foreground">Analysis Diagnostics</h3>
           {canRetry && (
-            <Button variant="outline" size="sm" onClick={handleRetry} loading={retrying} loadingText="Retrying…">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRetry}
+              disabled={pipelineBusy}
+              loading={retrying}
+              loadingText="Retrying…"
+            >
               <RefreshCw size="0.875rem" />
               Retry Incomplete Run
             </Button>
@@ -287,6 +297,10 @@ export function RunsView({
           <div className="text-flag bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-md px-4 py-3 text-data">
             {retryError}
           </div>
+        )}
+
+        {retrying && analysis?.currentStage && (
+          <AnalysisStageProgress stage={analysis.currentStage} className="text-data text-muted-foreground" />
         )}
 
         {(retrying || retryLog.length > 0) && <TerminalLog lines={retryLog} live={retrying} label="Retry details" />}

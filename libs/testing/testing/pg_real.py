@@ -38,7 +38,6 @@ first); this module does not create schema.
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 from collections.abc import Iterable, Iterator, Mapping
 from typing import Any
@@ -59,6 +58,8 @@ _TABLES = (
     "indicator_set_files",
     "indicator_sets",
     "indicator_file_contents",
+    "stage_item_failures",
+    "ingest_run_links",
     "forensic_records",
     "ingested_files",
     "pipeline_stage_status",
@@ -110,8 +111,8 @@ class PgReal:
                     )
                 for run_id in run_ids:
                     cur.execute(
-                        "INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions) "
-                        "VALUES (%s, %s, 'pytest', '{}'::jsonb)",
+                        "INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid) "
+                        "VALUES (%s, %s, 'pytest', '{}'::jsonb, 'pytest-host', 1)",
                         (run_id, "pytest"),
                     )
             self._conn.commit()
@@ -152,17 +153,20 @@ class PgReal:
     def ledger(self) -> list[dict[str, Any]]:
         rows = self._dicts(
             "SELECT *, raw_payload::text AS raw_payload, "
-            "array_to_json(produced_by_runs)::text AS produced_by_runs, "
             "evidence_id::text AS evidence_id, derivative_id::text AS derivative_id "
             "FROM ingested_files ORDER BY file_hash, ingest_id"
         )
-        for row in rows:
-            row["produced_by_runs"] = json.loads(row["produced_by_runs"])
         return rows
 
     def records(self) -> list[dict[str, Any]]:
         return self._dicts(
             "SELECT *, fields::text AS fields, evidence_id::text AS evidence_id FROM forensic_records ORDER BY id"
+        )
+
+    def failures(self) -> list[dict[str, Any]]:
+        return self._dicts(
+            "SELECT *, run_id::text AS run_id, evidence_id::text AS evidence_id, "
+            "derivative_id::text AS derivative_id FROM stage_item_failures ORDER BY failure_id"
         )
 
     def record_count(self, file_hash: str | None = None) -> int:

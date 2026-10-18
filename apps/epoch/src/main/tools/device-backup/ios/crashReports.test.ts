@@ -10,7 +10,13 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 import { CrashReportsAcquisition } from '@verichron/contracts';
 
-import { copyCrashReports, crashReportArgs, discardCrashReportsCopy, type RunTool } from './crashReports';
+import {
+  copyCrashReports,
+  crashReportArgs,
+  crashReportsCopyExists,
+  discardCrashReportsCopy,
+  type RunTool,
+} from './crashReports';
 import { crashReportsResult, crashReportsSummary } from './iosBackupSource';
 
 const UDID = '00008140-0000000000000000';
@@ -72,6 +78,15 @@ describe('crashReportArgs', () => {
 });
 
 describe('copyCrashReports', () => {
+  it('treats either the copy directory or its record as an existing copy', async () => {
+    assert.equal(await crashReportsCopyExists(backupDir), false);
+    fs.mkdirSync(`${backupDir}.crash-reports`);
+    assert.equal(await crashReportsCopyExists(backupDir), true);
+    fs.rmSync(`${backupDir}.crash-reports`, { recursive: true });
+    fs.writeFileSync(`${backupDir}.crash-reports.json`, '{}');
+    assert.equal(await crashReportsCopyExists(backupDir), true);
+  });
+
   it('copies beside the backup with -k, counts the files and records how, last', async () => {
     const calls: string[][] = [];
     const result = await copyCrashReports(

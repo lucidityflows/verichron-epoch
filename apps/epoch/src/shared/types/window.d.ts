@@ -3,12 +3,15 @@ import type {
   ForensicRecordPage,
   ForensicRecordQuery,
   IndicatorCheckRow,
+  InterruptedStageRow,
+  ItemFailurePage,
   PipelineRunRow,
   StageStatusRow,
 } from '@verichron/etl-db-reader';
 import type {
   BackupProgress,
   CrashReportsResult,
+  CrashReportsRetryLookup,
   DeviceInfo,
   PullOptions,
   BackupStats,
@@ -60,16 +63,16 @@ export interface PipelineLogEntry {
 }
 
 /**
- * EPOCH-305: what epoch:getAnalysisRunStatus reports for a workspace.
- *   'idle'        -- nothing tracked as running, and no dangling
- *                     pipeline_runs row (finished_at IS NULL) for it.
+ * EPOCH-305, EPOCH-435: what epoch:getAnalysisRunStatus reports for a workspace.
+ *   'idle'        -- nothing tracked as running, and no evidence of the
+ *                     workspace whose latest run was interrupted.
  *   'running'     -- the main process still has this workspace's
  *                     orchestrator subprocess tracked as in flight.
- *   'interrupted' -- nothing is currently running, but a past run for
- *                     this workspace never closed out cleanly (crash,
- *                     app restart mid-run, or a cleanup that hasn't
- *                     landed yet). The renderer should present this as a
- *                     failed/aborted run, not a fresh one.
+ *   'interrupted' -- nothing is currently running, but the latest run of
+ *                     some evidence in this workspace ended without
+ *                     finishing (cancelled, stalled, crashed, or abandoned
+ *                     when Epoch closed mid-run). The renderer should
+ *                     present this as a failed/aborted run, not a fresh one.
  */
 export interface AnalysisRunStatus {
   status: 'idle' | 'running' | 'interrupted';
@@ -123,6 +126,7 @@ export interface AnalysisState {
   /** The workspace, or the retried backup's source. */
   target: string | null;
   startedAt: number | null;
+  currentStage: { name: string; startedAt: number } | null;
   result: PipelineFinishedResult | null;
   log: PipelineLogEntry[];
 }
@@ -145,6 +149,11 @@ declare global {
       onPrepareState: (callback: (state: PrepareState) => void) => () => void;
       getPipelineRuns: () => Promise<PipelineRunRow[]>;
       getStageStatus: (runId: string) => Promise<StageStatusRow[]>;
+      // EPOCH-432
+      getStageFailures: (runId: string, stageName: string) => Promise<ItemFailurePage>;
+      getStillFailing: (runId: string) => Promise<ItemFailurePage>;
+      // EPOCH-561
+      getInterruptedStages: (runId: string) => Promise<InterruptedStageRow[]>;
       getForensicRecords: (runId: string, query?: ForensicRecordQuery) => Promise<ForensicRecordPage>;
       getIndicatorResults: (runId: string) => Promise<IndicatorResults>;
       getReport: (runId: string) => Promise<ReportResult>;
@@ -154,7 +163,7 @@ declare global {
       // no need for a second pair of structurally-equal types.
       startAnalysis: (workspace: string, labels: string[]) => Promise<{ started: boolean }>;
       // EPOCH-308
-      retryRun: (backupSource: string) => Promise<{ started: boolean }>;
+      retryRun: (runId: string) => Promise<{ started: boolean }>;
       // EPOCH-305
       cancelAnalysis: () => Promise<{ cancelled: boolean }>;
       getAnalysisRunStatus: (workspace: string) => Promise<AnalysisRunStatus>;
@@ -182,6 +191,12 @@ declare global {
       ) => Promise<IncompleteBackup[]>;
       deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) => Promise<void>;
       copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string) => Promise<CrashReportsResult>;
+      copyDeviceCrashReportsByReference: (
+        sourceId: string,
+        deviceRef: string,
+        backupDir: string
+      ) => Promise<CrashReportsResult>;
+      findCrashReportsRetryTargets: (sourceId: string, backupDirs: string[]) => Promise<CrashReportsRetryLookup>;
       onDeviceBackupStats: (callback: (stats: BackupStats) => void) => () => void;
       runToolAcquisitionSteps: (
         steps: ToolAcquisitionCommand[],

@@ -19,36 +19,30 @@ what a stage must do is in the
 ## Run
 
 ```bash
-pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace>
-pnpm --filter @verichron/orchestrator investigate -- <decrypted-backup-dir> [...]
-# either form takes --summary-path <file> for the call's result as JSON
+pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace> [--label <label> ...]
+# --summary-path <file> selects the call's result file
 ```
 
-With `--workspace`, it runs every `decrypted/<label>` that has a decrypt marker.
-The database comes from `DATABASE_URL` or `DB_*` in `.env`.
+Without `--label`, it runs every manifest entry with a decrypt completion
+marker. Repeated `--label` values select specific entries. Backup paths are not
+accepted directly: every selected path comes from the validated workspace
+manifest. The database comes from `DATABASE_URL` or `DB_*` in `.env`.
 
 ## Source
 
 | File | Responsibility |
 |---|---|
-| `src/cli.ts` | Arguments, picking backups, database URL |
+| `src/cli.ts` | Arguments, selecting manifest entries, database URL |
 | `src/discovery.ts` | Finding and validating `stage.json` files |
 | `src/registration.ts` | Evidence, device-key and derivative registration |
 | `src/pipeline.ts` | Per-backup flow, stage subprocesses, stage arguments |
+| `src/events.ts` | Writing [events](../../docs/architecture.md#orchestrator-events) to stdout, and relaying stage output so it can't pass for one |
 | `src/db.ts` | Run creation, stage status, the resume check |
 | `src/main.ts` | Entry point; writes the call's result to `--summary-path`, if given |
-| `src/runSummary.ts` | Exports each run's summary from the database to `runs/<label>/<run_id>.json` |
+| `src/runSummary.ts` | Exports each run's summary from the database to its manifest-declared summary directory |
 
 ## Test
 
 ```bash
 pnpm --filter @verichron/orchestrator test     # needs TEST_DATABASE_URL (a throwaway database)
 ```
-
-**Known issues:**
-
-| Issue | Ticket |
-|---|---|
-| Discovery checks `stage.json` by hand instead of against the schema | EPOCH-444 |
-| Run ids aren't reported to the app | EPOCH-443 |
-| The database URL is passed to stages on the command line | EPOCH-423 |

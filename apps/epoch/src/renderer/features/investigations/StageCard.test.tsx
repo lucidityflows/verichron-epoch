@@ -5,9 +5,9 @@
  */
 
 import assert from 'node:assert/strict';
-import type { StageStatusRow } from '@verichron/etl-db-reader';
+import type { ItemFailurePage, StageStatusRow } from '@verichron/etl-db-reader';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, it } from 'vitest';
+import { afterEach, describe, it, vi } from 'vitest';
 
 import { StageCard } from './StageCard';
 
@@ -28,9 +28,13 @@ function stage(overrides: Partial<StageStatusRow>): StageStatusRow {
     derivative_tool: { name: 'iphone_backup_decrypt', version: '0.10.0' },
     units: 3,
     records: 12,
+    run_ended_reason: null,
+    run_finished_at: null,
     ...overrides,
   } as StageStatusRow;
 }
+
+const NO_FAILURES = async (): Promise<ItemFailurePage> => ({ rows: [], total: 0 });
 
 /** The card itself: the one button named by its stage. */
 function card(): HTMLElement {
@@ -66,7 +70,7 @@ describe('StageCard', () => {
 
   it('shows the first lines of a failed stage’s output and keeps the rest behind a toggle', () => {
     const output = Array.from({ length: 8 }, (_, i) => `line ${i + 1}`).join('\n');
-    render(<StageCard stage={stage({ status: 'failed', error_message: output })} />);
+    render(<StageCard stage={stage({ status: 'failed', error_message: output })} loadFailures={NO_FAILURES} />);
     fireEvent.click(card());
     assert.ok(screen.getByText('Error'));
     assert.ok(screen.getByText(/line 5/));
@@ -108,5 +112,90 @@ describe('StageCard', () => {
     assert.ok(screen.getByText('Running…'));
     fireEvent.click(card());
     assert.ok(screen.getByText('—'));
+  });
+
+  it('lists a failed stage’s failed items behind a toggle once opened, and never reads them for other stages (EPOCH-432)', async () => {
+    const loadFailures = vi.fn(async (): Promise<ItemFailurePage> => ({
+      rows: [
+        {
+          run_id: '33333333-3333-3333-3333-333333333333',
+          stage_name: 'ileapp_bridge',
+          source_type: 'ileapp_record',
+          item: '_lava_artifacts.db#zalochat',
+          file_hash: null,
+          reason: "ArtifactError: column 'x' missing",
+          recorded_at: '2026-10-13T20:01:00.000Z',
+        },
+      ],
+      total: 3,
+    }));
+    const failed = stage({ stage_name: 'ileapp_bridge', status: 'failed', derivative_kind: 'ileapp_output' });
+    render(<StageCard stage={failed} loadFailures={loadFailures} />);
+    assert.equal(loadFailures.mock.calls.length, 0, 'nothing is read while the card is closed');
+
+    fireEvent.click(screen.getByRole('button', { name: /^ileapp_bridge/ }));
+    const toggle = await screen.findByRole('button', { name: '3 artifact tables failed' });
+    assert.deepEqual(loadFailures.mock.calls, [['33333333-3333-3333-3333-333333333333', 'ileapp_bridge']]);
+    assert.ok(screen.getByTitle('Copy list'));
+    assert.equal(screen.queryByText('_lava_artifacts.db#zalochat'), null, 'collapsed until asked for');
+
+    fireEvent.click(toggle);
+    assert.ok(screen.getByText('_lava_artifacts.db#zalochat'));
+    assert.ok(screen.getByText("ArtifactError: column 'x' missing"));
+    assert.ok(screen.getByText('Showing the first 1 of 3.'), 'a cut list says so (R25)');
+
+    cleanup();
+    const unused = vi.fn(NO_FAILURES);
+    render(<StageCard stage={stage({})} loadFailures={unused} />);
+    fireEvent.click(card());
+    assert.equal(unused.mock.calls.length, 0, 'a succeeded stage has no failed items to read');
+  });
+
+  it('says when a failed stage’s items could not be read', async () => {
+    const loadFailures = async (): Promise<ItemFailurePage> => {
+      throw new Error('connection refused');
+    };
+    render(<StageCard stage={stage({ status: 'failed' })} loadFailures={loadFailures} />);
+    fireEvent.click(card());
+    assert.ok(await screen.findByText('Could not read the failed items: connection refused'));
+  });
+
+  it('shows a stage its run ended under as stopped, with why and how long it ran, never as running (EPOCH-435)', () => {
+    render(
+      <StageCard
+        stage={stage({
+          status: 'running',
+          started_at: '2026-10-13T20:00:00.000Z',
+          finished_at: null,
+          run_ended_reason: 'cancelled',
+          run_finished_at: '2026-10-13T20:02:04.000Z',
+        })}
+        loadFailures={NO_FAILURES}
+      />
+    );
+    assert.ok(screen.getByText('stopped'));
+    assert.equal(screen.queryByText('running'), null);
+    assert.ok(screen.getByText('Stopped: the run was cancelled · 2 min 4 s'));
+    fireEvent.click(card());
+    assert.ok(
+      screen.getByText("This stage never finished: the run was cancelled. A rerun retries what it didn't complete.")
+    );
+  });
+
+  it('says a pending stage its run ended under was not run, and why', () => {
+    render(
+      <StageCard
+        stage={stage({ status: 'pending', started_at: null, finished_at: null, run_ended_reason: 'abandoned' })}
+        loadFailures={NO_FAILURES}
+      />
+    );
+    assert.ok(screen.getByText('stopped'));
+    assert.ok(screen.getByText('Not run: its orchestrator ended without finishing it'));
+  });
+
+  it('still shows a stage of a run that is going as running', () => {
+    render(<StageCard stage={stage({ status: 'running', finished_at: null, run_ended_reason: null })} />);
+    assert.ok(screen.getByText('Running…'));
+    assert.equal(screen.queryByText('stopped'), null);
   });
 });

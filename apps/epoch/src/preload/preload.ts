@@ -11,6 +11,7 @@ import type {
 import type {
   BackupProgress,
   CrashReportsResult,
+  CrashReportsRetryLookup,
   DeviceInfo,
   PullOptions,
   BackupStats,
@@ -65,6 +66,10 @@ const dbApi = {
   },
   getPipelineRuns: () => ipcRenderer.invoke('epoch:getPipelineRuns'),
   getStageStatus: (runId: string) => ipcRenderer.invoke('epoch:getStageStatus', runId),
+  getStageFailures: (runId: string, stageName: string) =>
+    ipcRenderer.invoke('epoch:getStageFailures', runId, stageName),
+  getStillFailing: (runId: string) => ipcRenderer.invoke('epoch:getStillFailing', runId),
+  getInterruptedStages: (runId: string) => ipcRenderer.invoke('epoch:getInterruptedStages', runId),
   getForensicRecords: (runId: string, query?: ForensicRecordQuery) =>
     ipcRenderer.invoke('epoch:getForensicRecords', runId, query),
   getIndicatorResults: (runId: string) => ipcRenderer.invoke('epoch:getIndicatorResults', runId),
@@ -75,9 +80,8 @@ const dbApi = {
   // each checked to be prepared there (EPOCH-530).
   startAnalysis: (workspace: string, labels: string[]): Promise<{ started: boolean }> =>
     ipcRenderer.invoke('epoch:startAnalysis', workspace, labels),
-  // EPOCH-308: retries the orchestrator against a single previously-run
-  // backup_source rather than a whole workspace.
-  retryRun: (backupSource: string): Promise<{ started: boolean }> => ipcRenderer.invoke('epoch:retryRun', backupSource),
+  // EPOCH-308: retries the evidence for a run from its current workspace manifest entry.
+  retryRun: (runId: string): Promise<{ started: boolean }> => ipcRenderer.invoke('epoch:retryRun', runId),
   // EPOCH-305: lets the renderer break out of a stalled/deadlocked run
   // without restarting the app. Resolves { cancelled: false } (rather than
   // rejecting) when nothing was actually running, since "there was nothing
@@ -125,6 +129,14 @@ const dbApi = {
     ipcRenderer.invoke('epoch:deleteIncompleteBackup', sourceId, destDir, device),
   copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string): Promise<CrashReportsResult> =>
     ipcRenderer.invoke('epoch:copyDeviceCrashReports', sourceId, device, backupDir),
+  copyDeviceCrashReportsByReference: (
+    sourceId: string,
+    deviceRef: string,
+    backupDir: string
+  ): Promise<CrashReportsResult> =>
+    ipcRenderer.invoke('epoch:copyDeviceCrashReportsByReference', sourceId, deviceRef, backupDir),
+  findCrashReportsRetryTargets: (sourceId: string, backupDirs: string[]): Promise<CrashReportsRetryLookup> =>
+    ipcRenderer.invoke('epoch:findCrashReportsRetryTargets', sourceId, backupDirs),
   onDeviceBackupStats: (callback: (stats: BackupStats) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, stats: BackupStats) => callback(stats);
     ipcRenderer.on('epoch:deviceBackupStats', listener);

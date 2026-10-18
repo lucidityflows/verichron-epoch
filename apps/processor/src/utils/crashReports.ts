@@ -15,7 +15,7 @@ export type CrashReportsOutcome =
 
 /**
  * The device's crash logs, acquired by the pull beside this backup
- * (EPOCH-514), copied into <workspace>/crash_reports/<label>/ as a derivative
+ * (EPOCH-514), copied to its manifest-declared path as a derivative
  * of the same evidence. The copy is hashed the way a backup is; its content
  * root is the derivative's identity, and it must match the pull's folder.
  * A folder without the pull's acquisition record is an unfinished copy and is

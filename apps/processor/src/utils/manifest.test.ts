@@ -14,7 +14,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { deriveEvidencePath, EvidenceSidecar } from '@verichron/contracts';
+import { createWorkspaceManifestBackup, EvidenceSidecar, resolveWorkspaceBackup } from '@verichron/contracts';
 
 import { writeFileAtomic } from './fs.js';
 import {
@@ -306,15 +306,24 @@ describe('writeFileAtomic', () => {
 });
 
 describe('evidence paths', () => {
-  it('a 255-byte label (the filename limit) still gets writable evidence files', async () => {
+  it('a maximum-length label still gives writable manifest-declared evidence files', async () => {
     const label = 'L'.repeat(255);
-    const paths = deriveEvidencePath(path.join(tmp, 'ws'), label);
+    const workspace = path.join(tmp, 'ws');
+    const entry = resolveWorkspaceBackup(workspace, createWorkspaceManifestBackup(label, '/source/backup'));
     const root = '0'.repeat(64);
-    for (const file of [paths.sidecar, paths.fingerprints, paths.manifestFor(root)]) {
-      assert.equal(path.relative(paths.dir, file).includes(label), false, 'label is not part of any file name');
+    for (const file of [
+      entry.sidecarPath,
+      entry.fingerprintsPath,
+      path.join(entry.manifestDirectory, `${root}.sha256`),
+    ]) {
+      assert.equal(path.basename(file).includes(label), false, 'label is not appended to a file name');
       await writeFileAtomic(file, 'x\n');
     }
-    assert.deepEqual((await fsp.readdir(paths.dir)).sort(), ['fingerprints.json', 'manifests', 'sidecar.json']);
+    assert.deepEqual((await fsp.readdir(path.dirname(entry.sidecarPath))).sort(), [
+      'fingerprints.json',
+      'manifests',
+      'sidecar.json',
+    ]);
   });
 });
 

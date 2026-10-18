@@ -6,18 +6,18 @@
     "types": ["node"]
   },
   "include": [
-    "./*.ts", 
-    "ts/sourceType.ts", 
-    "ts/deriveWorkspacePaths.ts", 
-    "ts/deriveEvidencePath.ts",
+    "./*.ts",
+    "ts/sourceType.ts",
+    "ts/workspaceManifest.ts",
     "ts/evidenceSidecar.ts",
     "ts/contractVersion.ts",
     "ts/indicatorResults.ts",
     "ts/derivativeMarker.ts",
     "ts/crashReportsAcquisition.ts",
-    "ts/discoverBackups.ts", 
-    "ts/normalizedRecord.ts", 
-    "ts/normalizedRecord.d.ts", 
-    "ts/env.ts"  
+    "ts/discoverBackups.ts",
+    "ts/normalizedRecord.ts",
+    "ts/normalizedRecord.d.ts",
+    "ts/env.ts",
+    "ts/pipelineEvent.ts"
   ]
 }

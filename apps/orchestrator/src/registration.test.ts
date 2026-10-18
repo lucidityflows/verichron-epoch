@@ -32,13 +32,22 @@ import pg from 'pg';
 
 import {
   DECRYPT_MARKER,
-  deriveRunSummaryPath,
   ILEAPP_MARKER,
   CRASH_REPORTS_MARKER,
+  PIPELINE_EVENT_PREFIX,
+  createWorkspaceManifestBackup,
+  emptyWorkspaceManifest,
+  findWorkspaceBackupForPath,
+  parsePipelineEventLine,
+  type PipelineEvent,
+  readWorkspaceManifestSync,
   renderCrashReportsMarker,
   renderDecryptMarker,
   renderIleappMarker,
+  resolveRunSummaryPath,
+  resolveWorkspaceBackup,
   type DecryptParams,
+  type ResolvedWorkspaceBackup,
 } from '@verichron/contracts';
 
 import { createRun, getRunState, hasCompleteRunFor } from './db.js';
@@ -129,6 +138,7 @@ interface Workspace {
   ileappPath: string;
   sidecarPath: string;
   contentRoot: string;
+  target: ResolvedWorkspaceBackup;
 }
 
 function infoPlist(udid: string, name: string): string {
@@ -151,8 +161,10 @@ function makeWorkspace(
   }: { manifest?: string; sourcePath?: string; label?: string; ileapp?: boolean } = {}
 ): Workspace {
   const workspace = path.join(tmp, name);
-  const backupPath = path.join(workspace, 'decrypted', label);
-  const ileappPath = path.join(workspace, 'ileapp', label);
+  const entry = createWorkspaceManifestBackup(label, sourcePath);
+  const target = resolveWorkspaceBackup(workspace, entry);
+  const backupPath = target.decryptedPath;
+  const ileappPath = target.ileappOutputPath;
   mkdirSync(backupPath, { recursive: true });
   writeFileSync(path.join(backupPath, 'Manifest.db'), '');
   writeFileSync(path.join(backupPath, 'Info.plist'), infoPlist(UDID, 'Alice &amp; Bob&apos;s iPhone'));
@@ -164,10 +176,10 @@ function makeWorkspace(
     writeFileSync(path.join(ileappPath, ILEAPP_MARKER), ileappMarker(contentRoot));
   }
 
-  const evidenceDir = path.join(workspace, 'evidence', label);
-  mkdirSync(path.join(evidenceDir, 'manifests'), { recursive: true });
-  writeFileSync(path.join(evidenceDir, 'manifests', `${contentRoot}.sha256`), manifest);
-  const sidecarPath = path.join(evidenceDir, 'sidecar.json');
+  mkdirSync(target.manifestDirectory, { recursive: true });
+  const evidenceManifestPath = path.join(target.manifestDirectory, `${contentRoot}.sha256`);
+  writeFileSync(evidenceManifestPath, manifest);
+  const sidecarPath = target.sidecarPath;
   writeFileSync(
     sidecarPath,
     JSON.stringify({
@@ -175,15 +187,26 @@ function makeWorkspace(
       evidence_name: label,
       algorithm: 'sha256',
       content_root: contentRoot,
-      manifest_path: `evidence/${label}/manifests/${contentRoot}.sha256`,
+      manifest_path: path.relative(workspace, evidenceManifestPath).split(path.sep).join('/'),
       file_count: 1,
       total_bytes: 0,
-      source_path: sourcePath,
+      source_path: target.sourcePath,
       hashed_at: '2026-10-08T00:00:00.000Z',
       tool: { name: 'processor', version: '0.1.0' },
     })
   );
-  return { workspace, backupPath, ileappPath, sidecarPath, contentRoot };
+  const workspaceManifestPath = path.join(workspace, 'workspace.json');
+  const workspaceManifest = existsSync(workspaceManifestPath)
+    ? readWorkspaceManifestSync(workspace)
+    : emptyWorkspaceManifest();
+  writeFileSync(
+    workspaceManifestPath,
+    JSON.stringify({
+      ...workspaceManifest,
+      backups: [...workspaceManifest.backups.filter((backup) => backup.label !== label), entry],
+    })
+  );
+  return { workspace, backupPath, ileappPath, sidecarPath, contentRoot, target };
 }
 
 /** A node stage that records the arguments it was given. */
@@ -213,8 +236,11 @@ function argsOf(stage: StageDefinition): Record<string, string> {
 }
 
 const NO_STAGES: StageSet = { enabled: [], disabled: [] };
-const run = (backupPath: string, stages: StageSet = NO_STAGES) =>
-  runPipelineForBackup(db, backupPath, DSN ?? '', 'python3', stages, { secretPath });
+const run = async (backupPath: string, stages: StageSet = NO_STAGES) => {
+  const target = await findWorkspaceBackupForPath(backupPath);
+  if (!target) throw new Error(`no workspace manifest for ${backupPath}`);
+  return runPipelineForBackup(db, target.entry, DSN ?? '', 'python3', stages, { secretPath });
+};
 
 /** A registered indicator set, as the registry stores one (EPOCH-490); `registeredAt` orders "newest". */
 async function registerSet(name: string, registeredAt: string): Promise<{ setId: string; setHash: string }> {
@@ -295,6 +321,9 @@ describe('pre-flight registration', live, () => {
     // Same backup, source now mounted somewhere else: same content_root.
     const sidecar = JSON.parse(readFileSync(ws.sidecarPath, 'utf8'));
     writeFileSync(ws.sidecarPath, JSON.stringify({ ...sidecar, source_path: '/media/usb-b/BK1' }));
+    const workspaceManifest = JSON.parse(readFileSync(path.join(ws.workspace, 'workspace.json'), 'utf8'));
+    workspaceManifest.backups[0].source_path = '/media/usb-b/BK1';
+    writeFileSync(path.join(ws.workspace, 'workspace.json'), JSON.stringify(workspaceManifest));
     const second = await run(ws.backupPath);
 
     assert.equal(second.skipped, true, 'the evidence already has a complete run, so it is skipped');
@@ -349,7 +378,7 @@ describe('pre-flight registration', live, () => {
     [
       'a sidecar whose manifest does not match its root',
       (ws: Workspace) => {
-        const manifest = path.join(ws.workspace, 'evidence', 'BK1', 'manifests', `${ws.contentRoot}.sha256`);
+        const manifest = path.join(ws.target.manifestDirectory, `${ws.contentRoot}.sha256`);
         writeFileSync(manifest, 'tampered\n');
       },
     ],
@@ -439,7 +468,8 @@ describe('pre-flight registration', live, () => {
   it('known evidence keeps its device even if the device key changes', async () => {
     const ws = makeWorkspace('rekeyed');
     const first = await run(ws.backupPath);
-    await db.query(`UPDATE pipeline_runs SET finished_at = NULL`); // force a re-run
+    // Force a re-run: an unfinished run has no end reason (migration 0017).
+    await db.query(`UPDATE pipeline_runs SET finished_at = NULL, ended_reason = NULL`);
     rmSync(secretPath); // a lost per-install secret: new key for the same phone
     const second = await run(ws.backupPath);
     assert.equal(second.evidenceId, first.evidenceId);
@@ -448,7 +478,7 @@ describe('pre-flight registration', live, () => {
 });
 
 describe('stages and the completeness predicate', live, () => {
-  it('passes each stage its evidence, the derivative it reads (id and path) and its parser version', async () => {
+  it('passes each stage its evidence, the derivative it reads (id and path), its parser version and its name', async () => {
     const ws = makeWorkspace('args');
     const reader = recordingStage('reader', 10, { parserVersion: 3 });
     const ileappReader = recordingStage('ileapp-reader', 30, { parserVersion: 1, reads: 'ileapp_output' });
@@ -469,6 +499,8 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(argsOf(reader)['--derivative-path'], ws.backupPath);
     assert.equal(argsOf(ileappReader)['--derivative-path'], ws.ileappPath);
     assert.equal(argsOf(report)['--parser-version'], undefined, 'a stage that declares none is passed none');
+    assert.equal(argsOf(reader)['--stage-name'], 'reader', 'a stage that writes facts labels its failures');
+    assert.equal(argsOf(report)['--stage-name'], undefined);
     assert.equal(
       argsOf(report)['--report-path'],
       path.join(ws.workspace, 'reports', 'BK1'),
@@ -619,7 +651,7 @@ describe('stages and the completeness predicate', live, () => {
     const older = await registerSet('older', '2026-10-01T00:00:00Z');
     await registerSet('newer', '2026-10-15T00:00:00Z');
 
-    const chosen = await runPipelineForBackup(db, ws.backupPath, DSN ?? '', 'python3', stages, {
+    const chosen = await runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', stages, {
       secretPath,
       indicatorSetHash: older.setHash,
     });
@@ -627,7 +659,7 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(argsOf(matcher)['--indicator-set-id'], older.setId);
 
     const runs = await count('pipeline_runs');
-    const unknown = await runPipelineForBackup(db, ws.backupPath, DSN ?? '', 'python3', stages, {
+    const unknown = await runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', stages, {
       secretPath,
       indicatorSetHash: 'f'.repeat(64),
     });
@@ -639,8 +671,7 @@ describe('stages and the completeness predicate', live, () => {
   it("records each stage's declared order, so a run's stages read back in stage.json order, disabled ones in place (EPOCH-414)", async () => {
     const ws = makeWorkspace('stage-order');
     const registration = await registerEvidence(db, {
-      backupPath: ws.backupPath,
-      ileappPath: ws.ileappPath,
+      target: ws.target,
       secretPath,
     });
     const provenance = { contractVersion: 'test', toolVersions: {} };
@@ -930,13 +961,13 @@ describe('stage warnings (EPOCH-420)', live, () => {
 });
 
 describe('per-run summaries (EPOCH-409)', live, () => {
-  const summaryOf = (backupPath: string, runId: string) => deriveRunSummaryPath(backupPath, runId)!;
+  const summaryOf = (target: ResolvedWorkspaceBackup, runId: string) => resolveRunSummaryPath(target, runId);
 
   it('a complete run whose summary went missing gets it back when the backup is skipped', async () => {
     const ws = makeWorkspace('summary-repair', { label: 'A' });
     const stages = { enabled: [recordingStage('ok', 10)], disabled: [] };
     const first = await run(ws.backupPath, stages);
-    const file = summaryOf(ws.backupPath, first.runId!);
+    const file = summaryOf(ws.target, first.runId!);
     // What a failed export after the run was marked complete leaves behind.
     rmSync(file);
 
@@ -948,7 +979,7 @@ describe('per-run summaries (EPOCH-409)', live, () => {
   it("writes each run's summary to its own file, as the database records it", async () => {
     const ws = makeWorkspace('summary-db', { label: 'A' });
     const result = await run(ws.backupPath, { enabled: [recordingStage('ok', 10)], disabled: [] });
-    const file = summaryOf(ws.backupPath, result.runId!);
+    const file = summaryOf(ws.target, result.runId!);
     assert.equal(file, path.join(ws.workspace, 'runs', 'A', `${result.runId}.json`));
     const written = JSON.parse(readFileSync(file, 'utf8'));
     assert.deepEqual(written, await readRunSummary(db, result.runId!));
@@ -964,12 +995,12 @@ describe('per-run summaries (EPOCH-409)', live, () => {
     const b = makeWorkspace('summary-shared', { label: 'B', manifest: 'b'.repeat(64) + '  Manifest.db\n' });
     const stages = { enabled: [recordingStage('ok', 10)], disabled: [] };
     const first = await run(a.backupPath, stages);
-    const before = readFileSync(summaryOf(a.backupPath, first.runId!));
+    const before = readFileSync(summaryOf(a.target, first.runId!));
 
     const other = await run(b.backupPath, stages);
     assert.notEqual(other.runId, first.runId);
-    assert.ok(readFileSync(summaryOf(b.backupPath, other.runId!)).length > 0);
-    assert.deepEqual(readFileSync(summaryOf(a.backupPath, first.runId!)), before);
+    assert.ok(readFileSync(summaryOf(b.target, other.runId!)).length > 0);
+    assert.deepEqual(readFileSync(summaryOf(a.target, first.runId!)), before);
   });
 
   it('a failed run writes its summary too, incomplete, and a rerun gets a file of its own', async () => {
@@ -977,12 +1008,12 @@ describe('per-run summaries (EPOCH-409)', live, () => {
     const failing = recordingStage('fails', 10);
     writeFileSync(path.join(failing.dir, 'stage.mjs'), 'process.exit(3);\n');
     const first = await run(ws.backupPath, { enabled: [failing], disabled: [] });
-    const firstFile = summaryOf(ws.backupPath, first.runId!);
+    const firstFile = summaryOf(ws.target, first.runId!);
     const before = readFileSync(firstFile);
     assert.equal(JSON.parse(before.toString()).state, 'incomplete');
 
     const second = await run(ws.backupPath, { enabled: [failing], disabled: [] });
-    assert.ok(readFileSync(summaryOf(ws.backupPath, second.runId!)).length > 0);
+    assert.ok(readFileSync(summaryOf(ws.target, second.runId!)).length > 0);
     assert.deepEqual(readFileSync(firstFile), before, 'the earlier run keeps its own summary');
     assert.deepEqual(
       readdirSync(path.join(ws.workspace, 'runs', 'A')).sort(),
@@ -997,12 +1028,234 @@ describe('registration in isolation', live, () => {
     // Make the derivative insert fail inside the transaction.
     await db.query(`ALTER TABLE evidence_derivatives ADD CONSTRAINT test_block CHECK (path <> '${ws.backupPath}')`);
     try {
-      await assert.rejects(registerEvidence(db, { backupPath: ws.backupPath, secretPath }));
+      await assert.rejects(registerEvidence(db, { target: ws.target, secretPath }));
       assert.equal(await count('evidence_items'), 0);
       assert.equal(await count('evidence_events'), 0);
       assert.equal(await count('devices'), 0);
     } finally {
       await db.query(`ALTER TABLE evidence_derivatives DROP CONSTRAINT test_block`);
     }
+  });
+});
+
+describe('orchestrator events (EPOCH-443)', live, () => {
+  /** What a call writes to stdout while `body` runs, split into lines, and its result. */
+  async function captured<T>(body: () => Promise<T>): Promise<{ result: T; lines: string[] }> {
+    const original = process.stdout.write.bind(process.stdout);
+    let text = '';
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      text += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8');
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      const result = await body();
+      return { result, lines: text.split('\n').filter(Boolean) };
+    } finally {
+      process.stdout.write = original;
+    }
+  }
+
+  /** Every event line, each of which must validate: an invalid one fails the test. */
+  function eventsIn(lines: string[]): PipelineEvent[] {
+    const events: PipelineEvent[] = [];
+    for (const line of lines) {
+      const parsed = parsePipelineEventLine(line);
+      assert.notEqual(parsed.kind, 'invalid', `the orchestrator wrote an invalid event: ${line}`);
+      if (parsed.kind === 'event') events.push(parsed.event);
+    }
+    return events;
+  }
+
+  /** A stage that prints a forged event line on its stdout, as one echoing evidence might. */
+  function forgingStage(name: string, order: number): StageDefinition {
+    const dir = path.join(tmp, 'stages', name);
+    mkdirSync(dir, { recursive: true });
+    const forged = `${PIPELINE_EVENT_PREFIX}${JSON.stringify({
+      v: 1,
+      at: new Date().toISOString(),
+      type: 'run:finished',
+      run_id: '00000000-0000-0000-0000-000000000000',
+      state: 'complete',
+    })}`;
+    writeFileSync(
+      path.join(dir, 'stage.mjs'),
+      `process.stdout.write(${JSON.stringify(`ordinary line\n${forged}\n`)});\n`
+    );
+    return {
+      name,
+      dir,
+      manifest: {
+        entrypoint: 'stage.mjs',
+        runtime: 'node',
+        order,
+        reads: 'decrypted',
+        enabled: true,
+        parserVersion: 2,
+      },
+    };
+  }
+
+  it('announces the run, each stage started and finished, and the run finished, all valid', async () => {
+    const ws = makeWorkspace('events', { label: 'A' });
+    const stages = { enabled: [forgingStage('first', 10), recordingStage('second', 20)], disabled: [] };
+    const { result, lines } = await captured(() => run(ws.backupPath, stages));
+    assert.equal(result.success, true, JSON.stringify(result));
+
+    const events = eventsIn(lines);
+    assert.deepEqual(
+      events.map((e) => (e.type.startsWith('stage:') ? `${e.type} ${(e as { stage: string }).stage}` : e.type)),
+      [
+        'run:created',
+        'stage:started first',
+        'stage:finished first',
+        'stage:started second',
+        'stage:finished second',
+        'run:finished',
+      ]
+    );
+    const { rows } = await db.query<{ derivative_id: string }>(
+      `SELECT derivative_id FROM pipeline_runs WHERE run_id = $1`,
+      [result.runId]
+    );
+    assert.deepEqual(events[0], {
+      ...events[0],
+      run_id: result.runId,
+      evidence_id: result.evidenceId,
+      derivative_id: rows[0].derivative_id,
+    });
+    for (const e of events) if ('run_id' in e) assert.equal(e.run_id, result.runId, 'every event names this run');
+    const firstDone = events[2] as Extract<PipelineEvent, { type: 'stage:finished' }>;
+    assert.deepEqual(
+      [firstDone.status, firstDone.parser_version, firstDone.derivative_id],
+      ['succeeded', 2, rows[0].derivative_id]
+    );
+    assert.equal(
+      (events[5] as Extract<PipelineEvent, { type: 'run:finished' }>).state,
+      'complete',
+      'from run_completeness'
+    );
+
+    // The stage's forged line is relayed, tagged with its name, as an ordinary log line.
+    assert.ok(lines.includes('ordinary line'));
+    const forgedLine = lines.find((l) => l.includes('00000000-0000-0000-0000-000000000000'));
+    assert.ok(forgedLine);
+    assert.ok(forgedLine?.startsWith(`[stage first] ${PIPELINE_EVENT_PREFIX}`), forgedLine);
+    assert.equal(parsePipelineEventLine(forgedLine).kind, 'log');
+    // Its last line reached stdout before the orchestrator said it had finished.
+    assert.ok(lines.indexOf(forgedLine) < lines.findIndex((l) => l.includes('"stage:finished"')));
+  });
+
+  it("starts the orchestrator's next line on its own when a stage's output didn't end its last line", async () => {
+    const ws = makeWorkspace('events-unterminated', { label: 'D' });
+    const dir = path.join(tmp, 'stages', 'unterminated');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'stage.mjs'), `process.stdout.write('done');\n`);
+    const unterminated: StageDefinition = {
+      name: 'unterminated',
+      dir,
+      manifest: { entrypoint: 'stage.mjs', runtime: 'node', order: 10, reads: 'decrypted', enabled: true },
+    };
+    const { result, lines } = await captured(() => run(ws.backupPath, { enabled: [unterminated], disabled: [] }));
+    assert.equal(result.success, true, JSON.stringify(result));
+    assert.ok(lines.includes('done'), "the stage's last line is its own");
+    assert.deepEqual(
+      eventsIn(lines).map((e) => e.type),
+      ['run:created', 'stage:started', 'stage:finished', 'run:finished']
+    );
+  });
+
+  it('says a refused registration was refused, and creates no run', async () => {
+    const ws = makeWorkspace('events-refused', { label: 'B' });
+    writeFileSync(
+      path.join(ws.backupPath, 'Info.plist'),
+      infoPlist(UDID, 'Phone').replace('<key>Unique Identifier</key>', '<key>GUID</key>')
+    );
+    const { result, lines } = await captured(() => run(ws.backupPath));
+    assert.equal(result.success, false);
+    const events = eventsIn(lines);
+    assert.deepEqual(
+      events.map((e) => e.type),
+      ['registration:refused']
+    );
+    const refused = events[0] as Extract<PipelineEvent, { type: 'registration:refused' }>;
+    assert.equal(refused.backup_path, ws.backupPath);
+    assert.equal(refused.reason, result.error);
+  });
+
+  it('says resume found a complete run instead of creating one', async () => {
+    const ws = makeWorkspace('events-skip', { label: 'C' });
+    const stages = { enabled: [recordingStage('only', 10)], disabled: [] };
+    const first = await run(ws.backupPath, stages);
+    const { result, lines } = await captured(() => run(ws.backupPath, stages));
+    assert.equal(result.skipped, true);
+    const events = eventsIn(lines);
+    assert.deepEqual(
+      events.map((e) => e.type),
+      ['run:skipped']
+    );
+    const skipped = events[0] as Extract<PipelineEvent, { type: 'run:skipped' }>;
+    assert.equal(skipped.evidence_id, first.evidenceId);
+    assert.match(skipped.reason, new RegExp(first.runId ?? 'missing'));
+  });
+});
+
+describe('how a run ends (EPOCH-435)', live, () => {
+  it('records the process that ran it, and that it completed', async () => {
+    const ws = makeWorkspace('ends-completed', { label: 'A' });
+    const result = await run(ws.backupPath, { enabled: [recordingStage('only', 10)], disabled: [] });
+    const { rows } = await db.query(
+      `SELECT host, pid, ended_reason, ended_detail, finished_at IS NOT NULL AS finished FROM pipeline_runs WHERE run_id = $1`,
+      [result.runId]
+    );
+    assert.deepEqual(rows, [
+      { host: os.hostname(), pid: process.pid, ended_reason: 'completed', ended_detail: null, finished: true },
+    ]);
+  });
+
+  it("closes a run its own failure stopped as crashed, with the error, and leaves the stage's row as it was", async () => {
+    const ws = makeWorkspace('ends-crashed', { label: 'B' });
+    const target = await findWorkspaceBackupForPath(ws.backupPath);
+    assert.ok(target);
+    // The database refuses the write that would record the stage finished,
+    // as a lost connection would, after the stage has run.
+    const failing = new Proxy(db, {
+      get(real, prop) {
+        if (prop === 'query') {
+          return (sql: unknown, params?: unknown[]) =>
+            typeof sql === 'string' && sql.includes('UPDATE pipeline_stage_status') && params?.[0] === 'succeeded'
+              ? Promise.reject(new Error('connection lost'))
+              : real.query(sql as string, params);
+        }
+        const value = Reflect.get(real, prop);
+        return typeof value === 'function' ? value.bind(real) : value;
+      },
+    });
+    await assert.rejects(
+      runPipelineForBackup(
+        failing,
+        target.entry,
+        DSN ?? '',
+        'python3',
+        { enabled: [recordingStage('midway', 10)], disabled: [] },
+        { secretPath }
+      ),
+      /connection lost/
+    );
+    const { rows: runs } = await db.query(`SELECT run_id, ended_reason, ended_detail FROM pipeline_runs`);
+    assert.deepEqual(
+      runs.map((r) => [r.ended_reason, r.ended_detail]),
+      [['crashed', 'connection lost']]
+    );
+    const { rows: stages } = await db.query(
+      `SELECT stage_name, status, error_message, finished_at FROM pipeline_stage_status WHERE run_id = $1`,
+      [runs[0].run_id]
+    );
+    assert.deepEqual(
+      stages,
+      [{ stage_name: 'midway', status: 'running', error_message: null, finished_at: null }],
+      'never rewritten'
+    );
+    const { rows: state } = await db.query(`SELECT state FROM run_completeness WHERE run_id = $1`, [runs[0].run_id]);
+    assert.equal(state[0].state, 'incomplete', 'run_completeness says so on its own');
   });
 });

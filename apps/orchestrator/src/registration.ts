@@ -27,13 +27,17 @@ import type { Client } from 'pg';
 
 import {
   DECRYPT_MARKER,
-  deriveEvidencePath,
   EvidenceSidecar,
+  WorkspaceManifestError,
   provenanceKey,
   readDecryptMarker,
   readIleappMarker,
   readCrashReportsMarker,
+  resolveWorkspaceBackup,
+  resolveWorkspacePath,
+  workspaceEvidenceManifestPath,
   type DerivativeKind,
+  type ResolvedWorkspaceBackup,
   type StageInput,
   type ToolVersion,
 } from '@verichron/contracts';
@@ -134,12 +138,8 @@ interface Provenance {
 }
 
 export interface RegistrationInput {
-  /** <workspace>/decrypted/<label>, as the orchestrator receives it. */
-  backupPath: string;
-  /** <workspace>/ileapp/<label>, if derivable. */
-  ileappPath?: string;
-  /** <workspace>/crash_reports/<label>, if derivable (EPOCH-514). */
-  crashReportsPath?: string;
+  /** All evidence and derivative locations resolved from workspace.json. */
+  target: ResolvedWorkspaceBackup;
   /** Recorded on locations and events; defaults to this machine's hostname. */
   host?: string;
   /** Per-install HMAC secret file; defaults to defaultSecretPath(). */
@@ -243,18 +243,6 @@ function readDevice(candidates: string[]): { udid: string; name: string } {
 // Evidence files
 // ---------------------------------------------------------------------------
 
-/** <workspace>/decrypted/<label> -> { workspace, label }. */
-export function locateWorkspace(backupPath: string): { workspace: string; label: string } {
-  const resolved = path.resolve(backupPath);
-  const parent = path.dirname(resolved);
-  if (path.basename(parent) !== 'decrypted') {
-    throw new RegistrationError(
-      `${backupPath} is not under <workspace>/decrypted/<label>; cannot find its evidence sidecar`
-    );
-  }
-  return { workspace: path.dirname(parent), label: path.basename(resolved) };
-}
-
 interface VerifiedSidecar {
   contentRoot: string;
   fileCount: number;
@@ -263,37 +251,52 @@ interface VerifiedSidecar {
   hashedAt: string;
 }
 
-function verifySidecar(workspace: string, label: string): VerifiedSidecar {
-  const paths = deriveEvidencePath(workspace, label);
-  if (!existsSync(paths.sidecar)) {
+function verifySidecar(target: ResolvedWorkspaceBackup): VerifiedSidecar {
+  if (!existsSync(target.sidecarPath)) {
     throw new RegistrationError(
-      `no evidence sidecar at ${paths.sidecar}; re-run the processor so the backup is hashed (EPOCH-401)`
+      `no evidence sidecar at ${target.sidecarPath}; re-run the processor so the backup is hashed (EPOCH-401)`
     );
   }
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(paths.sidecar, 'utf8'));
+    raw = JSON.parse(readFileSync(target.sidecarPath, 'utf8'));
   } catch (err) {
-    throw new RegistrationError(`${paths.sidecar} is not valid JSON: ${(err as Error).message}`);
+    throw new RegistrationError(`${target.sidecarPath} is not valid JSON: ${(err as Error).message}`);
   }
   const parsed = EvidenceSidecar.safeParse(raw);
   if (!parsed.success) {
     throw new RegistrationError(
-      `${paths.sidecar} does not match the evidence sidecar contract: ${parsed.error.message}`
+      `${target.sidecarPath} does not match the evidence sidecar contract: ${parsed.error.message}`
     );
   }
   const sidecar = parsed.data;
-  if (sidecar.evidence_name !== label) {
-    throw new RegistrationError(`${paths.sidecar} describes "${sidecar.evidence_name}", not "${label}"`);
+  if (sidecar.evidence_name !== target.label) {
+    throw new RegistrationError(`${target.sidecarPath} describes "${sidecar.evidence_name}", not "${target.label}"`);
+  }
+  if (path.resolve(sidecar.source_path) !== path.resolve(target.sourcePath)) {
+    throw new RegistrationError(
+      `${target.sidecarPath} source_path does not match the workspace manifest entry for "${target.label}"`
+    );
   }
 
   // The manifest must be the content-addressed one for this very root, inside
   // this label's evidence directory: no path tricks, no swapped files.
-  const manifestPath = path.resolve(workspace, sidecar.manifest_path);
-  if (manifestPath !== paths.manifestFor(sidecar.content_root)) {
+  let manifestPath: string;
+  try {
+    manifestPath = resolveWorkspacePath(target.workspace, sidecar.manifest_path);
+  } catch (error) {
+    if (error instanceof WorkspaceManifestError) {
+      throw new RegistrationError(
+        `${target.sidecarPath} has an invalid manifest_path "${sidecar.manifest_path}": ${error.message}`
+      );
+    }
+    throw error;
+  }
+  const expectedManifestPath = workspaceEvidenceManifestPath(target, sidecar.content_root);
+  if (manifestPath !== expectedManifestPath) {
     throw new RegistrationError(
-      `${paths.sidecar} points its manifest at ${sidecar.manifest_path}, expected ` +
-        path.relative(workspace, paths.manifestFor(sidecar.content_root))
+      `${target.sidecarPath} points its manifest at ${sidecar.manifest_path}, expected ` +
+        path.relative(target.workspace, expectedManifestPath)
     );
   }
   if (!existsSync(manifestPath)) {
@@ -448,12 +451,17 @@ async function upsertDerivative(
  */
 export async function registerEvidence(client: Client, input: RegistrationInput): Promise<Registration> {
   const host = input.host ?? os.hostname();
-  const { workspace, label } = locateWorkspace(input.backupPath);
-  const sidecar = verifySidecar(workspace, label);
-  const device = readDevice([path.resolve(input.backupPath), sidecar.sourcePath]);
+  const target = resolveWorkspaceBackup(input.target.workspace, input.target);
+  const sidecar = verifySidecar(target);
+  const device = readDevice([target.decryptedPath, sidecar.sourcePath]);
   const key = deviceKey(device.udid, loadDeviceSecret(input.secretPath));
-  const decryptedPath = path.resolve(input.backupPath);
-  const derivatives = verifyDerivatives(decryptedPath, input.ileappPath, input.crashReportsPath, sidecar.contentRoot);
+  const decryptedPath = target.decryptedPath;
+  const derivatives = verifyDerivatives(
+    decryptedPath,
+    target.ileappOutputPath,
+    target.crashReportsPath,
+    sidecar.contentRoot
+  );
 
   await client.query('BEGIN');
   try {

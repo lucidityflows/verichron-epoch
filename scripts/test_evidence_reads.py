@@ -21,7 +21,7 @@ from pathlib import Path
 
 import crash.main as crash_main
 import pytest
-from db_writer import IngestContext, ingest
+from db_writer import IngestContext, ingest, write_records
 from normalized_record import NormalizedRecord, SourceType
 from testing.pg_real import BACKENDS, PgReal, open_db
 
@@ -115,9 +115,9 @@ def test_an_unfinished_newer_version_does_not_hide_the_finished_one(db, artifact
             """
             INSERT INTO ingested_files
                 (evidence_id, derivative_id, file_hash, source_type, parser_version,
-                 file_path, file_name, payload_kind, raw_payload, produced_by_runs)
+                 file_path, file_name, payload_kind, raw_payload)
             SELECT evidence_id, derivative_id, file_hash, source_type, 2,
-                   file_path, file_name, payload_kind, raw_payload, produced_by_runs
+                   file_path, file_name, payload_kind, raw_payload
             FROM ingested_files WHERE parser_version = 1
             """
         )
@@ -131,11 +131,23 @@ def test_records_of_an_incomplete_unit_are_never_read(db, artifact):
     completion. Reads must not present half a file as the whole of it."""
     write(db, artifact, 1, ["kept"])
     with db.cursor() as cur:
-        cur.execute("UPDATE ingested_files SET ingest_complete = FALSE, record_count = NULL, completed_at = NULL")
+        cur.execute(
+            """
+            INSERT INTO ingested_files
+                (evidence_id, derivative_id, file_hash, source_type, parser_version,
+                 file_path, file_name, payload_kind, raw_payload)
+            SELECT evidence_id, derivative_id, file_hash, source_type, parser_version + 1,
+                   file_path, file_name, payload_kind, raw_payload
+            FROM ingested_files WHERE parser_version = 1
+            RETURNING ingest_id
+            """
+        )
+        incomplete_ingest_id = cur.fetchone()[0]
+    write_records(db, incomplete_ingest_id, EVIDENCE, [record("partial")])
     db.commit()
 
-    assert current(db) == []
-    assert current(db, view="forensic_records_history") == []
+    assert current(db) == [("kept", 1)]
+    assert current(db, view="forensic_records_history") == [("kept", 1)]
 
 
 def test_reads_are_per_evidence(db, artifact):
@@ -678,33 +690,23 @@ READERS = [
 FACT_SOURCES = re.compile(
     r"forensic_records|current_forensic_records|forensic_records_history|ingested_files|\$\{source\}"
 )
-#: R7's label: a fact unit lists the runs that produced it. Matching a run
-#: against it reads what that run produced (EPOCH-501).
-LABEL_READ = re.compile(r"(\S+)\s*=\s*ANY\s*\(\s*(?:\w+\.)?produced_by_runs\s*\)", re.I)
-#: A run id given to the query: `$1` in TypeScript, `%s` in Python.
-PARAMETER = re.compile(r"\$\d+|%s|%\(\w+\)s")
 #: The per-stage audit table: keyed by run, holds no facts.
 STAGE_STATUS_ALIAS = re.compile(r"\bpipeline_stage_status\s+(?:AS\s+)?(\w+)", re.I)
+INGEST_RUN_LINK_ALIAS = re.compile(r"\bingest_run_links\s+(?:AS\s+)?(\w+)", re.I)
 
 
 def run_route(sql: str) -> str | None:
     """How a statement reading facts reaches them by run, or None.
 
-    Allowed: matching a run against R7's `produced_by_runs` label, and the
+    Allowed: matching a run against R7's append-only ingest-run links, and the
     stage-status table's own run_id. Anything else that names `run_id`, or
     reads `pipeline_runs`, next to a fact source routes facts through a run."""
     if not FACT_SOURCES.search(sql):
         return None
     stage_run_ids = {f"{alias}.run_id" for alias in STAGE_STATUS_ALIAS.findall(sql)}
-
-    def label_read(match: re.Match) -> str:
-        # Only a given run id or the stage row's own run may be matched; any
-        # other left side (a fact's run_id) stays visible to the check below.
-        left = match.group(1)
-        return " " if PARAMETER.fullmatch(left) or left in stage_run_ids else match.group(0)
-
-    rest = LABEL_READ.sub(label_read, sql)
-    for run_id in stage_run_ids:
+    run_link_ids = {f"{alias}.run_id" for alias in INGEST_RUN_LINK_ALIAS.findall(sql)}
+    rest = sql
+    for run_id in stage_run_ids | run_link_ids:
         rest = re.sub(rf"\b{re.escape(run_id)}\b", " ", rest)
     found = re.search(r"\brun_id\b|(?:\bFROM|\bJOIN|,)\s*pipeline_runs\b", rest, re.I)
     return found.group(0) if found else None
@@ -726,12 +728,16 @@ def test_no_reader_filters_facts_by_run(path):
 @pytest.mark.parametrize(
     "sql",
     [
-        # What a run produced, read from R7's label (getStageStatus).
+        # What a run produced, read from R7's link relation (getStageStatus).
         """SELECT s.run_id, u.units FROM pipeline_stage_status s
            CROSS JOIN LATERAL (SELECT count(*) AS units FROM ingested_files f
-                                WHERE s.run_id = ANY (f.produced_by_runs)) u
+                                WHERE EXISTS (SELECT 1 FROM ingest_run_links l
+                                               WHERE l.ingest_id = f.ingest_id
+                                                 AND l.run_id = s.run_id)) u
            WHERE s.run_id = $1""",
-        "SELECT count(*) FROM ingested_files WHERE $1 = ANY(produced_by_runs)",
+        """SELECT count(*) FROM ingested_files f
+           JOIN ingest_run_links l ON l.ingest_id = f.ingest_id
+           WHERE l.run_id = $1""",
         "SELECT * FROM forensic_records WHERE evidence_id = $1",
     ],
 )
@@ -747,8 +753,10 @@ def test_the_guard_allows_reading_r7s_label(sql):
            JOIN pipeline_runs r ON r.evidence_id = f.evidence_id WHERE r.started_at > $1""",
         """SELECT f.* FROM ingested_files f JOIN pipeline_stage_status s ON s.derivative_id = f.derivative_id
            WHERE f.run_id = $1""",
-        # A fact's own run_id, even when matched against the label.
-        "SELECT * FROM ingested_files f WHERE f.run_id = ANY (f.produced_by_runs)",
+        # A fact's own run_id, even when matched against an audit link.
+        """SELECT * FROM ingested_files f
+           JOIN ingest_run_links l ON l.ingest_id = f.ingest_id
+           WHERE f.run_id = l.run_id""",
         # A comma join through the runs table.
         "SELECT f.* FROM ingested_files f, pipeline_runs r WHERE r.evidence_id = f.evidence_id",
     ],

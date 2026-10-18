@@ -3,8 +3,8 @@
     "name": "DATABASE_URL takes precedence",
     "env": {
       "DATABASE_URL": "postgresql://url-user:url-password@url-host:6543/url-db",
-      "DB_USER": "db-user",
-      "DB_PASSWORD": "db-password",
+      "DB_APP_USER": "db-user",
+      "DB_APP_PASSWORD": "db-password",
       "DB_NAME": "db-name"
     },
     "expectedUrl": "postgresql://url-user:url-password@url-host:6543/url-db"
@@ -12,8 +12,8 @@
   {
     "name": "DB variables include explicit host and port",
     "env": {
-      "DB_USER": "epoch-user",
-      "DB_PASSWORD": "epoch-password",
+      "DB_APP_USER": "epoch-user",
+      "DB_APP_PASSWORD": "epoch-password",
       "DB_NAME": "epoch-db",
       "DB_HOST": "db.example.test",
       "DB_PORT": "6544"
@@ -23,8 +23,8 @@
   {
     "name": "empty optional host and port use defaults",
     "env": {
-      "DB_USER": "epoch-user",
-      "DB_PASSWORD": "epoch-password",
+      "DB_APP_USER": "epoch-user",
+      "DB_APP_PASSWORD": "epoch-password",
       "DB_NAME": "epoch-db",
       "DB_HOST": "",
       "DB_PORT": ""
@@ -34,23 +34,32 @@
   {
     "name": "DB variables with URI-reserved characters are encoded",
     "env": {
-      "DB_USER": "epoch user",
-      "DB_PASSWORD": "p@ss:w/rd?#%",
+      "DB_APP_USER": "epoch user",
+      "DB_APP_PASSWORD": "p@ss:w/rd?#%",
       "DB_NAME": "epoch db"
     },
     "expectedUrl": "postgresql://epoch%20user:p%40ss%3Aw%2Frd%3F%23%25@localhost:5432/epoch%20db"
   },
   {
+    "name": "the administrative credentials alone are refused, never used at runtime",
+    "env": {
+      "DB_USER": "admin-user",
+      "DB_PASSWORD": "admin-password",
+      "DB_NAME": "epoch-db"
+    },
+    "expectedError": "Database configuration is required: set DATABASE_URL, or all of DB_APP_USER, DB_APP_PASSWORD, and DB_NAME."
+  },
+  {
     "name": "missing configuration fails",
     "env": {},
-    "expectedError": "Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME."
+    "expectedError": "Database configuration is required: set DATABASE_URL, or all of DB_APP_USER, DB_APP_PASSWORD, and DB_NAME."
   },
   {
     "name": "partial DB variables fail",
     "env": {
-      "DB_USER": "epoch-user",
-      "DB_PASSWORD": "epoch-password"
+      "DB_APP_USER": "epoch-user",
+      "DB_APP_PASSWORD": "epoch-password"
     },
-    "expectedError": "Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME."
+    "expectedError": "Database configuration is required: set DATABASE_URL, or all of DB_APP_USER, DB_APP_PASSWORD, and DB_NAME."
   }
 ]

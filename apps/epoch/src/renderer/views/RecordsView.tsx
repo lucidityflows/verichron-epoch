@@ -5,9 +5,15 @@ import { Badge } from '../components/ui/Badge';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
+import { InterruptedStagesPanel } from '../features/records/InterruptedStagesPanel';
+import { StillFailingPanel } from '../features/records/StillFailingPanel';
 
 interface RecordsViewProps {
   selectedRun: boolean;
+  /** The selected run, whose evidence's still-failing items show above its records (EPOCH-432). */
+  runId: string | null;
+  /** A rerun started from the still-failing panel has finished: read the records again. */
+  onRerunFinished?: () => void;
   records: ForensicRecordRow[];
   /** Records loaded so far for the run's evidence (all source types). */
   loadedCount: number;
@@ -78,6 +84,8 @@ function buildColumns(): DataTableColumn<ForensicRecordRow>[] {
 
 export function RecordsView({
   selectedRun,
+  runId,
+  onRerunFinished,
   records,
   loadedCount,
   totalCount,
@@ -98,6 +106,13 @@ export function RecordsView({
           Showing the first {loadedCount.toLocaleString()} of {totalCount.toLocaleString()} records for this evidence.
           Filters apply to the loaded records only.
         </p>
+      )}
+
+      {selectedRun && evidenceRegistered && runId && (
+        <>
+          <InterruptedStagesPanel key={`interrupted-${runId}`} runId={runId} onRerunFinished={onRerunFinished} />
+          <StillFailingPanel key={runId} runId={runId} onRerunFinished={onRerunFinished} />
+        </>
       )}
 
       {!selectedRun ? (

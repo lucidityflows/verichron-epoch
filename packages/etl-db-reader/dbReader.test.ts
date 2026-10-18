@@ -13,11 +13,13 @@
  */
 
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import pg from 'pg';
+import { createWorkspaceManifestBackup, emptyWorkspaceManifest, resolveWorkspaceBackup } from '@verichron/contracts';
 
 import {
   MAX_RECORDS_PAGE as MAX_PAGE,
@@ -27,6 +29,10 @@ import {
   getRunReportLocation,
   getStageStatus,
   getIndicatorChecks,
+  getStageFailures,
+  getStillFailing,
+  getInterruptedEvidence,
+  getInterruptedStages,
   type ForensicRecordQuery,
   type ForensicRecordRow,
   type RecordSortKey,
@@ -42,6 +48,21 @@ const RUN = '33333333-3333-3333-3333-333333333333';
 const REPORT_RUN = '44444444-4444-4444-4444-444444444444';
 const DECRYPT = '55555555-5555-5555-5555-555555555555';
 const UNREGISTERED_RUN = '77777777-7777-7777-7777-777777777777';
+const reportWorkspaceRoot = mkdtempSync(path.join(os.tmpdir(), 'db-reader-workspace-'));
+const oldReportWorkspace = path.join(reportWorkspaceRoot, 'old');
+const movedReportWorkspace = path.join(reportWorkspaceRoot, 'moved');
+
+function writeReportWorkspace(workspace: string) {
+  const entry = createWorkspaceManifestBackup('a', '/evidence/a');
+  entry.decrypted_path = 'decrypt/renamed-a';
+  entry.report_file_path = 'reports/arbitrary-name.md';
+  mkdirSync(workspace, { recursive: true });
+  writeFileSync(
+    path.join(workspace, 'workspace.json'),
+    JSON.stringify({ ...emptyWorkspaceManifest(), backups: [entry] })
+  );
+  return resolveWorkspaceBackup(workspace, entry);
+}
 
 /** 23 records for EVIDENCE: more than several pages at limit 4. Includes NULL
  * times and names, exact ties (decided by id), and two times that differ only
@@ -105,27 +126,31 @@ before(async () => {
     );
   }
   await db.query(
-    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-     VALUES ($1, 'test', 'test', '{}', $2, $2)`,
+    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+     VALUES ($1, 'test', 'test', '{}', $2, $2, 'test-host', 1)`,
     [RUN, EVIDENCE]
   );
 
   // One completed v1 unit holding every row, plus a superseded v0-style
   // history: a completed v1 for a second file that a completed v2 replaces.
-  const unit = await insertUnit(EVIDENCE, 'f'.repeat(64), 1, true);
+  const unit = await insertUnit(EVIDENCE, 'f'.repeat(64), 1);
   for (const [eventTime, sourceType, processName, bundleId] of ROWS) {
     await insertRecord(unit, EVIDENCE, sourceType, eventTime, processName, bundleId);
   }
-  const old = await insertUnit(EVIDENCE, 'e'.repeat(64), 1, true);
+  await completeUnit(unit, ROWS.length);
+  const old = await insertUnit(EVIDENCE, 'e'.repeat(64), 1);
   await insertRecord(old, EVIDENCE, 'crash_report', '2024-02-01 00:00:00+00', 'old_parse', null);
-  const fresh = await insertUnit(EVIDENCE, 'e'.repeat(64), 2, true);
+  await completeUnit(old, 1);
+  const fresh = await insertUnit(EVIDENCE, 'e'.repeat(64), 2);
   await insertRecord(fresh, EVIDENCE, 'crash_report', '2024-02-01 00:00:00+00', 'new_parse', null);
+  await completeUnit(fresh, 1);
   // Incomplete unit: its record must never be read.
-  const stranded = await insertUnit(EVIDENCE, 'd'.repeat(64), 1, false);
+  const stranded = await insertUnit(EVIDENCE, 'd'.repeat(64), 1);
   await insertRecord(stranded, EVIDENCE, 'crash_report', '2024-03-01 00:00:00+00', 'stranded', null);
   // Another evidence item's facts must never leak in.
-  const other = await insertUnit(OTHER, 'f'.repeat(64), 1, true);
+  const other = await insertUnit(OTHER, 'f'.repeat(64), 1);
   await insertRecord(other, OTHER, 'ileapp_record', '2024-01-15 10:31:00+00', 'other_evidence', null);
+  await completeUnit(other, 1);
 });
 
 after(async () => {
@@ -135,17 +160,24 @@ after(async () => {
   await admin.end();
 });
 
-async function insertUnit(evidence: string, fileHash: string, version: number, complete: boolean): Promise<string> {
+async function insertUnit(evidence: string, fileHash: string, version: number): Promise<string> {
   const { rows } = await db.query<{ ingest_id: string }>(
     `INSERT INTO ingested_files
        (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
-        payload_kind, raw_payload, ingest_complete, record_count, completed_at)
-     VALUES ($1, $1, $2, 'crash_report', $3, '/x', 'x', 'none', '{}', $4,
-             CASE WHEN $4 THEN 0 END, CASE WHEN $4 THEN now() END)
+        payload_kind, raw_payload)
+     VALUES ($1, $1, $2, 'crash_report', $3, '/x', 'x', 'none', '{}')
      RETURNING ingest_id`,
-    [evidence, fileHash, version, complete]
+    [evidence, fileHash, version]
   );
   return rows[0].ingest_id;
+}
+
+async function completeUnit(ingestId: string, recordCount: number): Promise<void> {
+  await db.query(
+    `UPDATE ingested_files SET ingest_complete = true, record_count = $2, completed_at = now()
+     WHERE ingest_id = $1`,
+    [ingestId, recordCount]
+  );
 }
 
 async function insertRecord(
@@ -263,8 +295,9 @@ describe('getForensicRecords', live, () => {
         statements += 1;
         if (!completed) {
           completed = true;
-          const unit = await insertUnit(EVIDENCE, 'a'.repeat(64), 1, true);
+          const unit = await insertUnit(EVIDENCE, 'a'.repeat(64), 1);
           await insertRecord(unit, EVIDENCE, 'crash_report', '2024-04-01 00:00:00+00', 'raced_in', null);
+          await completeUnit(unit, 1);
         }
         return result;
       },
@@ -277,8 +310,8 @@ describe('getForensicRecords', live, () => {
 
     const after = await getForensicRecords(db, EVIDENCE, { limit: MAX_PAGE });
     assert.equal(after.total, page.total + 1, 'the raced ingest is visible to the next read');
-    await db.query(`DELETE FROM forensic_records WHERE process_name = 'raced_in'`);
-    await db.query(`DELETE FROM ingested_files WHERE file_hash = repeat('a', 64)`);
+    // The completed unit remains in the throwaway database until the suite
+    // drops it; completed evidence is no longer cleaned up with direct DELETE.
   });
 
   it('an empty page still reports the true total', async () => {
@@ -291,7 +324,7 @@ describe('getForensicRecords', live, () => {
       cursor: Buffer.from(JSON.stringify({ v: null, id: String(Number(last.id) + 10_000) })).toString('base64url'),
     });
     assert.equal(tail.rows.length, 0);
-    assert.equal(tail.total, ROWS.length + 1, 'past the last row, the total is still reported');
+    assert.equal(tail.total, ROWS.length + 2, 'past the last row, the total is still reported');
   });
 
   it('rejects parameters outside the allowlist', async () => {
@@ -310,6 +343,7 @@ describe('getForensicRecords', live, () => {
         JSON.stringify(query)
       );
     }
+    rmSync(reportWorkspaceRoot, { recursive: true, force: true });
   });
 });
 
@@ -322,33 +356,45 @@ describe('evidence-scoped helpers', live, () => {
 
 describe('getRunReportLocation', live, () => {
   before(async () => {
+    const oldTarget = writeReportWorkspace(oldReportWorkspace);
+    writeReportWorkspace(movedReportWorkspace);
     await db.query(
       `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
-       VALUES ($1, $2, 'decrypted', '/old/ws/decrypted/a', '{"name": "iphone_backup_decrypt", "version": "0.10.0"}',
+       VALUES ($1, $2, 'decrypted', $3, '{"name": "iphone_backup_decrypt", "version": "0.10.0"}',
                '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('2', 64))`,
-      [DECRYPT, EVIDENCE]
+      [DECRYPT, EVIDENCE, oldTarget.decryptedPath]
     );
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-       VALUES ($1, '/old/ws/decrypted/a', 'test', '{}', $2, $3)`,
-      [REPORT_RUN, EVIDENCE, DECRYPT]
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+       VALUES ($1, $4, 'test', '{}', $2, $3, 'test-host', 1)`,
+      [REPORT_RUN, EVIDENCE, DECRYPT, oldTarget.decryptedPath]
     );
     // A run from before evidence registration (EPOCH-404).
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions)
-       VALUES ($1, '/legacy/decrypted/a', 'test', '{}')`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid)
+       VALUES ($1, '/legacy/decrypted/a', 'test', '{}', 'test-host', 1)`,
       [UNREGISTERED_RUN]
     );
   });
 
-  it("derives the report folder from the run's decrypt", async () => {
-    assert.equal(await getRunReportLocation(db, REPORT_RUN), '/old/ws/reports/a');
+  it("reads the report path from the run's workspace manifest", async () => {
+    assert.equal(
+      await getRunReportLocation(db, REPORT_RUN),
+      path.join(oldReportWorkspace, 'reports/arbitrary-name.md')
+    );
   });
 
   it('follows a moved workspace, not the run backup_source', async () => {
     // What registration does when the same decrypt is found at a new location.
-    await db.query(`UPDATE evidence_derivatives SET path = '/new/ws/decrypted/a' WHERE derivative_id = $1`, [DECRYPT]);
-    assert.equal(await getRunReportLocation(db, REPORT_RUN), '/new/ws/reports/a');
+    const movedTarget = writeReportWorkspace(movedReportWorkspace);
+    await db.query(`UPDATE evidence_derivatives SET path = $2 WHERE derivative_id = $1`, [
+      DECRYPT,
+      movedTarget.decryptedPath,
+    ]);
+    assert.equal(
+      await getRunReportLocation(db, REPORT_RUN),
+      path.join(movedReportWorkspace, 'reports/arbitrary-name.md')
+    );
   });
 
   it('is null for a run without registered evidence, and for an unknown run', async () => {
@@ -377,16 +423,22 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
               generate_series(1, more) AS n`,
       [RUN]
     );
-    // Two complete units this run labelled for the decrypt, one incomplete
-    // unit, and one complete unit only another run labelled.
+    // Two complete units this run linked to the decrypt, one incomplete
+    // unit, and one complete unit linked only to another run.
     await db.query(
-      `INSERT INTO ingested_files
-         (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
-          payload_kind, raw_payload, ingest_complete, record_count, completed_at, produced_by_runs)
-       VALUES ($1, $1, repeat('1', 64), 'crash_report', 1, '/a', 'a', 'none', '{}', TRUE, 3, now(), ARRAY[$2]::uuid[]),
-              ($1, $1, repeat('2', 64), 'crash_report', 1, '/b', 'b', 'none', '{}', TRUE, 4, now(), ARRAY[$2]::uuid[]),
-              ($1, $1, repeat('3', 64), 'crash_report', 1, '/c', 'c', 'none', '{}', FALSE, NULL, NULL, ARRAY[$2]::uuid[]),
-              ($1, $1, repeat('4', 64), 'crash_report', 1, '/d', 'd', 'none', '{}', TRUE, 9, now(), ARRAY[$3]::uuid[])`,
+      `WITH inserted AS (
+         INSERT INTO ingested_files
+           (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
+            payload_kind, raw_payload, ingest_complete, record_count, completed_at)
+         VALUES ($1, $1, repeat('1', 64), 'crash_report', 1, '/a', 'a', 'none', '{}', TRUE, 3, now()),
+                ($1, $1, repeat('2', 64), 'crash_report', 1, '/b', 'b', 'none', '{}', TRUE, 4, now()),
+                ($1, $1, repeat('3', 64), 'crash_report', 1, '/c', 'c', 'none', '{}', FALSE, NULL, NULL),
+                ($1, $1, repeat('4', 64), 'crash_report', 1, '/d', 'd', 'none', '{}', TRUE, 9, now())
+         RETURNING ingest_id, file_hash
+       )
+       INSERT INTO ingest_run_links (ingest_id, run_id)
+       SELECT ingest_id, CASE WHEN file_hash = repeat('4', 64) THEN $3::uuid ELSE $2::uuid END
+       FROM inserted`,
       [EVIDENCE, RUN, UNREGISTERED_RUN]
     );
   });
@@ -456,8 +508,8 @@ describe('getIndicatorChecks', live, () => {
       [SKIPPED_RUN, 'skipped', null, '2026-10-14T10:00:00Z', 'No indicator set is registered.'],
     ]) {
       await db.query(
-        `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-         VALUES ($1, 'test', 'test', '{}', $2, $2)`,
+        `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+         VALUES ($1, 'test', 'test', '{}', $2, $2, 'test-host', 1)`,
         [run, OTHER]
       );
       await db.query(
@@ -470,16 +522,21 @@ describe('getIndicatorChecks', live, () => {
     const { rows: units } = await db.query<{ ingest_id: string }>(
       `INSERT INTO ingested_files
          (evidence_id, indicator_set_id, file_hash, source_type, parser_version, file_path, file_name,
-          payload_kind, raw_payload, produced_by_runs, ingest_complete, record_count, completed_at)
-       VALUES ($1, $2, repeat('9', 64), 'indicator_match', 1, 'indicator_set/x', 'x', 'summary', $3,
-               ARRAY[$4::uuid], true, 1, now())
+          payload_kind, raw_payload)
+       VALUES ($1, $2, repeat('9', 64), 'indicator_match', 1, 'indicator_set/x', 'x', 'summary', $3)
        RETURNING ingest_id`,
-      [OTHER, setId, summary, CHECK_RUN]
+      [OTHER, setId, summary]
     );
+    await db.query(`INSERT INTO ingest_run_links (ingest_id, run_id) VALUES ($1, $2)`, [units[0].ingest_id, CHECK_RUN]);
     await db.query(
       `INSERT INTO forensic_records (ingest_id, evidence_id, source_type, event_time, fields)
        VALUES ($1, $2, 'indicator_match', '2026-03-01T12:00:00Z', '{"match_mode": "exact"}')`,
       [units[0].ingest_id, OTHER]
+    );
+    await db.query(
+      `UPDATE ingested_files SET ingest_complete = true, record_count = 1, completed_at = now()
+       WHERE ingest_id = $1`,
+      [units[0].ingest_id]
     );
 
     const checks = await getIndicatorChecks(db, OTHER);
@@ -501,5 +558,170 @@ describe('getIndicatorChecks', live, () => {
     assert.equal(skipped.summary, null);
     assert.deepEqual(skipped.match_rows, []);
     assert.deepEqual(await getIndicatorChecks(db, EVIDENCE), [], 'another evidence item has no checks');
+  });
+});
+
+describe('failed items and what is still failing (EPOCH-432)', live, () => {
+  const FIRST = '88888888-8888-8888-8888-888888888888';
+  const RERUN = '99999999-0000-0000-0000-000000000000';
+  const OTHER_CASE_RUN = '99999999-1111-0000-0000-000000000000';
+  // Hash letters no other fixture in this file uses (line ~296 completes an 'a'
+  // unit for EVIDENCE), so only these tests' units can fix these failures.
+  const hash = (c: string) => ({ a: '7', b: '8', c: 'c' })[c]!.repeat(64);
+
+  async function fail(run: string, evidence: string, item: string, fileHash: string | null, at: string) {
+    await db.query(
+      `INSERT INTO stage_item_failures
+         (run_id, stage_name, evidence_id, derivative_id, source_type, item, file_path, file_hash, reason, recorded_at)
+       VALUES ($1, 'crash', $2, $2, 'crash_report', $3, '/test/' || $3, $4, 'ValueError: ' || $3, now() - $5::interval)`,
+      [run, evidence, item, fileHash, at]
+    );
+  }
+
+  async function completed(fileHash: string, filePath: string, at: string) {
+    await db.query(
+      `INSERT INTO ingested_files
+         (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
+          payload_kind, raw_payload, ingest_complete, record_count, completed_at)
+       VALUES ($1, $1, $2, 'crash_report', 1, $3, 'x', 'none', '{}', TRUE, 1, now() - $4::interval)`,
+      [OTHER, fileHash, filePath, at]
+    );
+  }
+
+  before(async () => {
+    // The first run fails three of its files. Retired/b.ips completed once,
+    // before it failed (a parser bump), which must not count as fixed.
+    await completed(hash('b'), '/test/Retired/b.ips', '3 hours');
+    await fail(FIRST, OTHER, 'a.ips', hash('a'), '2 hours');
+    await fail(FIRST, OTHER, 'Retired/b.ips', hash('b'), '2 hours');
+    await fail(FIRST, OTHER, 'c.ips', null, '2 hours');
+    // Another evidence item's failure never leaks in.
+    await fail(OTHER_CASE_RUN, EVIDENCE, 'a.ips', hash('a'), '2 hours');
+  });
+
+  it("lists one stage's failed items by item, with the true total", async () => {
+    const page = await getStageFailures(db, FIRST, 'crash');
+    assert.equal(page.total, 3);
+    // Ordered by item in the database's collation, so compared as a set here.
+    assert.deepEqual(
+      page.rows.map((r) => [r.item, r.file_hash, r.reason]).sort(),
+      [
+        ['Retired/b.ips', hash('b'), 'ValueError: Retired/b.ips'],
+        ['a.ips', hash('a'), 'ValueError: a.ips'],
+        ['c.ips', null, 'ValueError: c.ips'],
+      ].sort()
+    );
+    assert.deepEqual(await getStageFailures(db, FIRST, 'ileapp_bridge'), { rows: [], total: 0 });
+  });
+
+  it('counts an item fixed once a later unit has its hash, or without a hash its path', async () => {
+    const items = async () => (await getStillFailing(db, OTHER)).rows.map((r) => r.item).sort();
+    assert.deepEqual(await items(), ['Retired/b.ips', 'a.ips', 'c.ips'].sort());
+
+    // A rerun completes a.ips: two remain.
+    await completed(hash('a'), '/test/a.ips', '1 hour');
+    assert.deepEqual(await items(), ['Retired/b.ips', 'c.ips']);
+    assert.equal((await getStillFailing(db, OTHER)).total, 2);
+
+    // c.ips had no hash; a later unit at the path it failed at fixes it.
+    await completed(hash('c'), '/test/c.ips', '1 hour');
+    assert.deepEqual(await items(), ['Retired/b.ips']);
+
+    // Moving the workspace afterwards updates the derivative's path, never the
+    // fixed paths compared, so nothing fixed comes back.
+    await db.query(`UPDATE evidence_derivatives SET path = '/moved' WHERE derivative_id = $1`, [OTHER]);
+    assert.deepEqual(await items(), ['Retired/b.ips']);
+
+    // The other evidence's a.ips is untouched by this evidence's fix.
+    assert.deepEqual(
+      (await getStillFailing(db, EVIDENCE)).rows.map((r) => r.item),
+      ['a.ips']
+    );
+  });
+
+  it("reports an item's latest failure once, and a fix before that failure doesn't count", async () => {
+    await fail(RERUN, OTHER, 'Retired/b.ips', hash('b'), '30 minutes');
+    const page = await getStillFailing(db, OTHER);
+    assert.deepEqual(
+      page.rows.map((r) => [r.item, r.run_id]),
+      [['Retired/b.ips', RERUN]]
+    );
+    assert.equal(page.total, 1);
+  });
+});
+
+describe('interrupted runs and stages (EPOCH-435, EPOCH-561)', live, () => {
+  const INTERRUPTED = 'aaaaaaaa-0000-0000-0000-000000000001';
+  const LATER = 'aaaaaaaa-0000-0000-0000-000000000002';
+  const GOING = 'aaaaaaaa-0000-0000-0000-000000000003';
+
+  async function runOf(runId: string, startedIn: string, end: { at: string; reason: string } | null) {
+    await db.query(
+      `INSERT INTO pipeline_runs
+         (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid,
+          started_at, finished_at, ended_reason)
+       VALUES ($1, 'test', 'test', '{}', $2, $2, 'test-host', 1, now() + $3::interval,
+               now() + $4::interval, $5)`,
+      [runId, OTHER, startedIn, end?.at ?? null, end?.reason ?? null]
+    );
+  }
+
+  async function stagesOf(runId: string, rows: Array<[string, number | null, string]>) {
+    for (const [name, parserVersion, status] of rows) {
+      await db.query(
+        `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, parser_version)
+         VALUES ($1, $2, 10, $3, $4)`,
+        [runId, name, status, parserVersion]
+      );
+    }
+  }
+
+  before(async () => {
+    // A run of the other evidence that stalled: two fact-writing stages
+    // unfinished, the report (writes no facts) and a skipped stage aside.
+    await runOf(INTERRUPTED, '1 hour', { at: '2 hours', reason: 'timeout' });
+    await stagesOf(INTERRUPTED, [
+      ['crash', 1, 'running'],
+      ['ileapp_bridge', 5, 'pending'],
+      ['reporting', null, 'pending'],
+      ['indicator_match', 1, 'skipped'],
+      // Failed before the run stalled: it recorded its items, so it isn't interrupted.
+      ['failed_stage', 1, 'failed'],
+    ]);
+  });
+
+  it('names the evidence whose latest run was interrupted, found by content root', async () => {
+    assert.deepEqual(await getInterruptedEvidence(db, ['c'.repeat(64), 'b'.repeat(64)]), [OTHER]);
+    assert.deepEqual(await getInterruptedEvidence(db, []), []);
+  });
+
+  it("gives each stage its run's end, and each run its end reason", async () => {
+    const crash = (await getStageStatus(db, INTERRUPTED)).find((s) => s.stage_name === 'crash')!;
+    assert.equal(crash.status, 'running', 'never rewritten');
+    assert.equal(crash.run_ended_reason, 'timeout');
+    assert.ok(crash.run_finished_at);
+    const run = (await getPipelineRuns(db)).find((r) => r.run_id === INTERRUPTED)!;
+    assert.deepEqual([run.state, run.ended_reason], ['incomplete', 'timeout']);
+  });
+
+  it('lists the fact-writing stages whose latest attempt was interrupted, until a later attempt finishes them', async () => {
+    const names = async () =>
+      (await getInterruptedStages(db, OTHER)).map((s) => [s.stage_name, s.status, s.ended_reason]);
+    assert.deepEqual(await names(), [
+      ['crash', 'running', 'timeout'],
+      ['ileapp_bridge', 'pending', 'timeout'],
+    ]);
+
+    // A later run finishes crash: only ileapp_bridge is still interrupted, and
+    // the evidence's latest run is complete.
+    await runOf(LATER, '3 hours', { at: '4 hours', reason: 'completed' });
+    await stagesOf(LATER, [['crash', 1, 'succeeded']]);
+    assert.deepEqual(await names(), [['ileapp_bridge', 'pending', 'timeout']]);
+    assert.deepEqual(await getInterruptedEvidence(db, ['c'.repeat(64)]), []);
+
+    // A run still going is the latest attempt, and its end isn't known yet.
+    await runOf(GOING, '5 hours', null);
+    await stagesOf(GOING, [['ileapp_bridge', 5, 'running']]);
+    assert.deepEqual(await names(), []);
   });
 });

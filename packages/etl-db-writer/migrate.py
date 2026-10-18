@@ -15,8 +15,11 @@ migrations/ as the schema evolves after first boot.
 Usage:
     uv run python packages/etl-db-writer/migrate.py
 
-The database comes from DATABASE_URL or DB_* (R28), read from the
+The database comes from the administrative identity, ADMIN_DATABASE_URL or
+DB_USER / DB_PASSWORD with DB_NAME (R28, EPOCH-562), read from the
 environment or the repo-root .env, never from the command line (R30).
+Migrations create roles and hand objects to the schema owner, so this
+identity must be a superuser; the app never connects with it.
 
 Tracks applied migrations in a schema_migrations table. Migrations are
 applied in filename order (hence the 0001_, 0002_ prefix convention), each
@@ -31,7 +34,7 @@ import sys
 from pathlib import Path
 
 import psycopg2
-from runtime_env import fatal_if_missing_venv, load_root_env, redact_password, require_database_url
+from runtime_env import fatal_if_missing_venv, load_root_env, redact_password, require_admin_database_url
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -57,6 +60,14 @@ def _column(table: str, column: str) -> str:
     return (
         "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
         f"WHERE table_name = '{table}' AND column_name = '{column}')"
+    )
+
+
+def _runtime_may_purge() -> str:
+    return (
+        "SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'verichron_epoch_runtime') "
+        "THEN has_function_privilege('verichron_epoch_runtime', 'public.purge_evidence(uuid, text)', 'EXECUTE') "
+        "ELSE FALSE END"
     )
 
 
@@ -124,6 +135,22 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
     "0014_stage_order.sql": (
         _column("pipeline_stage_status", "stage_order"),
         _column("pipeline_stage_status", "stage_order"),
+    ),
+    "0015_ingest_immutability_purge.sql": (
+        _relation("ingest_run_links"),
+        _relation("idx_ingest_run_links_run"),
+    ),
+    "0016_stage_item_failures.sql": (
+        _relation("stage_item_failures"),
+        _relation("idx_stage_item_failures_evidence"),
+    ),
+    "0017_run_liveness.sql": (
+        _column("pipeline_runs", "host"),
+        _relation("interrupted_stages"),
+    ),
+    "0018_database_roles.sql": (
+        "SELECT to_regprocedure('public.verichron_epoch_adopt()') IS NOT NULL",
+        _runtime_may_purge(),
     ),
 }
 
@@ -222,10 +249,24 @@ def apply_migration(conn, path: Path) -> None:
     conn.commit()
 
 
+def adopt_objects(conn) -> None:
+    """After any run (EPOCH-562): give every object a migration created to
+    the schema owner, and let the runtime read the migration ledger, which
+    this script creates and the orchestrator reads (EPOCH-498). A no-op on a
+    database before 0018."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT to_regprocedure('public.verichron_epoch_adopt()') IS NOT NULL")
+        if not cur.fetchone()[0]:
+            return
+        cur.execute("CALL public.verichron_epoch_adopt()")
+        cur.execute("GRANT SELECT ON schema_migrations TO verichron_epoch_runtime")
+    conn.commit()
+
+
 def main() -> None:
     load_root_env()
     fatal_if_missing_venv()
-    db_url = require_database_url()
+    db_url = require_admin_database_url()
     argparse.ArgumentParser(description="Apply pending migrations to the configured database.").parse_args()
 
     try:
@@ -244,6 +285,7 @@ def main() -> None:
 
         pending = pending_migrations(conn)
         if not pending:
+            adopt_objects(conn)
             print("[migrate] up to date, nothing to apply")
             return
 
@@ -262,6 +304,7 @@ def main() -> None:
                 sys.exit(1)
             print("[migrate]   ok")
 
+        adopt_objects(conn)
         print(f"[migrate] applied {len(pending)} migration(s)")
     finally:
         conn.close()

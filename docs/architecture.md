@@ -10,8 +10,8 @@ through it. Identity and provenance are explained in
 ```mermaid
 flowchart LR
   A[Encrypted backup] --> B[processor]
-  B -->|evidence/ sidecar + manifest| W[(Workspace)]
-  B -->|decrypted/ + ileapp/ with markers| W
+  B -->|workspace.json + evidence paths| W[(Workspace)]
+  B -->|manifest-declared derivatives + markers| W
   W --> C[orchestrator]
   C -->|register evidence| D[(PostgreSQL)]
   C -->|spawn in order| S[stages]
@@ -41,13 +41,28 @@ analyze → report**. The orchestrator coordinates the last three.
 
    Each output is a **derivative**: a separate product of the evidence, which
    itself is never altered. Each carries a marker recording what produced it.
+   The processor and orchestrator take the same exclusive
+   `<workspace>/.verichron.lock` for the duration of a run. It records the
+   owning process, tool and start time; another run is refused with the holder
+   identified, while a lock whose process has exited can be reclaimed.
+   An atomically published `.verichron.lock.guard` directory serializes lock
+   creation, stale-owner checks, removal and release. Its unique owner entry
+   allows recovery after a process exits; removing an abandoned guard cannot
+   remove a successor's nonempty guard. This
+   protects the decrypted evidence, iLEAPP output and results from changing
+   while the orchestrator reads them.
+
 3. **Extract (ETL, `apps/extractors/*`).** The orchestrator verifies the
    evidence and markers, registers the evidence, its device and derivatives, and
    decides whether a run is needed. It then runs the stages in `stage.json` order
    as subprocesses, passing each one its identity and the derivative it declares
    it reads. Each extraction stage reads that derivative, normalizes it, and
    loads facts through the one writer, `ingest()`, one atomic unit per source
-   file.
+   file. Each running Analyze stage has a 30-minute limit; on expiry its process
+   is stopped and that stage is recorded as failed, while later stages still
+   run. The app shows the active stage and elapsed time. A separate five-minute
+   no-output guard applies only while the orchestrator is outside an active
+   stage, so it does not cap total Analyze time.
 4. **Analyze (`apps/analysis`).** The LLM stage proposes leads from the facts;
    leads are never evidence. It is out of the pipeline until it reads the
    project's own facts (EPOCH-442); the report says it was not run.
@@ -85,8 +100,8 @@ never on a path guessed from the layout (R18):
 
 New Investigation lists the backups under the chosen folder and names each
 after its top-level folder there, which is the pull's `<UTC start>`. Two pulls
-of one device therefore get different names, and different `decrypted/<label>`
-folders in the workspace.
+of one device therefore get different names and separate manifest entries in
+the workspace.
 
 ### Verified device behaviour
 
@@ -123,6 +138,20 @@ tool versions. The reference backup is the 77,217,764,077-byte pull above.
 | iLEAPP copies every file it reads into its output's `data/` folder, in either input mode (`FileSeekerItunes` and `FileSeekerDir` both copy), so its output is close to a third copy of the backup: 71 GB in all, 70 GB of it `data/` | `_lava_artifacts.db` 101 MB, `_HTML` 259 MB, `_TSV Exports` 194 MB | iLEAPP 24ba13da | 2026-10-13 |
 | The full run in the app, Prepare Evidence then Analyze, completes. Hashing finished at 12:31 (11,227 files); the decrypt and repair finished by 12:52, including the wait for the password (repair: 634 databases checked, 59 repaired, 0 not fully recovered, 59 originals kept); iLEAPP ran 12:52 to 13:05 (878 of 879 modules). Analyze then took 77 s: `crash` 0.6 s (no crash reports found), `ileapp_bridge` 76.6 s (114 artifact tables, 46,434 records, every unit complete), `reporting` 0.3 s; the run's state is `complete` | Decrypted copy 72 GiB, iLEAPP output 71 GiB. The CPU was held at about 600 MHz by firmware clock modulation until about 12:45, then ran at 2.2–2.4 GHz | `iphone_backup_decrypt` 0.10.0, sqlite3 3.46.1, iLEAPP 24ba13da (EPOCH-489) | 2026-10-13 |
 
+The 30-minute Analyze timeout is per running stage, not per backup or
+workspace. The longest stage in the reference Analyze run took 76.6 seconds
+(`ileapp_bridge`); the limit leaves substantial room for slower machines and
+larger inputs without stopping a healthy multi-stage run at a fixed total time.
+
+Before decrypting, Prepare Evidence checks free space on the workspace
+filesystem. The reference run used a 77,217,764,077-byte backup and produced a
+77,185,142,589-byte decrypted tree after repair, plus about 71 GB of iLEAPP
+output. The estimate reserves one backup-sized decrypted copy plus iLEAPP
+output scaled by the measured ratio (71 GB / 77,217,764,077 bytes). `fs.statfs`
+provides available bytes; a shortfall or `ENOSPC` fails the backup with the
+workspace and capacity figures, without marking the failed derivative complete
+(EPOCH-496).
+
 ## Components
 
 Each concern has exactly one owner (R2).
@@ -143,6 +172,18 @@ Languages split by role: TypeScript runs the control plane (app, processor,
 orchestrator); Python parses, writes facts and renders the report. They meet
 only at process boundaries (a stage is a subprocess) and in the database.
 
+### Orchestrator events
+
+The orchestrator tells its caller what it is doing in typed events
+(EPOCH-443), defined once in `packages/contracts/ts/pipelineEvent.ts`.
+- **Format:** each event is one stdout line, `@@verichron ` followed by JSON, validated before it is written.
+- **The events:**
+  - `run:created`, `run:skipped` and `run:finished`; a finished run's state is read from `run_completeness` (R23);
+  - `stage:started` and `stage:finished`;
+  - `registration:refused`.
+- **Stage output:** the orchestrator relays a stage's stdout line by line, and tags any line that starts with the prefix with the stage's name. No stage, and no value it echoes from the evidence, can pass for an event.
+- **The app:** its main process reads the events with the same contract and doesn't trust an invalid one. It takes the running stage and the runs a call created from them, never from the human log lines printed beside them. Event lines are not shown in the log.
+
 ## The workspace
 
 The processor creates one workspace per batch of backups. Each backup is a
@@ -156,26 +197,25 @@ line, still analyzes every prepared backup in the workspace.
 
 ```
 <workspace>/
-  evidence/<label>/sidecar.json            identity: content_root, file count, source path
-  evidence/<label>/manifests/<root>.sha256 canonical manifest, content-addressed, never overwritten
-  evidence/<label>/fingerprints.json       stat cache that makes re-hashing cheap
-  decrypted/<label>/                       decrypted backup (iTunes layout) + .decrypted_ok marker
-  ileapp/<label>/                          iLEAPP's report + .ileapp_ok marker
-  reports/<label>/investigation_report.md  the report stage's output
-  runs/<label>/<run_id>.json               one run's summary, exported from the database
-  logs/<label>.ileapp.log                  iLEAPP output
-  logs/<label>.ileapp-modules.json         each iLEAPP module's timing
-  summary.json, summary.md                 the processor's run summary
+  workspace.json                           explicit paths for every backup and processor summary
+  <manifest-declared paths>                evidence, derivatives, reports, run summaries and logs
 ```
 
-Each run writes its own summary file, so no run touches another's. The
-database stays the source of truth; the file is a copy of it (EPOCH-409). What
-a single orchestrator call did (each backup's outcome, or why it stopped before
-any backup) goes to a file the caller names with `--summary-path`; the app
-gives each call its own temporary file, so no call reads another's result.
+The processor creates or updates `workspace.json` atomically while holding the
+workspace lock. Its canonical contract is
+[`workspace-manifest.schema.json`](../packages/contracts/workspace-manifest.schema.json).
+Workspace-owned paths in it are relative to the workspace root, so moving the
+workspace preserves them; the original source path is external provenance and
+remains as recorded by the evidence sidecar. Readers reject a missing, invalid
+or escaping manifest path rather than fall back to a directory convention
+(R18). The orchestrator accepts `--workspace` and optional `--label` values,
+then passes the resolved paths explicitly to stages.
 
-Today the orchestrator and app find these directories by layout. A workspace
-manifest replaces that (R18, EPOCH-427).
+Each run writes its own summary file, so no run touches another's. The database
+stays the source of truth; the file is a copy of it (EPOCH-409). What a single
+orchestrator call did (each backup's outcome, or why it stopped before any
+backup) goes to a file the caller names with `--summary-path`; the app gives
+each call its own temporary file, so no call reads another's result.
 
 ## The database
 
@@ -204,9 +244,14 @@ The contract is in
 
 An iOS backup holds none of the device's crash logs (EPOCH-447). An iPhone pull
 copies them beside the backup with `idevicecrashreport -k` (EPOCH-514), and the
-processor copies them into `crash_reports/<label>/`. Evidence without them, such
+processor copies them to their manifest-declared path. Evidence without them, such
 as a backup imported from elsewhere, has `crash` recorded as skipped, with that
 reason, and the report lists it under Not Examined.
+
+For an existing backup's [crash-log retry](decisions.md#crash-log-retry), the
+main process binds the opaque reference to that backup path and its originating
+device. A copy request must match that path before any copy, pull-record write
+or cleanup, and the backup and connected device are checked again before copying.
 
 `indicator_match` checks the newest registered indicator set, or the one given
 to the orchestrator with `--indicator-set <set hash>`. With no set registered it
@@ -226,13 +271,18 @@ switch ([decisions](decisions.md#product-and-builds)).
 ## Database configuration
 
 **Built — R28 (EPOCH-424):** database configuration fails closed unless
-`DATABASE_URL` or complete `DB_*` credentials are supplied; see
+`DATABASE_URL` or complete `DB_APP_*` credentials are supplied; see
 [the configuration rules](rules.md#configuration-and-security).
+
+**Built — roles (EPOCH-562):**
+- **The schema owner:** `verichron_epoch_schema_owner`, a non-login role, owns every table, view, sequence and trigger function. `migrate.py` gives each new object to it after every run.
+- **The runtime:** the app and its stages connect as a login that holds only `verichron_epoch_runtime`. That role reads everything and writes only what the writers write, and it purges only through `purge_evidence`. It cannot TRUNCATE, disable a trigger, change privileges or become an owner, so the immutability triggers (R9) hold against the running application.
+- **Who runs migrations:** the administrative identity, a superuser, which the app never uses. On the Lab build's bundled server, these roles are provisioned by EPOCH-477.
 
 **Built — R30 (EPOCH-423):** the URL never travels on a command line. The
 orchestrator resolves it once and gives each stage `DATABASE_URL` in its
 environment; stages read it with `runtime_env.require_database_url()`, and
-`migrate.py` and `db_peek.py` read `.env` themselves.
+`migrate.py`, `provision_roles.py` and `db_peek.py` read `.env` themselves.
 
 ## Changes already decided
 
@@ -240,5 +290,4 @@ These are settled but not yet built; this page will change when they land.
 
 | Change | Ticket |
 |---|---|
-| The app reads typed events from the processor and the orchestrator instead of scraping logs | EPOCH-443, EPOCH-445 |
-| A workspace manifest replaces path inference | EPOCH-427 |
+| The app reads typed events from the processor instead of scraping its logs; the orchestrator's are built (EPOCH-443) | EPOCH-445 |

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """The iLEAPP bridge: ingests the iLEAPP output the processor produced.
 
-The processor runs iLEAPP over each decrypt and leaves its report at
-<workspace>/ileapp/<label>/, marked complete with .ileapp_ok; the orchestrator
-registers it as an `ileapp_output` derivative and passes its directory here as
---derivative-path (EPOCH-416). This stage only reads that directory: it never
-runs iLEAPP, and never looks anywhere else for output.
+The processor runs iLEAPP over each decrypt and leaves its report at the
+output path declared in workspace.json, marked complete with .ileapp_ok; the
+orchestrator registers it as an `ileapp_output` derivative and passes its
+directory here as --derivative-path (EPOCH-416). This stage only reads that
+directory: it never runs iLEAPP, and never looks anywhere else for output.
 """
 
 from __future__ import annotations
@@ -15,14 +15,15 @@ import sys
 from itertools import batched
 from pathlib import Path
 
-from db_writer import IngestContext, add_context_args, context_from_args, incomplete_ingests, ingest
+from db_writer import IngestContext, add_context_args, context_from_args, incomplete_ingests, ingest, record_failures
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
 from runtime_env import redact_password, require_database_url
-from tool_defects import ToolDefect, defects_for
+from tool_defects import defects_for
 
 try:
     from .lava import (
+        DATABASE,
         TOOL,
         Artifact,
         ArtifactScan,
@@ -36,6 +37,7 @@ try:
     )
 except ImportError:
     from lava import (
+        DATABASE,
         TOOL,
         Artifact,
         ArtifactScan,
@@ -98,17 +100,15 @@ def _summary(scan: ArtifactScan) -> dict:
     }
 
 
-def ingest_artifact(
-    conn, lava_conn, ctx: IngestContext, output: LavaOutput, artifact: Artifact, defects: tuple[ToolDefect, ...] = ()
-) -> ETLRunResult:
+def ingest_artifact(conn, lava_conn, ctx: IngestContext, output: LavaOutput, scan: ArtifactScan) -> ETLRunResult:
     """One artifact table, one ingest unit (R13): every row commits, or none.
-    The table is read twice (EPOCH-418): the first pass checks it and fixes
-    the unit's identity, the second writes its rows in chunks inside the unit,
-    so no artifact is ever held in memory whole. An artifact with no rows is
-    a unit too, completed with 0 records, so the evidence shows it was
-    examined and later runs skip it (EPOCH-417)."""
+    The table is read twice (EPOCH-418): the first pass (`scan`, from
+    scan_artifact) checks it and fixes the unit's identity, the second writes
+    its rows in chunks inside the unit, so no artifact is ever held in memory
+    whole. An artifact with no rows is a unit too, completed with 0 records,
+    so the evidence shows it was examined and later runs skip it (EPOCH-417)."""
     result = ETLRunResult()
-    scan = scan_artifact(lava_conn, output, artifact, defects)
+    artifact = scan.artifact
     for note in scan.notes:
         result.note(note)
 
@@ -161,6 +161,17 @@ def _warn_about_incomplete_ingests(conn, evidence_id: str) -> None:
         print(f"[ileapp]   ... and {len(stranded) - 20} more", file=sys.stderr)
 
 
+def failure_item(artifact: Artifact) -> str:
+    """The failed artifact's name, relative to the report directory, as the
+    ledger names its unit (EPOCH-432). A table name that is missing or holds a
+    path separator can't name a place under the report directory, so the
+    failure is filed under the database itself; its reason names the table."""
+    table = artifact.tablename
+    if not table or "/" in table or "\\" in table:
+        return DATABASE
+    return f"{DATABASE}#{table}"
+
+
 def ingest_report(conn, ctx: IngestContext, report_dir: str | Path) -> ETLRunResult:
     """Ingest every artifact in one iLEAPP report. A report that can't be read
     as a whole fails the stage (LavaError); one artifact that can't be read
@@ -173,12 +184,17 @@ def ingest_report(conn, ctx: IngestContext, report_dir: str | Path) -> ETLRunRes
         defects = defects_for(TOOL, output.tool_version)
         result = ETLRunResult()
         for artifact in output.artifacts:
+            item = failure_item(artifact)
+            scan: ArtifactScan | None = None
             try:
-                result = result.merge(ingest_artifact(conn, lava_conn, ctx, output, artifact, defects))
+                scan = scan_artifact(lava_conn, output, artifact, defects)
+                result = result.merge(ingest_artifact(conn, lava_conn, ctx, output, scan))
             except Exception as exc:
                 # Per-artifact isolation (EXTRACTOR_CONTRACT.md #5); the
-                # failed artifact's unit has rolled back.
-                result.fail(artifact.name, exc)
+                # failed artifact's unit has rolled back. A table that failed
+                # its check has no content hash.
+                reason = exc if item != DATABASE else f"table {artifact.tablename!r}: {type(exc).__name__}: {exc}"
+                result.fail(item, reason, scan.content_hash if scan else None)
         return result
     finally:
         lava_conn.close()
@@ -188,6 +204,7 @@ def process_output_directory(db_url: str, ctx: IngestContext, report_dir: str | 
     conn = psycopg2.connect(db_url)
     try:
         result = ingest_report(conn, ctx, report_dir)
+        record_failures(conn, ctx, result.failures, source_type=SourceType.ILEAPP_RECORD.value, root=report_dir)
         _warn_about_incomplete_ingests(conn, ctx.evidence_id)
         return result
     finally:

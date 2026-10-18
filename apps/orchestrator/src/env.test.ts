@@ -16,7 +16,16 @@ const casesPath = fileURLToPath(
   new URL('../../../packages/contracts/testdata/database_url_cases.json', import.meta.url)
 );
 const databaseUrlCases = JSON.parse(readFileSync(casesPath, 'utf8')) as DatabaseUrlCase[];
-const databaseEnvKeys = ['DATABASE_URL', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'DB_HOST', 'DB_PORT'];
+const databaseEnvKeys = [
+  'DATABASE_URL',
+  'DB_USER',
+  'DB_PASSWORD',
+  'DB_APP_USER',
+  'DB_APP_PASSWORD',
+  'DB_NAME',
+  'DB_HOST',
+  'DB_PORT',
+];
 
 test('database URL resolution matches the shared Python/TypeScript cases', () => {
   const originalEnv = Object.fromEntries(databaseEnvKeys.map((key) => [key, process.env[key]]));
@@ -41,14 +50,17 @@ test('database URL resolution matches the shared Python/TypeScript cases', () =>
   }
 });
 
-test('node-postgres reads back DB_* values that need encoding', () => {
-  const env = { DB_USER: 'epoch user', DB_PASSWORD: 'p@ss:w/rd?#%', DB_NAME: 'epoch db' };
+test('node-postgres reads back DB_APP_* values that need encoding', () => {
+  const env = { DB_APP_USER: 'epoch user', DB_APP_PASSWORD: 'p@ss:w/rd?#%', DB_NAME: 'epoch db' };
   const saved = Object.fromEntries(databaseEnvKeys.map((key) => [key, process.env[key]]));
   try {
     for (const key of databaseEnvKeys) delete process.env[key];
     Object.assign(process.env, env);
     const client = new pg.Client({ connectionString: resolveDatabaseUrl() });
-    assert.deepEqual([client.user, client.password, client.database], [env.DB_USER, env.DB_PASSWORD, env.DB_NAME]);
+    assert.deepEqual(
+      [client.user, client.password, client.database],
+      [env.DB_APP_USER, env.DB_APP_PASSWORD, env.DB_NAME]
+    );
   } finally {
     for (const key of databaseEnvKeys) {
       const value = saved[key];

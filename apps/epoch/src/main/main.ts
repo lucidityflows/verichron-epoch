@@ -6,7 +6,7 @@ import type { BrowserWindowConstructorOptions, BrowserWindow as BrowserWindowTyp
 import { loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
 import { registerDbHandlers } from './ipc/dbHandlers';
 import { registerReportHandlers } from './ipc/reportHandlers';
-import { registerPipelineHandlers, reconcileStaleRunsOnStartup } from './ipc/pipelineHandlers';
+import { closeAbandonedRunsOnStartup, registerPipelineHandlers } from './ipc/pipelineHandlers';
 import { registerDeviceHandlers } from './ipc/deviceHandlers';
 
 const { app, BrowserWindow } = electron;
@@ -42,11 +42,10 @@ const getMainWindow = () => mainWindow;
 // Register all modularized IPC routes
 registerDbHandlers(dbPool);
 registerReportHandlers(dbPool);
-// EPOCH-305: pipelineHandlers now needs DB access too -- when the
-// orchestrator subprocess it spawns crashes, times out, or is cancelled,
-// it closes out any dangling pipeline_runs/pipeline_stage_status rows
-// directly rather than leaving them stuck 'running' forever (see
-// markWorkspaceRunsAborted in pipelineHandlers.ts).
+// EPOCH-305, EPOCH-435: pipelineHandlers needs DB access too -- when the
+// orchestrator subprocess it spawns crashes, times out, or is cancelled, it
+// ends the runs that call created (closeCallRuns in pipelineHandlers.ts)
+// rather than leaving them running forever.
 registerPipelineHandlers(getMainWindow, REPO_ROOT, dbPool);
 registerDeviceHandlers(getMainWindow);
 
@@ -81,10 +80,10 @@ const createWindow = (): void => {
 };
 
 app.whenReady().then(async () => {
-  // EPOCH-305 app-restart reconciliation: must complete before the window
+  // EPOCH-435: closes runs whose orchestrator is gone before the window
   // opens and IPC becomes reachable, so a fresh launch never shows a run
-  // left dangling by the previous session as "in progress" even briefly.
-  await reconcileStaleRunsOnStartup(dbPool);
+  // left by the previous session as "in progress" even briefly.
+  await closeAbandonedRunsOnStartup(dbPool);
   createWindow();
 });
 

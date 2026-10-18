@@ -4,9 +4,20 @@ import { parseCliConfig } from './cli.js';
 import { discoverStages } from './discovery.js';
 import { migrationRefusal, readMigrationStatus } from './migrations.js';
 import { runPipelineForBackup } from './pipeline.js';
+import { acquireWorkspaceLocks } from '@verichron/workspace-lock';
+import type { CliConfig } from './types.js';
 
 async function main() {
   const cfg = await parseCliConfig();
+  const releaseWorkspaceLocks = await acquireWorkspaceLocks(cfg.workspacePaths, 'orchestrator');
+  try {
+    await run(cfg);
+  } finally {
+    await releaseWorkspaceLocks();
+  }
+}
+
+async function run(cfg: CliConfig) {
   const pythonBin = await preflightPython(cfg.summaryPath);
   if (!pythonBin) {
     process.exitCode = 1;
@@ -22,7 +33,7 @@ async function main() {
     return;
   }
 
-  if (cfg.backupPaths.length === 0) {
+  if (cfg.targets.length === 0) {
     const error = 'No successfully decrypted backups were found in the workspace.';
     console.error(`[orchestrator] ${error}`);
     await writeCallSummary(cfg.summaryPath, [], error);
@@ -47,11 +58,12 @@ async function main() {
   let failedBackups = 0;
   const analysisResults: AnalysisResult[] = [];
 
-  for (const backupPath of cfg.backupPaths) {
+  for (const target of cfg.targets) {
+    const backupPath = target.decryptedPath;
     try {
       // Registration and the evidence-keyed resume check happen inside, before
       // any run is created (EPOCH-404).
-      const result = await runPipelineForBackup(client, backupPath, cfg.dbUrl, pythonBin, stages, {
+      const result = await runPipelineForBackup(client, target, cfg.dbUrl, pythonBin, stages, {
         indicatorSetHash: cfg.indicatorSetHash,
       });
       if (result.skipped) {

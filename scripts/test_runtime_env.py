@@ -14,7 +14,17 @@ import runtime_env
 DATABASE_URL_CASES = json.loads(
     (Path(__file__).resolve().parents[1] / "packages/contracts/testdata/database_url_cases.json").read_text()
 )
-DATABASE_ENV_KEYS = ("DATABASE_URL", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_HOST", "DB_PORT")
+DATABASE_ENV_KEYS = (
+    "DATABASE_URL",
+    "ADMIN_DATABASE_URL",
+    "DB_USER",
+    "DB_PASSWORD",
+    "DB_APP_USER",
+    "DB_APP_PASSWORD",
+    "DB_NAME",
+    "DB_HOST",
+    "DB_PORT",
+)
 
 
 @pytest.mark.parametrize("case", DATABASE_URL_CASES, ids=lambda case: case["name"])
@@ -131,8 +141,27 @@ def test_libpq_reads_back_db_values_that_need_encoding(monkeypatch):
 
     for key in DATABASE_ENV_KEYS:
         monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("DB_USER", "epoch user")
-    monkeypatch.setenv("DB_PASSWORD", "p@ss:w/rd?#%")
+    monkeypatch.setenv("DB_APP_USER", "epoch user")
+    monkeypatch.setenv("DB_APP_PASSWORD", "p@ss:w/rd?#%")
     monkeypatch.setenv("DB_NAME", "epoch db")
     parsed = parse_dsn(runtime_env.resolve_database_url())
     assert (parsed["user"], parsed["password"], parsed["dbname"]) == ("epoch user", "p@ss:w/rd?#%", "epoch db")
+
+
+def test_the_administrative_connection_is_its_own_and_never_the_runtimes(monkeypatch):
+    """EPOCH-562: migrations and provisioning connect as DB_USER / DB_PASSWORD
+    (or ADMIN_DATABASE_URL); the runtime login's variables don't satisfy it."""
+    for key in DATABASE_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("DB_NAME", "epoch-db")
+    monkeypatch.setenv("DB_APP_USER", "app")
+    monkeypatch.setenv("DB_APP_PASSWORD", "app-password")
+    with pytest.raises(RuntimeError, match="ADMIN_DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME"):
+        runtime_env.resolve_admin_database_url()
+
+    monkeypatch.setenv("DB_USER", "admin")
+    monkeypatch.setenv("DB_PASSWORD", "admin-password")
+    assert runtime_env.resolve_admin_database_url() == "postgresql://admin:admin-password@localhost:5432/epoch-db"
+    assert runtime_env.resolve_database_url() == "postgresql://app:app-password@localhost:5432/epoch-db"
+    monkeypatch.setenv("ADMIN_DATABASE_URL", "postgresql://a@h/d")
+    assert runtime_env.resolve_admin_database_url() == "postgresql://a@h/d"

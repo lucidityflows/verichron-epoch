@@ -988,10 +988,9 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
 
 def resolve_output_path(output: str | None, report_path: str | None) -> str:
     """
-    <report-path>/investigation_report.md: the orchestrator passes
-    --report-path (<workspace>/reports/<label>/, @verichron/contracts's
-    deriveReportPath) to every stage, which gives each backup's report a
-    stable home the app reads it from (EPOCH-489). An explicit --output
+    <report-path>/investigation_report.md: the orchestrator passes the
+    manifest-declared report folder to every stage, which gives each backup's
+    report a stable home the app reads from (EPOCH-489). An explicit --output
     wins, for a manual run. With neither, the report is refused rather than
     written somewhere the next run would overwrite.
     """

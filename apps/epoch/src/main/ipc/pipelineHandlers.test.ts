@@ -1,0 +1,332 @@
+import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import pg, { type Pool } from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it, vi } from 'vitest';
+import {
+  DECRYPT_MARKER,
+  renderPipelineEvent,
+  createWorkspaceManifestBackup,
+  emptyWorkspaceManifest,
+  readWorkspaceManifestSync,
+  resolveWorkspaceBackup,
+} from '@verichron/contracts';
+
+const { handlers, spawnMock } = vi.hoisted(() => ({
+  handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
+  spawnMock: vi.fn(),
+}));
+let workspace: string;
+let decryptPath: string;
+let pool: { query: () => Promise<{ rows: Array<{ path: string }> }> };
+
+vi.mock('electron', () => ({
+  ipcMain: {
+    handle: (channel: string, handler: (event: unknown, ...args: unknown[]) => unknown) =>
+      handlers.set(channel, handler),
+  },
+}));
+vi.mock('child_process', () => ({ spawn: spawnMock }));
+
+import { closeAbandonedRunsOnStartup, registerPipelineHandlers } from './pipelineHandlers';
+
+function childProcess() {
+  return Object.assign(new EventEmitter(), {
+    stdin: new PassThrough(),
+    stdout: new PassThrough(),
+    stderr: new PassThrough(),
+    kill: vi.fn(() => true),
+  });
+}
+
+const DSN = process.env.TEST_DATABASE_URL;
+const MIGRATIONS = path.resolve(__dirname, '../../../../../packages/etl-db-writer/migrations');
+
+function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
+  const handler = handlers.get(channel);
+  assert.ok(handler, `${channel} is registered`);
+  return Promise.resolve(handler({}, ...args)) as Promise<T>;
+}
+
+describe('pipeline IPC single-flight', () => {
+  beforeEach(() => {
+    handlers.clear();
+    spawnMock.mockReset();
+    workspace = mkdtempSync(path.join(os.tmpdir(), 'pipeline-handlers-'));
+    const entry = createWorkspaceManifestBackup('BK', '/source/BK');
+    entry.decrypted_path = 'renamed/decrypt/BK';
+    const target = resolveWorkspaceBackup(workspace, entry);
+    decryptPath = target.decryptedPath;
+    mkdirSync(decryptPath, { recursive: true });
+    writeFileSync(path.join(decryptPath, DECRYPT_MARKER), 'complete');
+    writeFileSync(
+      path.join(workspace, 'workspace.json'),
+      JSON.stringify({ ...emptyWorkspaceManifest(), backups: [entry] })
+    );
+    pool = { query: async () => ({ rows: [{ path: decryptPath }] }) };
+    registerPipelineHandlers(() => null, '/repo', pool as unknown as Pool);
+  });
+
+  afterEach(() => rmSync(workspace, { recursive: true, force: true }));
+
+  it('refuses the orchestrator while the processor runs, and the processor while the orchestrator runs', async () => {
+    const processor = childProcess();
+    spawnMock.mockReturnValueOnce(processor);
+    await invoke('epoch:startPipeline', '/source', { workspace });
+
+    await assert.rejects(
+      invoke('epoch:startAnalysis', workspace, []),
+      /Cannot start orchestrator while processor is running/
+    );
+    await assert.rejects(invoke('epoch:retryRun', 'run-123'), /Cannot start orchestrator while processor is running/);
+    processor.emit('close', 0);
+
+    const orchestrator = childProcess();
+    spawnMock.mockReturnValueOnce(orchestrator);
+    await invoke('epoch:retryRun', 'run-123');
+    const args = spawnMock.mock.calls.at(-1)?.[1] as string[];
+    assert.ok(args.includes('--workspace'));
+    assert.ok(args.includes(workspace));
+    assert.ok(args.includes('--label'));
+    assert.ok(args.includes('BK'));
+
+    await assert.rejects(
+      invoke('epoch:startPipeline', '/source', { workspace }),
+      /Cannot start processor while orchestrator is running/
+    );
+    orchestrator.emit('close', 0);
+  });
+});
+
+/**
+ * EPOCH-408, EPOCH-435: cancelling a retry ends the run its orchestrator
+ * created, by id, against real Postgres (R33). Needs TEST_DATABASE_URL (a role
+ * that may CREATE DATABASE). Skipped locally when unset; ipcHandlers.test.ts
+ * fails CI when it is missing.
+ */
+describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
+  const EVIDENCE = '11111111-1111-1111-1111-111111111111';
+  /** The run the examiner retries: it already ended. */
+  const RETRIED = '33333333-3333-3333-3333-333333333333';
+  /** The run the retry's orchestrator creates, reported by its run:created event. */
+  const CREATED = '55555555-5555-5555-5555-555555555555';
+  /** Another backup's run, whose orchestrator on this host is still alive. */
+  const OTHER = '44444444-4444-4444-4444-444444444444';
+  let admin: pg.Client;
+  let db: pg.Pool;
+  let dbName: string;
+
+  beforeAll(async () => {
+    workspace = mkdtempSync(path.join(os.tmpdir(), 'pipeline-cancel-'));
+    const entry = createWorkspaceManifestBackup('BK', '/source/BK');
+    decryptPath = resolveWorkspaceBackup(workspace, entry).decryptedPath;
+    mkdirSync(decryptPath, { recursive: true });
+    writeFileSync(path.join(decryptPath, DECRYPT_MARKER), 'complete');
+    writeFileSync(
+      path.join(workspace, 'workspace.json'),
+      JSON.stringify({ ...emptyWorkspaceManifest(), backups: [entry] })
+    );
+
+    dbName = `epoch_cancel_test_${Date.now()}_${process.pid}`;
+    admin = new pg.Client({ connectionString: DSN });
+    await admin.connect();
+    await admin.query(`CREATE DATABASE "${dbName}"`);
+    const url = new URL(DSN as string);
+    url.pathname = `/${dbName}`;
+    db = new pg.Pool({ connectionString: url.toString() });
+    for (const file of readdirSync(MIGRATIONS)
+      .filter((f) => f.endsWith('.sql'))
+      .sort()) {
+      await db.query(readFileSync(path.join(MIGRATIONS, file), 'utf8'));
+    }
+
+    await db.query(`INSERT INTO devices (device_id, device_key, label) VALUES
+      ('99999999-9999-9999-9999-999999999999', repeat('a', 64), 'test device')`);
+    await db.query(
+      `INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes)
+       VALUES ($1, repeat('b', 64), '99999999-9999-9999-9999-999999999999', 0, 0)`,
+      [EVIDENCE]
+    );
+    await db.query(
+      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
+       VALUES ($1, $1, 'decrypted', $2, '{"name": "test", "version": "0"}',
+               '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('b', 64))`,
+      [EVIDENCE, decryptPath]
+    );
+    // The retried run (ended), the run the retry creates, and another
+    // backup's open run. Both open runs belong to live processes on this host
+    // (this test's own), so only an id can close one.
+    await db.query(
+      `INSERT INTO pipeline_runs
+         (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid,
+          started_at, finished_at, ended_reason)
+       VALUES ($1, $2, 'test', '{}', $3, $3, $4, $5, now() - interval '1 hour', now() - interval '50 minutes', 'crashed'),
+              ($6, $2, 'test', '{}', $3, $3, $4, $5, now(), NULL, NULL)`,
+      [RETRIED, decryptPath, EVIDENCE, os.hostname(), process.pid, CREATED]
+    );
+    await db.query(
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid)
+       VALUES ($1, '/other/decrypted/X', 'test', '{}', $2, $3)`,
+      [OTHER, os.hostname(), process.pid]
+    );
+    await db.query(
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, started_at, finished_at) VALUES
+         ($1, 'crash', 1, 'succeeded', now(), now()),
+         ($1, 'ileapp', 2, 'running', now(), NULL),
+         ($1, 'report', 3, 'pending', NULL, NULL),
+         ($2, 'crash', 1, 'running', now(), NULL)`,
+      [CREATED, OTHER]
+    );
+
+    handlers.clear();
+    spawnMock.mockReset();
+    registerPipelineHandlers(() => null, '/repo', db as unknown as Pool);
+  });
+
+  afterAll(async () => {
+    await db?.end();
+    if (admin) {
+      await admin.query(`DROP DATABASE IF EXISTS "${dbName}"`);
+      await admin.end();
+    }
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it('ends the run the retry created, by id, leaves its stage rows and every other run alone, then frees the orchestrator', async () => {
+    const orchestrator = childProcess();
+    spawnMock.mockReturnValueOnce(orchestrator);
+    await invoke('epoch:retryRun', RETRIED);
+    orchestrator.stdout.write(
+      `${renderPipelineEvent({ type: 'run:created', run_id: CREATED, evidence_id: EVIDENCE, derivative_id: EVIDENCE })}\n`
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(await invoke('epoch:cancelAnalysis'), { cancelled: true });
+    assert.deepEqual(orchestrator.kill.mock.calls, [['SIGTERM']]);
+    orchestrator.emit('close', null);
+
+    const runs = async () =>
+      (
+        await db.query<{ run_id: string; ended_reason: string | null; ended_detail: string | null }>(
+          `SELECT run_id, ended_reason, ended_detail FROM pipeline_runs ORDER BY run_id`
+        )
+      ).rows;
+    await vi.waitFor(async () =>
+      assert.equal((await runs()).find((r) => r.run_id === CREATED)?.ended_reason, 'cancelled')
+    );
+    assert.deepEqual(await runs(), [
+      { run_id: RETRIED, ended_reason: 'crashed', ended_detail: null },
+      { run_id: OTHER, ended_reason: null, ended_detail: null },
+      { run_id: CREATED, ended_reason: 'cancelled', ended_detail: 'cancelled by user' },
+    ]);
+
+    const { rows: stages } = await db.query(
+      `SELECT run_id, stage_name, status, error_message, finished_at IS NOT NULL AS finished
+         FROM pipeline_stage_status ORDER BY run_id, stage_order`
+    );
+    assert.deepEqual(
+      stages,
+      [
+        { run_id: OTHER, stage_name: 'crash', status: 'running', error_message: null, finished: false },
+        { run_id: CREATED, stage_name: 'crash', status: 'succeeded', error_message: null, finished: true },
+        { run_id: CREATED, stage_name: 'ileapp', status: 'running', error_message: null, finished: false },
+        { run_id: CREATED, stage_name: 'report', status: 'pending', error_message: null, finished: false },
+      ],
+      'stage rows are never rewritten'
+    );
+    const { rows: state } = await db.query(`SELECT state FROM run_completeness WHERE run_id = $1`, [CREATED]);
+    assert.equal(state[0].state, 'incomplete', 'run_completeness says so on its own');
+
+    const next = childProcess();
+    spawnMock.mockReturnValueOnce(next);
+    assert.deepEqual(await invoke('epoch:retryRun', RETRIED), { started: true });
+    assert.equal(spawnMock.mock.calls.length, 2);
+    next.emit('close', 0);
+  });
+
+  it('ends the run as crashed, with the exit code, when the orchestrator exits unexpectedly', async () => {
+    const CRASHED = '88888888-8888-8888-8888-888888888888';
+    await db.query(
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+       VALUES ($1, $2, 'test', '{}', $3, $3, $4, $5)`,
+      [CRASHED, decryptPath, EVIDENCE, os.hostname(), process.pid]
+    );
+    // The stage it was running when it died.
+    await db.query(
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, started_at)
+       VALUES ($1, 'crash', 1, 'running', now())`,
+      [CRASHED]
+    );
+    const orchestrator = childProcess();
+    spawnMock.mockReturnValueOnce(orchestrator);
+    await invoke('epoch:retryRun', RETRIED);
+    orchestrator.stdout.write(
+      `${renderPipelineEvent({ type: 'run:created', run_id: CRASHED, evidence_id: EVIDENCE, derivative_id: EVIDENCE })}\n`
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    orchestrator.emit('close', 1);
+
+    const ended = async () =>
+      (await db.query(`SELECT ended_reason, ended_detail FROM pipeline_runs WHERE run_id = $1`, [CRASHED])).rows[0];
+    await vi.waitFor(async () => assert.equal((await ended()).ended_reason, 'crashed'));
+    assert.equal((await ended()).ended_detail, 'orchestrator process exited unexpectedly (code 1)');
+  });
+
+  it("reports the workspace interrupted when its evidence's latest run was, found by the sidecar's content root", async () => {
+    const entry = readWorkspaceManifestSync(workspace).backups[0];
+    const { sidecarPath } = resolveWorkspaceBackup(workspace, entry);
+    mkdirSync(path.dirname(sidecarPath), { recursive: true });
+    writeFileSync(
+      sidecarPath,
+      JSON.stringify({
+        schema_version: 1,
+        evidence_name: 'BK',
+        algorithm: 'sha256',
+        content_root: 'b'.repeat(64),
+        manifest_path: 'manifest.txt',
+        file_count: 0,
+        total_bytes: 0,
+        source_path: '/source/BK',
+        hashed_at: '2026-10-17T00:00:00Z',
+        tool: { name: 'test', version: '0' },
+      })
+    );
+    // The latest run of this evidence is the cancelled one above.
+    assert.deepEqual(await invoke('epoch:getAnalysisRunStatus', workspace), { status: 'interrupted' });
+  });
+
+  it("closes as abandoned a run whose orchestrator on this host is gone, and no one else's", async () => {
+    // A real process that has exited (child_process is mocked in this file).
+    const real = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    const dead = real.spawn(process.execPath, ['-e', '']);
+    const deadPid = dead.pid as number;
+    await new Promise((resolve) => dead.on('exit', resolve));
+    const ABANDONED = '66666666-6666-6666-6666-666666666666';
+    const ELSEWHERE = '77777777-7777-7777-7777-777777777777';
+    await db.query(
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid) VALUES
+         ($1, '/x', 'test', '{}', $3, $4),
+         ($2, '/y', 'test', '{}', 'another-host', $4)`,
+      [ABANDONED, ELSEWHERE, os.hostname(), deadPid]
+    );
+
+    await closeAbandonedRunsOnStartup(db as unknown as Pool);
+
+    const { rows } = await db.query(
+      `SELECT run_id, ended_reason, ended_detail FROM pipeline_runs WHERE run_id = ANY($1::uuid[]) ORDER BY run_id`,
+      [[ABANDONED, ELSEWHERE, OTHER]]
+    );
+    assert.deepEqual(rows, [
+      { run_id: OTHER, ended_reason: null, ended_detail: null },
+      {
+        run_id: ABANDONED,
+        ended_reason: 'abandoned',
+        ended_detail: `its orchestrator (process ${deadPid} on ${os.hostname()}) ended without finishing it`,
+      },
+      { run_id: ELSEWHERE, ended_reason: null, ended_detail: null },
+    ]);
+  });
+});

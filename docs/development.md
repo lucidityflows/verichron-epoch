@@ -52,12 +52,12 @@ both run as subprocesses.
 
 ```bash
 git clone --recurse-submodules <repo>
-cp .env.example .env                     # then fill in DB_USER, DB_PASSWORD, DB_NAME, DB_HOST, DB_PORT
+cp .env.example .env                     # then fill in DB_USER, DB_PASSWORD, DB_APP_USER, DB_APP_PASSWORD, DB_NAME, DB_HOST, DB_PORT
 mise install                             # Node, pnpm and uv at the pinned versions
 mise run check                           # report any missing prerequisite; changes nothing
 mise run setup                           # check again, then install every environment from the lockfiles
 docker compose -f infra/docker-compose.yml up -d postgres
-uv run python packages/etl-db-writer/migrate.py   # reads DB_* from .env
+mise run db                              # migrations as DB_USER, then the runtime login DB_APP_USER
 ```
 
 `mise run setup` reports every missing prerequisite at once, each with the
@@ -92,7 +92,8 @@ pnpm --filter @verichron/processor dev -- --source /path/to/backups --workspace 
 # 2. Register the evidence and run every stage: for every prepared backup in the workspace,
 #    or for the backups named (the app's Analyze names the selected ones, EPOCH-530)
 pnpm --filter @verichron/orchestrator investigate -- --workspace ~/verichron-workspace
-pnpm --filter @verichron/orchestrator investigate -- ~/verichron-workspace/decrypted/<label>
+# Analyze selected manifest entries instead:
+pnpm --filter @verichron/orchestrator investigate -- --workspace ~/verichron-workspace --label <label>
 
 # 3. Or drive both from the desktop app
 pnpm --filter @verichron/epoch dev
@@ -106,16 +107,17 @@ command again; otherwise the app runs the previous build of those packages
 (EPOCH-518). The orchestrator and processor are started fresh by each
 Analyze and Prepare Evidence, from the source.
 
-The orchestrator reads `DATABASE_URL` or complete `DB_USER`, `DB_PASSWORD`,
-and `DB_NAME` values from `.env` (with optional `DB_HOST` and `DB_PORT`). If
-neither configuration is present, the app, orchestrator, and database
-inspection tool fail before connecting; there is no built-in development
-credential. The report is written by the `reporting` stage to
-`reports/<label>/investigation_report.md`.
+**Two database identities (EPOCH-562).**
+- `DB_USER` and `DB_PASSWORD` are the administrative identity: the superuser Docker's Postgres is created with. Only `migrate.py` and `provision_roles.py` use it, through `mise run db`. `ADMIN_DATABASE_URL` overrides it.
+- The app, the orchestrator, the stages, the indicator registry and `db_peek.py` connect as the runtime login, `DB_APP_USER` / `DB_APP_PASSWORD` with `DB_NAME` (and optional `DB_HOST`, `DB_PORT`); `DATABASE_URL` overrides it. `mise run db` creates that login, or resets its password, as a member of `verichron_epoch_runtime` only. Run it again after recreating the database.
+- The runtime never falls back to the administrative identity. If its configuration is missing, the app, orchestrator and database inspection tool fail before connecting; there is no built-in development credential.
+
+The report is written by the `reporting` stage to the file declared
+in the selected workspace entry in `workspace.json`.
 A database created before EPOCH-489 that still holds mvt results is refused by
 migration 0009; recreate it with the command above.
 A database with runs from before EPOCH-414 is refused the same way by migration 0014,
-which adds each stage's order.
+which adds each stage's order, and one with runs from before EPOCH-435 by 0017.
 
 ## Forensic data and the repository
 
@@ -184,6 +186,8 @@ TEST_DATABASE_URL=postgresql://.../verichron_test uv run pytest
 
 pnpm --filter @verichron/processor test             # TypeScript (node:test via tsx)
 pnpm --filter @verichron/processor typecheck:tests  # Includes *.test.ts
+pnpm --filter @verichron/workspace-lock test
+pnpm --filter @verichron/workspace-lock typecheck:tests
 pnpm --filter @verichron/etl-db-reader typecheck:tests
 pnpm --filter @verichron/orchestrator typecheck:tests
 pnpm --filter @verichron/orchestrator test           # real-Postgres tests need TEST_DATABASE_URL

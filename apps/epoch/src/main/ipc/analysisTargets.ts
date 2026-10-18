@@ -1,5 +1,3 @@
-import * as path from 'node:path';
-
 import { readPreparedBackups } from './preparedBackups';
 
 /**
@@ -22,17 +20,27 @@ export function analysisTargets(workspace: string, labels: unknown[]): string[] 
   );
   const unique = [...new Set(labels as string[])].sort();
   for (const label of unique) {
-    if (label !== path.basename(label) || label === '.' || label === '..') {
+    if (label === '.' || label === '..' || label.includes('/') || label.includes('\\')) {
       throw new Error(`"${label}" is not a backup name.`);
     }
     if (!prepared.has(label)) {
       throw new Error(`${label} is not prepared in ${workspace}; prepare it before analyzing it.`);
     }
   }
-  return unique.map((label) => path.join(workspace, 'decrypted', label));
+  return unique;
 }
 
-/** The orchestrator's arguments for those backups: named paths, never `--workspace` (EPOCH-530). */
-export function orchestratorArgs(backupPaths: string[], summaryPath: string): string[] {
-  return ['--filter', '@verichron/orchestrator', 'investigate', '--', '--summary-path', summaryPath, ...backupPaths];
+/** The orchestrator receives the workspace and selected manifest labels (EPOCH-427, EPOCH-530). */
+export function orchestratorArgs(workspace: string, labels: string[], summaryPath: string): string[] {
+  return [
+    '--filter',
+    '@verichron/orchestrator',
+    'investigate',
+    '--',
+    '--workspace',
+    workspace,
+    ...labels.flatMap((label) => ['--label', label]),
+    '--summary-path',
+    summaryPath,
+  ];
 }

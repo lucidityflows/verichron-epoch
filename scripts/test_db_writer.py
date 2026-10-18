@@ -19,6 +19,7 @@ when its author intended, and was still wrong.
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 from datetime import UTC, datetime
@@ -28,9 +29,10 @@ from typing import TypedDict
 import psycopg2
 import psycopg2.extras
 import pytest
-from db_writer import IngestContext, compute_file_hash, incomplete_ingests, ingest, write_records
+from db_writer import IngestContext, compute_file_hash, incomplete_ingests, ingest, record_failures, write_records
+from etl_run import ItemFailure
 from normalized_record import NormalizedRecord, SourceType
-from testing.pg_real import BACKENDS, PgReal, open_db
+from testing.pg_real import BACKENDS, TEST_DATABASE_URL_ENV, PgReal, open_db
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MIGRATION = REPO_ROOT / "packages" / "etl-db-writer" / "migrations" / "0002_ingest_completion.sql"
@@ -82,15 +84,14 @@ def db(request):
 
 def strand(db, file_hash: str, file_path: str) -> int:
     """Insert an incomplete ledger row directly, as a hard kill would leave it.
-    The array literal goes through PgDouble's translation, so this one SQL
-    statement works on both backends."""
+    The ledger and run link are committed together to model the persisted state."""
     with db.cursor() as cur:
         cur.execute(
             """
             INSERT INTO ingested_files
                 (evidence_id, derivative_id, file_hash, source_type, parser_version,
-                 file_path, file_name, payload_kind, raw_payload, produced_by_runs)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, ARRAY[%s::uuid])
+                 file_path, file_name, payload_kind, raw_payload)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING ingest_id
             """,
             (
@@ -103,10 +104,20 @@ def strand(db, file_hash: str, file_path: str) -> int:
                 Path(file_path).name,
                 "full",
                 psycopg2.extras.Json({}),
-                RUN_ID,
             ),
         )
-        return cur.fetchone()[0]
+        ingest_id = cur.fetchone()[0]
+        cur.execute(
+            "INSERT INTO ingest_run_links (ingest_id, run_id) VALUES (%s, %s::uuid)",
+            (ingest_id, RUN_ID),
+        )
+        return ingest_id
+
+
+def run_ids(db, ingest_id: int) -> list[str]:
+    with db.cursor() as cur:
+        cur.execute("SELECT run_id FROM ingest_run_links WHERE ingest_id = %s ORDER BY run_id", (ingest_id,))
+        return [str(row[0]) for row in cur.fetchall()]
 
 
 @pytest.fixture
@@ -240,7 +251,7 @@ def test_second_run_of_a_completed_file_is_a_no_op(db, artifact):
 
 def test_completed_ledger_row_is_not_restamped_by_a_later_run(db, artifact):
     """A finished ingest is immutable audit data. A later run is recorded as
-    having seen the unit (R7), and nothing else about the row changes."""
+    having seen the unit (R7), and the ledger row itself never changes."""
     with ingest(db, ctx(RUN_ID), artifact, **UNIT) as unit:
         unit.write([record(0)])
     original = db.ledger()[0]
@@ -250,9 +261,104 @@ def test_completed_ledger_row_is_not_restamped_by_a_later_run(db, artifact):
         assert unit.already_ingested
 
     after = db.ledger()[0]
-    assert after["produced_by_runs"] == [RUN_ID, later]
-    for column in ("ingest_id", "derivative_id", "file_path", "raw_payload", "ingested_at", "completed_at"):
-        assert after[column] == original[column], column
+    assert after == original
+    assert run_ids(db, after["ingest_id"]) == [RUN_ID, later]
+
+
+@pytest.mark.parametrize("operation", ["update", "delete"])
+def test_completed_ingest_ledger_rows_reject_mutation_on_postgres(db, artifact, operation):
+    postgres_only(db)
+    with ingest(db, ctx(), artifact, **UNIT) as unit:
+        unit.write([record(0)])
+        ingest_id = unit.ingest_id
+
+    with pytest.raises(psycopg2.Error, match="completed ingested_files rows are immutable"):
+        with db.cursor() as cur:
+            if operation == "update":
+                cur.execute("UPDATE ingested_files SET raw_payload = '{}'::jsonb WHERE ingest_id = %s", (ingest_id,))
+            else:
+                cur.execute("DELETE FROM ingested_files WHERE ingest_id = %s", (ingest_id,))
+    db.rollback()
+    assert len(db.ledger()) == 1
+    assert db.record_count() == 1
+
+
+@pytest.mark.parametrize("operation", ["update", "delete", "insert"])
+def test_completed_ingest_records_reject_mutation_on_postgres(db, artifact, operation):
+    postgres_only(db)
+    with ingest(db, ctx(), artifact, **UNIT) as unit:
+        unit.write([record(0)])
+        ingest_id = unit.ingest_id
+
+    with pytest.raises(psycopg2.Error, match="forensic_records belonging to a completed ingest are immutable"):
+        with db.cursor() as cur:
+            if operation == "update":
+                cur.execute(
+                    "UPDATE forensic_records SET fields = fields || '{\"changed\": true}'::jsonb WHERE ingest_id = %s",
+                    (ingest_id,),
+                )
+            elif operation == "delete":
+                cur.execute("DELETE FROM forensic_records WHERE ingest_id = %s", (ingest_id,))
+            else:
+                cur.execute(
+                    "INSERT INTO forensic_records (ingest_id, evidence_id, source_type) "
+                    "VALUES (%s, %s, 'crash_report')",
+                    (ingest_id, EVIDENCE_A),
+                )
+    db.rollback()
+    assert db.record_count() == 1
+
+
+@pytest.mark.parametrize("operation", ["update", "delete"])
+def test_ingest_run_links_are_append_only_on_postgres(db, artifact, operation):
+    postgres_only(db)
+    with ingest(db, ctx(), artifact, **UNIT) as unit:
+        unit.write([record(0)])
+        ingest_id = unit.ingest_id
+
+    with pytest.raises(psycopg2.Error, match="ingest_run_links is append-only"):
+        with db.cursor() as cur:
+            if operation == "update":
+                cur.execute(
+                    "UPDATE ingest_run_links SET run_id = %s WHERE ingest_id = %s",
+                    ("22222222-2222-2222-2222-222222222222", ingest_id),
+                )
+            else:
+                cur.execute("DELETE FROM ingest_run_links WHERE ingest_id = %s", (ingest_id,))
+    db.rollback()
+    assert run_ids(db, ingest_id) == [RUN_ID]
+
+
+def test_the_audited_purge_deletes_facts_and_records_who_when_and_why(db, artifact):
+    postgres_only(db)
+    with ingest(db, ctx(), artifact, **UNIT) as unit:
+        unit.write([record(0), record(1)])
+        ingest_id = unit.ingest_id
+
+    with db.cursor() as cur:
+        cur.execute("SELECT session_user")
+        actor = cur.fetchone()[0]
+        cur.execute("SELECT purge_evidence(%s, %s)", (EVIDENCE_A, "privacy request"))
+    db.commit()
+
+    assert db.ledger() == []
+    assert db.record_count() == 0
+    assert run_ids(db, ingest_id) == []
+    with db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT kind, actor, detail->>'reason', detail->>'deleted_records',
+                   detail->>'deleted_run_links', detail->>'deleted_ingests', occurred_at
+            FROM evidence_events
+            WHERE evidence_id = %s AND kind = 'purged'
+            """,
+            (EVIDENCE_A,),
+        )
+        event = cur.fetchone()
+    assert event is not None
+    assert event[0:2] == ("purged", actor)
+    assert event[2:6] == ("privacy request", "2", "1", "1")
+    assert event[6] is not None
 
 
 def test_zero_records_is_a_valid_completion_not_an_incomplete_ingest(db, artifact):
@@ -309,6 +415,65 @@ def test_orphaned_records_from_a_hard_kill_are_not_double_counted(db, artifact):
 
     assert db.record_count() == 2, "partial records from the abandoned attempt must be cleared"
     assert db.ledger()[0]["record_count"] == 2
+
+
+def test_ingest_handles_a_completed_conflict_without_updating_the_ledger(db, artifact):
+    postgres_only(db)
+    ingest_id = strand(db, compute_file_hash(artifact), str(artifact))
+    db.commit()
+    raced = False
+
+    class RacingCursor:
+        def __init__(self, cursor):
+            self.cursor = cursor
+
+        def __enter__(self):
+            self.cursor.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.cursor.__exit__(*args)
+
+        def execute(self, statement, params=None):
+            nonlocal raced
+            self.cursor.execute(statement, params)
+            if not raced and statement.lstrip().startswith("SELECT ingest_id, ingest_complete FROM ingested_files"):
+                raced = True
+                concurrent = psycopg2.connect(os.environ[TEST_DATABASE_URL_ENV])
+                try:
+                    with concurrent.cursor() as cur:
+                        cur.execute(
+                            """
+                            UPDATE ingested_files
+                            SET ingest_complete = TRUE, record_count = 0, completed_at = now()
+                            WHERE ingest_id = %s
+                            """,
+                            (ingest_id,),
+                        )
+                    concurrent.commit()
+                finally:
+                    concurrent.close()
+            return self
+
+        def fetchone(self):
+            return self.cursor.fetchone()
+
+    class RacingConnection:
+        def cursor(self):
+            return RacingCursor(db.cursor())
+
+        def commit(self):
+            db.commit()
+
+        def rollback(self):
+            db.rollback()
+
+    with ingest(RacingConnection(), ctx("33333333-3333-3333-3333-333333333333"), artifact, **UNIT) as unit:
+        assert unit.already_ingested
+
+    assert raced
+    assert db.ledger()[0]["ingest_complete"] == 1
+    assert run_ids(db, ingest_id) == [RUN_ID, "33333333-3333-3333-3333-333333333333"]
 
 
 def test_incomplete_ingests_reports_stranded_rows(db, artifact):
@@ -452,7 +617,7 @@ def test_two_runs_over_one_evidence_are_one_unit_labeled_with_both(db, artifact)
 
     ledger = db.ledger()
     assert len(ledger) == 1
-    assert ledger[0]["produced_by_runs"] == [RUN_ID, retry]
+    assert run_ids(db, ledger[0]["ingest_id"]) == [RUN_ID, retry]
     assert db.record_count() == 1
 
 
@@ -462,7 +627,7 @@ def test_rerunning_the_same_run_does_not_repeat_its_label(db, artifact):
     with ingest(db, ctx(RUN_ID), artifact, **UNIT) as unit:
         assert unit.already_ingested
 
-    assert db.ledger()[0]["produced_by_runs"] == [RUN_ID]
+    assert run_ids(db, db.ledger()[0]["ingest_id"]) == [RUN_ID]
 
 
 def test_a_failed_attempt_leaves_no_run_label(db, artifact):
@@ -474,7 +639,7 @@ def test_a_failed_attempt_leaves_no_run_label(db, artifact):
         with ingest(db, ctx(retry), artifact, **UNIT):
             raise ValueError("crashed while handling a dedup hit")
 
-    assert db.ledger()[0]["produced_by_runs"] == [RUN_ID]
+    assert run_ids(db, db.ledger()[0]["ingest_id"]) == [RUN_ID]
 
 
 def test_parser_version_bump_appends_a_unit_and_keeps_the_old_one(db, artifact):
@@ -593,8 +758,8 @@ def test_a_run_cannot_pair_evidence_with_another_evidences_derivative(db):
 
 
 def test_deleting_a_run_deletes_no_evidence_or_facts(db, artifact):
-    """R9: nothing cascades from a run. produced_by_runs is a label, not a
-    foreign key, so the run can go and the facts stay."""
+    """R9: run links are audit labels, not foreign keys, so deleting a run
+    never touches evidence, facts, or their attribution."""
     postgres_only(db)
     with ingest(db, ctx(RUN_ID), artifact, **UNIT) as unit:
         unit.write([record(0), record(1)])
@@ -605,6 +770,7 @@ def test_deleting_a_run_deletes_no_evidence_or_facts(db, artifact):
 
     assert len(db.ledger()) == 1
     assert db.record_count() == 2
+    assert run_ids(db, db.ledger()[0]["ingest_id"]) == [RUN_ID]
 
 
 @pytest.mark.parametrize("statement", ["UPDATE evidence_events SET host = 'x'", "DELETE FROM evidence_events"])
@@ -728,3 +894,115 @@ def test_a_content_hash_must_be_a_sha256(db, artifact):
     with pytest.raises(ValueError, match="sha256 hex digest"):
         with ingest(db, ctx(), artifact, source_type="ileapp_record", payload_kind="none", content_hash="abc"):
             pass
+
+
+# ==========================================================================
+# Failed items (EPOCH-432)
+# ==========================================================================
+
+
+#: The directory a stage read, as the orchestrator passes it.
+ROOT = "/ws/crash_reports/BK1"
+
+
+def staged(run_id: str = RUN_ID, evidence_id: str = EVIDENCE_A) -> IngestContext:
+    return IngestContext(
+        evidence_id=evidence_id,
+        derivative_id=SEEDED_EVIDENCE[evidence_id],
+        run_id=run_id,
+        parser_version=1,
+        stage_name="crash",
+    )
+
+
+def test_record_failures_stamps_each_item_from_the_context_in_one_commit(db):
+    failures = [
+        ItemFailure("Retired/a.ips", "ValueError: no JSON metadata line", "a" * 64),
+        ItemFailure("b.ips", "PermissionError: denied"),
+    ]
+
+    assert record_failures(db, staged(), failures, source_type="crash_report", root=ROOT) == 2
+
+    assert db.commits == 1
+    rows = [
+        (
+            r["run_id"],
+            r["stage_name"],
+            r["evidence_id"],
+            r["derivative_id"],
+            r["source_type"],
+            r["item"],
+            r["file_hash"],
+            r["reason"],
+        )
+        for r in db.failures()
+    ]
+    assert rows == [
+        (RUN_ID, "crash", EVIDENCE_A, DERIVATIVE_A, "crash_report", "Retired/a.ips", "a" * 64, failures[0].reason),
+        (RUN_ID, "crash", EVIDENCE_A, DERIVATIVE_A, "crash_report", "b.ips", None, failures[1].reason),
+    ]
+    # Where each item was, fixed when written, as ingest() names a unit.
+    assert [r["file_path"] for r in db.failures()] == [f"{ROOT}/Retired/a.ips", f"{ROOT}/b.ips"]
+
+
+def test_record_failures_with_nothing_failed_writes_and_commits_nothing(db):
+    assert record_failures(db, staged(), [], source_type="crash_report", root=ROOT) == 0
+    assert db.commits == 0
+    assert db.failures() == []
+
+
+def test_record_failures_needs_the_stage_name(db):
+    with pytest.raises(ValueError, match="--stage-name"):
+        record_failures(db, ctx(), [ItemFailure("a.ips", "boom")], source_type="crash_report", root=ROOT)
+
+
+@pytest.mark.parametrize("item", ["/abs/a.ips", "", "../outside.ips", "Retired/../../outside.ips"])
+def test_record_failures_refuses_an_item_not_relative_to_its_derivative(db, item):
+    with pytest.raises(ValueError, match="relative to its derivative"):
+        record_failures(db, staged(), [ItemFailure(item, "boom")], source_type="crash_report", root=ROOT)
+    assert db.failures() == []
+
+
+def test_record_failures_refuses_a_hash_that_is_not_a_sha256(db):
+    with pytest.raises(ValueError, match="sha256 hex digest"):
+        record_failures(db, staged(), [ItemFailure("a.ips", "boom", "abc")], source_type="crash_report", root=ROOT)
+
+
+@pytest.mark.parametrize(
+    "statement", ["UPDATE stage_item_failures SET reason = 'x'", "DELETE FROM stage_item_failures"]
+)
+def test_stage_item_failures_are_append_only_on_postgres(db, statement):
+    postgres_only(db)
+    record_failures(db, staged(), [ItemFailure("a.ips", "boom")], source_type="crash_report", root=ROOT)
+
+    with pytest.raises(psycopg2.Error, match="stage_item_failures is append-only"):
+        with db.cursor() as cur:
+            cur.execute(statement)
+    db.rollback()
+    assert len(db.failures()) == 1
+
+
+def test_the_purge_deletes_and_counts_the_evidences_failed_items_only(db):
+    postgres_only(db)
+    record_failures(
+        db,
+        staged(),
+        [ItemFailure("a.ips", "boom"), ItemFailure("b.ips", "bang")],
+        source_type="crash_report",
+        root=ROOT,
+    )
+    record_failures(
+        db, staged(evidence_id=EVIDENCE_B), [ItemFailure("c.ips", "other case")], source_type="crash_report", root=ROOT
+    )
+
+    with db.cursor() as cur:
+        cur.execute("SELECT purge_evidence(%s, %s)", (EVIDENCE_A, "privacy request"))
+        cur.execute(
+            "SELECT detail->>'deleted_item_failures' FROM evidence_events WHERE evidence_id = %s AND kind = 'purged'",
+            (EVIDENCE_A,),
+        )
+        counted = cur.fetchone()[0]
+    db.commit()
+
+    assert counted == "2"
+    assert [(r["evidence_id"], r["item"]) for r in db.failures()] == [(EVIDENCE_B, "c.ips")]

@@ -84,6 +84,7 @@ fi
 [ -z "$(ls -A "$4" 2>/dev/null)" ] || { echo "  decrypt-backup: $4 is not empty" >&2; exit 2; }
 if [ "$STUB_DECRYPT" = hang ]; then sleep 60 & wait; exit 0; fi
 mkdir -p "$4" && touch "$4/from-$(cat "$3/version.txt").txt" "$4/Manifest.db"
+if [ "$STUB_DECRYPT" = enospc ]; then echo "OSError: [Errno 28] No space left on device" >&2; exit 1; fi
 if [ "$STUB_DECRYPT" = fail ]; then echo "  decrypt-backup: incomplete: 1 of 2 files written" >&2; exit 1; fi
 if [ "$STUB_DECRYPT" = mutate ]; then echo "mutated" > "$3/version.txt"; fi
 if [ "$STUB_DECRYPT" = unplug ] && [ "$(basename "$3")" = BK1 ]; then rm -rf "$3"; fi
@@ -245,6 +246,16 @@ describe('decrypt provenance', () => {
 
     await runCli();
     assert.ok(readDecryptMarker(decrypted()), 'a clean re-run restores it');
+  });
+
+  it('reports ENOSPC with workspace capacity and leaves the decrypt incomplete', async () => {
+    const out = await runCli(['--force-decrypt', '--only', 'BK1'], 'enospc');
+    assert.match(
+      out,
+      /\[decrypt\] error: Prepare Evidence ran out of workspace space in .*GB free; this backup needs an estimated .*GB/
+    );
+    assert.equal(readDecryptMarker(decrypted()), null);
+    assert.equal(readIleappMarker(ileapp()), null);
   });
 
   it('a backup that changes while being decrypted gets no marker', async () => {
@@ -460,7 +471,7 @@ describe('crash logs (EPOCH-514)', () => {
   it('copies them into crash_reports/<label>/ and records their content root and the evidence they came with', async () => {
     writeAcquisition(2, 6);
     const out = await runCli();
-    assert.match(out, /\[crash\]   copied 2 file\(s\) -> crash_reports\/BK1/);
+    assert.ok(out.includes(`[crash]   copied 2 file(s) -> ${copied()}`));
     const marker = readCrashReportsMarker(copied())!;
     assert.ok(marker, 'marker written');
     assert.equal(marker.content_root, readDecryptMarker(decrypted())!.content_root);

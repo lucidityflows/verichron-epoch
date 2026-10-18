@@ -6,9 +6,9 @@ Turns [iLEAPP](https://github.com/abrignoni/iLEAPP)'s results into
 [stage contract](../../../packages/contracts/EXTRACTOR_CONTRACT.md).
 
 The processor runs iLEAPP, not this stage (EPOCH-416): it leaves one report per
-backup at `<workspace>/ileapp/<label>/`, marked with `.ileapp_ok`, and the
-orchestrator registers it and passes its directory as `--derivative-path`.
-This stage reads that directory and nothing else.
+backup at the output path declared in `workspace.json`, marked with
+`.ileapp_ok`, and the orchestrator registers it and passes its directory as
+`--derivative-path`. This stage reads that directory and nothing else.
 
 > **Known issues** are ticketed and ordered under VER-24. Its tests use
 > recorded LAVA output (`test_integration.py`); CI doesn't run the real iLEAPP
@@ -48,7 +48,11 @@ chosen or parsed by name.
 
 **Warnings (EPOCH-420).** The stage writes notes to stderr. When it succeeds,
 the orchestrator stores that stderr in the stage's `warnings`; if the stage
-fails, stderr is stored as its error message instead.
+fails, stderr is stored as its error message instead. Each artifact that fails
+is recorded as `_lava_artifacts.db#<table>`, with its content hash when its
+check had computed one (EPOCH-432). An artifact whose table name is missing or
+holds a path separator is recorded under `_lava_artifacts.db`, with the table
+name in its reason, so no item names a place outside the report directory.
 
 **iLEAPP's output is checked, not trusted (R36, EPOCH-511).**
 

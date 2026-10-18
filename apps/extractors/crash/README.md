@@ -9,7 +9,7 @@ derivative). It follows the
 on the real reference backup, `Manifest.db` listed no file under
 `DiagnosticReports` or `CrashReporter`. Crash logs are copied from the device
 separately: an iPhone pull copies them with `idevicecrashreport -k`, and the
-processor copies them into `crash_reports/<label>/` (EPOCH-514; see
+processor copies them to the path declared in `workspace.json` (EPOCH-514; see
 [docs/evidence-model.md](../../../docs/evidence-model.md#derivatives)).
 EPOCH-515 will read them from full-filesystem extractions. Evidence without
 them has this stage recorded as skipped, with that reason, and the report lists
@@ -66,5 +66,6 @@ The tests use redacted real reports, one per body format
 ([fixtures/README.md](fixtures/README.md)).
 
 Failures are handled per file: an unparseable file is rolled back and retried on
-the next run, while the others commit. The atomicity tests are in
+the next run, while the others commit. Each failed file is recorded with its
+path under the crash logs and its hash (EPOCH-432). The atomicity tests are in
 `scripts/test_extractor_ingest_atomicity.py`.

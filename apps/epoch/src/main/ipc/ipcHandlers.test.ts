@@ -14,6 +14,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import pg from 'pg';
+import { createWorkspaceManifestBackup, emptyWorkspaceManifest } from '@verichron/contracts';
 import { afterAll, beforeAll, describe, it, vi } from 'vitest';
 
 const { handlers, openPath } = vi.hoisted(() => ({
@@ -53,6 +54,11 @@ function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 
 beforeAll(async () => {
   workspace = mkdtempSync(path.join(os.tmpdir(), 'epoch454-'));
+  const backup = createWorkspaceManifestBackup('b', '/source/b');
+  writeFileSync(
+    path.join(workspace, 'workspace.json'),
+    JSON.stringify({ ...emptyWorkspaceManifest(), backups: [backup] })
+  );
   if (!DSN) return;
   dbName = `epoch_ipc_test_${Date.now()}_${process.pid}`;
   admin = new pg.Client({ connectionString: DSN });
@@ -87,8 +93,8 @@ beforeAll(async () => {
     const { rows } = await pool.query<{ ingest_id: string }>(
       `INSERT INTO ingested_files
          (evidence_id, derivative_id, file_hash, source_type, parser_version, file_path, file_name,
-          payload_kind, raw_payload, ingest_complete, record_count, completed_at)
-       VALUES ($1, $1, repeat($2, 64), 'crash_report', 1, '/x', 'x', 'none', '{}', TRUE, 1, now())
+          payload_kind, raw_payload)
+       VALUES ($1, $1, repeat($2, 64), 'crash_report', 1, '/x', 'x', 'none', '{}')
        RETURNING ingest_id`,
       [evidence, root]
     );
@@ -97,16 +103,21 @@ beforeAll(async () => {
        VALUES ($1, $2, 'crash_report', $3)`,
       [rows[0].ingest_id, evidence, `process_of_${root}`]
     );
+    await pool.query(
+      `UPDATE ingested_files SET ingest_complete = TRUE, record_count = 1, completed_at = now()
+       WHERE ingest_id = $1`,
+      [rows[0].ingest_id]
+    );
   }
   await pool.query(
-    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id)
-     VALUES ($1, $2, 'test', '{}', $3, $3)`,
+    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
+     VALUES ($1, $2, 'test', '{}', $3, $3, 'test-host', 1)`,
     [RUN, path.join(workspace, 'decrypted', 'b'), EVIDENCE]
   );
   // A run from before evidence registration (EPOCH-404).
   await pool.query(
-    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions)
-     VALUES ($1, '/legacy/decrypted/a', 'test', '{}')`,
+    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid)
+     VALUES ($1, '/legacy/decrypted/a', 'test', '{}', 'test-host', 1)`,
     [UNREGISTERED_RUN]
   );
 
@@ -148,6 +159,37 @@ describe.skipIf(live)('database handlers', () => {
       total: 0,
       nextCursor: null,
     });
+  });
+
+  it("reads a stage's failed items, and the run's evidence's still-failing items (EPOCH-432)", async () => {
+    await pool.query(
+      `INSERT INTO stage_item_failures
+         (run_id, stage_name, evidence_id, derivative_id, source_type, item, file_path, reason)
+       VALUES ($1, 'crash', $2, $2, 'crash_report', 'Retired/x.ips', '/c/Retired/x.ips', 'ValueError: no JSON metadata line'),
+              ($1, 'crash', $3, $3, 'crash_report', 'other.ips', '/c/other.ips', 'ValueError: another case')`,
+      [RUN, EVIDENCE, OTHER]
+    );
+    // Ordered in the database's collation, so compared as a set.
+    const items = (page: { rows: Array<{ item: string }>; total: number }) => [
+      page.rows.map((r) => r.item).sort(),
+      page.total,
+    ];
+
+    assert.deepEqual(items(await invoke('epoch:getStageFailures', RUN, 'crash')), [
+      ['Retired/x.ips', 'other.ips'].sort(),
+      2,
+    ]);
+    assert.deepEqual(
+      items(await invoke('epoch:getStillFailing', RUN)),
+      [['Retired/x.ips'], 1],
+      'its evidence only (R7)'
+    );
+    assert.deepEqual(await invoke('epoch:getStillFailing', UNREGISTERED_RUN), { rows: [], total: 0 });
+  });
+
+  it("reads the run's evidence's interrupted stages, and none for a run without evidence (EPOCH-561)", async () => {
+    assert.deepEqual(await invoke('epoch:getInterruptedStages', RUN), []);
+    assert.deepEqual(await invoke('epoch:getInterruptedStages', UNREGISTERED_RUN), []);
   });
 
   it('lists runs with their status from run_completeness', async () => {

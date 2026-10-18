@@ -1,4 +1,9 @@
-import { DECRYPT_MARKER } from '@verichron/contracts';
+import {
+  DECRYPT_MARKER,
+  WorkspaceManifestError,
+  readWorkspaceManifest,
+  resolveWorkspaceBackup,
+} from '@verichron/contracts';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import * as fsp from 'node:fs/promises';
@@ -9,7 +14,7 @@ import { loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
 
 export function printUsage() {
   console.error(
-    `Usage:\n  pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace-dir> [--summary-path <file>] [--indicator-set <set hash>]`
+    `Usage:\n  pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace-dir> [--label <label> ...] [--summary-path <file>] [--indicator-set <set hash>]`
   );
 }
 
@@ -76,6 +81,7 @@ export async function parseCliConfig(): Promise<CliConfig> {
     args: cleanArgs,
     options: {
       workspace: { type: 'string' },
+      label: { type: 'string', multiple: true },
       'summary-path': { type: 'string' },
       // The indicator set to check, by set hash; the newest registered set when omitted (EPOCH-491).
       'indicator-set': { type: 'string' },
@@ -86,32 +92,60 @@ export async function parseCliConfig(): Promise<CliConfig> {
   const summaryPath = values['summary-path'];
   const indicatorSetHash = values['indicator-set'];
 
-  if (values.workspace) {
-    const decryptedDir = path.join(values.workspace, 'decrypted');
-    let entries;
-    try {
-      entries = await fsp.readdir(decryptedDir, { withFileTypes: true });
-    } catch (err) {
-      console.error(`[orchestrator] could not read ${decryptedDir}`);
-      process.exit(1);
+  if (!values.workspace) {
+    if (positionals.length > 0) {
+      throw new Error('backup paths are no longer accepted; provide --workspace and optional --label values');
     }
-    const candidates = entries.filter((e) => e.isDirectory());
-    const backupPaths: string[] = [];
-    for (const entry of candidates) {
-      const dir = path.join(decryptedDir, entry.name);
-      const markerExists = await fsp
-        .access(path.join(dir, DECRYPT_MARKER))
-        .then(() => true)
-        .catch(() => false);
-      if (markerExists) backupPaths.push(dir);
-    }
-    backupPaths.sort();
-    return { backupPaths, dbUrl, summaryPath, indicatorSetHash };
-  }
-
-  if (positionals.length === 0) {
     printUsage();
     process.exit(1);
   }
-  return { backupPaths: positionals, dbUrl, summaryPath, indicatorSetHash };
+
+  if (positionals.length > 0) {
+    throw new Error('backup paths are no longer accepted; provide --workspace and optional --label values');
+  }
+  const workspace = path.resolve(values.workspace);
+  const targets = await workspaceTargets(workspace, values.label);
+  return { targets, workspacePaths: [workspace], dbUrl, summaryPath, indicatorSetHash };
+}
+
+export async function workspaceTargets(
+  workspace: string,
+  requestedLabels?: string[]
+): Promise<ReturnType<typeof resolveWorkspaceBackup>[]> {
+  let manifest;
+  try {
+    manifest = await readWorkspaceManifest(workspace);
+  } catch (error) {
+    if (error instanceof WorkspaceManifestError) throw error;
+    throw new Error(
+      `could not read workspace manifest for ${workspace}: ${error instanceof Error ? error.message : error}`,
+      { cause: error }
+    );
+  }
+
+  const selectedLabels = requestedLabels ? [...new Set(requestedLabels)].sort() : null;
+  const entries = selectedLabels
+    ? selectedLabels.map((label) => {
+        const entry = manifest.backups.find((candidate) => candidate.label === label);
+        if (!entry) throw new Error(`workspace manifest has no entry for backup "${label}"`);
+        return entry;
+      })
+    : [...manifest.backups].sort((a, b) => a.label.localeCompare(b.label));
+
+  const candidates = entries.map((entry) => resolveWorkspaceBackup(workspace, entry));
+  const resolvedTargets: typeof candidates = [];
+  for (const candidate of candidates) {
+    try {
+      await fsp.access(path.join(candidate.decryptedPath, DECRYPT_MARKER));
+      resolvedTargets.push(candidate);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
+  if (selectedLabels && resolvedTargets.length !== selectedLabels.length) {
+    const ready = new Set(resolvedTargets.map((target) => target.label));
+    const notPrepared = selectedLabels.find((label) => !ready.has(label));
+    throw new Error(`backup "${notPrepared}" has no decrypt completion marker in its manifest path`);
+  }
+  return resolvedTargets;
 }

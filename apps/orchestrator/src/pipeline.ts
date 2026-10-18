@@ -1,21 +1,21 @@
 import { execFileSync, spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { Client } from 'pg';
 import type { StageDefinition, StageSet, RunConfig } from './types.js';
-import { createRun, findCompleteRunFor, markStage, markRunFailed, type RunProvenance } from './db.js';
+import { createRun, findCompleteRunFor, finishRun, markStage, markRunFailed, type RunProvenance } from './db.js';
 import { inputsFor, registerEvidence, RegistrationError, type Registration } from './registration.js';
 import { IndicatorSetError, selectIndicatorSet, type IndicatorSetChoice } from './indicatorSets.js';
 import {
   contractVersion,
-  deriveIleappPath,
-  deriveCrashReportsPath,
-  deriveReportPath,
-  deriveRunSummaryPath,
+  resolveRunSummaryPath,
+  type ResolvedWorkspaceBackup,
   type DerivativeKind,
 } from '@verichron/contracts';
 import { exportRunSummary } from './runSummary.js';
+import { emitEvent, relayStageOutput } from './events.js';
 
 async function validateBackupPath(backupPath: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!backupPath || backupPath.startsWith('-')) {
@@ -49,6 +49,32 @@ const DERIVATIVE_NAMES: Record<DerivativeKind, string> = {
 
 export type StageOutcome = { status: 'succeeded' | 'failed'; stderr: string } | { status: 'skipped'; reason: string };
 
+export const STAGE_TIMEOUT_MS = 30 * 60 * 1000;
+const STAGE_KILL_GRACE_MS = 5000;
+
+function signalStageProcess(child: ChildProcess, signal: NodeJS.Signals): string | null {
+  if (process.platform !== 'win32' && child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, signal);
+      return null;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ESRCH') return null;
+      return `Could not send ${signal} to the stage process group: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (child.exitCode !== null || child.signalCode !== null) return null;
+  try {
+    return child.kill(signal) ? null : `Could not send ${signal} to the stage process.`;
+  } catch (err) {
+    return `Could not send ${signal} to the stage process: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
+function formatTimeout(timeoutMs: number): string {
+  return timeoutMs % 60_000 === 0 ? `${timeoutMs / 60_000} minutes` : `${timeoutMs} ms`;
+}
+
 /**
  * Runs one stage against the input its stage.json says it reads: a derivative,
  * whose id and path it passes, or the indicator set the run checks, whose id it
@@ -62,7 +88,8 @@ export function runStage(
   config: RunConfig,
   runId: string,
   registration: Registration,
-  indicatorSet: IndicatorSetChoice | null = null
+  indicatorSet: IndicatorSetChoice | null = null,
+  timeoutMs = STAGE_TIMEOUT_MS
 ): Promise<StageOutcome> {
   // Identity comes from here, never from the stage (R16): the evidence, the
   // input this stage reads, and its declared parser version.
@@ -103,8 +130,10 @@ export function runStage(
       config.backupPath,
       ...inputArgs,
     ];
+    // A stage that writes facts also records the items it could not ingest,
+    // labelled with its name (EPOCH-432).
     if (stage.manifest.parserVersion !== undefined)
-      extraArgs.push('--parser-version', String(stage.manifest.parserVersion));
+      extraArgs.push('--parser-version', String(stage.manifest.parserVersion), '--stage-name', stage.name);
     if (config.reportPath) extraArgs.push('--report-path', config.reportPath);
 
     const entrypointPath = path.join(stage.dir, stage.manifest.entrypoint);
@@ -115,18 +144,58 @@ export function runStage(
     const child = spawn(bin, [entrypointPath, ...extraArgs], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, DATABASE_URL: config.dbUrl },
+      detached: process.platform !== 'win32',
     });
 
     let stderr = '';
-    child.stdout?.pipe(process.stdout);
+    let timedOut = false;
+    let stopError: string | null = null;
+    let timeoutHandle: NodeJS.Timeout | null = null;
+    let killEscalationHandle: NodeJS.Timeout | null = null;
+    let settled = false;
+    const finish = (outcome: StageOutcome) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+      if (killEscalationHandle) clearTimeout(killEscalationHandle);
+      resolve(outcome);
+    };
+
+    // Line by line, so a stage's output can't pass for an event (EPOCH-443).
+    // The outcome waits for the relay to drain, so a stage's last line is
+    // written before its stage:finished event.
+    const relay = relayStageOutput(stage.name);
+    let relayDrained = false;
+    relay.once('end', () => {
+      relayDrained = true;
+    });
+    child.stdout?.pipe(relay).pipe(process.stdout, { end: false });
+    const afterRelay = (then: () => void) => (relayDrained ? then() : relay.once('end', then));
     // Decoded as a stream, so a UTF-8 character split across two chunks
     // survives intact into error_message or warnings.
     child.stderr?.setEncoding('utf8');
     child.stderr?.on('data', (text: string) => {
       stderr += text;
     });
-    child.on('error', (err) => resolve({ status: 'failed', stderr: err.message }));
-    child.on('close', (code) => resolve({ status: code === 0 ? 'succeeded' : 'failed', stderr: stderr.trim() }));
+    timeoutHandle = setTimeout(() => {
+      if (process.platform === 'win32' && (child.exitCode !== null || child.signalCode !== null)) return;
+      timedOut = true;
+      stopError = signalStageProcess(child, 'SIGTERM');
+      killEscalationHandle = setTimeout(() => {
+        stopError ??= signalStageProcess(child, 'SIGKILL');
+      }, STAGE_KILL_GRACE_MS);
+    }, timeoutMs);
+    child.on('error', (err) => finish({ status: 'failed', stderr: err.message }));
+    child.on('close', (code) => {
+      const details = [
+        stderr.trim(),
+        ...(timedOut ? [`Stage "${stage.name}" timed out after ${formatTimeout(timeoutMs)} and was stopped.`] : []),
+        ...(stopError ? [stopError] : []),
+      ]
+        .filter(Boolean)
+        .join('\n');
+      afterRelay(() => finish({ status: timedOut || code !== 0 ? 'failed' : 'succeeded', stderr: details }));
+    });
   });
 }
 
@@ -174,34 +243,47 @@ export interface RunPipelineOptions {
   indicatorSetHash?: string;
 }
 
+/** `run:finished` with the run's state as run_completeness says it (R23). */
+async function emitRunFinished(client: Client, runId: string): Promise<void> {
+  const { rows } = await client.query<{ state: 'running' | 'incomplete' | 'complete' }>(
+    `SELECT state FROM run_completeness WHERE run_id = $1`,
+    [runId]
+  );
+  if (!rows[0]) throw new Error(`run ${runId} has no run_completeness row`);
+  emitEvent({ type: 'run:finished', run_id: runId, state: rows[0].state });
+}
+
 export async function runPipelineForBackup(
   client: Client,
-  backupPath: string,
+  target: ResolvedWorkspaceBackup,
   dbUrl: string,
   pythonBin: string,
   stages: StageSet,
   options: RunPipelineOptions = {}
 ): Promise<BackupRunResult> {
+  const backupPath = target.decryptedPath;
   // Validate, then register, BEFORE touching pipeline_runs: a bad path or an
   // unverifiable sidecar must not leave an orphaned run row (EPOCH-404).
   const validation = await validateBackupPath(backupPath);
   if (!validation.ok) {
+    emitEvent({ type: 'registration:refused', backup_path: backupPath, reason: validation.reason });
     return { success: false, error: validation.reason };
   }
 
-  const reportPath = deriveReportPath(backupPath);
-  const ileappPath = deriveIleappPath(backupPath);
-  const crashReportsPath = deriveCrashReportsPath(backupPath);
+  const reportPath = target.reportPath;
+  const ileappPath = target.ileappOutputPath;
+  const crashReportsPath = target.crashReportsPath;
   let registration: Registration;
   try {
     registration = await registerEvidence(client, {
-      backupPath,
-      ileappPath,
-      crashReportsPath,
+      target,
       secretPath: options.secretPath,
     });
   } catch (err) {
-    if (err instanceof RegistrationError) return { success: false, error: err.message };
+    if (err instanceof RegistrationError) {
+      emitEvent({ type: 'registration:refused', backup_path: backupPath, reason: err.message });
+      return { success: false, error: err.message };
+    }
     throw err;
   }
 
@@ -223,22 +305,34 @@ export async function runPipelineForBackup(
   if (completeRun) {
     // A run marked complete whose summary export then failed (a full disk)
     // would otherwise never get its file: write it now (EPOCH-409).
-    const existing = deriveRunSummaryPath(backupPath, completeRun);
-    if (existing && !(await fsp.stat(existing).catch(() => null))) {
+    const existing = resolveRunSummaryPath(target, completeRun);
+    if (!(await fsp.stat(existing).catch(() => null))) {
       await exportRunSummary(client, completeRun, existing);
     }
+    emitEvent({
+      type: 'run:skipped',
+      evidence_id: registration.evidenceId,
+      reason: `a complete run (${completeRun}) already covers this evidence with the stages enabled now`,
+    });
     return { success: true, skipped: true, evidenceId: registration.evidenceId };
   }
 
   const runId = await createRun(client, backupPath, stages, collectProvenance(pythonBin), registration, indicatorSet);
+  emitEvent({
+    type: 'run:created',
+    run_id: runId,
+    evidence_id: registration.evidenceId,
+    derivative_id: registration.decryptedDerivativeId,
+  });
   const results: { stage: string; success: boolean }[] = [];
   // Registration located the workspace, so a backup that reached here has one.
-  const summaryPath = deriveRunSummaryPath(backupPath, runId);
-  if (!summaryPath) throw new Error(`no workspace for ${backupPath}; registration should have refused it`);
+  const summaryPath = resolveRunSummaryPath(target, runId);
 
   try {
     for (const stage of stages.enabled) {
       await markStage(client, runId, stage.name, 'running');
+      process.stdout.write(`[orchestrator] stage started: ${stage.name}\n`);
+      emitEvent({ type: 'stage:started', run_id: runId, stage: stage.name });
       const outcome = await runStage(
         stage,
         { backupPath, reportPath, ileappPath, crashReportsPath, dbUrl, pythonBin },
@@ -246,6 +340,7 @@ export async function runPipelineForBackup(
         registration,
         indicatorSet
       );
+      process.stdout.write(`[orchestrator] stage finished: ${stage.name}\n`);
 
       if (outcome.status === 'skipped') {
         // Nothing failed, and nothing was examined: the reason says which
@@ -258,16 +353,29 @@ export async function runPipelineForBackup(
       } else {
         await markStage(client, runId, stage.name, 'failed', outcome.stderr || 'unknown error');
       }
+      emitEvent({
+        type: 'stage:finished',
+        run_id: runId,
+        stage: stage.name,
+        status: outcome.status,
+        parser_version: stage.manifest.parserVersion ?? null,
+        derivative_id: inputsFor(stage, registration, indicatorSet).derivativeId,
+      });
       results.push({ stage: stage.name, success: outcome.status !== 'failed' });
     }
 
-    await client.query(`UPDATE pipeline_runs SET finished_at = now() WHERE run_id = $1`, [runId]);
+    await finishRun(client, runId, 'completed');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await markRunFailed(client, runId, message);
+    // Best effort: the run's own error is the one to report, not this one's.
+    await emitRunFinished(client, runId).catch((eventErr: unknown) =>
+      console.error(`[orchestrator] could not report run ${runId} finished:`, eventErr)
+    );
     await exportRunSummary(client, runId, summaryPath);
     throw err;
   }
+  await emitRunFinished(client, runId);
   // EPOCH-409: each run's summary in its own file, so no run touches another's.
   await exportRunSummary(client, runId, summaryPath);
   return { runId, results, evidenceId: registration.evidenceId, success: results.every((result) => result.success) };

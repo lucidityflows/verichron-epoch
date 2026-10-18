@@ -1,8 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { spawn, execFileSync, type ChildProcess } from 'child_process';
 import type {
   BackupProgress,
   BackupStats,
   CrashReportsResult,
+  CrashReportsRetryLookup,
+  CrashReportsRetryTarget,
   DestinationBackup,
   DeviceBackupSource,
   DeviceInfo,
@@ -33,7 +36,12 @@ import {
   type OutputEvent,
 } from './backupRun';
 import { appendPullRecord, type PullRecord } from './pullRecord';
-import { copyCrashReports, discardCrashReportsCopy, type CrashReportCopy } from './crashReports';
+import {
+  copyCrashReports,
+  crashReportsCopyExists,
+  discardCrashReportsCopy,
+  type CrashReportCopy,
+} from './crashReports';
 
 /**
  * NOTE (EPOCH-103 review): the password captured here (used as
@@ -101,6 +109,8 @@ export class IosBackupSource implements DeviceBackupSource {
   private cancelRequested: boolean | null = null;
   /** True while crash logs are being copied again (EPOCH-519); a pull waits for it. */
   private copyingCrashLogs = false;
+  /** Renderer-safe, short-lived references bound to a backup and its originating device. */
+  private retryTargetReferences = new Map<string, { device: DeviceInfo; backupDir: string }>();
 
   /**
    * Stops the running backup cleanly: SIGINT, as Ctrl+C would, so
@@ -228,6 +238,69 @@ export class IosBackupSource implements DeviceBackupSource {
     } finally {
       this.copyingCrashLogs = false;
     }
+  }
+
+  async findCrashReportsRetryTargets(backupDirs: string[]): Promise<CrashReportsRetryLookup> {
+    if (this.running !== null || this.cancelRequested !== null || this.copyingCrashLogs) {
+      return { targets: [], errors: [] };
+    }
+    const devices = await this.listConnectedDevices();
+    const connectedIds = new Set(devices.map((device) => device.id.toUpperCase()));
+    for (const [reference, { device }] of this.retryTargetReferences) {
+      if (!connectedIds.has(device.id.toUpperCase())) this.retryTargetReferences.delete(reference);
+    }
+    if (devices.length === 0) return { targets: [], errors: [] };
+
+    const plistutil = trustedToolPath('plistutil');
+    if (!plistutil) throw new Error('plistutil is not available -- complete the iPhone tool setup first.');
+
+    const targets: CrashReportsRetryTarget[] = [];
+    const errors: CrashReportsRetryLookup['errors'] = [];
+
+    for (const [backupIndex, backupDir] of backupDirs.entries()) {
+      try {
+        if ((await incompleteReason(plistutil, backupDir)) !== null) continue;
+        const deviceId = await backupDeviceId(plistutil, backupDir);
+        if (!deviceId) continue;
+        const device = devices.find(
+          (connected) =>
+            connected.id.toUpperCase() === deviceId.toUpperCase() && path.basename(backupDir) === connected.id
+        );
+        if (!device || (await crashReportsCopyExists(backupDir))) continue;
+        const deviceRef = this.referenceForRetryTarget(device, backupDir);
+        targets.push({ sourceId: this.id, backupIndex, deviceRef, deviceName: device.name });
+      } catch (err) {
+        errors.push({
+          backupIndex,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    return { targets, errors };
+  }
+
+  async copyCrashReportsAgainByReference(deviceRef: string, backupDir: string): Promise<CrashReportsResult> {
+    const target = this.retryTargetReferences.get(deviceRef);
+    if (!target) throw new Error('The device reference is no longer available. Refresh the backup list and try again.');
+    if (backupDir !== target.backupDir) {
+      throw new Error(
+        'The backup path does not match the selected retry target. Refresh the backup list and try again.'
+      );
+    }
+    return this.copyCrashReportsAgain(target.device, target.backupDir);
+  }
+
+  private referenceForRetryTarget(device: DeviceInfo, backupDir: string): string {
+    for (const [reference, existing] of this.retryTargetReferences) {
+      if (existing.backupDir === backupDir && existing.device.id.toUpperCase() === device.id.toUpperCase()) {
+        this.retryTargetReferences.set(reference, { device, backupDir });
+        return reference;
+      }
+    }
+
+    const reference = randomUUID();
+    this.retryTargetReferences.set(reference, { device, backupDir });
+    return reference;
   }
 
   async checkToolAvailable(): Promise<ToolAvailabilityStatus> {

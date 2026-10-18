@@ -7,13 +7,21 @@ Prepares iOS backups for the pipeline. For each backup it:
    pinned), into the same iTunes layout, and fails unless every file the
    backup's `Manifest.db` lists was written;
 3. repairs malformed SQLite databases;
-4. runs iLEAPP over the decrypt, into `ileapp/<label>/`, with
+4. runs iLEAPP over the decrypt, into the manifest-declared output directory, with
    `unifiedlog_iterator` turned off.
 
-It writes only to the workspace and never touches the database. The workspace
-layout and the role this plays are described in
+It writes only to the workspace and never touches the database. The processor
+creates or updates `workspace.json` atomically while the workspace lock is
+held; workspace-owned paths are relative to its root. The contract and the
+role this plays are described in
 [docs/architecture.md](../../docs/architecture.md), and the identity and markers
 in [docs/evidence-model.md](../../docs/evidence-model.md).
+
+Before decrypting a backup, the processor checks free space on the workspace
+filesystem against a backup-sized decrypted copy plus an iLEAPP margin scaled
+from the measured reference run. A shortfall refuses the backup before
+decrypt; an `ENOSPC` during a step fails that backup with the workspace and
+capacity figures. Failed derivatives are not marked complete.
 
 ## Run
 
@@ -36,7 +44,7 @@ times.
 | `--sqlite-bin <path>` | `sqlite3` for the repair pass |
 | `--ileapp-dir <dir>` | The iLEAPP checkout to run (default `tools/ileapp/iLEAPP`, the submodule) |
 | `--ileapp-python <path>` | iLEAPP's interpreter (default `tools/ileapp/.venv/bin/python`, the pinned environment `mise run setup` creates) |
-| `--ileapp-module-timeout <dur>` | Stop iLEAPP, and everything it started, when one module, its setup or its report runs longer than this (default `60m`). A long run that keeps moving is never stopped. Each module's timing is written to `logs/<backup>.ileapp-modules.json` |
+| `--ileapp-module-timeout <dur>` | Stop iLEAPP, and everything it started, when one module, its setup or its report runs longer than this (default `60m`). A long run that keeps moving is never stopped. Each module's timing is written to the path declared in `workspace.json` |
 | `--force` | Re-run iLEAPP even if current |
 | `--force-decrypt` | Re-decrypt from an empty folder, then repair and run iLEAPP again |
 | `--verify` | Re-read every byte when hashing, ignoring the stat cache |
@@ -64,7 +72,7 @@ that ran.
 | `src/utils/repair.ts` | SQLite quick-check and `.recover`, returning repair provenance |
 | `src/utils/resolver.ts` | Reading the `sqlite3` version |
 | `src/utils/prompt.ts` | Password prompt |
-| `src/utils/summary.ts` | `summary.md` |
+| `src/utils/summary.ts` | The manifest-declared processor summary |
 
 ## Test
 
