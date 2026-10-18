@@ -1,8 +1,8 @@
 import { StringDecoder } from 'node:string_decoder';
 
-import { eventMessage, parsePipelineEventLine } from '@verichron/contracts';
+import type { PipelineEvent } from '@verichron/contracts';
 
-import { applyPrepareLogLine, initPrepareProgress } from '../../shared/prepareProgress';
+import { applyPrepareEvent, initPrepareProgress } from '../../shared/prepareProgress';
 import type { AnalysisState, PipelineFinishedResult, PipelineLogEntry, PrepareState } from '../../shared/types/window';
 
 /**
@@ -41,12 +41,11 @@ class Notifier<T> {
   }
 }
 
+/** The latest entries of the task's log, for a page that mounts mid-run; the saved log has all of them. */
 class LogBuffer {
   private lines: PipelineLogEntry[] = [];
-  private seq = 0;
 
-  add(stream: PipelineLogEntry['stream'], line: string): PipelineLogEntry {
-    const entry = { stream, line, seq: ++this.seq };
+  add(entry: PipelineLogEntry): PipelineLogEntry {
     this.lines.push(entry);
     if (this.lines.length > KEPT_LOG_LINES) this.lines.splice(0, this.lines.length - KEPT_LOG_LINES);
     return entry;
@@ -71,6 +70,7 @@ export class PrepareSession {
     progress: null,
     passwordFor: null,
     result: null,
+    taskLog: null,
   };
   private readonly log = new LogBuffer();
   private readonly notifier: Notifier<PrepareState>;
@@ -91,16 +91,27 @@ export class PrepareSession {
       progress: initPrepareProgress(labels),
       passwordFor: null,
       result: null,
+      taskLog: null,
     };
     this.notifier.now();
   }
 
-  /** Records one of the processor's lines and returns it, numbered, for the live log. */
-  line(stream: PipelineLogEntry['stream'], text: string, now = Date.now()): PipelineLogEntry {
-    const entry = this.log.add(stream, text);
-    if (this.state.progress) this.state.progress = applyPrepareLogLine(this.state.progress, text, now);
+  /** The saved log this task writes (EPOCH-570). */
+  logFile(file: string): void {
+    this.state.taskLog = file;
     this.notifier.soon();
-    return entry;
+  }
+
+  /** Keeps one entry of the task's log, as the writer saved it (EPOCH-570). */
+  entry(entry: PipelineLogEntry): void {
+    this.log.add(entry);
+    this.notifier.soon();
+  }
+
+  /** Follows one of the processor's events: its progress (EPOCH-445). Nothing is taken from text. */
+  follow(event: PipelineEvent, now = Date.now()): void {
+    if (this.state.progress) this.state.progress = applyPrepareEvent(this.state.progress, event, now);
+    this.notifier.soon();
   }
 
   passwordRequested(backup: string): void {
@@ -131,6 +142,8 @@ export class AnalysisSession {
     startedAt: null,
     currentStage: null,
     result: null,
+    taskLog: null,
+    workspace: null,
   };
   private readonly log = new LogBuffer();
   private readonly notifier: Notifier<AnalysisState>;
@@ -141,42 +154,47 @@ export class AnalysisSession {
     this.notifier = new Notifier<AnalysisState>(send, () => ({ ...this.state, log: [] }));
   }
 
-  start(kind: 'workspace' | 'retry', target: string, now = Date.now()): void {
+  start(kind: 'workspace' | 'retry', target: string, workspace: string, now = Date.now()): void {
     this.log.clear();
     this.createdRuns = [];
-    this.state = { status: 'running', kind, target, startedAt: now, currentStage: null, result: null };
+    this.state = {
+      status: 'running',
+      kind,
+      target,
+      startedAt: now,
+      currentStage: null,
+      result: null,
+      taskLog: null,
+      workspace,
+    };
     this.notifier.now();
   }
 
+  /** The saved log this task writes (EPOCH-570). */
+  logFile(file: string): void {
+    this.state.taskLog = file;
+    this.notifier.soon();
+  }
+
+  /** Keeps one entry of the task's log, as the writer saved it (EPOCH-570). */
+  entry(entry: PipelineLogEntry): void {
+    this.log.add(entry);
+  }
+
   /**
-   * One line of the orchestrator's output. An event (EPOCH-443) updates the
-   * state and is not a log line, so it returns null; the orchestrator prints
-   * its own human line beside each. A prefixed line that isn't a valid event
-   * is never trusted: it is kept in the log as text and changes nothing.
-   * Only stdout carries events.
+   * Follows one of the orchestrator's events (EPOCH-443): the runs it created
+   * and the running stage. Nothing is taken from text.
    */
-  line(stream: PipelineLogEntry['stream'], text: string, now = Date.now()): PipelineLogEntry | null {
-    if (stream === 'stdout') {
-      const parsed = parsePipelineEventLine(text, 'orchestrator');
-      if (parsed.kind === 'event') {
-        const event = parsed.event;
-        if (event.type === 'run:created') {
-          this.createdRuns.push(event.run_id);
-        } else if (event.type === 'stage:started') {
-          this.state = { ...this.state, currentStage: { name: event.stage, startedAt: now } };
-          this.notifier.soon();
-        } else if (event.type === 'stage:finished') {
-          this.state = { ...this.state, currentStage: null };
-          this.notifier.soon();
-        }
-        // With --output events every line is an event; shown as its sentence
-        // until the task log replaces this buffer (EPOCH-570).
-        return this.log.add(stream, eventMessage(event));
-      }
-      if (parsed.kind === 'invalid')
-        console.warn(`[pipelineSessions] ignored an invalid orchestrator event: ${parsed.error}`);
+  follow(event: PipelineEvent, now = Date.now()): void {
+    if (event.type === 'run:created') {
+      this.createdRuns.push(event.run_id);
+    } else if (event.type === 'stage:started') {
+      this.state = { ...this.state, currentStage: { name: event.stage, startedAt: now } };
+      this.notifier.soon();
+    } else if (event.type === 'stage:finished') {
+      this.state = { ...this.state, currentStage: null };
+      this.notifier.soon();
     }
-    return this.log.add(stream, text);
   }
 
   /** The runs the current or last call's orchestrator created, in order. */
@@ -200,8 +218,7 @@ export class AnalysisSession {
 
 /**
  * Splits a child's output into lines, decoding the stream as one so a
- * character split across chunks stays whole. `pending()` is the text after
- * the last line break, which is how a password prompt with no newline is seen.
+ * character split across chunks stays whole.
  */
 export class LineSplitter {
   private readonly decoder = new StringDecoder('utf8');
@@ -211,17 +228,6 @@ export class LineSplitter {
     const parts = (this.carry + this.decoder.write(chunk)).split('\n');
     this.carry = parts.pop() ?? '';
     return parts;
-  }
-
-  pending(): string {
-    return this.carry;
-  }
-
-  /** Takes the text after the last line break, e.g. once a prompt has been handled. */
-  takePending(): string {
-    const rest = this.carry;
-    this.carry = '';
-    return rest;
   }
 
   end(): string {

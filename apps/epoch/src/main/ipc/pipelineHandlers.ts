@@ -8,6 +8,7 @@ import { readFile, rm, stat } from 'node:fs/promises';
 import type { Pool } from 'pg';
 import {
   EvidenceSidecar,
+  ProcessorSummary,
   discoverBackups,
   findWorkspaceBackupForPath,
   readWorkspaceManifestSync,
@@ -16,20 +17,20 @@ import {
   type Backup,
 } from '@verichron/contracts';
 import { getInterruptedEvidence, getRunDecryptedPath } from '@verichron/etl-db-reader';
+import type { EventProducer, LogLevel, PipelineEvent, TaskOutcome } from '@verichron/contracts';
 import type { PipelineFinishedResult, AnalysisRunStatus, PipelineLogEntry } from '../../shared/types/window';
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
 import { PipelineSingleFlight } from './pipelineSingleFlight';
 import { analysisTargets, orchestratorArgs } from './analysisTargets';
 import { defaultWorkspace, readPreparedBackups } from './preparedBackups';
 import { closeAbandonedRuns, closeRuns, type AppEndedReason } from './runCloseOut';
+import { TaskLog, listTaskLogs, readSavedTaskLog, type TaskLogSetup } from './taskLog';
 
 interface StartPipelineOptions {
   workspace?: string;
   forceDecrypt?: boolean;
   only?: string[];
 }
-
-const PASSWORD_PROMPT_RE = /password for (.+): $/;
 
 const OUTSIDE_STAGE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -59,7 +60,13 @@ export async function closeAbandonedRunsOnStartup(dbPool: Pool): Promise<void> {
   }
 }
 
-export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | null, repoRoot: string, dbPool: Pool) {
+export function registerPipelineHandlers(
+  getMainWindow: () => BrowserWindow | null,
+  repoRoot: string,
+  dbPool: Pool,
+  /** Recorded in each task log's header (EPOCH-570). */
+  appVersion: string
+) {
   let runningProcessor: ChildProcessWithoutNullStreams | null = null;
   let runningOrchestratorProcess: ChildProcessWithoutNullStreams | null = null;
   const pipelineSingleFlight = new PipelineSingleFlight();
@@ -88,28 +95,38 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   const prepareSession = new PrepareSession((state) => sendToRenderer('epoch:prepareState', state));
   const analysisSession = new AnalysisSession((state) => sendToRenderer('epoch:analysisState', state));
 
-  /** Relays the processor's output line by line, and its password prompt (which ends without a newline). */
-  function makeStreamBuffer(stream: PipelineLogEntry['stream'], child: ChildProcessWithoutNullStreams) {
-    const splitter = new LineSplitter();
-    const emit = (line: string) => sendToRenderer('epoch:prepareLog', prepareSession.line(stream, line));
-    const onChunk = (chunk: Buffer) => {
-      splitter.push(chunk).forEach(emit);
-      if (stream === 'stdout') {
-        const match = PASSWORD_PROMPT_RE.exec(splitter.pending());
-        if (match) {
-          emit(splitter.takePending());
-          pendingPasswordResolve = (password: string) => {
-            child.stdin.write(password + '\n');
-          };
-          prepareSession.passwordRequested(match[1]);
-        }
-      }
-    };
-    const end = () => {
-      const rest = splitter.end();
-      if (rest) emit(rest);
-    };
-    return { onChunk, end };
+  /**
+   * Feeds a child's stdout and stderr to its task log, line by line
+   * (EPOCH-570). Every line becomes a sanitized entry, which the writer hands
+   * to the session and the renderer; an event behind it is passed to
+   * `onEvent`, in memory only, for the session to follow.
+   */
+  function feedTaskLog(
+    log: TaskLog,
+    producer: EventProducer,
+    child: ChildProcessWithoutNullStreams,
+    onEvent: (event: PipelineEvent) => void,
+    onLine: () => void = () => undefined
+  ): { end: () => void } {
+    const ends = (['stdout', 'stderr'] as const).map((stream) => {
+      const splitter = new LineSplitter();
+      const take = (line: string) => {
+        const { event } = log.line(producer, stream, line);
+        if (event) onEvent(event);
+        onLine();
+      };
+      child[stream].on('data', (chunk: Buffer) => splitter.push(chunk).forEach(take));
+      return () => {
+        const rest = splitter.end();
+        if (rest) take(rest);
+      };
+    });
+    return { end: () => ends.forEach((end) => end()) };
+  }
+
+  /** "exit code 1", "signal SIGKILL": how a child ended, for its log. */
+  function howItEnded(code: number | null, signal: NodeJS.Signals | null): string {
+    return signal ? `signal ${signal}` : `exit code ${code}`;
   }
 
   function armOutsideStageTimeout(): void {
@@ -125,38 +142,21 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }, OUTSIDE_STAGE_TIMEOUT_MS);
   }
 
-  function makeOrchestratorStreamBuffer(stream: PipelineLogEntry['stream']) {
-    const splitter = new LineSplitter();
-    const emit = (line: string) => {
-      const entry = analysisSession.line(stream, line);
-      if (entry) sendToRenderer('epoch:orchestratorLog', entry);
-      armOutsideStageTimeout();
-    };
-    const onChunk = (chunk: Buffer) => splitter.push(chunk).forEach(emit);
-    const emitPending = () => {
-      const rest = splitter.end();
-      if (rest) emit(rest);
-    };
-    return { onChunk, emitPending };
-  }
-
-  /** The processor's summary.json, if this run wrote it: one left by an earlier run is ignored. */
+  /**
+   * The processor's summary.json, if this run wrote it: one left by an
+   * earlier run is ignored. It is checked against its contract; one that
+   * doesn't read is an error, not a quiet "no summary" (EPOCH-570).
+   */
   async function readPreparationSummary(workspace: string, runStartedAt: number) {
     const manifest = readWorkspaceManifestSync(workspace);
     const { json: file } = resolveProcessorSummaryPaths(workspace, manifest);
     try {
       if ((await stat(file)).mtimeMs < runStartedAt) return undefined;
-      const raw = await readFile(file, 'utf8');
-      const parsed: unknown = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { backups?: unknown }).backups)) {
-        return undefined;
-      }
-      return (parsed as { backups: Array<{ label: string; success: boolean; decrypted: boolean }> }).backups;
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
-      if (error instanceof SyntaxError) return undefined;
       throw error;
     }
+    return ProcessorSummary.parse(JSON.parse(await readFile(file, 'utf8'))).backups;
   }
 
   /** A file of its own for one orchestrator call's result (EPOCH-409), so no
@@ -265,50 +265,160 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }
 
     const workspacePath = options?.workspace?.trim() || defaultWorkspace();
-    const args = ['--filter', '@verichron/processor', 'dev', '--', '--source', source];
-    args.push('--workspace', workspacePath);
-    if (options?.forceDecrypt) args.push('--force-decrypt');
-    if (options?.only && options.only.length > 0) args.push('--only', options.only.join(','));
-
+    const only = options?.only ?? [];
     const releasePipeline = pipelineSingleFlight.reserve('processor');
+    const startedAt = Date.now();
+    prepareSession.start(source, workspacePath, only, startedAt);
+
+    // The selected backups' identifiers, so the log can replace them (docs/event-log.md §6.3).
+    const notes: TaskLogSetup['notes'] = [];
+    let backups: Backup[] = [];
+    try {
+      backups = (await discoverBackups(source)).filter((b) => only.length === 0 || only.includes(b.label));
+    } catch (err) {
+      notes.push({
+        level: 'warn',
+        message: `the backups in the chosen folder could not be listed, so their device identifiers are not known to the log: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      });
+    }
+    const labels = only.length > 0 ? only : backups.map((b) => b.label);
+
+    let log: TaskLog;
+    try {
+      log = await TaskLog.open(
+        {
+          workspace: workspacePath,
+          kind: 'prepare',
+          labels,
+          options: { force_decrypt: Boolean(options?.forceDecrypt) },
+          backups,
+          source,
+          appRoot: repoRoot,
+          appVersion,
+          message: `Prepare Evidence started for ${labels.length} backup${labels.length === 1 ? '' : 's'}`,
+          notes,
+        },
+        (entry) => {
+          prepareSession.entry(entry);
+          sendToRenderer('epoch:prepareLog', entry);
+        }
+      );
+    } catch (err) {
+      // No log, no task (docs/event-log.md §7).
+      releasePipeline();
+      const error = `The task log could not be created, so Prepare Evidence did not start: ${
+        err instanceof Error ? err.message : String(err)
+      }`;
+      prepareSession.finish({ success: false, error, workspace: workspacePath });
+      throw new Error(error);
+    }
+    prepareSession.logFile(log.file);
+
+    // pnpm --silent: its script banners would print the repository's path (docs/event-log.md §6.6).
+    const args = ['--silent', '--filter', '@verichron/processor', 'dev', '--', '--source', source];
+    args.push('--workspace', workspacePath, '--output', 'events');
+    if (options?.forceDecrypt) args.push('--force-decrypt');
+    if (only.length > 0) args.push('--only', only.join(','));
+
+    let finished = false;
+    const finish = async (
+      result: Parameters<TaskLog['finish']>[0],
+      message: string,
+      outcome: PipelineFinishedResult
+    ) => {
+      if (finished) return;
+      finished = true;
+      runningProcessor = null;
+      pendingPasswordResolve = null;
+      await log.finish(result, message);
+      prepareSession.finish(outcome);
+    };
+
     let child: ChildProcessWithoutNullStreams;
     try {
       child = spawn('pnpm', args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] });
     } catch (err) {
       releasePipeline();
+      const error = `could not start the processor: ${err instanceof Error ? err.message : String(err)}`;
+      await finish(
+        { outcome: 'crashed', exitCode: null, signal: null, reported: false, failedLabels: [] },
+        `Prepare Evidence did not start: ${error}`,
+        { success: false, error, workspace: workspacePath }
+      );
       throw err;
     }
     runningProcessor = child;
     pendingPasswordResolve = null;
-    const startedAt = Date.now();
-    prepareSession.start(source, workspacePath, options?.only ?? [], startedAt);
+    log.app('debug', 'the processor started');
 
-    const stdoutBuffer = makeStreamBuffer('stdout', child);
-    const stderrBuffer = makeStreamBuffer('stderr', child);
-    child.stdout.on('data', stdoutBuffer.onChunk);
-    child.stderr.on('data', stderrBuffer.onChunk);
-
-    child.on('error', (err) => {
-      runningProcessor = null;
-      pendingPasswordResolve = null;
-      prepareSession.finish({ success: false, error: err.message, workspace: workspacePath });
+    // The failed labels from prepare:finished, once the processor reports its own result.
+    const reported: { failedLabels: string[] | null } = { failedLabels: null };
+    const feed = feedTaskLog(log, 'processor', child, (event) => {
+      prepareSession.follow(event);
+      if (event.type === 'password:required') {
+        // The answer goes to stdin, and the log holds it only to remove it if it ever appears (§6.2).
+        pendingPasswordResolve = (password: string) => {
+          log.addSecret(password);
+          child.stdin.write(password + '\n');
+        };
+        prepareSession.passwordRequested(event.label);
+      } else if (event.type === 'prepare:finished') {
+        reported.failedLabels = event.failed_labels;
+      }
     });
 
-    child.on('close', (code) => {
+    child.on('error', (err) => {
+      const error = `could not run the processor: ${err.message}`;
+      void finish(
+        { outcome: 'crashed', exitCode: null, signal: null, reported: false, failedLabels: [] },
+        `Prepare Evidence stopped: ${error}`,
+        { success: false, error, workspace: workspacePath }
+      );
+    });
+
+    child.on('close', (code, closeSignal) => {
+      // Node passes null when no signal ended it; the log records null, never undefined.
+      const signal = closeSignal ?? null;
       releasePipeline();
-      runningProcessor = null;
-      pendingPasswordResolve = null;
-      stdoutBuffer.end();
-      stderrBuffer.end();
-      void readPreparationSummary(workspacePath, startedAt)
-        .then((backups) => {
-          prepareSession.finish({ success: code === 0, exitCode: code, workspace: workspacePath, backups });
-        })
-        .catch((err) => {
-          const message = err instanceof Error ? err.message : String(err);
-          console.error('[pipelineHandlers] could not read processor summary:', message);
-          prepareSession.finish({ success: false, exitCode: code, workspace: workspacePath, error: message });
-        });
+      feed.end();
+      void (async () => {
+        const failedLabels = reported.failedLabels ?? [];
+        if (reported.failedLabels === null) {
+          // The processor ended without its own result: the cause EPOCH-569 could not see.
+          const error = `the processor ended (${howItEnded(code, signal)}) without reporting a result`;
+          await finish(
+            { outcome: 'crashed', exitCode: code, signal, reported: false, failedLabels },
+            `Prepare Evidence stopped: ${error}`,
+            { success: false, exitCode: code, workspace: workspacePath, error }
+          );
+          return;
+        }
+        let backups: PipelineFinishedResult['backups'];
+        try {
+          backups = await readPreparationSummary(workspacePath, startedAt);
+        } catch (err) {
+          const error = `could not read the processor's summary: ${err instanceof Error ? err.message : String(err)}`;
+          log.app('error', error);
+          await finish(
+            { outcome: 'failed', exitCode: code, signal, reported: true, failedLabels },
+            'Prepare Evidence finished, but its summary could not be read',
+            { success: false, exitCode: code, workspace: workspacePath, error }
+          );
+          return;
+        }
+        const succeeded = code === 0 && failedLabels.length === 0;
+        await finish(
+          { outcome: succeeded ? 'succeeded' : 'failed', exitCode: code, signal, reported: true, failedLabels },
+          succeeded
+            ? 'Prepare Evidence finished'
+            : `Prepare Evidence finished: ${failedLabels.length} backup${failedLabels.length === 1 ? '' : 's'} need${
+                failedLabels.length === 1 ? 's' : ''
+              } attention`,
+          { success: code === 0, exitCode: code, workspace: workspacePath, backups }
+        );
+      })();
     });
 
     return { started: true, workspace: workspacePath };
@@ -327,6 +437,203 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
   ipcMain.handle('epoch:getPrepareState', () => prepareSession.snapshot());
   ipcMain.handle('epoch:getAnalysisState', () => analysisSession.snapshot());
 
+  /** One orchestrator call: a whole Analyze from New Investigation, or one run retried from Investigations. */
+  interface OrchestratorCall {
+    kind: 'workspace' | 'retry';
+    /** What the session shows it is for: the workspace, or the retried run. */
+    target: string;
+    workspace: string;
+    labels: string[];
+    /** Where each selected backup is, so its identifiers are known to the log (docs/event-log.md §6.3). */
+    backups: { label: string; path: string }[];
+    /** Each decrypt's path to its label, to name a backup that failed. */
+    labelOf: Map<string, string>;
+  }
+
+  /** A backup's identifiers are read from its source, or from its decrypt when the source is gone. */
+  function identitySource(entry: ReturnType<typeof resolveWorkspaceBackup>): { label: string; path: string } {
+    const fromSource = existsSync(path.join(entry.sourcePath, 'Info.plist'));
+    return { label: entry.label, path: fromSource ? entry.sourcePath : entry.decryptedPath };
+  }
+
+  async function runOrchestratorCall(call: OrchestratorCall, releasePipeline: () => void): Promise<void> {
+    analysisSession.start(call.kind, call.target, call.workspace);
+    let log: TaskLog;
+    try {
+      log = await TaskLog.open(
+        {
+          workspace: call.workspace,
+          kind: 'analyze',
+          labels: call.labels,
+          options: call.kind === 'retry' ? { retry: true } : {},
+          backups: call.backups,
+          source: null,
+          appRoot: repoRoot,
+          appVersion,
+          message: `Analyze started for ${call.labels.length} backup${call.labels.length === 1 ? '' : 's'}`,
+        },
+        (entry) => {
+          analysisSession.entry(entry);
+          sendToRenderer('epoch:orchestratorLog', entry);
+        }
+      );
+    } catch (err) {
+      // No log, no task (docs/event-log.md §7).
+      releasePipeline();
+      const error = `The task log could not be created, so Analyze did not start: ${
+        err instanceof Error ? err.message : String(err)
+      }`;
+      analysisSession.finish({ success: false, error });
+      throw new Error(error);
+    }
+    analysisSession.logFile(log.file);
+
+    let finished = false;
+    const finish = async (
+      result: Parameters<TaskLog['finish']>[0],
+      message: string,
+      outcome: PipelineFinishedResult
+    ): Promise<void> => {
+      if (finished) return;
+      finished = true;
+      await log.finish(result, message);
+      analysisSession.finish(outcome);
+    };
+
+    const summaryPath = newSummaryPath();
+    let child: ChildProcessWithoutNullStreams;
+    try {
+      // pnpm --silent: its script banners would print the repository's path (docs/event-log.md §6.6).
+      child = spawn('pnpm', ['--silent', ...orchestratorArgs(call.workspace, call.labels, summaryPath)], {
+        cwd: repoRoot,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      releasePipeline();
+      const error = `could not start the orchestrator: ${err instanceof Error ? err.message : String(err)}`;
+      await finish(
+        { outcome: 'crashed', exitCode: null, signal: null, reported: false, failedLabels: [] },
+        `Analyze did not start: ${error}`,
+        { success: false, error }
+      );
+      throw err;
+    }
+    runningOrchestratorProcess = child;
+    // A retry is not this workspace's Analyze, so epoch:getAnalysisRunStatus doesn't report it.
+    runningOrchestratorWorkspace = call.kind === 'workspace' ? call.workspace : null;
+    orchestratorTerminationReason = null;
+    log.app('debug', 'the orchestrator started');
+
+    // EPOCH-305 timeout guardrail: a hung orchestrator (e.g. blocked on a
+    // stalled DB connection) never fires 'error' or 'close' on its own --
+    // this is the only thing that gets the renderer out of an indefinite
+    // spinner in that case. Every line it writes restarts it.
+    armOutsideStageTimeout();
+    const feed = feedTaskLog(
+      log,
+      'orchestrator',
+      child,
+      (event) => analysisSession.follow(event),
+      armOutsideStageTimeout
+    );
+
+    const stopped = (reason: 'cancelled' | 'timeout' | null) => ({
+      cancelled: reason === 'cancelled',
+      timedOut: reason === 'timeout',
+      outcome: (reason === 'cancelled' ? 'cancelled' : reason === 'timeout' ? 'timed-out' : null) as TaskOutcome | null,
+    });
+    const stalled = `stalled outside an active stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes and was stopped`;
+
+    child.on('error', (err) => {
+      clearOrchestratorTimers();
+      const reason = orchestratorTerminationReason;
+      const tracked = runningOrchestratorWorkspace;
+      runningOrchestratorProcess = null;
+      runningOrchestratorWorkspace = null;
+      orchestratorTerminationReason = null;
+      const { cancelled, timedOut, outcome } = stopped(reason);
+      void (async () => {
+        if (call.kind === 'retry' || tracked) {
+          await closeCallRuns(endedReason(reason), `orchestrator process error: ${err.message}`);
+        }
+        await rm(summaryPath, { force: true });
+        await finish(
+          { outcome: outcome ?? 'crashed', exitCode: null, signal: null, reported: false, failedLabels: [] },
+          `Analyze stopped: could not run the orchestrator: ${err.message}`,
+          { success: false, error: err.message, cancelled, timedOut }
+        );
+      })();
+    });
+
+    child.on('close', (code, closeSignal) => {
+      const signal = closeSignal ?? null;
+      releasePipeline();
+      feed.end();
+      clearOrchestratorTimers();
+      const reason = orchestratorTerminationReason;
+      const tracked = runningOrchestratorWorkspace;
+      runningOrchestratorProcess = null;
+      runningOrchestratorWorkspace = null;
+      orchestratorTerminationReason = null;
+      const { cancelled, timedOut, outcome } = stopped(reason);
+
+      void (async () => {
+        // A clean `code === 0` exit means the orchestrator's own main()
+        // already closed out pipeline_runs/pipeline_stage_status itself.
+        // Any other outcome -- a crash, our own timeout kill, or a manual
+        // cancel -- can leave rows dangling and needs the same cleanup path.
+        if (code !== 0 && (call.kind === 'retry' || tracked)) {
+          await closeCallRuns(
+            endedReason(reason),
+            cancelled
+              ? 'cancelled by user'
+              : timedOut
+                ? `orchestrator ${stalled}`
+                : `orchestrator process exited unexpectedly (${howItEnded(code, signal)})`
+          );
+        }
+        const { analysis, error } = await readAnalysisSummary(summaryPath);
+        const reported = analysis !== undefined || error !== undefined;
+        const failedLabels = (analysis ?? [])
+          .filter((r) => r.status === 'failed')
+          .map((r) => call.labelOf.get(path.resolve(r.backupPath)) ?? r.backupPath);
+        const result = {
+          outcome: outcome ?? (!reported ? 'crashed' : code === 0 ? 'succeeded' : 'failed'),
+          exitCode: code,
+          signal,
+          reported,
+          failedLabels,
+        } satisfies Parameters<TaskLog['finish']>[0];
+        const message = cancelled
+          ? 'Analyze was cancelled'
+          : timedOut
+            ? `Analyze ${stalled}`
+            : !reported
+              ? `Analyze stopped: the orchestrator ended (${howItEnded(code, signal)}) without reporting a result`
+              : code === 0
+                ? 'Analyze finished'
+                : `Analyze finished: ${failedLabels.length} backup${failedLabels.length === 1 ? '' : 's'} need${
+                    failedLabels.length === 1 ? 's' : ''
+                  } attention`;
+        const shown = call.kind === 'workspace' ? analysis : undefined;
+        await finish(
+          result,
+          message,
+          code === 0
+            ? { success: true, exitCode: code, analysis: shown }
+            : {
+                success: false,
+                exitCode: code,
+                analysis: shown,
+                cancelled,
+                timedOut,
+                error: cancelled ? 'Analysis was cancelled.' : timedOut ? `Analysis ${stalled}.` : error,
+              }
+        );
+      })();
+    });
+  }
+
   // Analyze reads the backups the examiner selected, each checked to be
   // prepared in this workspace, never every prepared backup there (EPOCH-530).
   ipcMain.handle('epoch:startAnalysis', async (_event, workspace: string, labels: unknown) => {
@@ -338,110 +645,25 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
     }
     const trimmedWorkspace = workspace.trim();
     const releasePipeline = pipelineSingleFlight.reserve('orchestrator');
-    let selectedLabels: string[];
-    let summaryPath: string;
+    let call: OrchestratorCall;
     try {
-      selectedLabels = analysisTargets(trimmedWorkspace, Array.isArray(labels) ? labels : []);
-      summaryPath = newSummaryPath();
+      const selected = analysisTargets(trimmedWorkspace, Array.isArray(labels) ? labels : []);
+      const entries = readWorkspaceManifestSync(trimmedWorkspace)
+        .backups.filter((entry) => selected.includes(entry.label))
+        .map((entry) => resolveWorkspaceBackup(trimmedWorkspace, entry));
+      call = {
+        kind: 'workspace',
+        target: trimmedWorkspace,
+        workspace: trimmedWorkspace,
+        labels: selected,
+        backups: entries.map(identitySource),
+        labelOf: new Map(entries.map((entry) => [path.resolve(entry.decryptedPath), entry.label])),
+      };
     } catch (err) {
       releasePipeline();
       throw err;
     }
-
-    let child: ChildProcessWithoutNullStreams;
-    try {
-      child = spawn('pnpm', orchestratorArgs(trimmedWorkspace, selectedLabels, summaryPath), {
-        cwd: repoRoot,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-    } catch (err) {
-      releasePipeline();
-      throw err;
-    }
-    runningOrchestratorProcess = child;
-    runningOrchestratorWorkspace = trimmedWorkspace;
-    orchestratorTerminationReason = null;
-    analysisSession.start('workspace', trimmedWorkspace);
-
-    // EPOCH-305 timeout guardrail: a hung orchestrator (e.g. blocked on a
-    // stalled DB connection) never fires 'error' or 'close' on its own --
-    // this is the only thing that gets the renderer out of an indefinite
-    // spinner in that case.
-    armOutsideStageTimeout();
-
-    const stdoutBuffer = makeOrchestratorStreamBuffer('stdout');
-    const stderrBuffer = makeOrchestratorStreamBuffer('stderr');
-    child.stdout.on('data', stdoutBuffer.onChunk);
-    child.stderr.on('data', stderrBuffer.onChunk);
-
-    child.on('error', (err) => {
-      clearOrchestratorTimers();
-      const reason = orchestratorTerminationReason;
-      const workspaceAtFailure = runningOrchestratorWorkspace;
-      runningOrchestratorProcess = null;
-      runningOrchestratorWorkspace = null;
-      orchestratorTerminationReason = null;
-      if (workspaceAtFailure) {
-        void closeCallRuns(endedReason(reason), `orchestrator process error: ${err.message}`);
-      }
-      void rm(summaryPath, { force: true });
-      analysisSession.finish({
-        success: false,
-        error: err.message,
-        cancelled: reason === 'cancelled',
-        timedOut: reason === 'timeout',
-      });
-    });
-
-    child.on('close', (code) => {
-      releasePipeline();
-      stdoutBuffer.emitPending();
-      stderrBuffer.emitPending();
-      clearOrchestratorTimers();
-      const reason = orchestratorTerminationReason;
-      const workspaceAtClose = runningOrchestratorWorkspace;
-      runningOrchestratorProcess = null;
-      runningOrchestratorWorkspace = null;
-      orchestratorTerminationReason = null;
-
-      const cancelled = reason === 'cancelled';
-      const timedOut = reason === 'timeout';
-
-      // A clean `code === 0` exit means the orchestrator's own main()
-      // already closed out pipeline_runs/pipeline_stage_status itself.
-      // Any other outcome -- a crash, our own timeout kill, or a manual
-      // cancel -- can leave rows dangling and needs the same cleanup path.
-      if (code !== 0 && workspaceAtClose) {
-        const closeReason = cancelled
-          ? 'cancelled by user'
-          : timedOut
-            ? `orchestrator stalled outside a stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes`
-            : `orchestrator process exited unexpectedly (code ${code})`;
-
-        void closeCallRuns(endedReason(reason), closeReason)
-          .then(() => readAnalysisSummary(summaryPath))
-          .then(({ analysis, error }) => {
-            analysisSession.finish({
-              success: false,
-              exitCode: code,
-              analysis,
-              cancelled,
-              timedOut,
-              error: cancelled
-                ? 'Analysis was cancelled.'
-                : timedOut
-                  ? `Analysis stalled outside an active stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes and was stopped.`
-                  : error,
-            });
-          });
-        return;
-      }
-
-      void readAnalysisSummary(summaryPath).then(({ analysis }) => {
-        analysisSession.finish({ success: true, exitCode: code, analysis });
-      });
-    });
-
+    await runOrchestratorCall(call, releasePipeline);
     return { started: true };
   });
 
@@ -470,103 +692,27 @@ export function registerPipelineHandlers(getMainWindow: () => BrowserWindow | nu
         `No workspace manifest contains the registered decrypt for run ${trimmedRunId}; prepare and register the backup again.`
       );
     }
-    const summaryPath = newSummaryPath();
     const releasePipeline = pipelineSingleFlight.reserve('orchestrator');
-
-    let child: ChildProcessWithoutNullStreams;
-    try {
-      child = spawn(
-        'pnpm',
-        [
-          '--filter',
-          '@verichron/orchestrator',
-          'investigate',
-          '--',
-          '--workspace',
-          workspaceTarget.workspace,
-          '--label',
-          workspaceTarget.entry.label,
-          '--summary-path',
-          summaryPath,
-          '--output',
-          'events',
-        ],
-        { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] }
-      );
-    } catch (err) {
-      releasePipeline();
-      throw err;
-    }
-    runningOrchestratorProcess = child;
-    runningOrchestratorWorkspace = null;
-    orchestratorTerminationReason = null;
-    analysisSession.start('retry', trimmedRunId);
-
-    armOutsideStageTimeout();
-
-    const stdoutBuffer = makeOrchestratorStreamBuffer('stdout');
-    const stderrBuffer = makeOrchestratorStreamBuffer('stderr');
-    child.stdout.on('data', stdoutBuffer.onChunk);
-    child.stderr.on('data', stderrBuffer.onChunk);
-
-    child.on('error', (err) => {
-      clearOrchestratorTimers();
-      const reason = orchestratorTerminationReason;
-      runningOrchestratorProcess = null;
-      orchestratorTerminationReason = null;
-      void closeCallRuns(endedReason(reason), `orchestrator process error: ${err.message}`);
-      void rm(summaryPath, { force: true });
-      analysisSession.finish({
-        success: false,
-        error: err.message,
-        cancelled: reason === 'cancelled',
-        timedOut: reason === 'timeout',
-      });
-    });
-
-    child.on('close', (code) => {
-      releasePipeline();
-      stdoutBuffer.emitPending();
-      stderrBuffer.emitPending();
-      clearOrchestratorTimers();
-      const reason = orchestratorTerminationReason;
-      runningOrchestratorProcess = null;
-      orchestratorTerminationReason = null;
-
-      const cancelled = reason === 'cancelled';
-      const timedOut = reason === 'timeout';
-
-      if (code !== 0) {
-        const closeReason = cancelled
-          ? 'cancelled by user'
-          : timedOut
-            ? `orchestrator stalled outside a stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes`
-            : `orchestrator process exited unexpectedly (code ${code})`;
-
-        void closeCallRuns(endedReason(reason), closeReason)
-          .then(() => readAnalysisSummary(summaryPath))
-          .then(({ error }) => {
-            analysisSession.finish({
-              success: false,
-              exitCode: code,
-              cancelled,
-              timedOut,
-              error: cancelled
-                ? 'Analysis was cancelled.'
-                : timedOut
-                  ? `Analysis stalled outside an active stage for ${OUTSIDE_STAGE_TIMEOUT_MS / 60000} minutes and was stopped.`
-                  : error,
-            });
-          });
-        return;
-      }
-
-      void rm(summaryPath, { force: true });
-      analysisSession.finish({ success: true, exitCode: code });
-    });
-
+    const { entry } = workspaceTarget;
+    await runOrchestratorCall(
+      {
+        kind: 'retry',
+        target: trimmedRunId,
+        workspace: workspaceTarget.workspace,
+        labels: [entry.label],
+        backups: [identitySource(entry)],
+        labelOf: new Map([[path.resolve(entry.decryptedPath), entry.label]]),
+      },
+      releasePipeline
+    );
     return { started: true };
   });
+
+  // EPOCH-570: the workspace's saved task logs, read back after a restart.
+  ipcMain.handle('epoch:listTaskLogs', async (_event, workspace: string) => listTaskLogs(workspace));
+  ipcMain.handle('epoch:readTaskLog', async (_event, workspace: string, file: string) =>
+    readSavedTaskLog(workspace, file)
+  );
 
   ipcMain.handle('epoch:cancelAnalysis', async (): Promise<{ cancelled: boolean }> => {
     if (!runningOrchestratorProcess) {

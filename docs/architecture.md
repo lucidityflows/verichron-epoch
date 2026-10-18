@@ -289,11 +289,3 @@ switch ([decisions](decisions.md#product-and-builds)).
 orchestrator resolves it once and gives each stage `DATABASE_URL` in its
 environment; stages read it with `runtime_env.require_database_url()`, and
 `migrate.py`, `provision_roles.py` and `db_peek.py` read `.env` themselves.
-
-## Changes already decided
-
-These are settled but not yet built; this page will change when they land.
-
-| Change | Ticket |
-|---|---|
-| The app reads typed events from the processor instead of scraping its logs, and saves each task's log ([event-log.md](event-log.md)); the orchestrator's events and the contract are built (EPOCH-443, EPOCH-570) | EPOCH-445, EPOCH-570 |

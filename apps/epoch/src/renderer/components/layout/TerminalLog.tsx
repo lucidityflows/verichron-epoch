@@ -1,16 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, ArrowDown, TerminalSquare } from 'lucide-react';
 import type { PipelineLogEntry } from '../../../shared/types/window';
+import { formatLogTime } from '../../../shared/time';
 import { Loader } from '../ui/Loader';
 
+/** A task log's entry (EPOCH-570), or a plain line of a tool's own output, such as a setup step's. */
+export type TerminalLine = PipelineLogEntry | { stream: 'stdout' | 'stderr'; line: string };
+
 interface TerminalLogProps {
-  lines: Array<Pick<PipelineLogEntry, 'stream' | 'line'>>;
+  lines: TerminalLine[];
   live: boolean;
   defaultOpen?: boolean;
   label?: string;
 }
 
 const BOTTOM_THRESHOLD_PX = 64;
+
+const LEVEL_CLASS: Record<PipelineLogEntry['level'], string> = {
+  error: 'text-danger',
+  warn: 'text-flag',
+  info: 'text-foreground/80',
+  debug: 'text-muted-foreground',
+};
 
 export function TerminalLog({ lines, live, defaultOpen = false, label = 'Technical log' }: TerminalLogProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -102,11 +113,21 @@ export function TerminalLog({ lines, live, defaultOpen = false, label = 'Technic
             {lines.length === 0 ? (
               <p className="text-muted-foreground italic">No output yet.</p>
             ) : (
-              lines.map((entry, i) => (
-                <div key={i} className={entry.stream === 'stderr' ? 'text-danger' : 'text-foreground/80'}>
-                  {entry.line || '\u00A0'}
-                </div>
-              ))
+              // Each line states its time and level in text, as well as colour (EPOCH-570).
+              lines.map((entry, i) =>
+                'level' in entry ? (
+                  <div key={entry.seq} className={LEVEL_CLASS[entry.level]}>
+                    <span className="text-muted-foreground">{formatLogTime(entry.at)}</span>{' '}
+                    <span className="inline-block w-12">{entry.level.toUpperCase()}</span>
+                    {entry.label ? <span className="text-muted-foreground">[{entry.label}] </span> : null}
+                    {entry.message || '\u00A0'}
+                  </div>
+                ) : (
+                  <div key={i} className={entry.stream === 'stderr' ? 'text-danger' : 'text-foreground/80'}>
+                    {entry.line || '\u00A0'}
+                  </div>
+                )
+              )
             )}
           </div>
           {!stickToBottom && lines.length > 0 && (

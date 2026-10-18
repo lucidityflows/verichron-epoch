@@ -26,6 +26,7 @@ import type {
   ToolAvailabilityStatus,
 } from './tools';
 import type { PrepareRunProgress } from '../prepareProgress';
+import type { PrepareStep, ReadTaskLog, TaskKind, TaskLogEntry, TaskOutcome } from '@verichron/contracts';
 
 export type ReportResult =
   | { status: 'ok'; content: string; path: string }
@@ -55,11 +56,24 @@ export interface StartPipelineOptions {
   only?: string[];
 }
 
-export interface PipelineLogEntry {
-  stream: 'stdout' | 'stderr';
-  line: string;
-  /** Increases with each line of a run, so a line already shown is never shown twice (EPOCH-487). */
-  seq: number;
+/**
+ * One entry of a task's log, as the writer saved it (EPOCH-570): sanitized,
+ * levelled and timed. Its `seq` increases with each entry of a task, so one
+ * already shown is never shown twice (EPOCH-487).
+ */
+export type PipelineLogEntry = TaskLogEntry;
+export type { ReadTaskLog };
+
+/** A saved log as a list shows it, from its header and result, without its entries. */
+export interface TaskLogSummary {
+  file: string;
+  kind: TaskKind;
+  startedAt: string;
+  labels: string[];
+  finished: boolean;
+  outcome: TaskOutcome | null;
+  /** Lines that are not valid entries, a cut-off last line, or an unreadable header: shown, never hidden. */
+  problems: number;
 }
 
 /**
@@ -83,7 +97,14 @@ export interface PipelineFinishedResult {
   exitCode?: number | null;
   error?: string;
   workspace?: string;
-  backups?: Array<{ label: string; success: boolean; decrypted: boolean }>;
+  /** Each backup's result from the processor's summary.json; a failed one names its step and reason. */
+  backups?: Array<{
+    label: string;
+    success: boolean;
+    decrypted: boolean;
+    failed_step: PrepareStep | null;
+    reason: string | null;
+  }>;
   analysis?: Array<{
     backupPath: string;
     status: 'succeeded' | 'failed' | 'skipped';
@@ -114,7 +135,9 @@ export interface PrepareState {
   /** The backup whose password the processor is waiting for. */
   passwordFor: string | null;
   result: PipelineFinishedResult | null;
-  /** The run's recent log lines, oldest first; empty in the change events, which carry state only. */
+  /** This task's saved log in `<workspace>/logs/`, once it has one (EPOCH-570). */
+  taskLog: string | null;
+  /** The run's recent log entries, oldest first; empty in the change events, which carry state only. */
   log: PipelineLogEntry[];
 }
 
@@ -128,6 +151,10 @@ export interface AnalysisState {
   startedAt: number | null;
   currentStage: { name: string; startedAt: number } | null;
   result: PipelineFinishedResult | null;
+  /** This task's saved log in `<workspace>/logs/`, once it has one (EPOCH-570). */
+  taskLog: string | null;
+  /** The workspace the log is in. */
+  workspace: string | null;
   log: PipelineLogEntry[];
 }
 
@@ -170,6 +197,9 @@ declare global {
       onOrchestratorLog: (callback: (entry: PipelineLogEntry) => void) => () => void;
       getAnalysisState: () => Promise<AnalysisState>;
       onAnalysisState: (callback: (state: AnalysisState) => void) => () => void;
+      // EPOCH-570: the workspace's saved task logs, read back after a restart.
+      listTaskLogs: (workspace: string) => Promise<TaskLogSummary[]>;
+      readTaskLog: (workspace: string, file: string) => Promise<ReadTaskLog>;
       listDeviceBackupSources: () => Promise<Array<{ id: string; label: string }>>;
       checkDeviceBackupToolAvailable: (sourceId: string) => Promise<ToolAvailabilityStatus>;
       listConnectedDevices: (sourceId: string) => Promise<DeviceInfo[]>;

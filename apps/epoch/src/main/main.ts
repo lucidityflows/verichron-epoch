@@ -48,7 +48,7 @@ registerReportHandlers(dbPool);
 // orchestrator subprocess it spawns crashes, times out, or is cancelled, it
 // ends the runs that call created (closeCallRuns in pipelineHandlers.ts)
 // rather than leaving them running forever.
-registerPipelineHandlers(getMainWindow, REPO_ROOT, dbPool);
+registerPipelineHandlers(getMainWindow, REPO_ROOT, dbPool, app.getVersion());
 registerDeviceHandlers(getMainWindow);
 
 const createWindow = (): void => {

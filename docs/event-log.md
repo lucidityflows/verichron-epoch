@@ -238,7 +238,7 @@ The identifier formats were checked on 2026-10-18 against the Info.plist of the 
 | Temporary paths (summary files and similar) | **no** | the app chose them and needs no record | `<temp>` if a tool prints it |
 | Command lines and arguments | **no** | the header records the selected labels and options as fields | not recorded |
 | Host name, process ids, account name, environment variables | **no** | no consumer | not recorded; the account name inside a path becomes `<user>` |
-| Development tooling output (pnpm's script banners) | **no** | not part of the task | not produced: the app runs pnpm with `--silent` (flag to verify at build), and the packaged app runs no pnpm |
+| Development tooling output (pnpm's script banners) | **no** | not part of the task | not produced: the app runs pnpm with `--silent` (checked 2026-10-18: no banner, nested builds included), and the packaged app runs no pnpm |
 | Passwords, database credentials | **never** | none | prevented at the source (§6.2) |
 | Device identifiers | **never as values** | none | markers (§6.3) |
 
@@ -306,11 +306,15 @@ The events below extend the existing `PipelineEvent` union (EPOCH-443): one cont
 
 ### 8.4 App
 
-- `TaskLog` (main process) implements the writer: it collects identifiers and roots, sanitizes, assigns `seq`, buffers, sends over IPC and saves.
+- `TaskLog` (`apps/epoch/src/main/ipc/taskLog.ts`) is the writer. It collects identifiers and roots, sanitizes, assigns `seq`, hands each entry to the session and the renderer, and saves it.
+  - The producer's event is handed back beside its entry, for the session to follow: progress, a password request, the running stage, the runs created. It is used in memory only; only the sanitized entry is kept.
 - The app's own entries are:
-  - the spawn, and a cancel or timeout;
-  - **how the process ended**: exit code or signal, and whether it reported a result. EPOCH-569 lacked exactly this.
-  - an event that didn't validate.
+  - the spawn;
+  - **how the process ended**, in `task:finished`: the exit code or signal, and whether the producer reported its own result. EPOCH-569 lacked exactly this;
+  - an event that didn't validate, or came from the other program;
+  - the tripwire, and any identifier the sanitizer could not use.
+- Prepare's progress comes from the processor's events (`applyPrepareEvent`), and the password dialog from `password:required`. The text parsing they replaced (`applyPrepareLogLine`, `PASSWORD_PROMPT_RE`) is gone.
+- After a restart, `epoch:listTaskLogs` lists a workspace's logs from their headers and results, and `epoch:readTaskLog` reads one, by its file name only.
 
 ## 9. Display
 

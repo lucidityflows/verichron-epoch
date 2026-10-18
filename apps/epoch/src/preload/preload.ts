@@ -5,6 +5,8 @@ import type {
   AnalysisRunStatus,
   AnalysisState,
   PipelineLogEntry,
+  ReadTaskLog,
+  TaskLogSummary,
   PrepareState,
   ReportResult,
 } from '../shared/types/window';
@@ -102,6 +104,10 @@ const dbApi = {
   },
   // EPOCH-487: Analyze's state, kept in the main process like Prepare Evidence's.
   getAnalysisState: (): Promise<AnalysisState> => ipcRenderer.invoke('epoch:getAnalysisState'),
+  // EPOCH-570: the workspace's saved task logs.
+  listTaskLogs: (workspace: string): Promise<TaskLogSummary[]> => ipcRenderer.invoke('epoch:listTaskLogs', workspace),
+  readTaskLog: (workspace: string, file: string): Promise<ReadTaskLog> =>
+    ipcRenderer.invoke('epoch:readTaskLog', workspace, file),
   onAnalysisState: (callback: (state: AnalysisState) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: AnalysisState) => callback(state);
     ipcRenderer.on('epoch:analysisState', listener);
