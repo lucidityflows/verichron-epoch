@@ -1,0 +1,16 @@
+Copyright (c) 2026 Verichron Inc. All rights reserved.
+
+Verichron Epoch is proprietary software. This repository is public so that its
+source can be read; publishing it grants no licence. No part of it may be
+used, copied, modified, merged, published, distributed, sublicensed or sold
+without the prior written permission of Verichron Inc., except as applicable
+law allows.
+
+Third-party components in this repository, including the iLEAPP submodule
+(tools/ileapp/iLEAPP) and any vendored code, remain under their own licences,
+as stated in their own licence files. Nothing in this notice restricts the
+rights those licences grant.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
