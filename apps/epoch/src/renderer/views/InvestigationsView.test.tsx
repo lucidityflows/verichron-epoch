@@ -9,8 +9,9 @@ import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, it, vi } from 'vitest';
 
+const hook = vi.hoisted(() => ({ analysis: null as unknown }));
 vi.mock('../hooks/usePipelineState', () => ({
-  useAnalysisState: () => ({ state: null, log: [] }),
+  useAnalysisState: () => ({ state: hook.analysis, log: [] }),
   usePrepareState: () => ({ state: null, log: [] }),
 }));
 
@@ -22,7 +23,10 @@ import {
   warningLines,
 } from '../features/investigations/investigations';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  hook.analysis = null;
+});
 
 const UDID = '00008140-001A2B3C4D5E6F70';
 const EVIDENCE_A = 'aaaaaaaa-0000-0000-0000-00000000000a';
@@ -204,5 +208,21 @@ describe('InvestigationsView', () => {
     const { onViewReport } = show(NEWER, [stage({})]);
     fireEvent.click(screen.getByRole('button', { name: /View Report/ }));
     assert.equal(onViewReport.mock.calls.length, 1);
+  });
+
+  it('says Analyze Again found nothing new when a complete analysis already covers the backup', () => {
+    hook.analysis = {
+      kind: 'retry',
+      target: NEWER.run_id,
+      status: 'finished',
+      currentStage: null,
+      result: { success: true, analysis: [{ backupPath: '/x', status: 'skipped' }] },
+    };
+    show(NEWER, [stage({})]);
+    assert.ok(
+      screen.getByText(
+        'Already up to date: a complete analysis covers this backup with the stages and indicator set in use now.'
+      )
+    );
   });
 });

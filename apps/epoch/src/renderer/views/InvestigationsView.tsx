@@ -128,6 +128,9 @@ export function InvestigationsView({
   const againResult = againThis && analysis?.status === 'finished' ? analysis.result : null;
   const againError =
     startError ?? (againResult && !againResult.success ? (againResult.error ?? 'Analyze Again failed.') : null);
+  // Nothing new to analyze: the orchestrator found a complete analysis for the
+  // same evidence, stages and indicator set, and added none (R22).
+  const upToDate = !!againResult?.success && (againResult.analysis ?? []).some((result) => result.status === 'skipped');
 
   // When this analysis's Analyze Again ends, read the analyses and stages again.
   const wasAnalyzing = useRef(false);
@@ -279,6 +282,12 @@ export function InvestigationsView({
                   <div className="text-flag bg-flag/10 border border-flag/30 rounded-md px-4 py-3 text-data">
                     {againError}
                   </div>
+                )}
+                {upToDate && (
+                  <p role="status" className="text-data text-muted-foreground">
+                    Already up to date: a complete analysis covers this backup with the stages and indicator set in use
+                    now.
+                  </p>
                 )}
                 {analyzingAgain && analysis?.currentStage && (
                   <AnalysisStageProgress stage={analysis.currentStage} className="text-data text-muted-foreground" />

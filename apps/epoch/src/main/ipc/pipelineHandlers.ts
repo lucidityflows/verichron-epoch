@@ -636,7 +636,10 @@ export function registerPipelineHandlers(
                 : `Analyze finished: ${failedLabels.length} backup${failedLabels.length === 1 ? '' : 's'} need${
                     failedLabels.length === 1 ? 's' : ''
                   } attention`;
-        const shown = call.kind === 'workspace' ? analysis : undefined;
+        // Each backup's outcome, for an Analyze Again too: a skipped one means a
+        // complete analysis already covers it (EPOCH-555). New Investigation
+        // shows only its own workspace's results (analysisShown).
+        const shown = analysis;
         await finish(
           result,
           message,
