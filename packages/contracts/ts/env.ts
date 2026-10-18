@@ -17,7 +17,9 @@ export function loadRootEnv(repoRoot: string): void {
   loaded = true;
   const envPath = path.join(repoRoot, '.env');
   if (fs.existsSync(envPath)) {
-    loadDotenv({ path: envPath });
+    // quiet: dotenv otherwise announces itself on stdout ("injected env (N) from …"),
+    // a line every task log would keep (EPOCH-570).
+    loadDotenv({ path: envPath, quiet: true });
   }
 }
 
