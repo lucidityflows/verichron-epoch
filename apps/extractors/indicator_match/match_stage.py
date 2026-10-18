@@ -29,7 +29,7 @@ import indicator_field_map
 import psycopg2
 import psycopg2.extras
 from db_writer import add_context_args, context_from_args, ingest
-from etl_run import ETLRunResult
+from etl_run import ETLRunResult, Note
 from matching import Fact, SetIndicator, match, record_fields, summarize
 from normalized_record import NormalizedRecord, SourceType
 from runtime_env import redact_password, require_database_url
@@ -119,31 +119,45 @@ def content_hash(set_hash: str, units: list[list[Any]]) -> str:
     return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
 
-def notes(name: str, set_hash: str, payload: dict[str, Any]) -> list[str]:
-    """One line per indicator type, so a stage summary never says "no match" without what wasn't checked."""
-    lines = [f"set {name} ({set_hash[:12]}): {payload['matches']} match(es)"]
-    for indicator_type, entry in payload["types"].items():
+def notes(name: str, set_hash: str, payload: dict[str, Any]) -> list[Note]:
+    """One line per indicator type, so a stage summary never says "no match" without what wasn't checked.
+
+    Each type's line carries its place among the types (EPOCH-570); a gap in
+    the check is a warning, and what the check doesn't cover is information.
+    """
+    lines = [Note(f"set {name} ({set_hash[:12]}): {payload['matches']} match(es)")]
+    types = list(payload["types"].items())
+    for place, (indicator_type, entry) in enumerate(types, start=1):
         head = f"{indicator_type}: {entry['indicators']} indicator(s)"
         if entry["status"] == "checked":
             used = sum(1 for s in entry["sources"] if s["values"])
-            lines.append(
+            text = (
                 f"{head}; {entry['values_checked']} value(s) checked from {used} source(s); "
                 f"{entry['matches']} match(es)"
             )
         elif entry["status"] == "no_facts":
-            lines.append(f"{head} not checked: no facts in this case ({entry['reason']})")
+            text = f"{head} not checked: no facts in this case ({entry['reason']})"
         else:
-            lines.append(f"{head} not checked: no source in any backup ({entry['reason']})")
+            text = f"{head} not checked: no source in any backup ({entry['reason']})"
+        lines.append(Note(text, "info", place, len(types)))
     if payload["not_loaded"]:
-        lines.append(f"not loaded from the set: {payload['not_loaded']}")
+        lines.append(Note(f"not loaded from the set: {payload['not_loaded']}"))
     for reason in payload["not_read"].values():
-        lines.append(f"not read: {reason}")
+        lines.append(Note(f"not read: {reason}"))
     for error in payload["ileapp_plugin_errors"]:
         lines.append(
-            "iLEAPP plugin errored on this case, so its records weren't checked: "
-            f"{error['artifact']} ({error['module']})"
+            Note(
+                "iLEAPP plugin errored on this case, so its records weren't checked: "
+                f"{error['artifact']} ({error['module']})",
+                "warning",
+            )
         )
     return lines
+
+
+def result_line(name: str, matches: int) -> str:
+    """The check's result, as the task log's Summary states it."""
+    return f"no match against {name}" if matches == 0 else f"{matches:,} match(es) against {name}"
 
 
 def run(conn, ctx, set_id: str) -> ETLRunResult:
@@ -190,7 +204,11 @@ def run(conn, ctx, set_id: str) -> ETLRunResult:
             unit.write(records)
             result.ok(len(records))
     for line in notes(name, set_hash, payload):
-        result.note(line)
+        result.note(line, line.kind, index=line.index, total=line.total)
+    # A match is something in the evidence an examiner must look at: for review (EPOCH-570).
+    if payload["matches"]:
+        result.note(result_line(name, payload["matches"]), "review")
+    result.summary = result_line(name, payload["matches"])
     return result
 
 

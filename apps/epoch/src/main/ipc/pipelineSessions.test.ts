@@ -1,44 +1,107 @@
 /**
  * EPOCH-487: Prepare Evidence and Analyze keep their state in the main
- * process, so New Investigation can be left and opened again mid-run.
+ * process, so New Investigation can be left and opened again mid-run. Their
+ * progress comes from the producers' typed events (EPOCH-445), never text,
+ * and their log is the task log's entries (EPOCH-570).
  */
 import assert from 'node:assert/strict';
-import { PIPELINE_EVENT_PREFIX, renderPipelineEvent, type PipelineEventBody } from '@verichron/contracts';
-import { describe, it, vi } from 'vitest';
+import { PipelineEvent, type PipelineEventBody, type TaskLogEntry } from '@verichron/contracts';
+import { describe, it } from 'vitest';
 
-import { applyPrepareLogLine, initPrepareProgress } from '../../shared/prepareProgress';
+import { applyPrepareEvent, initPrepareProgress } from '../../shared/prepareProgress';
 import type { PrepareState } from '../../shared/types/window';
 import { AnalysisSession, KEPT_LOG_LINES, LineSplitter, PrepareSession } from './pipelineSessions';
 
-describe('prepare progress lines', () => {
-  const lines = (...text: string[]) => {
+const AT = '2026-10-18T15:30:02.123Z';
+const TASK = '1f3a9c2e-0000-4000-8000-000000000001';
+const event = (body: PipelineEventBody): PipelineEvent => PipelineEvent.parse({ v: 1, at: AT, ...body });
+
+/** A log entry as the task log hands it over. */
+function entry(seq: number, message: string): TaskLogEntry {
+  return {
+    v: 1,
+    task_id: TASK,
+    seq,
+    at: AT,
+    clock: 'received',
+    level: 'info',
+    source: 'app',
+    label: null,
+    step: null,
+    kind: 'message',
+    message,
+  };
+}
+
+describe('prepare progress from events', () => {
+  const after = (...events: PipelineEventBody[]) => {
     let state = initPrepareProgress(['BK']);
-    text.forEach((line, i) => (state = applyPrepareLogLine(state, line, 1000 * (i + 1))));
+    events.forEach((body, i) => (state = applyPrepareEvent(state, event(body), 1000 * (i + 1))));
     return state.byLabel.BK;
   };
+  const step = (s: string, status: string, more: Record<string, string> = {}) =>
+    ({ type: 'backup:step', label: 'BK', step: s, status, ...more }) as PipelineEventBody;
 
   it('reads bytes hashed, bytes decrypted and the iLEAPP module', () => {
-    const hashing = lines('=== BK ===', '  [hash]    progress 23100000000 bytes, 4021 files');
+    const hashing = after(step('hash', 'started'), {
+      type: 'hash:progress',
+      label: 'BK',
+      bytes: 23_100_000_000,
+      files: 4021,
+    });
     assert.deepEqual(hashing.hashed, { bytes: 23_100_000_000, files: 4021 });
     assert.equal(hashing.stageStartedAt.hash, 1000);
+    assert.equal(hashing.overall, 'running');
 
-    const decrypting = lines(
-      '=== BK ===',
-      '  [hash]    done -> x',
-      '  [decrypt] progress 12400000000 of 77217764077 bytes'
-    );
+    const decrypting = after(step('hash', 'started'), step('hash', 'done'), step('decrypt', 'started'), {
+      type: 'decrypt:progress',
+      label: 'BK',
+      bytes: 12_400_000_000,
+      total: 77_217_764_077,
+    });
     assert.deepEqual(decrypting.decrypted, { bytes: 12_400_000_000, total: 77_217_764_077 });
-    assert.equal(decrypting.stages.decrypt, 'running');
-    assert.equal(decrypting.stageStartedAt.decrypt, 2000, 'the decrypt started when the hash finished');
+    assert.deepEqual([decrypting.stages.hash, decrypting.stages.decrypt], ['done', 'running']);
+    assert.equal(decrypting.stageStartedAt.decrypt, 3000, 'the decrypt started when its event said so');
 
-    const reading = lines('=== BK ===', '  [ileapp]  module 212 of 540: Biome App Intents');
+    const reading = after(step('ileapp', 'started'), {
+      type: 'ileapp:module',
+      label: 'BK',
+      index: 212,
+      total: 540,
+      module: 'Biome App Intents',
+    });
     assert.deepEqual(reading.ileappModule, { index: 212, total: 540, name: 'Biome App Intents', startedAt: 2000 });
   });
 
-  it('leaves a step running on a progress line', () => {
-    const state = lines('=== BK ===', '  [hash]    progress 5 bytes, 1 files');
-    assert.equal(state.stages.hash, 'running');
-    assert.equal(state.overall, 'running');
+  it('marks a failed step and the backup with the reason, and a skipped step as skipped', () => {
+    const failed = after(
+      step('hash', 'started'),
+      step('hash', 'done'),
+      step('decrypt', 'skipped', { reason: 'already done' }),
+      step('ileapp', 'started'),
+      step('ileapp', 'error', { reason: 'iLEAPP exited with code 1' }),
+      {
+        type: 'backup:finished',
+        label: 'BK',
+        success: false,
+        failed_step: 'ileapp',
+        reason: 'iLEAPP exited with code 1',
+      }
+    );
+    assert.deepEqual([failed.stages.decrypt, failed.stages.ileapp], ['skipped', 'error']);
+    assert.equal(failed.overall, 'failed');
+    assert.equal(failed.errorMessage, 'iLEAPP exited with code 1');
+  });
+
+  it('finishes a backup only on its backup:finished, and ignores another backup', () => {
+    const done = after(step('hash', 'started'), step('hash', 'done'), {
+      type: 'backup:finished',
+      label: 'BK',
+      success: true,
+    });
+    assert.equal(done.overall, 'done');
+    const other = after({ type: 'backup:step', label: 'OTHER', step: 'hash', status: 'started' });
+    assert.equal(other.overall, 'queued');
   });
 });
 
@@ -48,20 +111,22 @@ describe('PrepareSession', () => {
     return { sent, prepare: new PrepareSession((state) => sent.push(state)) };
   }
 
-  it('keeps progress, a pending password and the result for a page that mounts later', () => {
+  it('keeps progress, a pending password, its log and the result for a page that mounts later', () => {
     const { prepare } = session();
     prepare.start('/home/x/Downloads', '/home/x/verichron-workspace', ['BK'], 1000);
-    prepare.line('stdout', '=== BK ===', 2000);
-    prepare.line('stdout', '  [hash]    done -> x', 3000);
+    prepare.logFile('prepare-2026-10-18T153002Z-1f3a9c2e.ndjson');
+    prepare.entry(entry(1, 'Prepare Evidence started for 1 backup'));
+    prepare.follow(event({ type: 'backup:step', label: 'BK', step: 'hash', status: 'started' }), 2000);
     prepare.passwordRequested('BK');
 
     const mid = prepare.snapshot();
     assert.equal(mid.status, 'running');
     assert.equal(mid.passwordFor, 'BK');
-    assert.equal(mid.progress?.byLabel.BK.stages.decrypt, 'running');
+    assert.equal(mid.taskLog, 'prepare-2026-10-18T153002Z-1f3a9c2e.ndjson');
+    assert.equal(mid.progress?.byLabel.BK.stages.hash, 'running');
     assert.deepEqual(
-      mid.log.map((l) => l.line),
-      ['=== BK ===', '  [hash]    done -> x']
+      mid.log.map((l) => l.message),
+      ['Prepare Evidence started for 1 backup']
     );
 
     prepare.passwordSubmitted();
@@ -70,7 +135,7 @@ describe('PrepareSession', () => {
     assert.equal(done.status, 'finished');
     assert.equal(done.passwordFor, null);
     assert.equal(done.result?.success, true);
-    assert.equal(done.log.length, 2, 'the log stays with the finished run');
+    assert.equal(done.log.length, 1, 'the log stays with the finished run');
   });
 
   it('sends a change at once for a start, a password and a finish, without the log', () => {
@@ -89,51 +154,45 @@ describe('PrepareSession', () => {
     assert.ok(sent.every((s) => s.log.length === 0));
   });
 
-  it('keeps the most recent lines, numbered across runs so none is shown twice', () => {
+  it('keeps the most recent entries for a page that mounts mid-run; the saved log keeps all', () => {
     const { prepare } = session();
     prepare.start('/s', '/w', ['BK']);
-    for (let i = 0; i < KEPT_LOG_LINES + 5; i++) prepare.line('stdout', `line ${i}`);
+    for (let i = 1; i <= KEPT_LOG_LINES + 5; i++) prepare.entry(entry(i, `line ${i}`));
     const log = prepare.snapshot().log;
     assert.equal(log.length, KEPT_LOG_LINES);
-    assert.equal(log[0].line, 'line 5');
-    const lastSeq = log[log.length - 1].seq;
+    assert.equal(log[0].message, 'line 6');
 
     prepare.start('/s', '/w', ['BK']);
     assert.equal(prepare.snapshot().log.length, 0, 'a new run starts a new log');
-    assert.ok(prepare.line('stdout', 'next run').seq > lastSeq);
+    assert.equal(prepare.snapshot().taskLog, null);
   });
 });
 
 describe('AnalysisSession', () => {
-  it('records whether a run is a workspace analysis or one retried backup', () => {
+  const RUN = '33333333-3333-3333-3333-333333333333';
+
+  it('records whether a run is a workspace analysis or one retried backup, and its workspace', () => {
     const analysis = new AnalysisSession(() => {});
-    analysis.start('retry', 'run-123', 1000);
-    analysis.line('stdout', 'retrying');
-    assert.deepEqual((({ status, kind, target }) => ({ status, kind, target }))(analysis.snapshot()), {
-      status: 'running',
-      kind: 'retry',
-      target: 'run-123',
-    });
+    analysis.start('retry', 'run-123', '/w', 1000);
+    analysis.entry(entry(1, 'Analyze started for 1 backup'));
+    assert.deepEqual(
+      (({ status, kind, target, workspace }) => ({ status, kind, target, workspace }))(analysis.snapshot()),
+      { status: 'running', kind: 'retry', target: 'run-123', workspace: '/w' }
+    );
     analysis.finish({ success: true });
     assert.equal(analysis.snapshot().status, 'finished');
     assert.equal(analysis.snapshot().log.length, 1);
   });
 
-  const RUN = '33333333-3333-3333-3333-333333333333';
-  const event = (body: PipelineEventBody) => renderPipelineEvent(body);
-
-  it('tracks the running stage from orchestrator events and clears it at completion (EPOCH-443)', () => {
+  it('tracks the running stage and the runs created from events, and clears the stage at completion (EPOCH-443)', () => {
     const analysis = new AnalysisSession(() => {});
-    analysis.start('workspace', '/w', 1000);
-    assert.equal(
-      analysis.line('stdout', event({ type: 'stage:started', run_id: RUN, stage: 'ileapp_bridge' }), 2500),
-      null
-    );
+    analysis.start('workspace', '/w', '/w', 1000);
+    analysis.follow(event({ type: 'run:created', run_id: RUN, evidence_id: RUN, derivative_id: RUN }));
+    analysis.follow(event({ type: 'stage:started', run_id: RUN, stage: 'ileapp_bridge' }), 2500);
     assert.deepEqual(analysis.snapshot().currentStage, { name: 'ileapp_bridge', startedAt: 2500 });
     assert.equal(analysis.hasActiveStage(), true);
 
-    analysis.line(
-      'stdout',
+    analysis.follow(
       event({
         type: 'stage:finished',
         run_id: RUN,
@@ -145,59 +204,22 @@ describe('AnalysisSession', () => {
       3500
     );
     assert.equal(analysis.snapshot().currentStage, null);
-    assert.equal(analysis.hasActiveStage(), false);
+    assert.deepEqual(analysis.runIds(), [RUN]);
 
-    analysis.line('stdout', event({ type: 'stage:started', run_id: RUN, stage: 'reporting' }), 4000);
+    analysis.follow(event({ type: 'stage:started', run_id: RUN, stage: 'reporting' }), 4000);
     analysis.finish({ success: false });
     assert.equal(analysis.snapshot().currentStage, null);
-    assert.equal(analysis.snapshot().log.length, 0, 'events are not log lines');
-  });
-
-  it('takes nothing from human text, only from events', () => {
-    const analysis = new AnalysisSession(() => {});
-    analysis.start('workspace', '/w', 1000);
-    analysis.line('stdout', '[orchestrator] stage started: ileapp_bridge', 2500);
-    assert.equal(analysis.snapshot().currentStage, null);
-    assert.equal(analysis.snapshot().log.length, 1, 'kept as a log line');
-  });
-
-  it('never trusts a prefixed line that is not a valid event: it stays text and changes nothing', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const analysis = new AnalysisSession(() => {});
-    analysis.start('workspace', '/w', 1000);
-    const forged = `${PIPELINE_EVENT_PREFIX}{"v":1,"type":"run:created","run_id":"${RUN}"}`;
-    const entry = analysis.line('stdout', forged, 2500);
-    assert.equal(entry?.line, forged);
-    assert.deepEqual(analysis.runIds(), []);
-    assert.equal(warn.mock.calls.length, 1);
-    // A stage's line the orchestrator tagged is ordinary text too.
-    analysis.line('stdout', `[stage crash] ${event({ type: 'stage:started', run_id: RUN, stage: 'x' })}`, 2600);
-    assert.equal(analysis.snapshot().currentStage, null);
-    warn.mockRestore();
-  });
-
-  it('records the runs a call created, and forgets them when the next call starts', () => {
-    const analysis = new AnalysisSession(() => {});
-    analysis.start('workspace', '/w', 1000);
-    const other = '44444444-4444-4444-4444-444444444444';
-    for (const run_id of [RUN, other]) {
-      analysis.line('stdout', event({ type: 'run:created', run_id, evidence_id: run_id, derivative_id: run_id }));
-    }
-    analysis.line('stderr', event({ type: 'run:created', run_id: RUN, evidence_id: RUN, derivative_id: RUN }));
-    assert.deepEqual(analysis.runIds(), [RUN, other], 'only stdout carries events');
-    analysis.start('retry', RUN, 2000);
-    assert.deepEqual(analysis.runIds(), []);
+    assert.equal(analysis.snapshot().log.length, 0, 'following an event adds no entry; the task log does');
   });
 });
 
 describe('LineSplitter', () => {
-  it('keeps a character split across chunks whole, and exposes a prompt without a newline', () => {
+  it('keeps a character split across chunks whole, and returns what is left at the end', () => {
     const splitter = new LineSplitter();
-    const bytes = Buffer.from('Été\n  password for BK: ', 'utf8');
-    assert.deepEqual(splitter.push(bytes.subarray(0, 1)), []);
-    assert.deepEqual(splitter.push(bytes.subarray(1)), ['Été']);
-    assert.equal(splitter.pending(), '  password for BK: ');
-    assert.equal(splitter.takePending(), '  password for BK: ');
-    assert.equal(splitter.end(), '');
+    const bytes = Buffer.from('noté\nlast', 'utf8');
+    const split = bytes.indexOf(Buffer.from('é')) + 1;
+    assert.deepEqual(splitter.push(bytes.subarray(0, split)), []);
+    assert.deepEqual(splitter.push(bytes.subarray(split)), ['noté']);
+    assert.equal(splitter.end(), 'last');
   });
 });

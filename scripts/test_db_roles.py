@@ -25,7 +25,7 @@ from db_writer import IngestContext, ingest, record_failures
 from etl_run import ItemFailure
 from normalized_record import NormalizedRecord, SourceType
 from psycopg2 import sql
-from testing.pg_real import TEST_DATABASE_URL_ENV, PgReal, open_db
+from testing.pg_real import TEST_DATABASE_URL_ENV, PgReal, open_db, safe_test_database_url
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_OWNER = "verichron_epoch_schema_owner"
@@ -63,7 +63,7 @@ provision_roles = _load("provision_roles_under_test", REPO_ROOT / "packages" / "
 
 
 def admin_dsn() -> str:
-    dsn = os.environ.get(TEST_DATABASE_URL_ENV)
+    dsn = safe_test_database_url()
     if not dsn:
         if os.environ.get("CI"):
             pytest.fail(f"{TEST_DATABASE_URL_ENV} must be set in CI")

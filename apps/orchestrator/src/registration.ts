@@ -33,6 +33,7 @@ import {
   readDecryptMarker,
   readIleappMarker,
   readCrashReportsMarker,
+  readPlistValues,
   resolveWorkspaceBackup,
   resolveWorkspacePath,
   workspaceEvidenceManifestPath,
@@ -201,25 +202,16 @@ export function deviceKey(udid: string, secret: Buffer): string {
 // Info.plist
 // ---------------------------------------------------------------------------
 
-const XML_ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'" };
-
 /**
- * Top-level <key>/<string> pairs of an XML property list. iTunes and
- * idevicebackup2 write Info.plist as XML; a binary plist is refused with a
- * clear message rather than guessed at.
+ * Top-level strings (and dates) of an XML Info.plist, read by the contract's
+ * one reader. A binary property list is refused rather than guessed at.
  */
 export function readPlistStrings(file: string): Map<string, string> {
-  const bytes = readFileSync(file);
-  if (bytes.subarray(0, 8).toString('latin1') === 'bplist00') {
-    throw new RegistrationError(`${file} is a binary property list; only XML Info.plist is supported`);
+  try {
+    return readPlistValues(file);
+  } catch (err) {
+    throw new RegistrationError(err instanceof Error ? err.message : String(err));
   }
-  const text = bytes.toString('utf8');
-  const out = new Map<string, string>();
-  for (const match of text.matchAll(/<key>([^<]*)<\/key>\s*<string>([^<]*)<\/string>/g)) {
-    const decode = (s: string) => s.replace(/&(amp|lt|gt|quot|apos);/g, (e) => XML_ENTITIES[e]);
-    out.set(decode(match[1]), decode(match[2]));
-  }
-  return out;
 }
 
 function readDevice(candidates: string[]): { udid: string; name: string } {

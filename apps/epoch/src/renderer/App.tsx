@@ -7,6 +7,7 @@ import { RecordsView } from './views/RecordsView';
 import { IocsView } from './views/IocsView';
 import { ReportsView } from './views/ReportsView';
 import { EvidenceTag } from './components/ui/EvidenceTag';
+import { ActivityLogDock } from './features/activityLog/ActivityLogDock';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { useEpochStore } from './store/useEpochStore';
 import { runsApi } from './api/runs';
@@ -188,6 +189,9 @@ export const App: React.FC = () => {
 
             {section === 'reports' && <ReportsView selectedRun={selectedRun} />}
           </div>
+
+          {/* EPOCH-570: the Activity Log, docked below the page, never inside it. U4 adds it to Investigations. */}
+          {section === 'workspace' && <ActivityLogDock />}
         </div>
       </div>
     </TooltipProvider>

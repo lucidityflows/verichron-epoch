@@ -70,6 +70,9 @@ mkdir "$7/$9"
     logPath: path.join(tmp, `${name}.log`),
     modulesPath: path.join(tmp, `${name}.modules.json`),
     moduleTimeoutMs: 30_000,
+    onOutput: () => undefined,
+    onModule: () => undefined,
+    onWarning: () => undefined,
   });
 
   it('resolves relative paths against the processor, not the iLEAPP checkout it runs in', async () => {
@@ -148,12 +151,7 @@ echo "Report generation Completed."
   async function runWith(name: string, env: Record<string, string>, moduleTimeoutMs: number) {
     const saved = { ...process.env };
     Object.assign(process.env, env);
-    const printed: string[] = [];
-    const write = process.stdout.write.bind(process.stdout);
-    process.stdout.write = ((chunk: string | Uint8Array, ...rest: unknown[]) => {
-      printed.push(String(chunk));
-      return (write as (...a: unknown[]) => boolean)(chunk, ...rest);
-    }) as typeof process.stdout.write;
+    const modules: string[] = [];
     const modulesPath = path.join(tmp, `${name}.modules.json`);
     try {
       const outcome = await runIleapp({
@@ -165,25 +163,27 @@ echo "Report generation Completed."
         logPath: path.join(tmp, `${name}.log`),
         modulesPath,
         moduleTimeoutMs,
+        onOutput: () => undefined,
+        onModule: (m) => modules.push(`module ${m.index} of ${m.total}: ${m.name}`),
+        onWarning: () => undefined,
       }).then(
         () => null,
         (err: Error) => err
       );
-      return { outcome, printed: printed.join(''), timings: JSON.parse(readFileSync(modulesPath, 'utf8')) };
+      return { outcome, modules, timings: JSON.parse(readFileSync(modulesPath, 'utf8')) };
     } finally {
-      process.stdout.write = write;
       process.env = saved;
     }
   }
 
   it('lets a run longer than the limit finish when each module stays under it', async () => {
     // Three modules of 0.4 s against a 1 s limit: the run takes about 1.2 s.
-    const { outcome, printed, timings } = await runWith('slow-but-moving', { STUB_STEP: '0.4' }, 1000);
+    const { outcome, modules, timings } = await runWith('slow-but-moving', { STUB_STEP: '0.4' }, 1000);
     assert.equal(outcome, null);
     const [unbuffered, iterator] = readFileSync(envFile, 'utf8').trim().split('|');
     assert.equal(unbuffered, '1', 'iLEAPP runs unbuffered');
     assert.equal(iterator, UNIFIEDLOG_ITERATOR_DISABLED, 'iLEAPP never finds unifiedlog_iterator (EPOCH-489)');
-    assert.match(printed, /\[ileapp\]  module 2 of 3: Module 2/);
+    assert.ok(modules.includes('module 2 of 3: Module 2'), modules.join('\n'));
     assert.equal(timings.stopped, null);
     assert.deepEqual(
       timings.modules.map((m: { module: string; status: string }) => [m.module, m.status]),

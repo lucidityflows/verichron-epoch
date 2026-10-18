@@ -36,7 +36,7 @@ manifest. The database comes from `DATABASE_URL` or `DB_*` in `.env`.
 | `src/discovery.ts` | Finding and validating `stage.json` files |
 | `src/registration.ts` | Evidence, device-key and derivative registration |
 | `src/pipeline.ts` | Per-backup flow, stage subprocesses, stage arguments |
-| `src/events.ts` | Writing [events](../../docs/architecture.md#orchestrator-events) to stdout, and relaying stage output so it can't pass for one |
+| `src/events.ts` | Writing [events](../../docs/architecture.md#events-and-the-task-log): events or human text, by `--output`, and relaying stage output so it can't pass for an event |
 | `src/db.ts` | Run creation, stage status, the resume check |
 | `src/main.ts` | Entry point; writes the call's result to `--summary-path`, if given |
 | `src/runSummary.ts` | Exports each run's summary from the database to its manifest-declared summary directory |

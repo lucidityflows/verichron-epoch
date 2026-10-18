@@ -7,6 +7,7 @@
  * when unset; fails in CI. Run: pnpm --filter @verichron/orchestrator test
  */
 
+import { safeTestDatabaseUrl } from '@verichron/contracts';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -25,7 +26,8 @@ import {
 
 import { migrationRefusal, MIGRATIONS_DIR, readMigrationStatus } from './migrations.js';
 
-const DSN = process.env.TEST_DATABASE_URL;
+// Refused unless it names a test database: these tests empty the tables they use (EPOCH-570).
+const DSN = safeTestDatabaseUrl();
 const FILES = readdirSync(MIGRATIONS_DIR)
   .filter((f) => f.endsWith('.sql'))
   .sort();

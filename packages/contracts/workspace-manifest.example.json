@@ -21,5 +21,6 @@
   "summary_files": {
     "processor_json_path": "summary.json",
     "processor_markdown_path": "summary.md"
-  }
+  },
+  "task_logs_path": "logs"
 }

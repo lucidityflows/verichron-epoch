@@ -32,6 +32,7 @@ import psycopg2
 import psycopg2.extras
 from indicator_set import results_config, stale_after_days
 from runtime_env import redact_password, require_database_url
+from stage_report import report
 from tool_defects import defect as registered_defect
 
 
@@ -962,7 +963,7 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
         ]
         with open(output_path, "w") as f:
             f.write("\n".join(lines))
-        print(f"[reporting] wrote {output_path} (no evidence registered for run {run_id})")
+        report("warn", f"written to {output_path}, with no evidence registered for this run, so it has no facts")
         return
 
     lines += render_coverage_section(
@@ -986,7 +987,7 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     with open(output_path, "w") as f:
         f.write("\n".join(lines))
 
-    print(f"[reporting] wrote {output_path}")
+    report("info", f"written to {output_path}")
 
 
 def resolve_output_path(output: str | None, report_path: str | None) -> str:

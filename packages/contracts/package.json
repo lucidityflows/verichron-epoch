@@ -12,7 +12,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --project tsconfig.test.json",
+    "test": "tsx --test 'ts/*.test.ts'"
   },
   "dependencies": {
     "dotenv": "catalog:",
@@ -21,6 +23,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
-    "dotenv": "catalog:"
-    }
+    "dotenv": "catalog:",
+    "tsx": "catalog:"
+  }
 }

@@ -19,8 +19,10 @@ function trim(lines: PipelineLogEntry[]): PipelineLogEntry[] {
 /**
  * Follows a run whose state lives in the main process (EPOCH-487): it reads
  * the state and recent log when the page mounts, then applies each change.
- * Lines are numbered, so one that arrives while the state is being read is
- * neither lost nor shown twice. A new run (a new start time) starts a new log.
+ * Entries are numbered within their task (EPOCH-570), so one that arrives
+ * while the state is being read is neither lost nor shown twice. A new task
+ * (a new task id, or a new start time) starts a new log, and its numbering
+ * starts again.
  */
 function useRunState<S extends { startedAt: number | null; log: PipelineLogEntry[] }>(
   read: () => Promise<S>,
@@ -34,6 +36,7 @@ function useRunState<S extends { startedAt: number | null; log: PipelineLogEntry
     let active = true;
     let loaded = false;
     let lastSeq = 0;
+    let taskId: string | null = null;
     let startedAt: number | null = null;
     let early: PipelineLogEntry[] = [];
     let batch: PipelineLogEntry[] = [];
@@ -52,6 +55,13 @@ function useRunState<S extends { startedAt: number | null; log: PipelineLogEntry
         early.push(entry);
         return;
       }
+      if (entry.task_id !== taskId) {
+        // Another task's entries: its numbering starts again at 1.
+        taskId = entry.task_id;
+        lastSeq = 0;
+        batch = [];
+        setLog([]);
+      }
       if (entry.seq <= lastSeq) return;
       lastSeq = entry.seq;
       batch.push(entry);
@@ -60,9 +70,9 @@ function useRunState<S extends { startedAt: number | null; log: PipelineLogEntry
 
     const unsubState = onState((next) => {
       if (loaded && next.startedAt !== startedAt) {
+        // The task id decides when a log starts again: a state change that
+        // arrives after a new task's first entries must not drop them.
         startedAt = next.startedAt;
-        batch = [];
-        setLog([]);
       }
       setState(withoutLog(next));
     });
@@ -72,13 +82,23 @@ function useRunState<S extends { startedAt: number | null; log: PipelineLogEntry
       const recent = snapshot.log;
       const rest = withoutLog(snapshot);
       startedAt = rest.startedAt;
+      taskId = recent.length > 0 ? recent[recent.length - 1].task_id : null;
       lastSeq = recent.length > 0 ? recent[recent.length - 1].seq : 0;
-      const later = early.filter((entry) => entry.seq > lastSeq);
+      // Early entries of another task than the snapshot's belong to a newer task.
+      const newer = early.filter((entry) => entry.task_id !== taskId);
+      const later =
+        newer.length > 0
+          ? newer.filter((entry) => entry.task_id === newer[newer.length - 1].task_id)
+          : early.filter((entry) => entry.seq > lastSeq);
+      if (newer.length > 0) {
+        taskId = later[later.length - 1].task_id;
+        lastSeq = 0;
+      }
       if (later.length > 0) lastSeq = later[later.length - 1].seq;
       early = [];
       loaded = true;
       setState(rest);
-      setLog(trim([...recent, ...later]));
+      setLog(trim(newer.length > 0 ? later : [...recent, ...later]));
     });
 
     return () => {

@@ -148,9 +148,13 @@ function PreparedState({ prepared }: { prepared?: PreparedBackup }) {
   if (!prepared) return <span className="text-label text-muted-foreground shrink-0">Not prepared</span>;
   const when = formatDateTime(prepared.preparedAt);
   if (prepared.state === 'partial') {
+    // Why, written out, not on hover (DESIGN.md §9): the last Prepare's reason, else what is missing.
     return (
-      <span className="text-label text-flag shrink-0" title={`Decrypted ${when}; iLEAPP's output is missing`}>
-        Partly prepared · prepare again
+      <span className="flex flex-col items-end text-right shrink-0 max-w-[22rem]">
+        <span className="text-label text-flag">Partly prepared · prepare again</span>
+        <span className="text-label text-muted-foreground">
+          {prepared.reason ?? `Decrypted ${when}; iLEAPP's output is missing`}
+        </span>
       </span>
     );
   }

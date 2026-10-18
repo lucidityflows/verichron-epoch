@@ -50,6 +50,8 @@ export const WorkspaceManifest = z
         processor_markdown_path: relativeWorkspacePath,
       })
       .strict(),
+    /** The folder each task's log is saved in (EPOCH-570, docs/event-log.md §3). */
+    task_logs_path: relativeWorkspacePath,
   })
   .strict()
   .superRefine((manifest, context) => {
@@ -105,6 +107,7 @@ export function emptyWorkspaceManifest(): WorkspaceManifest {
       processor_json_path: 'summary.json',
       processor_markdown_path: 'summary.md',
     },
+    task_logs_path: 'logs',
   };
 }
 
@@ -151,7 +154,13 @@ export function parseWorkspaceManifest(raw: string | unknown, file = WORKSPACE_M
     const detail = parsed.error.issues
       .map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
       .join('; ');
-    throw new WorkspaceManifestError(`${file} is not a valid workspace manifest: ${detail}`);
+    // A manifest from before EPOCH-570 has no task_logs_path. It is refused, not
+    // defaulted (no legacy paths, AGENTS.md §2); the message says what to add.
+    const missingLogs =
+      value !== null && typeof value === 'object' && !('task_logs_path' in value)
+        ? ' Add "task_logs_path": "logs" to it (EPOCH-570).'
+        : '';
+    throw new WorkspaceManifestError(`${file} is not a valid workspace manifest: ${detail}.${missingLogs}`);
   }
   return parsed.data;
 }
@@ -225,6 +234,11 @@ export function resolveProcessorSummaryPaths(
     json: resolveWorkspacePath(workspace, manifest.summary_files.processor_json_path),
     markdown: resolveWorkspacePath(workspace, manifest.summary_files.processor_markdown_path),
   };
+}
+
+/** The folder a workspace's task logs are saved in, as its manifest declares it (EPOCH-570). */
+export function resolveTaskLogsPath(workspace: string, manifest: WorkspaceManifest): string {
+  return resolveWorkspacePath(workspace, manifest.task_logs_path);
 }
 
 export function resolveRunSummaryPath(entry: ResolvedWorkspaceBackup, runId: string): string {

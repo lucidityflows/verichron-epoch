@@ -5,7 +5,7 @@
   "description": "The explicit paths for evidence and outputs in one workspace.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "backups", "summary_files"],
+  "required": ["schema_version", "backups", "summary_files", "task_logs_path"],
   "properties": {
     "schema_version": {
       "const": 1
@@ -18,6 +18,10 @@
     },
     "summary_files": {
       "$ref": "#/$defs/summary_files"
+    },
+    "task_logs_path": {
+      "$ref": "#/$defs/relative_path",
+      "description": "The folder each task log is saved in (EPOCH-570)."
     }
   },
   "$defs": {

@@ -1,16 +1,41 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, ArrowDown, TerminalSquare } from 'lucide-react';
 import type { PipelineLogEntry } from '../../../shared/types/window';
+import { formatLogTime } from '../../../shared/time';
 import { Loader } from '../ui/Loader';
+import { cn } from '../../libs/utils';
+
+/** A task log's entry (EPOCH-570), or a plain line of a tool's own output, such as a setup step's. */
+export type TerminalLine = PipelineLogEntry | { stream: 'stdout' | 'stderr'; line: string };
 
 interface TerminalLogProps {
-  lines: Array<Pick<PipelineLogEntry, 'stream' | 'line'>>;
+  lines: TerminalLine[];
   live: boolean;
   defaultOpen?: boolean;
   label?: string;
 }
 
 const BOTTOM_THRESHOLD_PX = 64;
+
+/**
+ * One entry as its line: "15:21:03Z  INFO   [label] message". The level is
+ * padded to one width with real spaces, so a copied line keeps its columns.
+ */
+export function logLineParts(entry: PipelineLogEntry): { text: string; muted: boolean }[] {
+  return [
+    { text: `${formatLogTime(entry.at)}  `, muted: true },
+    { text: `${entry.level.toUpperCase().padEnd(5)}  `, muted: false },
+    ...(entry.label ? [{ text: `[${entry.label}] `, muted: true }] : []),
+    { text: entry.message || '\u00A0', muted: false },
+  ];
+}
+
+const LEVEL_CLASS: Record<PipelineLogEntry['level'], string> = {
+  error: 'text-danger',
+  warn: 'text-flag',
+  info: 'text-foreground/80',
+  debug: 'text-muted-foreground',
+};
 
 export function TerminalLog({ lines, live, defaultOpen = false, label = 'Technical log' }: TerminalLogProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -102,11 +127,23 @@ export function TerminalLog({ lines, live, defaultOpen = false, label = 'Technic
             {lines.length === 0 ? (
               <p className="text-muted-foreground italic">No output yet.</p>
             ) : (
-              lines.map((entry, i) => (
-                <div key={i} className={entry.stream === 'stderr' ? 'text-danger' : 'text-foreground/80'}>
-                  {entry.line || '\u00A0'}
-                </div>
-              ))
+              // Each line states its time and level in text, as well as colour (EPOCH-570).
+              lines.map((entry, i) =>
+                'level' in entry ? (
+                  // Real spaces, kept by whitespace-pre-wrap, so a copied line reads as it shows.
+                  <div key={entry.seq} className={cn('whitespace-pre-wrap', LEVEL_CLASS[entry.level])}>
+                    {logLineParts(entry).map((part, i) => (
+                      <span key={i} className={part.muted ? 'text-muted-foreground' : undefined}>
+                        {part.text}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div key={i} className={entry.stream === 'stderr' ? 'text-danger' : 'text-foreground/80'}>
+                    {entry.line || '\u00A0'}
+                  </div>
+                )
+              )
             )}
           </div>
           {!stickToBottom && lines.length > 0 && (

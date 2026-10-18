@@ -172,17 +172,23 @@ Languages split by role: TypeScript runs the control plane (app, processor,
 orchestrator); Python parses, writes facts and renders the report. They meet
 only at process boundaries (a stage is a subprocess) and in the database.
 
-### Orchestrator events
+<a id="orchestrator-events"></a>
 
-The orchestrator tells its caller what it is doing in typed events
-(EPOCH-443), defined once in `packages/contracts/ts/pipelineEvent.ts`.
+### Events and the task log
+
+The orchestrator (EPOCH-443) and the processor (EPOCH-445) tell their caller
+what they are doing in typed events, defined once in
+`packages/contracts/ts/pipelineEvent.ts`. The app saves each task's events and
+output as a levelled, sanitized log; [event-log.md](event-log.md) describes it.
+- **Who emits what:** each event type names the program that may emit it, and an event from the other program is invalid.
 - **Format:** each event is one stdout line, `@@verichron ` followed by JSON, validated before it is written.
 - **The events:**
   - `run:created`, `run:skipped` and `run:finished`; a finished run's state is read from `run_completeness` (R23);
   - `stage:started` and `stage:finished`;
   - `registration:refused`.
-- **Stage output:** the orchestrator relays a stage's stdout line by line, and tags any line that starts with the prefix with the stage's name. No stage, and no value it echoes from the evidence, can pass for an event.
-- **The app:** its main process reads the events with the same contract and doesn't trust an invalid one. It takes the running stage and the runs a call created from them, never from the human log lines printed beside them. Event lines are not shown in the log.
+- **Output modes:** with `--output events`, how the app runs the orchestrator and the processor, stdout carries only events. With `--output text`, the command line's default, the same events are written as human lines, in the same wording.
+- **Stage output:** the orchestrator relays a stage's stdout and stderr line by line, each line a `stage:output` event, the line a field inside it. No stage, and no value it echoes from the evidence, can pass for an event. A failed stage's `stage:finished` gives its reason: the last line it wrote to stderr, or its stop reason.
+- **The app:** its main process reads the events with the same contract and doesn't trust an invalid one, or one from the other program. It takes the running stage and the runs a call created from them, never from text.
 
 ## The workspace
 
@@ -197,7 +203,7 @@ line, still analyzes every prepared backup in the workspace.
 
 ```
 <workspace>/
-  workspace.json                           explicit paths for every backup and processor summary
+  workspace.json                           explicit paths for every backup, the processor summary and the task logs
   <manifest-declared paths>                evidence, derivatives, reports, run summaries and logs
 ```
 
@@ -283,11 +289,3 @@ switch ([decisions](decisions.md#product-and-builds)).
 orchestrator resolves it once and gives each stage `DATABASE_URL` in its
 environment; stages read it with `runtime_env.require_database_url()`, and
 `migrate.py`, `provision_roles.py` and `db_peek.py` read `.env` themselves.
-
-## Changes already decided
-
-These are settled but not yet built; this page will change when they land.
-
-| Change | Ticket |
-|---|---|
-| The app reads typed events from the processor instead of scraping its logs; the orchestrator's are built (EPOCH-443) | EPOCH-445 |

@@ -599,6 +599,12 @@ requires-dist = [
 name = "verichron-etl-run"
 version = "0.1.0"
 source = { editable = "libs/etl-run" }
+dependencies = [
+    { name = "verichron-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "verichron-contracts", editable = "packages/contracts" }]
 
 [[package]]
 name = "verichron-ileapp-bridge"

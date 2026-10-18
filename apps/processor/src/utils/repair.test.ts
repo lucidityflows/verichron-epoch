@@ -66,7 +66,7 @@ describe('repair provenance', () => {
     mkdirSync(`${db}-wal`);
     writeFileSync(path.join(`${db}-wal`, 'keep'), '');
 
-    const repair = await repairDecrypted({ sqliteBin: sqlite } as Config, decDir);
+    const repair = await repairDecrypted({ sqliteBin: sqlite } as Config, decDir, () => undefined);
 
     assert.equal(repair.status, 'ran');
     if (repair.status !== 'ran') return;
@@ -110,7 +110,7 @@ describe('streamed recovery (EPOCH-486)', () => {
     const db = path.join(decDir, 'HomeDomain', 'big.db');
     sqliteFile(db);
 
-    const repair = await repairDecrypted({ sqliteBin: sqlite } as Config, decDir);
+    const repair = await repairDecrypted({ sqliteBin: sqlite } as Config, decDir, () => undefined);
 
     assert.equal(repair.status, 'ran');
     if (repair.status !== 'ran') return;
@@ -129,7 +129,7 @@ describe('streamed recovery (EPOCH-486)', () => {
     const db = path.join(decDir, 'HomeDomain', 'sms.db');
     sqliteFile(db);
 
-    const repair = await repairDecrypted({ sqliteBin: sqlite } as Config, decDir);
+    const repair = await repairDecrypted({ sqliteBin: sqlite } as Config, decDir, () => undefined);
 
     assert.equal(repair.status, 'ran');
     if (repair.status !== 'ran') return;
@@ -152,7 +152,7 @@ describe('streamed recovery (EPOCH-486)', () => {
       const db = path.join(decDir, 'HomeDomain', 'sms.db');
       sqliteFile(db);
 
-      const repair = await repairDecrypted({ sqliteBin: sqlite } as Config, decDir);
+      const repair = await repairDecrypted({ sqliteBin: sqlite } as Config, decDir, () => undefined);
 
       assert.equal(repair.status, 'ran');
       if (repair.status !== 'ran') return;

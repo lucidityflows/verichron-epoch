@@ -1,3 +1,4 @@
+import { safeTestDatabaseUrl } from '@verichron/contracts';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
@@ -8,6 +9,7 @@ import pg, { type Pool } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, it, vi } from 'vitest';
 import {
   DECRYPT_MARKER,
+  readTaskLog,
   renderPipelineEvent,
   createWorkspaceManifestBackup,
   emptyWorkspaceManifest,
@@ -42,7 +44,8 @@ function childProcess() {
   });
 }
 
-const DSN = process.env.TEST_DATABASE_URL;
+// Refused unless it names a test database: these tests empty the tables they use (EPOCH-570).
+const DSN = safeTestDatabaseUrl();
 const MIGRATIONS = path.resolve(__dirname, '../../../../../packages/etl-db-writer/migrations');
 
 function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
@@ -67,7 +70,7 @@ describe('pipeline IPC single-flight', () => {
       JSON.stringify({ ...emptyWorkspaceManifest(), backups: [entry] })
     );
     pool = { query: async () => ({ rows: [{ path: decryptPath }] }) };
-    registerPipelineHandlers(() => null, '/repo', pool as unknown as Pool);
+    registerPipelineHandlers(() => null, '/repo', pool as unknown as Pool, '0.1.0');
   });
 
   afterEach(() => rmSync(workspace, { recursive: true, force: true }));
@@ -98,6 +101,94 @@ describe('pipeline IPC single-flight', () => {
       /Cannot start processor while orchestrator is running/
     );
     orchestrator.emit('close', 0);
+  });
+});
+
+/**
+ * EPOCH-570, EPOCH-445: Prepare runs the processor for its events, and every
+ * line goes to the task log; the password prompt comes from an event, and the
+ * password reaches only the processor's stdin.
+ */
+describe('Prepare and its task log', () => {
+  beforeEach(() => {
+    handlers.clear();
+    spawnMock.mockReset();
+    workspace = mkdtempSync(path.join(os.tmpdir(), 'pipeline-prepare-'));
+    writeFileSync(path.join(workspace, 'workspace.json'), JSON.stringify(emptyWorkspaceManifest()));
+    registerPipelineHandlers(() => null, '/repo', { query: async () => ({ rows: [] }) } as unknown as Pool, '0.1.0');
+  });
+  afterEach(() => rmSync(workspace, { recursive: true, force: true }));
+
+  const savedLog = () => {
+    const dir = path.join(workspace, 'logs');
+    const [file] = readdirSync(dir);
+    return { file, text: readFileSync(path.join(dir, file), 'utf8') };
+  };
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+  it('runs the processor silently for its events, asks for the password on its event, and logs everything', async () => {
+    const processor = childProcess();
+    let written = '';
+    processor.stdin.on('data', (chunk: Buffer) => (written += chunk.toString()));
+    spawnMock.mockReturnValueOnce(processor);
+    await invoke('epoch:startPipeline', '/source', { workspace, only: ['BK'] });
+    const args = spawnMock.mock.calls.at(-1)?.[1] as string[];
+    assert.equal(args[0], '--silent', "pnpm's banners would print the repository's path");
+    assert.deepEqual(args.slice(args.indexOf('--output'), args.indexOf('--output') + 2), ['--output', 'events']);
+
+    processor.stdout.write(`${renderPipelineEvent({ type: 'password:required', label: 'BK', attempt: 1, max: 3 })}\n`);
+    await tick();
+    const asking = await invoke<{ passwordFor: string | null; taskLog: string | null }>('epoch:getPrepareState');
+    assert.equal(asking.passwordFor, 'BK');
+    assert.equal(asking.taskLog, savedLog().file);
+
+    await invoke('epoch:submitBackupPassword', 'correct-horse');
+    assert.equal(written, 'correct-horse\n', 'the password goes to stdin only');
+    processor.stderr.write('a stray line with correct-horse in it\n');
+    processor.stdout.write(`${renderPipelineEvent({ type: 'prepare:finished', failed_labels: [] })}\n`);
+    await tick();
+    processor.emit('close', 0, null);
+    await vi.waitFor(async () =>
+      assert.equal((await invoke<{ status: string }>('epoch:getPrepareState')).status, 'finished')
+    );
+
+    const { text } = savedLog();
+    assert.ok(!text.includes('correct-horse'), 'never saved');
+    const read = readTaskLog(text);
+    assert.deepEqual([read.finished, read.invalid], [true, []]);
+    const last = read.entries.at(-1)!;
+    assert.ok(last.kind === 'task:finished' && last.result.outcome === 'succeeded');
+    assert.ok(read.entries.some((e) => e.level === 'error' && /a password reached the output/.test(e.message)));
+  });
+
+  it('records a processor that ended without reporting a result, and how it ended (EPOCH-569)', async () => {
+    const processor = childProcess();
+    spawnMock.mockReturnValueOnce(processor);
+    await invoke('epoch:startPipeline', '/source', { workspace });
+    processor.emit('close', null, 'SIGKILL');
+    await vi.waitFor(async () =>
+      assert.equal((await invoke<{ status: string }>('epoch:getPrepareState')).status, 'finished')
+    );
+    const state = await invoke<{ result: { success: boolean; error?: string } }>('epoch:getPrepareState');
+    assert.deepEqual(state.result.success, false);
+    assert.equal(state.result.error, 'the processor ended (signal SIGKILL) without reporting a result');
+    const last = readTaskLog(savedLog().text).entries.at(-1)!;
+    assert.ok(last.kind === 'task:finished');
+    assert.deepEqual(last.kind === 'task:finished' && [last.result.outcome, last.result.signal, last.result.reported], [
+      'crashed',
+      'SIGKILL',
+      false,
+    ]);
+  });
+
+  it('does not start Prepare when its log cannot be created: no log, no task', async () => {
+    const blocked = path.join(workspace, 'blocked');
+    writeFileSync(blocked, '');
+    await assert.rejects(
+      invoke('epoch:startPipeline', '/source', { workspace: blocked }),
+      /The task log could not be created, so Prepare Evidence did not start/
+    );
+    assert.equal(spawnMock.mock.calls.length, 0, 'the processor was never started');
   });
 });
 
@@ -183,7 +274,7 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
 
     handlers.clear();
     spawnMock.mockReset();
-    registerPipelineHandlers(() => null, '/repo', db as unknown as Pool);
+    registerPipelineHandlers(() => null, '/repo', db as unknown as Pool, '0.1.0');
   });
 
   afterAll(async () => {
@@ -272,7 +363,7 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     const ended = async () =>
       (await db.query(`SELECT ended_reason, ended_detail FROM pipeline_runs WHERE run_id = $1`, [CRASHED])).rows[0];
     await vi.waitFor(async () => assert.equal((await ended()).ended_reason, 'crashed'));
-    assert.equal((await ended()).ended_detail, 'orchestrator process exited unexpectedly (code 1)');
+    assert.equal((await ended()).ended_detail, 'orchestrator process exited unexpectedly (exit code 1)');
   });
 
   it("reports the workspace interrupted when its evidence's latest run was, found by the sidecar's content root", async () => {

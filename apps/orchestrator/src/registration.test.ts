@@ -8,6 +8,7 @@
  * when unset; fails in CI. Run: pnpm --filter @verichron/orchestrator test
  */
 
+import { safeTestDatabaseUrl } from '@verichron/contracts';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -52,12 +53,14 @@ import {
 
 import { createRun, getRunState, hasCompleteRunFor } from './db.js';
 import { discoverStages } from './discovery.js';
-import { runPipelineForBackup } from './pipeline.js';
+import { STOPPED_EXIT_CODE, requestStop, resetStopForTests, runPipelineForBackup } from './pipeline.js';
 import { readRunSummary } from './runSummary.js';
 import { deviceKey, loadDeviceSecret, readPlistStrings, registerEvidence, RegistrationError } from './registration.js';
+import { setOutputMode } from './events.js';
 import type { StageDefinition, StageSet } from './types.js';
 
-const DSN = process.env.TEST_DATABASE_URL;
+// Refused unless it names a test database: these tests empty the tables they use (EPOCH-570).
+const DSN = safeTestDatabaseUrl();
 const MIGRATIONS = path.resolve(import.meta.dirname, '../../../packages/etl-db-writer/migrations');
 const UDID = '00008030-001A2B3C4D5E6F70';
 const DECRYPT = { name: 'iphone_backup_decrypt', version: '0.10.0' };
@@ -1039,6 +1042,10 @@ describe('registration in isolation', live, () => {
 });
 
 describe('orchestrator events (EPOCH-443)', live, () => {
+  // As the app runs it (EPOCH-570): every stdout line is an event.
+  before(() => setOutputMode('events'));
+  after(() => setOutputMode('text'));
+
   /** What a call writes to stdout while `body` runs, split into lines, and its result. */
   async function captured<T>(body: () => Promise<T>): Promise<{ result: T; lines: string[] }> {
     const original = process.stdout.write.bind(process.stdout);
@@ -1055,15 +1062,23 @@ describe('orchestrator events (EPOCH-443)', live, () => {
     }
   }
 
-  /** Every event line, each of which must validate: an invalid one fails the test. */
+  /** Every line, each of which must be a valid event: anything else fails the test. */
+  function allEventsIn(lines: string[]): PipelineEvent[] {
+    return lines.map((line) => {
+      const parsed = parsePipelineEventLine(line, 'orchestrator');
+      assert.equal(parsed.kind, 'event', `stdout carried a line that is not a valid event: ${line}`);
+      return (parsed as { kind: 'event'; event: PipelineEvent }).event;
+    });
+  }
+
+  /** The run's events, without the stages' relayed output and the orchestrator's log lines. */
   function eventsIn(lines: string[]): PipelineEvent[] {
-    const events: PipelineEvent[] = [];
-    for (const line of lines) {
-      const parsed = parsePipelineEventLine(line);
-      assert.notEqual(parsed.kind, 'invalid', `the orchestrator wrote an invalid event: ${line}`);
-      if (parsed.kind === 'event') events.push(parsed.event);
-    }
-    return events;
+    return allEventsIn(lines).filter((e) => e.type !== 'stage:output' && e.type !== 'log');
+  }
+
+  /** What the stages wrote to stdout, line by line. */
+  function stageStdout(lines: string[]): string[] {
+    return allEventsIn(lines).flatMap((e) => (e.type === 'stage:output' && e.stream === 'stdout' ? [e.line] : []));
   }
 
   /** A stage that prints a forged event line on its stdout, as one echoing evidence might. */
@@ -1135,12 +1150,17 @@ describe('orchestrator events (EPOCH-443)', live, () => {
       'from run_completeness'
     );
 
-    // The stage's forged line is relayed, tagged with its name, as an ordinary log line.
-    assert.ok(lines.includes('ordinary line'));
+    // The stage's forged line is relayed as that stage's output, never as an event of its own.
+    const output = stageStdout(lines);
+    assert.ok(output.includes('ordinary line'));
+    assert.ok(
+      output.some((line) => line.startsWith(PIPELINE_EVENT_PREFIX)),
+      'the forged text is kept as written'
+    );
     const forgedLine = lines.find((l) => l.includes('00000000-0000-0000-0000-000000000000'));
     assert.ok(forgedLine);
-    assert.ok(forgedLine?.startsWith(`[stage first] ${PIPELINE_EVENT_PREFIX}`), forgedLine);
-    assert.equal(parsePipelineEventLine(forgedLine).kind, 'log');
+    const relayed = parsePipelineEventLine(forgedLine, 'orchestrator');
+    assert.ok(relayed.kind === 'event' && relayed.event.type === 'stage:output' && relayed.event.stage === 'first');
     // Its last line reached stdout before the orchestrator said it had finished.
     assert.ok(lines.indexOf(forgedLine) < lines.findIndex((l) => l.includes('"stage:finished"')));
   });
@@ -1157,10 +1177,67 @@ describe('orchestrator events (EPOCH-443)', live, () => {
     };
     const { result, lines } = await captured(() => run(ws.backupPath, { enabled: [unterminated], disabled: [] }));
     assert.equal(result.success, true, JSON.stringify(result));
-    assert.ok(lines.includes('done'), "the stage's last line is its own");
+    assert.deepEqual(stageStdout(lines), ['done'], "the stage's last line is its own");
     assert.deepEqual(
       eventsIn(lines).map((e) => e.type),
       ['run:created', 'stage:started', 'stage:finished', 'run:finished']
+    );
+  });
+
+  it('stops the running stage and exits on a stop, writing nothing to its row (EPOCH-570)', async () => {
+    const ws = makeWorkspace('events-stopped', { label: 'F' });
+    const dir = path.join(tmp, 'stages', 'sleeping');
+    mkdirSync(dir, { recursive: true });
+    const pidFile = path.join(dir, 'pid');
+    writeFileSync(
+      path.join(dir, 'stage.mjs'),
+      `import { writeFileSync } from 'node:fs';\nwriteFileSync(${JSON.stringify(pidFile)}, String(process.pid));\nsetTimeout(() => {}, 60_000);\n`
+    );
+    const sleeping: StageDefinition = {
+      name: 'sleeping',
+      dir,
+      manifest: { entrypoint: 'stage.mjs', runtime: 'node', order: 10, reads: 'decrypted', enabled: true },
+    };
+    // The run never returns: the orchestrator exits instead, so its promise is left pending.
+    void run(ws.backupPath, { enabled: [sleeping], disabled: [] });
+    for (let i = 0; i < 200 && !existsSync(pidFile); i++) await new Promise((resolve) => setTimeout(resolve, 50));
+    const stagePid = Number(readFileSync(pidFile, 'utf8'));
+
+    const exited = new Promise<number>((resolve) => requestStop(resolve));
+    assert.equal(await exited, STOPPED_EXIT_CODE);
+    assert.throws(() => process.kill(stagePid, 0), 'the stage was stopped with the orchestrator');
+    const { rows } = await db.query<{ status: string }>(
+      `SELECT s.status FROM pipeline_stage_status s JOIN pipeline_runs r USING (run_id)
+        WHERE r.backup_source = $1 AND s.stage_name = 'sleeping'`,
+      [ws.backupPath]
+    );
+    assert.deepEqual(rows, [{ status: 'running' }], 'left as it was, so it reads as Interrupted, never Failed');
+    resetStopForTests();
+  });
+
+  it('says why a stage failed, from the last line of its stderr, and relays that stderr (EPOCH-570)', async () => {
+    const ws = makeWorkspace('events-failed', { label: 'E' });
+    const dir = path.join(tmp, 'stages', 'failing');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      path.join(dir, 'stage.mjs'),
+      `process.stderr.write('Traceback (most recent call last):\\n  File "x"\\nValueError: bad input\\n');\nprocess.exit(1);\n`
+    );
+    const failing: StageDefinition = {
+      name: 'failing',
+      dir,
+      manifest: { entrypoint: 'stage.mjs', runtime: 'node', order: 10, reads: 'decrypted', enabled: true },
+    };
+    const { result, lines } = await captured(() => run(ws.backupPath, { enabled: [failing], disabled: [] }));
+    assert.equal(result.success, false);
+    const finished = eventsIn(lines).find((e) => e.type === 'stage:finished') as Extract<
+      PipelineEvent,
+      { type: 'stage:finished' }
+    >;
+    assert.deepEqual([finished.status, finished.reason], ['failed', 'ValueError: bad input']);
+    assert.deepEqual(
+      allEventsIn(lines).flatMap((e) => (e.type === 'stage:output' && e.stream === 'stderr' ? [e.line] : [])),
+      ['Traceback (most recent call last):', '  File "x"', 'ValueError: bad input']
     );
   });
 

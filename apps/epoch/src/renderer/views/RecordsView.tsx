@@ -95,7 +95,7 @@ export function RecordsView({
   const columns = useMemo(buildColumns, []);
 
   return (
-    <ViewLayout section="records" title="Forensic Records" className="overflow-hidden">
+    <ViewLayout section="records" title="Forensic Records" scroll="contained" className="overflow-hidden">
       {selectedRun && loadedCount < totalCount && (
         // A capped list must say so (R25). Filters below apply only to the
         // loaded rows until the server-side grid lands (EPOCH-411).

@@ -13,6 +13,12 @@ interface ViewLayoutProps {
   description?: React.ReactNode;
   /** `readable` caps the width for form-like views; the left edge never moves. */
   width?: 'full' | 'readable';
+  /**
+   * `page` (default): the view grows with its content and the shell's
+   * container scrolls it, so the gutter follows the last card. `contained`:
+   * the view is held to the window, for a table that scrolls inside it.
+   */
+  scroll?: 'page' | 'contained';
   /** Applied to the content below the header (e.g. `gap-7`, `overflow-hidden`). */
   className?: string;
   children: React.ReactNode;
@@ -31,14 +37,19 @@ export function ViewLayout({
   titleAside,
   description,
   width = 'full',
+  scroll = 'page',
   className,
   children,
 }: ViewLayoutProps) {
   const Icon = SECTIONS[section].icon;
+  // min-h-0 lets a contained view shrink to the window. A page view must not
+  // shrink: its content would spill past its box, and the shell's bottom
+  // gutter would sit at the window's edge instead of after the last card.
+  const fit = scroll === 'contained' ? 'min-h-0' : 'shrink-0';
   return (
     <div
       style={sectionStyle(section)}
-      className={cn('relative flex flex-col flex-1 min-h-0', width === 'readable' && 'w-full max-w-4xl')}
+      className={cn('relative flex flex-col flex-1', fit, width === 'readable' && 'w-full max-w-4xl')}
     >
       <div
         aria-hidden
@@ -56,7 +67,9 @@ export function ViewLayout({
           {description && <p className="text-data text-muted-foreground mt-1">{description}</p>}
         </div>
       </header>
-      <div className={cn('relative flex flex-col flex-1 min-h-0', className)}>{children}</div>
+      <div className={cn('relative flex flex-col flex-1', scroll === 'contained' && 'min-h-0', className)}>
+        {children}
+      </div>
     </div>
   );
 }

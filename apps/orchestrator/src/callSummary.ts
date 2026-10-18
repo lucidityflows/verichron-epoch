@@ -1,4 +1,5 @@
 import * as fsp from 'node:fs/promises';
+import { log } from './events.js';
 import * as path from 'node:path';
 import { resolvePythonBin } from './cli.js';
 
@@ -38,7 +39,7 @@ export async function preflightPython(
     return await resolve();
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    console.error(`[orchestrator] ${error}`);
+    log('error', error);
     await writeCallSummary(summaryPath, [], error);
     return undefined;
   }

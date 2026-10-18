@@ -12,6 +12,7 @@
  * must reproduce the single-page result exactly, with no gaps or repeats.
  */
 
+import { safeTestDatabaseUrl } from '@verichron/contracts';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
@@ -39,7 +40,8 @@ import {
   type RecordSortKey,
 } from './dbReader.js';
 
-const DSN = process.env.TEST_DATABASE_URL;
+// Refused unless it names a test database: these tests empty the tables they use (EPOCH-570).
+const DSN = safeTestDatabaseUrl();
 // This package is CommonJS, so __dirname rather than import.meta.
 const MIGRATIONS = path.resolve(__dirname, '../etl-db-writer/migrations');
 

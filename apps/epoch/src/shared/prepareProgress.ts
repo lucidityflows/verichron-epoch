@@ -1,17 +1,11 @@
-// Translates the processor's raw stdout/stderr lines into structured
-// per-backup progress, so the UI can show a plain-English status next to
-// (not instead of) the raw CLI output. Pure and tolerant by design: an
-// unrecognized line is a no-op, never a thrown error -- this only drives a
-// friendlier display, the raw technical log underneath remains the source
-// of truth for anything this doesn't catch.
-//
-// Depends on the processor's log format staying banner/prefix-based
-// (`=== <name> ===`, `  [stage]  <detail>`) -- see apps/processor/src/main.ts's
-// run() loop, which is what actually produces these lines, and the table in
-// apps/processor/README.md.
+// Per-backup Prepare progress, from the processor's typed events (EPOCH-445):
+// each step's start and outcome, and progress figures. Nothing here reads
+// text, so rewording a log line changes nothing in the UI.
 //
 // Shared (EPOCH-487): the main process keeps a run's progress, so leaving and
 // returning to New Investigation shows it; the renderer only displays it.
+
+import type { PipelineEvent } from '@verichron/contracts';
 
 export type StageName = 'hash' | 'decrypt' | 'repair' | 'ileapp';
 export type StageState = 'pending' | 'running' | 'done' | 'skipped' | 'error';
@@ -64,114 +58,58 @@ export function initPrepareProgress(labels: string[]): PrepareRunProgress {
   return { order: [...labels], byLabel, currentLabel: null };
 }
 
-const BACKUP_START_RE = /^=== (.+) ===$/;
-const STAGE_LINE_RE = /^\s*\[(hash|decrypt|repair|ileapp)\]\s*(.*)$/;
-const STAGE_ERROR_RE = /^\s*\[(hash|decrypt|repair|ileapp)\]\s*error\b:?\s*(.*)$/i;
-const HASH_PROGRESS_RE = /^\s*\[hash\]\s+progress (\d+) bytes, (\d+) files$/;
-const DECRYPT_PROGRESS_RE = /^\s*\[decrypt\]\s+progress (\d+) of (\d+) bytes$/;
-const ILEAPP_MODULE_RE = /^\s*\[ileapp\]\s+module (\d+) of (\d+): (.+)$/;
+const isStage = (step: string): step is StageName => (STAGE_ORDER as string[]).includes(step);
 
-export function applyPrepareLogLine(
+/** The progress after one of the processor's events; an event about another backup, or none, changes nothing. */
+export function applyPrepareEvent(
   state: PrepareRunProgress,
-  rawLine: string,
+  event: PipelineEvent,
   now: number = Date.now()
 ): PrepareRunProgress {
-  const line = rawLine.replace(/\s+$/, '');
-
-  const startMatch = BACKUP_START_RE.exec(line);
-  if (startMatch) {
-    const label = startMatch[1];
-    const current = state.byLabel[label];
-    if (!current) return state; // unknown label (shouldn't happen) -- ignore rather than throw
-
-    return {
-      ...state,
-      currentLabel: label,
-      byLabel: {
-        ...state.byLabel,
-        [label]: {
-          ...current,
-          overall: 'running',
-          stages: { ...current.stages, hash: 'running' },
-          stageStartedAt: { hash: now },
-        },
-      },
-    };
-  }
-
-  if (!state.currentLabel) return state;
-  const current = state.byLabel[state.currentLabel];
-  if (!current) return state;
-
-  const update = (patch: Partial<BackupProgress>): PrepareRunProgress => ({
+  if (!('label' in event) || !event.label) return state;
+  const current = state.byLabel[event.label];
+  if (!current) return state; // not one the examiner selected
+  const update = (patch: Partial<BackupProgress>, currentLabel = state.currentLabel): PrepareRunProgress => ({
     ...state,
-    byLabel: { ...state.byLabel, [state.currentLabel as string]: { ...current, ...patch } },
+    currentLabel,
+    byLabel: { ...state.byLabel, [current.label]: { ...current, ...patch } },
   });
-  const hashed = HASH_PROGRESS_RE.exec(line);
-  if (hashed) return update({ hashed: { bytes: Number(hashed[1]), files: Number(hashed[2]) } });
-  const decrypted = DECRYPT_PROGRESS_RE.exec(line);
-  if (decrypted) return update({ decrypted: { bytes: Number(decrypted[1]), total: Number(decrypted[2]) } });
-  const ileappModule = ILEAPP_MODULE_RE.exec(line);
-  if (ileappModule) {
-    return update({
-      ileappModule: {
-        index: Number(ileappModule[1]),
-        total: Number(ileappModule[2]),
-        name: ileappModule[3],
-        startedAt: now,
-      },
-    });
-  }
 
-  const errorMatch = STAGE_ERROR_RE.exec(line);
-  if (errorMatch) {
-    const [, stageRaw, msg] = errorMatch;
-    const stage = stageRaw as StageName;
-    return {
-      ...state,
-      byLabel: {
-        ...state.byLabel,
-        [state.currentLabel]: {
-          ...current,
+  switch (event.type) {
+    case 'backup:step': {
+      if (!isStage(event.step)) return state; // the crash-log copy has no step of its own on screen
+      const step = event.step;
+      if (event.status === 'started') {
+        return update(
+          {
+            overall: current.overall === 'failed' ? 'failed' : 'running',
+            stages: { ...current.stages, [step]: 'running' },
+            stageStartedAt: { ...current.stageStartedAt, [step]: now },
+          },
+          current.label
+        );
+      }
+      if (event.status === 'error') {
+        return update({
           overall: 'failed',
-          stages: { ...current.stages, [stage]: 'error' },
-          errorMessage: msg || undefined,
-        },
-      },
-    };
-  }
-
-  const stageMatch = STAGE_LINE_RE.exec(line);
-  if (stageMatch) {
-    const [, stageRaw, rest] = stageMatch;
-    const stage = stageRaw as StageName;
-    const isSkipped = /^(already done, skipping|skipped)/i.test(rest);
-    const isDone = isSkipped || /^done\b/i.test(rest);
-    if (!isDone) return state;
-
-    const stages: Record<StageName, StageState> = { ...current.stages, [stage]: isSkipped ? 'skipped' : 'done' };
-    const stageStartedAt = { ...current.stageStartedAt };
-    const idx = STAGE_ORDER.indexOf(stage);
-    const isLastStage = idx === STAGE_ORDER.length - 1;
-    if (!isLastStage) {
-      stages[STAGE_ORDER[idx + 1]] = 'running';
-      stageStartedAt[STAGE_ORDER[idx + 1]] = now;
+          stages: { ...current.stages, [step]: 'error' },
+          errorMessage: current.errorMessage ?? event.reason,
+        });
+      }
+      return update({ stages: { ...current.stages, [step]: event.status === 'skipped' ? 'skipped' : 'done' } });
     }
-
-    return {
-      ...state,
-      byLabel: {
-        ...state.byLabel,
-        [state.currentLabel]: {
-          ...current,
-          stages,
-          stageStartedAt,
-          // An earlier step's error leaves the backup failed even when iLEAPP finishes.
-          overall: isLastStage && current.overall !== 'failed' ? 'done' : current.overall,
-        },
-      },
-    };
+    case 'hash:progress':
+      return update({ hashed: { bytes: event.bytes, files: event.files } });
+    case 'decrypt:progress':
+      return update({ decrypted: { bytes: event.bytes, total: event.total } });
+    case 'ileapp:module':
+      return update({ ileappModule: { index: event.index, total: event.total, name: event.module, startedAt: now } });
+    case 'backup:finished':
+      return update({
+        overall: event.success ? 'done' : 'failed',
+        errorMessage: event.success ? undefined : (current.errorMessage ?? event.reason),
+      });
+    default:
+      return state;
   }
-
-  return state;
 }

@@ -7,7 +7,12 @@ name = "verichron-etl-run"
 version = "0.1.0"
 description = "Shared per-file/per-record success-and-failure accounting for the extractor pipeline"
 requires-python = "==3.14.*"
-dependencies = []
+dependencies = [
+    "verichron-contracts",
+]
+
+[tool.uv.sources]
+verichron-contracts = { workspace = true }
 
 [tool.setuptools]
 py-modules = ["etl_run"]

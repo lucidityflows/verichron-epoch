@@ -109,8 +109,10 @@ def ingest_artifact(conn, lava_conn, ctx: IngestContext, output: LavaOutput, sca
     so the evidence shows it was examined and later runs skip it (EPOCH-417)."""
     result = ETLRunResult()
     artifact = scan.artifact
+    # What the scan found in the evidence: impossible or future times, values
+    # stored encoded, values corrected for a tool defect. For review (EPOCH-570).
     for note in scan.notes:
-        result.note(note)
+        result.note(note, "review")
 
     with ingest(
         conn,

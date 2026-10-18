@@ -40,8 +40,8 @@ export interface DecryptTool {
 /**
  * Decrypts `src` into `dest`. The password goes only in BACKUP_PASSWORD, never
  * on the command line (R30), and the tool's stdin is closed so it can't wait
- * for a typed one. Its output streams to the console a line at a time, so the
- * processor's own progress lines never land inside one of its lines.
+ * for a typed one. Its output is passed on a line at a time, so the
+ * processor's own lines never land inside one of its lines.
  *
  * The tool runs in its own process group, tracked so a stop sent to the
  * processor reaches it, and `signal` (the stall limit) stops it the same way.
@@ -53,6 +53,8 @@ export async function decryptBackup(opts: {
   dest: string;
   password: string;
   signal?: AbortSignal;
+  /** Each line the tool writes, as written. */
+  onOutput: (stream: 'stdout' | 'stderr', line: string) => void;
 }): Promise<void> {
   await fsp.mkdir(opts.dest, { recursive: true });
   await new Promise<void>((resolve, reject) => {
@@ -76,9 +78,9 @@ export async function decryptBackup(opts: {
     // The tool's last line on stderr says why it failed.
     let lastError = '';
     const readers = [
-      lineReader((line) => process.stdout.write(line + '\n')),
+      lineReader((line) => opts.onOutput('stdout', line)),
       lineReader((line) => {
-        process.stderr.write(line + '\n');
+        opts.onOutput('stderr', line);
         if (line.trim()) lastError = line.trim();
       }),
     ];
