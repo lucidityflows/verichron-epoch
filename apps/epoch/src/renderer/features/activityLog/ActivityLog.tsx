@@ -256,7 +256,10 @@ export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked'
                 {error ?? (entries.length === 0 ? 'No activity yet.' : 'Nothing at this level.')}
               </p>
             ) : (
-              <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+              // Rows stay in the document's flow between two spacers, not positioned
+              // absolutely: selected and copied text then keeps one line per entry.
+              <div>
+                <div aria-hidden style={{ height: virtualizer.getVirtualItems()[0]?.start ?? 0 }} />
                 {virtualizer.getVirtualItems().map((item) => {
                   const entry = shown[item.index];
                   const { time, tag, label, message } = lineParts(entry, view);
@@ -265,8 +268,7 @@ export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked'
                       key={item.key}
                       ref={virtualizer.measureElement}
                       data-index={item.index}
-                      className="absolute left-0 w-full px-4 whitespace-pre-wrap break-words"
-                      style={{ transform: `translateY(${item.start}px)` }}
+                      className="px-4 whitespace-pre-wrap break-words"
                     >
                       <span className="text-muted-foreground">{time} </span>
                       {tag && (
@@ -281,6 +283,12 @@ export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked'
                     </div>
                   );
                 })}
+                <div
+                  aria-hidden
+                  style={{
+                    height: Math.max(0, virtualizer.getTotalSize() - (virtualizer.getVirtualItems().at(-1)?.end ?? 0)),
+                  }}
+                />
               </div>
             )}
           </div>

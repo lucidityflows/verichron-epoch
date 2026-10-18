@@ -338,6 +338,9 @@ export function eventLevel(event: PipelineEventBody): LogLevel {
     case 'hash:progress':
     case 'decrypt:progress':
     case 'ileapp:module':
+    // The app's task:finished states the run's end in the Summary; the processor's
+    // own line would say it twice (owner, 2026-10-18).
+    case 'prepare:finished':
       return 'debug';
     case 'run:created':
     case 'run:skipped':
@@ -346,7 +349,6 @@ export function eventLevel(event: PipelineEventBody): LogLevel {
     case 'prepare:backups':
     case 'password:required':
     case 'backup:finished':
-    case 'prepare:finished':
       return 'info';
   }
 }
