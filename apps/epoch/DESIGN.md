@@ -401,6 +401,12 @@ and stage cards sit on `surface-raised`. The × is a graphic, so it needs only
 3:1 (WCAG 1.4.11). Danger is only for a failure; a stop the examiner asked
 for is Interrupted.
 
+**A chip's reason is written, never hover-only:** "Interrupted · the app was
+closed", the reason in `muted-foreground` after a middle dot, so keyboard and
+touch users read it too. `muted-foreground` on a `/10` role fill measures at
+least 6.7 / 5.7 / 4.6 on background / surface / raised (flag 6.7 / 5.8 / 4.7,
+danger 7.0 / 6.1 / 5.0).
+
 **Keyboard focus is the accent** (EPOCH-558): every focusable element shows a
 2 px `accent` outline, 2 px out, from one `:focus-visible` rule in
 `index.css`. Inputs keep their accent border instead.
@@ -460,6 +466,15 @@ only how they are shown.
 - **A chosen zone's label includes its offset,** because on the night the
   clocks go back its name alone doesn't say which 01:30 is meant. A zone
   with no short name is labelled by its offset alone (`UTC+05:30`).
+- **A recorded calendar date is shown as recorded, with no zone** (decided
+  2026-10-18). A date with no time of day, such as the day an indicator feed
+  was downloaded (a `DATE` column), is not an instant, so no zone can move it
+  to another day: `2026-10-15`. The reader returns a `DATE` as its text
+  (`readerTypes` in `packages/etl-db-reader`); the driver's default would make
+  it the host's local midnight.
+- **A time with no UTC offset is refused,** not read in the host's zone.
+- **Copied or exported times keep their milliseconds** when there are any
+  (`2026-10-08T00:36:36.400Z`).
 - **A missing time reads `no time recorded`.** It is never guessed.
 - **Folder names stay compact UTC** (`2026-10-15T154804Z`), and durations
   are unchanged.

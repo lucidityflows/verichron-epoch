@@ -4,6 +4,7 @@ import path from 'path';
 import { Pool } from 'pg';
 import type { BrowserWindowConstructorOptions, BrowserWindow as BrowserWindowType } from 'electron';
 import { loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
+import { readerTypes } from '@verichron/etl-db-reader';
 import { registerDbHandlers } from './ipc/dbHandlers';
 import { registerReportHandlers } from './ipc/reportHandlers';
 import { closeAbandonedRunsOnStartup, registerPipelineHandlers } from './ipc/pipelineHandlers';
@@ -22,6 +23,7 @@ loadRootEnv(REPO_ROOT);
 const dbPool = new Pool({
   connectionString: resolveDatabaseUrl(),
   max: 10,
+  types: readerTypes,
 });
 
 process.on('uncaughtException', (error) => {

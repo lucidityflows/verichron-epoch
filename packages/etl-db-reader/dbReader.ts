@@ -26,9 +26,27 @@
  */
 
 import { findWorkspaceBackupForPath } from '@verichron/contracts';
-import type { Client, Pool, PoolClient } from 'pg';
+import pg from 'pg';
+import type { Client, CustomTypesConfig, Pool, PoolClient } from 'pg';
 
 type Db = Client | PoolClient | Pool;
+
+/** PostgreSQL's DATE type. */
+const DATE_OID = 1082;
+
+/**
+ * The driver's parsers, except that a DATE stays its text ("2026-10-15").
+ * By default the driver makes a DATE a Date at the host's local midnight,
+ * which east of UTC is the previous day in UTC. A calendar date has no
+ * instant, so it is never converted (R11). Every Pool or Client whose rows
+ * this package reads is created with these as its `types`.
+ */
+export const readerTypes: CustomTypesConfig = {
+  getTypeParser: ((oid: number, format?: 'text' | 'binary') =>
+    oid === DATE_OID && format !== 'binary'
+      ? (value: string) => value
+      : pg.types.getTypeParser(oid, format)) as CustomTypesConfig['getTypeParser'],
+};
 
 export interface PipelineRunRow {
   run_id: string;
@@ -558,6 +576,7 @@ export interface IndicatorSetSourceRow {
   redistributable: boolean;
   /** count(*): BIGINT, a string from the driver (R26). */
   files: string;
+  /** A DATE, as its text: "2026-10-15" (`readerTypes`). */
   downloaded_on: string | null;
 }
 

@@ -11,6 +11,9 @@
  *
  * The offset is part of a chosen zone's label because the zone's name alone
  * doesn't say which 01:30 is meant on the night the clocks go back.
+ *
+ * A recorded calendar date ("2026-10-15", a DATE column) is not an instant: it
+ * is shown as recorded, with no zone, and never moved to another day.
  */
 
 /** UTC, or an IANA zone name such as "America/Chicago". */
@@ -24,13 +27,25 @@ export const NO_TIME = 'no time recorded';
 /** A time: ISO text from the database, milliseconds since the epoch, or a Date. */
 export type TimeValue = string | number | Date;
 
-/** A time to show: the value (in monospace) and its zone label (beside it). */
+/** A time to show: the value (in monospace) and its zone label (beside it; null for a calendar date). */
 export interface TimeParts {
   value: string;
-  label: string;
+  label: string | null;
 }
 
+/** A recorded calendar date with no time of day: "2026-10-15". */
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Text that says its own offset: "…Z", "…+00" (PostgreSQL), "…-05:00". */
+const HAS_OFFSET = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/i;
+
+const isCalendarDate = (time: TimeValue): time is string => typeof time === 'string' && CALENDAR_DATE.test(time);
+
 function toDate(time: TimeValue): Date {
+  if (typeof time === 'string') {
+    // Without an offset, the host's zone would be assumed: a guessed time (R11).
+    if (CALENDAR_DATE.test(time)) throw new Error(`a calendar date has no time of day: ${time}`);
+    if (!HAS_OFFSET.test(time.trim())) throw new Error(`not a readable time (no UTC offset): ${time}`);
+  }
   const date = time instanceof Date ? time : new Date(time);
   if (Number.isNaN(date.getTime())) {
     throw new Error(`not a readable time: ${String(time)}`);
@@ -103,12 +118,13 @@ export function formatParts(time: TimeValue | null | undefined, zone: DisplayZon
   return { value: `${f.date} ${f.time}`, label: zoneLabel(date, zone) };
 }
 
-/** A date only, in the zone that decides which day it is. */
+/** A date only, in the zone that decides which day it is; a recorded calendar date as recorded. */
 export function formatDateParts(
   time: TimeValue | null | undefined,
   zone: DisplayZone = DEFAULT_ZONE
 ): TimeParts | null {
   if (time === null || time === undefined) return null;
+  if (isCalendarDate(time)) return { value: time, label: null };
   const date = toDate(time);
   return { value: fields(date, zone).date, label: zoneLabel(date, zone) };
 }
@@ -119,10 +135,12 @@ export function formatDateTime(time: TimeValue | null | undefined, zone: Display
   return parts ? `${parts.value} ${parts.label}` : NO_TIME;
 }
 
+const joined = (parts: TimeParts) => (parts.label ? `${parts.value} ${parts.label}` : parts.value);
+
 /** A date as one line of text. */
 export function formatDate(time: TimeValue | null | undefined, zone: DisplayZone = DEFAULT_ZONE): string {
   const parts = formatDateParts(time, zone);
-  return parts ? `${parts.value} ${parts.label}` : NO_TIME;
+  return parts ? joined(parts) : NO_TIME;
 }
 
 /** A log line's time: "15:21:03Z" in UTC, "10:21:03 CDT" in a chosen zone. */
@@ -135,11 +153,16 @@ export function formatLogTime(time: TimeValue, zone: DisplayZone = DEFAULT_ZONE)
 
 /**
  * The time as ISO 8601 with its offset, for copying and exporting, so it is
- * never ambiguous: "2026-10-08T00:36:36Z", "2026-10-07T19:36:36-05:00".
+ * never ambiguous: "2026-10-08T00:36:36Z", "2026-10-07T19:36:36-05:00". It
+ * keeps the milliseconds when there are any ("2026-10-08T00:36:36.400Z"); a
+ * Date holds no finer precision. A calendar date is copied as recorded.
  */
 export function isoWithOffset(time: TimeValue, zone: DisplayZone = DEFAULT_ZONE): string {
+  if (isCalendarDate(time)) return time;
   const date = toDate(time);
   const f = fields(date, zone);
+  const ms = date.getUTCMilliseconds();
+  const fraction = ms ? `.${String(ms).padStart(3, '0')}` : '';
   const minutes = isUtc(zone) ? 0 : offsetMinutes(date, zone);
-  return `${f.date}T${f.time}${minutes === 0 && isUtc(zone) ? 'Z' : offsetText(minutes)}`;
+  return `${f.date}T${f.time}${fraction}${isUtc(zone) ? 'Z' : offsetText(minutes)}`;
 }

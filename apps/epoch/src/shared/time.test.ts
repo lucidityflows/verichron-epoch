@@ -40,6 +40,21 @@ describe('time display (EPOCH-559)', () => {
     expect(() => formatDateTime('not a time')).toThrow(/not a readable time/);
   });
 
+  it('refuses a time with no UTC offset, rather than reading it in the host zone (R11)', () => {
+    expect(() => formatDateTime('2026-10-15T12:00:00')).toThrow(/no UTC offset/);
+    expect(() => formatDateTime('2026-10-15 12:00:00')).toThrow(/no UTC offset/);
+    expect(() => isoWithOffset('2026-10-15T12:00:00')).toThrow(/no UTC offset/);
+  });
+
+  it('keeps a recorded calendar date on its day, with no zone, in every zone', () => {
+    for (const zone of ['UTC', 'America/Chicago', 'Asia/Kolkata', 'Pacific/Kiritimati']) {
+      expect(formatDateParts('2026-10-15', zone)).toEqual({ value: '2026-10-15', label: null });
+      expect(formatDate('2026-10-15', zone)).toBe('2026-10-15');
+      expect(isoWithOffset('2026-10-15', zone)).toBe('2026-10-15');
+    }
+    expect(() => formatDateTime('2026-10-15')).toThrow(/calendar date has no time of day/);
+  });
+
   it('shows a chosen zone with its short name and offset', () => {
     expect(formatParts('2026-10-08T00:36:36Z', 'America/Chicago')).toEqual({
       value: '2026-10-07 19:36:36',
@@ -79,7 +94,9 @@ describe('time display (EPOCH-559)', () => {
   });
 
   it('copies and exports a time as ISO 8601 with its offset', () => {
-    expect(isoWithOffset('2026-10-08T00:36:36.900Z')).toBe('2026-10-08T00:36:36Z');
+    expect(isoWithOffset('2026-10-08T00:36:36Z')).toBe('2026-10-08T00:36:36Z');
+    expect(isoWithOffset('2026-10-08T00:36:36.900Z')).toBe('2026-10-08T00:36:36.900Z');
+    expect(isoWithOffset('2026-10-08T00:36:36.004Z', 'America/Chicago')).toBe('2026-10-07T19:36:36.004-05:00');
     expect(isoWithOffset('2026-10-08T00:36:36Z', 'America/Chicago')).toBe('2026-10-07T19:36:36-05:00');
     expect(isoWithOffset('2026-10-08T00:36:36Z', 'Asia/Kolkata')).toBe('2026-10-08T06:06:36+05:30');
   });

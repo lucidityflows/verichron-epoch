@@ -48,4 +48,5 @@ export {
   FAILURE_LIMIT,
   MATCH_LIMIT,
   MAX_RECORDS_PAGE,
+  readerTypes,
 } from './dbReader.js';

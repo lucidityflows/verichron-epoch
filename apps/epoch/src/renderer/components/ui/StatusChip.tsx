@@ -33,16 +33,17 @@ interface StatusChipProps {
   state: ChipState;
   /** Once warnings are counted (EPOCH-555): "Complete, 2 warnings". */
   warningCount?: number;
-  /** Why, shown on hover: "the app was closed". */
+  /** Why, written beside the label so it never needs a hover: "the app was closed". */
   detail?: string;
   className?: string;
 }
 
 export function StatusChip({ state, warningCount, detail, className }: StatusChipProps) {
   return (
-    <span className={cn(chipVariants({ state }), className)} title={detail}>
+    <span className={cn(chipVariants({ state }), className)}>
       {state === 'failed' && <X aria-hidden size="0.75rem" strokeWidth={3} className="text-danger" />}
       {chipLabel(state, warningCount)}
+      {detail && <span className="text-muted-foreground">· {detail}</span>}
     </span>
   );
 }

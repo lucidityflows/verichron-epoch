@@ -82,7 +82,13 @@ describe('StatusChip', () => {
     const interrupted = screen.getByText('Interrupted');
     assert.match(interrupted.className, /text-flag/);
     assert.doesNotMatch(interrupted.className, /danger/);
-    assert.equal(interrupted.getAttribute('title'), 'the app was closed');
+  });
+
+  it('writes the reason beside the label, so it never needs a hover', () => {
+    render(<StatusChip state="interrupted" detail="the app was closed" />);
+    const reason = screen.getByText('· the app was closed');
+    assert.equal(reason.parentElement!.textContent, 'Interrupted· the app was closed');
+    assert.equal(reason.parentElement!.getAttribute('title'), null);
   });
 });
 
@@ -91,7 +97,15 @@ describe('DateTime', () => {
     render(<DateTime value="2026-10-08T00:36:36.400Z" />);
     assert.ok(screen.getByText('2026-10-08 00:36:36'));
     assert.ok(screen.getByText('UTC'));
-    assert.equal(screen.getByText('2026-10-08 00:36:36').parentElement!.getAttribute('title'), '2026-10-08T00:36:36Z');
+    assert.equal(
+      screen.getByText('2026-10-08 00:36:36').parentElement!.getAttribute('title'),
+      '2026-10-08T00:36:36.400Z'
+    );
+  });
+
+  it('shows a recorded calendar date as recorded, with no zone', () => {
+    const { container } = render(<DateTime value="2026-10-15" dateOnly zone="America/Chicago" />);
+    assert.equal(container.textContent, '2026-10-15');
   });
 
   it('says when there is no time, rather than guessing one', () => {

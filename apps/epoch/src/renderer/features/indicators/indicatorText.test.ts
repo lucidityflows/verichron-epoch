@@ -52,7 +52,7 @@ describe('indicator wording', () => {
   it('states the set, when it was fetched, and its newest indicator age when checked', () => {
     assert.equal(
       setLine(base),
-      'Set: mvt-indicators index b22ddf05e1a3, fetched 2026-10-15 UTC (e3fb2081f3e1). ' +
+      'Set: mvt-indicators index b22ddf05e1a3, fetched 2026-10-15 (e3fb2081f3e1). ' +
         'Newest indicator 2026-10-09 UTC: 6 day(s) old when checked.'
     );
     assert.equal(staleLine(base, 90), null);
