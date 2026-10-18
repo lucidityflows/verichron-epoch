@@ -5,6 +5,8 @@ interface CopyButtonProps {
   /** The text to copy; a function is read at click time. */
   text: string | (() => string);
   title?: string;
+  /** The button's words, e.g. "Copy Details" (EPOCH-570); "Copy" by default. */
+  label?: string;
   className?: string;
 }
 
@@ -12,7 +14,7 @@ interface CopyButtonProps {
  * A small Copy button that confirms with "Copied" for two seconds, or says
  * "Copy failed" when the clipboard refuses (DESIGN.md §1).
  */
-export function CopyButton({ text, title = 'Copy', className = '' }: CopyButtonProps) {
+export function CopyButton({ text, title = 'Copy', label = 'Copy', className = '' }: CopyButtonProps) {
   const [result, setResult] = useState<'copied' | 'failed' | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -51,7 +53,7 @@ export function CopyButton({ text, title = 'Copy', className = '' }: CopyButtonP
         </>
       ) : (
         <>
-          <Copy size="0.75rem" /> <span>Copy</span>
+          <Copy size="0.75rem" /> <span>{label}</span>
         </>
       )}
     </button>

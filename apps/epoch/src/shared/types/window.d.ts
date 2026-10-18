@@ -48,6 +48,8 @@ export interface PreparedBackup {
   state: 'prepared' | 'partial';
   /** When the newest of those steps completed (ISO 8601). */
   preparedAt: string;
+  /** For a partly prepared backup: why its last Prepare failed, from that task's log (EPOCH-570). */
+  reason?: string | null;
 }
 
 export interface StartPipelineOptions {
@@ -200,6 +202,8 @@ declare global {
       // EPOCH-570: the workspace's saved task logs, read back after a restart.
       listTaskLogs: (workspace: string) => Promise<TaskLogSummary[]>;
       readTaskLog: (workspace: string, file: string) => Promise<ReadTaskLog>;
+      saveTaskLogAs: (workspace: string, file: string) => Promise<{ saved: string | null }>;
+      popOutActivityLog: () => Promise<void>;
       listDeviceBackupSources: () => Promise<Array<{ id: string; label: string }>>;
       checkDeviceBackupToolAvailable: (sourceId: string) => Promise<ToolAvailabilityStatus>;
       listConnectedDevices: (sourceId: string) => Promise<DeviceInfo[]>;

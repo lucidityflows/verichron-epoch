@@ -19,7 +19,7 @@ import * as path from 'node:path';
 import { renderPipelineEvent, type TaskLogEntry } from '@verichron/contracts';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
-import { TaskLog, listTaskLogs, readSavedTaskLog, type TaskLogSetup } from './taskLog';
+import { TaskLog, lastPrepareFailures, listTaskLogs, readSavedTaskLog, type TaskLogSetup } from './taskLog';
 
 const UDID = '00008030-000A1B2C3D4E5F60';
 const LABEL = '2026-10-15T180523Z';
@@ -222,5 +222,25 @@ describe('saved logs', () => {
     assert.deepEqual([read.invalid.length, read.truncated], [1, true]);
     assert.equal((await listTaskLogs(workspace))[0].problems, 2);
     await assert.rejects(readSavedTaskLog(workspace, '../workspace.json'), /not a task log's name/);
+  });
+});
+
+describe('lastPrepareFailures', () => {
+  it("gives a backup's reason from the newest Prepare that reported on it", async () => {
+    const { log } = await openLog({ backups: [] });
+    log.line(
+      'processor',
+      'stdout',
+      renderPipelineEvent({
+        type: 'backup:finished',
+        label: LABEL,
+        success: false,
+        failed_step: 'ileapp',
+        reason: `iLEAPP exited with code 1 in ${workspace}`,
+      })
+    );
+    await log.finish({ ...result, outcome: 'failed', failedLabels: [LABEL] }, 'done');
+    const reasons = await lastPrepareFailures(workspace, [LABEL, 'other']);
+    assert.deepEqual([...reasons], [[LABEL, 'iLEAPP exited with code 1 in <workspace>']], 'sanitized as it was saved');
   });
 });

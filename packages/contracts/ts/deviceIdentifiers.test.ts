@@ -106,7 +106,7 @@ describe('event wording', () => {
     );
     assert.equal(
       eventMessage({ type: 'decrypt:progress', label, bytes: 31_200_000_000, total: 58_400_000_000 }),
-      'Decrypted 31.2 GB of 58.4 GB'
+      'Decrypting: 31.2 GB of 58.4 GB'
     );
     assert.equal(
       eventMessage({ type: 'backup:finished', label, success: false, failed_step: 'ileapp', reason: 'x' }),

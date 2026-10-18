@@ -355,3 +355,25 @@ export async function listTaskLogs(workspace: string): Promise<TaskLogSummary[]>
   }
   return out.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
+
+/**
+ * Why each of `labels` failed in the newest Prepare that reported on it, from
+ * that task's log (EPOCH-570): its backup:finished, sanitized as it was
+ * saved. A backup prepared since, or never reported, has no reason.
+ */
+export async function lastPrepareFailures(workspace: string, labels: string[]): Promise<Map<string, string>> {
+  const reasons = new Map<string, string>();
+  const pending = new Set(labels);
+  if (pending.size === 0) return reasons;
+  for (const summary of await listTaskLogs(workspace)) {
+    if (summary.kind !== 'prepare') continue;
+    const { entries } = await readSavedTaskLog(workspace, summary.file);
+    for (const entry of [...entries].reverse()) {
+      if (entry.kind !== 'event' || entry.event.type !== 'backup:finished' || !pending.has(entry.event.label)) continue;
+      pending.delete(entry.event.label);
+      if (!entry.event.success && entry.event.reason) reasons.set(entry.event.label, entry.event.reason);
+    }
+    if (pending.size === 0) break;
+  }
+  return reasons;
+}

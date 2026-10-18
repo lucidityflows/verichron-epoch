@@ -16,7 +16,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { BackupRow } from '../features/devicePullPanel/BackupRow';
-import { TerminalLog } from '../components/layout/TerminalLog';
+import { FailureBanner, type PrepareFailure } from '../features/activityLog/FailureBanner';
 import { DevicePullPanel } from '../features/devicePullPanel/DevicePullPanel';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
@@ -87,12 +87,11 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   // coming back shows a run still going, a password the processor is
   // waiting for, or a finished result.
   const { state: prepare, log: prepareLog } = usePrepareState();
-  const { state: analysis, log: analysisLogAll } = useAnalysisState();
+  const { state: analysis } = useAnalysisState();
   const isRunning = prepare?.status === 'running';
   // The run belongs to the folder it was started on; another folder shows none.
   const showsRun = !!prepare && prepare.status !== 'idle' && prepare.source === selectedPath;
   const runProgress = showsRun ? prepare.progress : null;
-  const logLines = showsRun ? prepareLog : [];
   const finishResult = showsRun && prepare.status === 'finished' ? prepare.result : null;
   const pendingPasswordFor = prepare?.passwordFor ?? null;
   const lastRunWorkspace = showsRun && prepare.status === 'finished' ? prepare.workspace : null;
@@ -124,7 +123,6 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const analysisForRun = analysisShown(analysis, prepare, analysisWorkspace);
   const analysisRunning = analysisForRun && analysis?.status === 'running';
   const currentAnalysisStage = analysisRunning ? analysis?.currentStage : null;
-  const analysisLog = analysisForRun ? analysisLogAll : [];
   const analysisResult: PipelineFinishedResult | null = analysisRunning
     ? null
     : analysisForRun && analysis?.status === 'finished'
@@ -627,7 +625,16 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         </div>
       )}
 
-      {finishResult && runProgress && (
+      {finishResult && runProgress && prepareFailures(finishResult).length > 0 && (
+        <FailureBanner
+          failures={prepareFailures(finishResult)}
+          entries={prepareLog}
+          prepared={doneCount}
+          total={runProgress.order.length}
+        />
+      )}
+
+      {finishResult && runProgress && prepareFailures(finishResult).length === 0 && (
         <div
           className={`flex items-start gap-4 rounded-xl p-5 shadow-elevation-1 ${
             failedCount === 0 ? 'bg-success/10 border border-success/30' : 'bg-danger/10 border border-danger/30'
@@ -652,8 +659,6 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
           </div>
         </div>
       )}
-
-      {(isRunning || logLines.length > 0) && <TerminalLog lines={logLines} live={isRunning} />}
 
       {showAnalyze && (
         <div className="bg-surface shadow-elevation-1 rounded-xl p-6">
@@ -805,12 +810,6 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
               )}
             </div>
           )}
-
-          {(analysisRunning || analysisLog.length > 0) && (
-            <div className="mt-4">
-              <TerminalLog lines={analysisLog} live={analysisRunning} label="Analysis details" />
-            </div>
-          )}
         </div>
       )}
 
@@ -888,5 +887,12 @@ function ImportChoice({ icon, title, description, action, tone, onChoose }: Impo
         {action}
       </span>
     </button>
+  );
+}
+
+/** Each backup the processor reported as failed, with its step and reason (EPOCH-570). */
+function prepareFailures(result: PipelineFinishedResult): PrepareFailure[] {
+  return (result.backups ?? []).flatMap((b) =>
+    !b.success && b.failed_step && b.reason ? [{ label: b.label, step: b.failed_step, reason: b.reason }] : []
   );
 }

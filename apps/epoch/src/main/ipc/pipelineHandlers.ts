@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
-import { readFile, rm, stat } from 'node:fs/promises';
+import { readFile, rm, stat, writeFile } from 'node:fs/promises';
 import type { Pool } from 'pg';
 import {
   EvidenceSidecar,
@@ -24,7 +24,9 @@ import { PipelineSingleFlight } from './pipelineSingleFlight';
 import { analysisTargets, orchestratorArgs } from './analysisTargets';
 import { defaultWorkspace, readPreparedBackups } from './preparedBackups';
 import { closeAbandonedRuns, closeRuns, type AppEndedReason } from './runCloseOut';
-import { TaskLog, listTaskLogs, readSavedTaskLog, type TaskLogSetup } from './taskLog';
+import { TaskLog, lastPrepareFailures, listTaskLogs, readSavedTaskLog, type TaskLogSetup } from './taskLog';
+import { popOutWindows } from '../windows';
+import { logFileText } from '../../shared/activityLog';
 
 interface StartPipelineOptions {
   workspace?: string;
@@ -83,11 +85,10 @@ export function registerPipelineHandlers(
   let orchestratorTerminationReason: 'cancelled' | 'timeout' | null = null;
   let pendingPasswordResolve: ((password: string) => void) | null = null;
 
+  /** To the main window and any Activity Log pop-out (EPOCH-570). */
   function sendToRenderer(channel: string, ...args: unknown[]) {
     const win = getMainWindow();
-    if (win) {
-      win.webContents.send(channel, ...args);
-    }
+    for (const target of [...(win ? [win] : []), ...popOutWindows()]) target.webContents.send(channel, ...args);
   }
 
   // EPOCH-487: each run's state outlives New Investigation, which unmounts
@@ -253,7 +254,13 @@ export function registerPipelineHandlers(
 
   ipcMain.handle('epoch:getPreparedBackups', async (_event, workspace?: string) => {
     const resolved = workspace?.trim() || defaultWorkspace();
-    return { workspace: resolved, backups: readPreparedBackups(resolved) };
+    const backups = readPreparedBackups(resolved);
+    // A partly prepared backup says why, from its last Prepare's log (EPOCH-570).
+    const reasons = await lastPrepareFailures(
+      resolved,
+      backups.filter((b) => b.state === 'partial').map((b) => b.label)
+    );
+    return { workspace: resolved, backups: backups.map((b) => ({ ...b, reason: reasons.get(b.label) ?? null })) };
   });
 
   ipcMain.handle('epoch:startPipeline', async (_event, source: string, options?: StartPipelineOptions) => {
@@ -712,6 +719,36 @@ export function registerPipelineHandlers(
   ipcMain.handle('epoch:listTaskLogs', async (_event, workspace: string) => listTaskLogs(workspace));
   ipcMain.handle('epoch:readTaskLog', async (_event, workspace: string, file: string) =>
     readSavedTaskLog(workspace, file)
+  );
+
+  /**
+   * Save As… (EPOCH-570): the saved log, sanitized as it was written, as text
+   * (the Full log under a header) or as its own NDJSON. The copy is private
+   * to the examiner (0600): it is case material, like the log.
+   */
+  ipcMain.handle(
+    'epoch:saveTaskLogAs',
+    async (_event, workspace: string, file: string): Promise<{ saved: string | null }> => {
+      const read = await readSavedTaskLog(workspace, file);
+      const mainWindow = getMainWindow();
+      const options = {
+        title: 'Save the Activity Log',
+        defaultPath: file.replace(/\.ndjson$/, '.log'),
+        filters: [
+          { name: 'Text', extensions: ['log', 'txt'] },
+          { name: 'Task log entries (NDJSON)', extensions: ['ndjson'] },
+        ],
+      };
+      const choice = mainWindow
+        ? await dialog.showSaveDialog(mainWindow, options)
+        : await dialog.showSaveDialog(options);
+      if (choice.canceled || !choice.filePath) return { saved: null };
+      const content = choice.filePath.endsWith('.ndjson')
+        ? read.entries.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
+        : logFileText(read.entries);
+      await writeFile(choice.filePath, content, { mode: 0o600 });
+      return { saved: choice.filePath };
+    }
   );
 
   ipcMain.handle('epoch:cancelAnalysis', async (): Promise<{ cancelled: boolean }> => {

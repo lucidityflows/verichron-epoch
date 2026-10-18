@@ -108,6 +108,9 @@ const dbApi = {
   listTaskLogs: (workspace: string): Promise<TaskLogSummary[]> => ipcRenderer.invoke('epoch:listTaskLogs', workspace),
   readTaskLog: (workspace: string, file: string): Promise<ReadTaskLog> =>
     ipcRenderer.invoke('epoch:readTaskLog', workspace, file),
+  saveTaskLogAs: (workspace: string, file: string): Promise<{ saved: string | null }> =>
+    ipcRenderer.invoke('epoch:saveTaskLogAs', workspace, file),
+  popOutActivityLog: (): Promise<void> => ipcRenderer.invoke('epoch:popOutActivityLog'),
   onAnalysisState: (callback: (state: AnalysisState) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: AnalysisState) => callback(state);
     ipcRenderer.on('epoch:analysisState', listener);

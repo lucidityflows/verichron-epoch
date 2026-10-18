@@ -281,12 +281,13 @@ export function eventMessage(event: PipelineEventBody): string {
       if (event.status === 'skipped') return `${name}: skipped${event.reason ? `, ${event.reason}` : ''}`;
       return `${name} failed: ${event.reason}`;
     }
+    // A progress line names its step: the Summary shows only the latest one per step.
     case 'hash:progress':
-      return `Checked ${plural(event.files, 'file')} (${formatBytes(event.bytes)})`;
+      return `${PREPARE_STEP_NAMES.hash}: ${plural(event.files, 'file')} (${formatBytes(event.bytes)})`;
     case 'decrypt:progress':
-      return `Decrypted ${formatBytes(event.bytes)} of ${formatBytes(event.total)}`;
+      return `${PREPARE_STEP_NAMES.decrypt}: ${formatBytes(event.bytes)} of ${formatBytes(event.total)}`;
     case 'ileapp:module':
-      return `Module ${event.index} of ${event.total}: ${event.module}`;
+      return `${PREPARE_STEP_NAMES.ileapp}: module ${event.index} of ${event.total}, ${event.module}`;
     case 'password:required':
       return `Waiting for the backup password (attempt ${event.attempt} of ${event.max})`;
     case 'backup:finished':

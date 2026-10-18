@@ -390,9 +390,9 @@ changed.
 "Investigations States and Rules"). The shared `StatusChip` is a rounded pill
 in `text-label`, with its state written out, so colour is never the only
 signal. `stageChip()` derives the state from the stage's recorded status and
-why its run ended, never from text. The views adopt it in U3 (Investigations,
-including the stage card) and U4; until then the stage card still shows its
-raw status.
+why its run ended, never from text. The views adopt it in U4 (Investigations,
+including the stage card) and U3 (New Investigation); until then the stage
+card still shows its raw status.
 
 | Chip | Role | Shown when | Fill, text | Contrast on background / surface / raised |
 |---|---|---|---|---|
@@ -494,4 +494,43 @@ only how they are shown.
 - **One implementation:** `shared/time.ts` (`formatDateTime`, `formatDate`,
   `formatLogTime`, `isoWithOffset`) and the `DateTime` component. A view never
   calls `toLocaleString` on a time.
+
+## 12. Activity Log — one docked drawer, wherever a task runs
+
+Decided 2026-10-18 by the project owner (EPOCH-570; the boards "New
+Investigation View" and "Investigations States and Rules"). What it records,
+and how it is sanitized, is `docs/event-log.md`; this is how it looks.
+
+- **Docked, not a page.** A slim bar at the bottom of the content area, beside
+  the sidebar, never over it, on the `inset` surface with a shadow cast upward
+  (`ActivityLogDock`, rendered by `App.tsx` below the scrolling page). It
+  shows **Activity Log**, the latest entry that isn't debug, and the counts:
+  errors (`danger/10`, `foreground` text, as the Failed chip), warnings
+  (`flag/10`, `flag`) and notes for review (`accent/10`, `accent`). One click
+  opens the drawer above it; the page above gets shorter and nothing nests.
+- **Two views (owner, 2026-10-18).** **Summary**, the default, shows `info`,
+  warnings and errors in plain sentences; only an error, a warning or a note
+  for review carries a word tag (Error, Warning, For review), and progress
+  collapses to its step's latest line. **Full log** shows every entry with its
+  level (`INFO`, `WARN`, `REVIEW`, `ERROR`, `DEBUG`). The level is always
+  written, so colour is never the only signal.
+- **"For review"** marks something in the evidence worth a look, never a
+  problem with the run and never a lead (owner, 2026-10-18); it uses the
+  `accent` role, not `flag`.
+- **The drawer:** View (Summary, Full log), Filter (All, Warnings, Errors),
+  search, "Times in UTC, <date>", Copy (the visible lines as text), Save As…
+  (the whole saved log, as text under a header or as NDJSON), Pop Out (its own
+  window, for a second monitor) and Following Latest, which becomes Jump to
+  Latest when you scroll up. The lines are 220px high, virtualized, in
+  monospace: the time muted, the tag in its role colour at weight 500, the
+  label muted, the message. Text is built with real spaces, so a copied line
+  reads as it shows. With nothing to show: "Nothing at this level."
+- **Failures state their cause.** New Investigation's danger banner names each
+  backup that couldn't be prepared with its failed step's own sentence from
+  the log, and **Copy Details** copies the step, the evidence and the log
+  around it, never debug and never a password. A partly prepared backup's row
+  writes the reason under its chip, not on hover.
+- **Where:** New Investigation shows the running task's log, else the last
+  one; after a restart, the workspace's newest saved log. U4 adds the same
+  drawer to Investigations in place of Show Raw Log.
 
