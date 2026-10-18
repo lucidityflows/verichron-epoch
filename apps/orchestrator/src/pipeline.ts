@@ -71,6 +71,40 @@ function signalStageProcess(child: ChildProcess, signal: NodeJS.Signals): string
   }
 }
 
+/** The exit code of an orchestrator stopped by SIGTERM or SIGINT, as a shell reports one (128 + 15). */
+export const STOPPED_EXIT_CODE = 143;
+/** Under the app's own 5 s grace, so the stage is never left behind when the app escalates. */
+const STOP_GRACE_MS = 3000;
+
+let activeStage: ChildProcess | null = null;
+let stopRequested = false;
+
+/**
+ * Stops the orchestrator on request (SIGTERM or SIGINT; EPOCH-570): the
+ * running stage, in a process group of its own, is signalled too, and the
+ * orchestrator exits once it has ended. Nothing is written to the stage's
+ * row first: the app closes the run as cancelled and leaves the stage as it
+ * was, so it reads as Interrupted, not Failed (EPOCH-435).
+ */
+export function requestStop(exit: (code: number) => void = (code) => process.exit(code)): void {
+  if (stopRequested) return;
+  stopRequested = true;
+  const stage = activeStage;
+  if (!stage || stage.exitCode !== null || stage.signalCode !== null) {
+    exit(STOPPED_EXIT_CODE);
+    return;
+  }
+  stage.once('close', () => exit(STOPPED_EXIT_CODE));
+  signalStageProcess(stage, 'SIGTERM');
+  setTimeout(() => signalStageProcess(stage, 'SIGKILL'), STOP_GRACE_MS).unref();
+}
+
+/** For tests only: a process stops once, so a test that stops one run restores the state for the next. */
+export function resetStopForTests(): void {
+  stopRequested = false;
+  activeStage = null;
+}
+
 function formatTimeout(timeoutMs: number): string {
   return timeoutMs % 60_000 === 0 ? `${timeoutMs / 60_000} minutes` : `${timeoutMs} ms`;
 }
@@ -196,7 +230,16 @@ export function runStage(
       }, STAGE_KILL_GRACE_MS);
     }, timeoutMs);
     child.on('error', (err) => finish({ status: 'failed', stderr: err.message }));
+    activeStage = child;
     child.on('close', (code) => {
+      activeStage = null;
+      // Stopping: requestStop exits now; this stage's outcome is not recorded,
+      // and its timers end with it.
+      if (stopRequested) {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        if (killEscalationHandle) clearTimeout(killEscalationHandle);
+        return;
+      }
       const details = [
         stderr.trim(),
         ...(timedOut ? [`Stage "${stage.name}" timed out after ${formatTimeout(timeoutMs)} and was stopped.`] : []),

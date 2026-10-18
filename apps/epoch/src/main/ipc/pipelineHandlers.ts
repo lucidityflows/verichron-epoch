@@ -26,6 +26,7 @@ import { defaultWorkspace, readPreparedBackups } from './preparedBackups';
 import { closeAbandonedRuns, closeRuns, type AppEndedReason } from './runCloseOut';
 import { TaskLog, lastPrepareFailures, listTaskLogs, readSavedTaskLog, type TaskLogSetup } from './taskLog';
 import { popOutWindows } from '../windows';
+import { signalTask } from './processGroup';
 import { logFileText } from '../../shared/activityLog';
 
 interface StartPipelineOptions {
@@ -226,10 +227,10 @@ export function registerPipelineHandlers(
   function killOrchestrator(reason: 'cancelled' | 'timeout'): void {
     if (!runningOrchestratorProcess) return;
     orchestratorTerminationReason = reason;
-    runningOrchestratorProcess.kill('SIGTERM');
+    signalTask(runningOrchestratorProcess, 'SIGTERM');
     orchestratorKillEscalationHandle = setTimeout(() => {
       if (runningOrchestratorProcess) {
-        runningOrchestratorProcess.kill('SIGKILL');
+        signalTask(runningOrchestratorProcess, 'SIGKILL');
       }
     }, KILL_GRACE_MS);
   }
@@ -345,7 +346,8 @@ export function registerPipelineHandlers(
 
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = spawn('pnpm', args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] });
+      // Its own process group, so a stop reaches the processor, not only pnpm.
+      child = spawn('pnpm', args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
     } catch (err) {
       releasePipeline();
       const error = `could not start the processor: ${err instanceof Error ? err.message : String(err)}`;
@@ -511,9 +513,11 @@ export function registerPipelineHandlers(
     let child: ChildProcessWithoutNullStreams;
     try {
       // pnpm --silent: its script banners would print the repository's path (docs/event-log.md §6.6).
+      // Its own process group, so Cancel reaches the orchestrator, not only pnpm.
       child = spawn('pnpm', ['--silent', ...orchestratorArgs(call.workspace, call.labels, summaryPath)], {
         cwd: repoRoot,
         stdio: ['pipe', 'pipe', 'pipe'],
+        detached: true,
       });
     } catch (err) {
       releasePipeline();
@@ -790,4 +794,17 @@ export function registerPipelineHandlers(
     const interrupted = await getInterruptedEvidence(dbPool, contentRoots);
     return { status: interrupted.length > 0 ? 'interrupted' : 'idle' };
   });
+
+  return {
+    /**
+     * Stops any running task when the app quits: in a process group of its
+     * own, it would otherwise run on after the app. Its runs are closed as
+     * abandoned at the next start (EPOCH-435).
+     */
+    stopAll(): void {
+      for (const child of [runningProcessor, runningOrchestratorProcess]) {
+        if (child) signalTask(child, 'SIGTERM');
+      }
+    },
+  };
 }

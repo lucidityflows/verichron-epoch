@@ -4,9 +4,12 @@ import { parseCliConfig } from './cli.js';
 import { discoverStages } from './discovery.js';
 import { migrationRefusal, readMigrationStatus } from './migrations.js';
 import { log } from './events.js';
-import { runPipelineForBackup } from './pipeline.js';
+import { requestStop, runPipelineForBackup } from './pipeline.js';
 import { acquireWorkspaceLocks } from '@verichron/workspace-lock';
 import type { CliConfig } from './types.js';
+
+// EPOCH-570: a stop from the app ends the running stage too, then the orchestrator.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) process.on(signal, () => requestStop());
 
 async function main() {
   const cfg = await parseCliConfig();

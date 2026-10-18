@@ -49,7 +49,7 @@ registerReportHandlers(dbPool);
 // orchestrator subprocess it spawns crashes, times out, or is cancelled, it
 // ends the runs that call created (closeCallRuns in pipelineHandlers.ts)
 // rather than leaving them running forever.
-registerPipelineHandlers(getMainWindow, REPO_ROOT, dbPool, app.getVersion());
+const pipeline = registerPipelineHandlers(getMainWindow, REPO_ROOT, dbPool, app.getVersion());
 registerDeviceHandlers(getMainWindow);
 
 const webPreferences: BrowserWindowConstructorOptions['webPreferences'] = {
@@ -127,5 +127,7 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
+  // A running task is in a process group of its own and would outlive the app (EPOCH-570).
+  pipeline.stopAll();
   dbPool.end().catch((err) => console.error('Error closing DB pool:', err));
 });

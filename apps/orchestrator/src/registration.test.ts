@@ -53,7 +53,7 @@ import {
 
 import { createRun, getRunState, hasCompleteRunFor } from './db.js';
 import { discoverStages } from './discovery.js';
-import { runPipelineForBackup } from './pipeline.js';
+import { STOPPED_EXIT_CODE, requestStop, resetStopForTests, runPipelineForBackup } from './pipeline.js';
 import { readRunSummary } from './runSummary.js';
 import { deviceKey, loadDeviceSecret, readPlistStrings, registerEvidence, RegistrationError } from './registration.js';
 import { setOutputMode } from './events.js';
@@ -1182,6 +1182,37 @@ describe('orchestrator events (EPOCH-443)', live, () => {
       eventsIn(lines).map((e) => e.type),
       ['run:created', 'stage:started', 'stage:finished', 'run:finished']
     );
+  });
+
+  it('stops the running stage and exits on a stop, writing nothing to its row (EPOCH-570)', async () => {
+    const ws = makeWorkspace('events-stopped', { label: 'F' });
+    const dir = path.join(tmp, 'stages', 'sleeping');
+    mkdirSync(dir, { recursive: true });
+    const pidFile = path.join(dir, 'pid');
+    writeFileSync(
+      path.join(dir, 'stage.mjs'),
+      `import { writeFileSync } from 'node:fs';\nwriteFileSync(${JSON.stringify(pidFile)}, String(process.pid));\nsetTimeout(() => {}, 60_000);\n`
+    );
+    const sleeping: StageDefinition = {
+      name: 'sleeping',
+      dir,
+      manifest: { entrypoint: 'stage.mjs', runtime: 'node', order: 10, reads: 'decrypted', enabled: true },
+    };
+    // The run never returns: the orchestrator exits instead, so its promise is left pending.
+    void run(ws.backupPath, { enabled: [sleeping], disabled: [] });
+    for (let i = 0; i < 200 && !existsSync(pidFile); i++) await new Promise((resolve) => setTimeout(resolve, 50));
+    const stagePid = Number(readFileSync(pidFile, 'utf8'));
+
+    const exited = new Promise<number>((resolve) => requestStop(resolve));
+    assert.equal(await exited, STOPPED_EXIT_CODE);
+    assert.throws(() => process.kill(stagePid, 0), 'the stage was stopped with the orchestrator');
+    const { rows } = await db.query<{ status: string }>(
+      `SELECT s.status FROM pipeline_stage_status s JOIN pipeline_runs r USING (run_id)
+        WHERE r.backup_source = $1 AND s.stage_name = 'sleeping'`,
+      [ws.backupPath]
+    );
+    assert.deepEqual(rows, [{ status: 'running' }], 'left as it was, so it reads as Interrupted, never Failed');
+    resetStopForTests();
   });
 
   it('says why a stage failed, from the last line of its stderr, and relays that stderr (EPOCH-570)', async () => {
