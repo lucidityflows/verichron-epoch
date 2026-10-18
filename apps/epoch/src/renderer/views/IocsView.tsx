@@ -5,7 +5,9 @@ import type { IndicatorResults } from '../../shared/types/window';
 import { runsApi } from '../api/runs';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { Badge } from '../components/ui/Badge';
+import { DateTime } from '../components/ui/DateTime';
 import { Disclosure } from '../components/ui/Disclosure';
+import { formatDateTime } from '../../shared/time';
 import { EmptyState } from '../components/ui/EmptyState';
 import {
   inOrder,
@@ -116,10 +118,8 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
                 const { indicator, fact, match_mode } = m.fields;
                 return (
                   <tr key={`${fact.record_id}-${indicator.value}-${i}`} className="border-b border-border/50">
-                    <td className={`${cell} font-mono`}>
-                      {m.event_time
-                        ? new Date(m.event_time).toISOString().replace('T', ' ').slice(0, 19)
-                        : 'no time recorded'}
+                    <td className={cell}>
+                      <DateTime value={m.event_time} />
                     </td>
                     <td className={cell}>{typeLabel(indicator.type)}</td>
                     <td className={`${cell} font-mono break-all`}>{indicator.value}</td>
@@ -157,9 +157,7 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
 }
 
 const checkedOn = (check: IndicatorCheckRow) =>
-  check.finished_at
-    ? new Date(check.finished_at).toISOString().replace('T', ' ').slice(0, 19) + ' UTC'
-    : 'not finished';
+  check.finished_at ? formatDateTime(check.finished_at) : 'not finished';
 
 /**
  * Indicator Matches (EPOCH-493): every check of the selected investigation's

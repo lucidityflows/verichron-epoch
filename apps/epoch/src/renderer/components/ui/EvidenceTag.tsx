@@ -1,6 +1,7 @@
 import React from 'react';
 import type { PipelineRunRow } from '@verichron/etl-db-reader';
 import { Badge } from './Badge';
+import { DateTime } from './DateTime';
 import { Tooltip, TooltipTrigger, TooltipContent } from './Tooltip';
 
 interface EvidenceTagProps {
@@ -24,7 +25,7 @@ export function EvidenceTag({ run }: EvidenceTagProps) {
         <TooltipContent>{run.run_id}</TooltipContent>
       </Tooltip>
       <span className="font-mono text-muted-foreground">{run.backup_source.split('/').pop()}</span>
-      <span className="font-mono text-muted-foreground">{new Date(run.started_at).toLocaleString()}</span>
+      <DateTime value={run.started_at} className="text-muted-foreground" />
       <Badge variant={run.state}>{RUN_STATE_LABEL[run.state]}</Badge>
     </div>
   );

@@ -378,6 +378,41 @@ app-wide the tokens, the sidebar, `ViewLayout`, `EmptyState` and `Badge`
 own panels still use surface opacities and adopt the roles as they are next
 changed.
 
+**A stage's state is one of seven chips** (EPOCH-559, U1; the board
+"Investigations States and Rules"). The shared `StatusChip` is a rounded pill
+in `text-label`, with its state written out, so colour is never the only
+signal. `stageChip()` derives the state from the stage's recorded status and
+why its run ended, never from text. The views adopt it in U3 (Investigations,
+including the stage card) and U4; until then the stage card still shows its
+raw status.
+
+| Chip | Role | Shown when | Fill, text | Contrast on background / surface / raised |
+|---|---|---|---|---|
+| Complete | success | the stage succeeded | `success/10`, `success` | 7.8 / 6.6 / 5.4 |
+| Complete with warnings | flag | it succeeded with warnings ("Complete, 2 warnings" once counted) | `flag/10`, `flag` | 8.0 / 6.9 / 5.6 |
+| Skipped | neutral | it had nothing to work on; never shown as a clean result | `muted-foreground/14`, `foreground` | 12.4 / 10.6 / 8.7 |
+| Interrupted | flag | it was pending or running when the examiner cancelled, or the app was closed (detail: "the app was closed") | `flag/10`, `flag` | 8.0 / 6.9 / 5.6 |
+| Not started | muted | it was pending when the run ended any other way | `muted-foreground/8`, `muted-foreground` | 7.0 / 6.0 / 4.9 |
+| Failed | danger | it failed, or was running when the run crashed or timed out | `danger/10`, `foreground`, with a `danger` × | 13.9 / 12.0 / 9.9 (× 5.7 / 4.9 / 4.1) |
+| Running | accent | it is running in a live run | `accent/10`, `accent` | 8.1 / 7.0 / 5.7 |
+
+Role chips use the `/10` row-fill strength. **Failed** uses `foreground` text
+with a `danger` ×, not `danger` text, for the same reason as the destructive
+button above. `danger` text measures 3.95:1 on its fill over `surface-raised`,
+and stage cards sit on `surface-raised`. The × is a graphic, so it needs only
+3:1 (WCAG 1.4.11). Danger is only for a failure; a stop the examiner asked
+for is Interrupted.
+
+**A chip's reason is written, never hover-only:** "Interrupted · the app was
+closed", the reason in `muted-foreground` after a middle dot, so keyboard and
+touch users read it too. `muted-foreground` on a `/10` role fill measures at
+least 6.7 / 5.7 / 4.6 on background / surface / raised (flag 6.7 / 5.8 / 4.7,
+danger 7.0 / 6.1 / 5.0).
+
+**Keyboard focus is the accent** (EPOCH-558): every focusable element shows a
+2 px `accent` outline, 2 px out, from one `:focus-visible` rule in
+`index.css`. Inputs keep their accent border instead.
+
 ## 10. Step flows — the user always sees what is done and what comes next
 
 Decided 2026-10-13 (EPOCH-497), after the first full run on a real backup:
@@ -409,4 +444,46 @@ forgot what was prepared. "We must guide clearly, or we look untrustworthy."
   chevron; closed, they show the status and what the stage produced; open,
   what it read, what it wrote, exact times and its output (EPOCH-431). A card
   with nothing to open has no hover lift.
+
+## 11. Dates and times — every time says its zone
+
+Decided 2026-10-16 and 2026-10-18 by the project owner (EPOCH-559, EPOCH-560;
+the board "Time Display Rules"). Times are stored in UTC (R11). This decides
+only how they are shown.
+
+- **Every date and time shows its zone.** The default is UTC. The examiner
+  can choose a zone in Settings (EPOCH-560), and it then applies everywhere,
+  the report included. The report's header names the zone.
+- **One format:** a 24-hour clock with seconds, the value in monospace, and
+  the zone beside it in muted `text-label`. Hovering shows the exact time
+  with its offset.
+
+  | Where | UTC (default) | A chosen zone |
+  |---|---|---|
+  | A date and time | `2026-10-08 00:36:36` UTC | `2026-10-07 19:36:36` CDT, UTC−05:00 |
+  | A date | `2026-10-15` UTC | `2026-10-14` CDT, UTC−05:00 |
+  | A log line | `15:21:03Z` | `10:21:03 CDT` |
+  | Copied or exported | `2026-10-08T00:36:36Z` | `2026-10-07T19:36:36-05:00` |
+
+- **A chosen zone's label includes its offset,** because on the night the
+  clocks go back its name alone doesn't say which 01:30 is meant. A zone
+  with no short name is labelled by its offset alone (`UTC+05:30`).
+- **A recorded calendar date is shown as recorded, with no zone** (decided
+  2026-10-18). A date with no time of day, such as the day an indicator feed
+  was downloaded (a `DATE` column), is not an instant, so no zone can move it
+  to another day: `2026-10-15`. The reader returns a `DATE` as its text
+  (`readerTypes` in `packages/etl-db-reader`); the driver's default would make
+  it the host's local midnight.
+- **A time with no UTC offset is refused,** not read in the host's zone. Text
+  must be full ISO 8601 with seconds and an offset (PostgreSQL's
+  `2026-10-15 15:48:04+00` included); looser text that `Date` would accept is
+  refused too.
+- **Copied or exported times keep their milliseconds** when there are any
+  (`2026-10-08T00:36:36.400Z`).
+- **A missing time reads `no time recorded`.** It is never guessed.
+- **Folder names stay compact UTC** (`2026-10-15T154804Z`), and durations
+  are unchanged.
+- **One implementation:** `shared/time.ts` (`formatDateTime`, `formatDate`,
+  `formatLogTime`, `isoWithOffset`) and the `DateTime` component. A view never
+  calls `toLocaleString` on a time.
 

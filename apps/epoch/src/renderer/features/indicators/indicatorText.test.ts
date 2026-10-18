@@ -53,7 +53,7 @@ describe('indicator wording', () => {
     assert.equal(
       setLine(base),
       'Set: mvt-indicators index b22ddf05e1a3, fetched 2026-10-15 (e3fb2081f3e1). ' +
-        'Newest indicator 2026-10-09: 6 day(s) old when checked.'
+        'Newest indicator 2026-10-09 UTC: 6 day(s) old when checked.'
     );
     assert.equal(staleLine(base, 90), null);
     const old = { ...base, newest_indicator: '2026-05-01T00:00:00.000Z' };

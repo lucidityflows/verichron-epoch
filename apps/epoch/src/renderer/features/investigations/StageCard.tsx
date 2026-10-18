@@ -4,6 +4,7 @@ import type { ItemFailurePage, StageStatusRow } from '@verichron/etl-db-reader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { CopyButton } from '../../components/ui/CopyButton';
+import { DateTime } from '../../components/ui/DateTime';
 import { Disclosure } from '../../components/ui/Disclosure';
 import { reportsApi } from '../../api/reports';
 import { runsApi } from '../../api/runs';
@@ -132,10 +133,6 @@ function statusColour(stage: StageStatusRow): string {
   return 'var(--muted-foreground)';
 }
 
-function formatTime(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : '—';
-}
-
 /**
  * One stage of an investigation (EPOCH-431): its status and what it produced
  * at a glance, and everything else (what it read, what it wrote, exact times,
@@ -214,12 +211,12 @@ export function StageCard({
               </>
             )}
             <dt className="text-muted-foreground">Started</dt>
-            <dd className="font-mono text-foreground" title={stage.started_at ?? undefined}>
-              {formatTime(stage.started_at)}
+            <dd className="text-foreground">
+              <DateTime value={stage.started_at} />
             </dd>
             <dt className="text-muted-foreground">Finished</dt>
-            <dd className="font-mono text-foreground" title={stage.finished_at ?? undefined}>
-              {formatTime(stage.finished_at)}
+            <dd className="text-foreground">
+              <DateTime value={stage.finished_at} />
             </dd>
           </dl>
 

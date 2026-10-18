@@ -33,6 +33,7 @@ import {
   getStillFailing,
   getInterruptedEvidence,
   getInterruptedStages,
+  readerTypes,
   type ForensicRecordQuery,
   type ForensicRecordRow,
   type RecordSortKey,
@@ -98,7 +99,7 @@ before(async () => {
   await admin.query(`CREATE DATABASE "${dbName}"`);
   const url = new URL(DSN);
   url.pathname = `/${dbName}`;
-  db = new pg.Client({ connectionString: url.toString() });
+  db = new pg.Client({ connectionString: url.toString(), types: readerTypes });
   await db.connect();
 
   for (const file of readdirSync(MIGRATIONS)
@@ -554,6 +555,7 @@ describe('getIndicatorChecks', live, () => {
     assert.deepEqual(check.summary, summary);
     assert.equal(check.sources.length, 1);
     assert.equal(check.sources[0].licence, 'MIT');
+    assert.equal(check.sources[0].downloaded_on, '2026-10-15', 'a DATE stays its recorded day, whatever the host zone');
     assert.equal(check.match_rows.length, 1);
     assert.equal(skipped.summary, null);
     assert.deepEqual(skipped.match_rows, []);

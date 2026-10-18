@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { DateTime } from '../../components/ui/DateTime';
 import { Loader } from '../../components/ui/Loader';
 import { useDevicePull } from '../../hooks/useDevicePull';
 import { PasswordField } from '../../components/ui/PasswordField';
@@ -634,7 +635,9 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                 {pulledAt !== null && (
                   <>
                     <dt className="text-muted-foreground">Finished</dt>
-                    <dd className="text-foreground">{new Date(pulledAt).toLocaleString()}</dd>
+                    <dd className="text-foreground">
+                      <DateTime value={pulledAt} />
+                    </dd>
                   </>
                 )}
                 <dt className="text-muted-foreground">Saved to</dt>

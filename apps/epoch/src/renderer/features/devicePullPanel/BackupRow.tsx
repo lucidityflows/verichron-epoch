@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Smartphone, Circle, Loader2, CheckCircle2, XCircle, KeyRound } from 'lucide-react';
 import type { Backup } from '@verichron/contracts';
 import { STAGE_ORDER, STAGE_LABELS, type BackupProgress, type StageName } from '../../../shared/prepareProgress';
+import { formatDateTime } from '../../../shared/time';
 import type { PreparedBackup } from '../../../shared/types/window';
 import type { CrashReportsRetryTarget } from '../../../shared/types/tools';
 import { Button } from '../../components/ui/Button';
@@ -145,7 +146,7 @@ export function BackupRow({
 /** The backup's state in the workspace, in its role colour (DESIGN.md §9). */
 function PreparedState({ prepared }: { prepared?: PreparedBackup }) {
   if (!prepared) return <span className="text-label text-muted-foreground shrink-0">Not prepared</span>;
-  const when = new Date(prepared.preparedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const when = formatDateTime(prepared.preparedAt);
   if (prepared.state === 'partial') {
     return (
       <span className="text-label text-flag shrink-0" title={`Decrypted ${when}; iLEAPP's output is missing`}>

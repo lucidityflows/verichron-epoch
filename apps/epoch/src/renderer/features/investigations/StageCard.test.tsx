@@ -111,7 +111,7 @@ describe('StageCard', () => {
     render(<StageCard stage={stage({ status: 'running', finished_at: null })} />);
     assert.ok(screen.getByText('Running…'));
     fireEvent.click(card());
-    assert.ok(screen.getByText('—'));
+    assert.ok(screen.getByText('no time recorded'));
   });
 
   it('lists a failed stage’s failed items behind a toggle once opened, and never reads them for other stages (EPOCH-432)', async () => {
