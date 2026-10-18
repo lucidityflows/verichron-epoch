@@ -69,13 +69,11 @@ def load_root_env() -> None:
         load_dotenv(env_path)
 
 
-def resolve_database_url() -> str:
-    """Mirrors packages/contracts/ts/env.ts's resolveDatabaseUrl(). Keep
-    the two in sync if the resolution order ever changes."""
-    if environ.get("DATABASE_URL"):
-        return environ["DATABASE_URL"]
-    user = environ.get("DB_USER")
-    password = environ.get("DB_PASSWORD")
+def _url_from_env(url_var: str, user_var: str, password_var: str) -> str:
+    if environ.get(url_var):
+        return environ[url_var]
+    user = environ.get(user_var)
+    password = environ.get(password_var)
     name = environ.get("DB_NAME")
     host = environ.get("DB_HOST") or "localhost"
     port = environ.get("DB_PORT") or "5432"
@@ -87,8 +85,23 @@ def resolve_database_url() -> str:
 
         return f"postgresql://{enc(user)}:{enc(password)}@{host}:{port}/{enc(name)}"
     raise RuntimeError(
-        "Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME."
+        f"Database configuration is required: set {url_var}, or all of {user_var}, {password_var}, and DB_NAME."
     )
+
+
+def resolve_database_url() -> str:
+    """The runtime connection (EPOCH-562): DATABASE_URL, or the login
+    provision_roles.py created, DB_APP_USER / DB_APP_PASSWORD. Never the
+    administrative identity. Mirrors packages/contracts/ts/env.ts's
+    resolveDatabaseUrl(); keep the two in sync."""
+    return _url_from_env("DATABASE_URL", "DB_APP_USER", "DB_APP_PASSWORD")
+
+
+def resolve_admin_database_url() -> str:
+    """The administrative connection, for migrations and provisioning only
+    (EPOCH-562): ADMIN_DATABASE_URL, or DB_USER / DB_PASSWORD, the identity
+    the database server was created with."""
+    return _url_from_env("ADMIN_DATABASE_URL", "DB_USER", "DB_PASSWORD")
 
 
 def require_database_url() -> str:
@@ -98,6 +111,15 @@ def require_database_url() -> str:
     none is configured, before anything connects."""
     try:
         return resolve_database_url()
+    except RuntimeError as exc:
+        print(f"[env] {exc}", file=sys.stderr)
+        sys.exit(2)
+
+
+def require_admin_database_url() -> str:
+    """require_database_url() for the administrative connection."""
+    try:
+        return resolve_admin_database_url()
     except RuntimeError as exc:
         print(f"[env] {exc}", file=sys.stderr)
         sys.exit(2)

@@ -218,7 +218,7 @@ Every fact enters through one door, `ingest()` in `db_writer.py` (R13).
   completed unit with every run that successfully read or deduplicated it.
   These links are separate from `ingested_files`, so recording a later run never
   updates a completed ledger row; deleting a run does not delete its links.
-- **Completed units are immutable in PostgreSQL (R9).** Database triggers
+- **Completed units are immutable in PostgreSQL (R9), against the runtime too** (EPOCH-562). The tables belong to a non-login schema owner, and the app connects as a role that can neither TRUNCATE them nor alter their triggers. Database triggers
   reject changes to completed ledger rows and their facts. Reclaiming an
   incomplete unit may still delete its orphaned records. The
   `purge_evidence(evidence_id, reason)` function, owned by a dedicated

@@ -98,7 +98,7 @@ fi
 
 if [ -f .env ]; then
   missing_vars=()
-  for var in DB_USER DB_PASSWORD DB_NAME DB_HOST DB_PORT; do
+  for var in DB_USER DB_PASSWORD DB_APP_USER DB_APP_PASSWORD DB_NAME DB_HOST DB_PORT; do
     grep -Eq "^${var}=.+" .env || missing_vars+=("$var")
   done
   if [ ${#missing_vars[@]} -eq 0 ]; then
@@ -107,7 +107,7 @@ if [ -f .env ]; then
     problem ".env has no value for: ${missing_vars[*]}" "edit .env and set them"
   fi
 else
-  problem ".env is missing" "cp .env.example .env, then set DB_USER, DB_PASSWORD, DB_NAME, DB_HOST, DB_PORT"
+  problem ".env is missing" "cp .env.example .env, then set DB_USER, DB_PASSWORD, DB_APP_USER, DB_APP_PASSWORD, DB_NAME, DB_HOST, DB_PORT"
 fi
 
 if [ ${#problems[@]} -gt 0 ]; then

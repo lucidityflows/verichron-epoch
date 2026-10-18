@@ -22,20 +22,20 @@ export function loadRootEnv(repoRoot: string): void {
 }
 
 /**
- * The one place a Postgres connection string gets assembled. DATABASE_URL
- * wins if explicitly set; otherwise it's synthesized from the same
- * DB_USER/DB_PASSWORD/DB_HOST/DB_PORT/DB_NAME vars .env.example declares
- * and infra/docker-compose.yml's Postgres service substitutes into
- * POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB -- so one .env edit changes
- * both the container's credentials and what every client connects with.
- * Mirror of libs/verichron-runtime-env/runtime_env.py's
- * resolve_database_url() -- keep the two in sync if resolution order changes.
+ * The one place the runtime's Postgres connection string gets assembled
+ * (EPOCH-562). DATABASE_URL wins if explicitly set; otherwise it's
+ * synthesized from DB_APP_USER/DB_APP_PASSWORD, the login provision_roles.py
+ * creates, with DB_HOST/DB_PORT/DB_NAME. It never falls back to DB_USER /
+ * DB_PASSWORD: that is the administrative identity Docker's Postgres is
+ * created with, used only by migrations and provisioning. Mirror of
+ * libs/verichron-runtime-env/runtime_env.py's resolve_database_url() --
+ * keep the two in sync if resolution order changes.
  */
 export function resolveDatabaseUrl(): string {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
 
-  const user = process.env.DB_USER;
-  const password = process.env.DB_PASSWORD;
+  const user = process.env.DB_APP_USER;
+  const password = process.env.DB_APP_PASSWORD;
   const name = process.env.DB_NAME;
   const host = process.env.DB_HOST || 'localhost';
   const port = process.env.DB_PORT || '5432';
@@ -46,5 +46,7 @@ export function resolveDatabaseUrl(): string {
     return `postgresql://${enc(user)}:${enc(password)}@${host}:${port}/${enc(name)}`;
   }
 
-  throw new Error('Database configuration is required: set DATABASE_URL, or all of DB_USER, DB_PASSWORD, and DB_NAME.');
+  throw new Error(
+    'Database configuration is required: set DATABASE_URL, or all of DB_APP_USER, DB_APP_PASSWORD, and DB_NAME.'
+  );
 }
