@@ -2,15 +2,15 @@ import React, { useCallback, useEffect } from 'react';
 import type { PipelineRunRow } from '@verichron/etl-db-reader';
 import { Sidebar, type Section } from './components/layout/Sidebar';
 import { WorkspaceView } from './views/WorkspaceView';
-import { RunsView } from './views/RunsView';
+import { InvestigationsView } from './views/InvestigationsView';
 import { RecordsView } from './views/RecordsView';
 import { IocsView } from './views/IocsView';
 import { ReportsView } from './views/ReportsView';
-import { EvidenceTag } from './components/ui/EvidenceTag';
 import { ActivityLogDock } from './features/activityLog/ActivityLogDock';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { useEpochStore } from './store/useEpochStore';
 import { runsApi } from './api/runs';
+import { analysisName } from './features/investigations/investigations';
 
 export const App: React.FC = () => {
   const {
@@ -138,10 +138,6 @@ export const App: React.FC = () => {
         <Sidebar active={section} onSelect={handleSectionSelect} dbStatus={dbStatus} />
 
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Nothing is selected on New Investigation (EPOCH-558). U4 replaces the strip with the
-              selected investigation's own card. */}
-          {selectedRun && section !== 'workspace' && <EvidenceTag run={selectedRun} />}
-
           {/* The one place a view's gutter is set (EPOCH-464, DESIGN.md §6). */}
           <div className="flex-1 min-h-0 overflow-auto p-8 flex flex-col">
             {section === 'workspace' && (
@@ -154,13 +150,14 @@ export const App: React.FC = () => {
             )}
 
             {section === 'runs' && (
-              <RunsView
+              <InvestigationsView
                 runs={runs}
                 loading={loading}
                 error={error}
                 selectedRun={selectedRun}
                 stages={stages}
                 onSelectRun={selectRun}
+                onViewReport={() => handleSectionSelect('reports')}
                 onRefreshStages={refreshStages}
                 onRefreshRun={refreshRun}
               />
@@ -170,6 +167,7 @@ export const App: React.FC = () => {
               <RecordsView
                 selectedRun={!!selectedRun}
                 runId={selectedRun?.run_id ?? null}
+                analysisName={analysisName(selectedRun)}
                 onRerunFinished={() => {
                   if (!selectedRun) return;
                   refreshRun(selectedRun.run_id);

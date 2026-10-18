@@ -28,9 +28,9 @@ it's the wrong tool — use elevation.
 | `shadow-elevation-3` | Modals, overlays — anything floating above the whole page |
 
 Do not mix `border` + `shadow-elevation-*` on the same container to
-signal the same thing (accent-color left-borders like `RunsView`'s
-status indicator are a different signal — state color, not elevation —
-and can coexist with a shadow tier).
+signal the same thing (accent-color left-borders like the selected
+investigation in `InvestigationsView` are a different signal — state or
+selection, not elevation — and can coexist with a shadow tier).
 
 **Table rows:** a selected row has the accent bar (an inset accent shadow),
 an expanded row has `shadow-elevation-1`, and a row that is both has both
@@ -71,7 +71,7 @@ to approximate one of these; use the named class.
 
 | Class | Size / weight | Use for |
 |---|---|---|
-| `text-display` | 1.25rem / 600 | The one heading per view/route — page titles. Every top-level section header in the sidebar-navigated views (`WorkspaceView`, `RunsView`, `IocsView`, `ReportsView`, `RecordsView`) is a page title in this sense, even though some render inside a shared shell — there is exactly one per view. |
+| `text-display` | 1.25rem / 600 | The one heading per view/route — page titles. Every top-level section header in the sidebar-navigated views (`WorkspaceView`, `InvestigationsView`, `IocsView`, `ReportsView`, `RecordsView`) is a page title in this sense, even though some render inside a shared shell — there is exactly one per view. |
 | `text-heading` | 1rem / 600 | Section and card titles (`h2`/`h3`) inside a view: the option cards on New Investigation, "Backups Found", a dialog's title. Added 2026-10-09 (EPOCH-464); see the amendment below the table. |
 | `text-label` | 0.75rem / 500 | UI chrome: form labels, tab/filter labels, panel sub-headings (e.g. a card's own `<h3>` inside a page that already has its `text-display` title), uppercase eyebrow text, **and button text** (see EPOCH-203 / `Button.tsx` — a button's label is UI chrome, not content). |
 | `text-data` | 0.8125rem / 400 | Actual content — table cells, timestamps, IDs, badge-adjacent values, log lines. This is the default for anything that isn't a heading or a form label. |
@@ -187,7 +187,7 @@ what makes the future toggle a CSS-only change.
 
 ## 6. View layout — one gutter, one title, one left edge
 
-Every sidebar-navigated view (`WorkspaceView`, `RunsView`, `RecordsView`,
+Every sidebar-navigated view (`WorkspaceView`, `InvestigationsView`, `RecordsView`,
 `IocsView`, `ReportsView`) renders inside `ViewLayout`
 (`components/layout/ViewLayout.tsx`), and switching views never moves the
 content edge or the title (EPOCH-464).
@@ -223,10 +223,10 @@ content edge or the title (EPOCH-464).
   (`bg-section/20 text-section`, §9), the state as one `text-heading` line in
   the foreground colour, and an optional muted `text-data` detail. A view never
   shows a bare line of text for these. One exception: a view that is loading
-  *into a table* shows a skeleton of that table (`TableSkeleton` in
-  `components/ui/Skeleton.tsx`, as `RunsView` does), so the
-  layout doesn't jump from a centered spinner to a full table when the rows
-  arrive. Errors are not empty states: they use the flag banner (§1).
+  *into a table or a list* shows a skeleton of it (`TableSkeleton` or
+  `ListSkeleton` in `components/ui/Skeleton.tsx`; `InvestigationsView` shows
+  the list's), so the layout doesn't jump from a centered spinner to the full
+  table or list when the rows arrive. Errors are not empty states: they use the flag banner (§1).
 
 ## 7. Capitalization and wording — names are Title Case, sentences are not
 
@@ -247,9 +247,18 @@ Decided 2026-10-09 (EPOCH-464), following the common desktop convention
 - **Product names keep their own casing:** iPhone, iOS, iLEAPP.
 - **Ellipsis:** the single character `…`, never three periods, for
   in-progress states ("Checking for the required tool…").
-- **One term per concept:** the user-facing unit of work is an
-  *investigation*; "run" is a pipeline term and doesn't appear in the UI's
-  names.
+- **One term per concept:** an *investigation* is one piece of evidence (one
+  backup), and each Analyze is an *analysis* of it (owner, 2026-10-18). Analyze
+  Again adds an analysis to the same investigation, and analyses are listed
+  newest first. "Run" is a pipeline term and doesn't appear in the UI.
+- **An investigation is named by its device model, iOS version and backup
+  date** ("iPhone17,5 · iOS 26.6.1", with the date beside it), as the backup's
+  Info.plist records them. A short ID (its first eight characters) is a small
+  detail beside the name. The device identifier never appears, and the
+  Info.plist Device Name, often a person's name, is a detail in the
+  investigation's card only.
+- **A stage is named by its title** ("Crash Reports", "iLEAPP Artifacts"),
+  from the contracts' one map (`STAGE_TITLES`), never by its directory name.
 
 
 ## 8. Progressive disclosure — one step at a time, secrets only while needed
@@ -390,9 +399,14 @@ changed.
 "Investigations States and Rules"). The shared `StatusChip` is a rounded pill
 in `text-label`, with its state written out, so colour is never the only
 signal. `stageChip()` derives the state from the stage's recorded status and
-why its run ended, never from text. The views adopt it in U4 (Investigations,
-including the stage card) and U3 (New Investigation); until then the stage
-card still shows its raw status.
+why its run ended, never from text. Investigations uses it on every stage
+(U4, EPOCH-555); New Investigation adopts it in U3.
+
+**An analysis takes the same chips** (`analysisChip()`, EPOCH-555), from the
+database's verdict (`run_completeness`) and how the analysis ended: Running
+while it runs; Complete, or Complete with warnings, when it completed;
+Interrupted when the examiner cancelled it or the app was closed; Failed when
+it ended incomplete any other way.
 
 | Chip | Role | Shown when | Fill, text | Contrast on background / surface / raised |
 |---|---|---|---|---|

@@ -214,7 +214,19 @@ export function readPlistStrings(file: string): Map<string, string> {
   }
 }
 
-function readDevice(candidates: string[]): { udid: string; name: string } {
+/** The device a backup came from, and how the investigation is named (EPOCH-555). */
+interface BackupDevice {
+  udid: string;
+  name: string;
+  /** Info.plist "Product Type", the model identifier, e.g. iPhone17,5. */
+  productType: string;
+  /** Info.plist "Product Version", e.g. 26.6.1. */
+  iosVersion: string;
+  /** Info.plist "Last Backup Date": when the backup began, as an ISO time. */
+  backupDate: string;
+}
+
+function readDevice(candidates: string[]): BackupDevice {
   const plistPath = candidates.map((dir) => path.join(dir, 'Info.plist')).find((p) => existsSync(p));
   if (!plistPath) {
     throw new RegistrationError(`no Info.plist in ${candidates.join(' or ')}; cannot identify the device`);
@@ -228,7 +240,22 @@ function readDevice(candidates: string[]): { udid: string; name: string } {
     const guidNote = keys.has('GUID') ? ' ("GUID" is the backup\'s iTunes GUID, not the device UDID)' : '';
     throw new RegistrationError(`${plistPath} has no "Unique Identifier" or "Target Identifier"${guidNote}`);
   }
-  return { udid, name: keys.get('Device Name') || keys.get('Display Name') || 'Unknown device' };
+  const required = (key: string): string => {
+    const value = keys.get(key)?.trim();
+    if (!value) throw new RegistrationError(`${plistPath} has no "${key}"; cannot name the investigation`);
+    return value;
+  };
+  const backupDate = new Date(required('Last Backup Date'));
+  if (Number.isNaN(backupDate.getTime())) {
+    throw new RegistrationError(`${plistPath} has a "Last Backup Date" that is not a date`);
+  }
+  return {
+    udid,
+    name: keys.get('Device Name') || keys.get('Display Name') || 'Unknown device',
+    productType: required('Product Type'),
+    iosVersion: required('Product Version'),
+    backupDate: backupDate.toISOString(),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -479,11 +506,19 @@ export async function registerEvidence(client: Client, input: RegistrationInput)
       );
       deviceId = deviceRow.rows[0].device_id;
       const created = await client.query<{ evidence_id: string }>(
-        `INSERT INTO evidence_items (content_root, device_id, file_count, total_bytes)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO evidence_items (content_root, device_id, file_count, total_bytes, product_type, ios_version, backup_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (content_root) DO NOTHING
          RETURNING evidence_id`,
-        [sidecar.contentRoot, deviceId, sidecar.fileCount, sidecar.totalBytes]
+        [
+          sidecar.contentRoot,
+          deviceId,
+          sidecar.fileCount,
+          sidecar.totalBytes,
+          device.productType,
+          device.iosVersion,
+          device.backupDate,
+        ]
       );
       if (created.rows.length > 0) {
         evidenceId = created.rows[0].evidence_id;

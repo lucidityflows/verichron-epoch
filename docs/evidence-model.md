@@ -32,6 +32,13 @@ a copy other users can read is refused). The UDID is read from `Info.plist`'s
 `Unique Identifier` / `Target Identifier`; `GUID` is an iTunes backup ID, not the
 UDID, and is refused.
 
+**What names an investigation.** The same `Info.plist` gives each piece of
+evidence its model (`Product Type`), iOS version (`Product Version`) and backup
+date (`Last Backup Date`, when the backup began), recorded on `evidence_items`
+at registration (migration 0019, EPOCH-555). A backup whose `Info.plist` lacks
+any of them is refused. The app names an investigation by these, never by the
+UDID or the backup's path ([DESIGN.md](../apps/epoch/DESIGN.md) §7).
+
 ## Derivatives
 
 A *derivative* is something produced from evidence: the **decrypted** backup,

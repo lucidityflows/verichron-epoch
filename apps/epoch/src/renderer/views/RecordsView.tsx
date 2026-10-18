@@ -13,6 +13,8 @@ interface RecordsViewProps {
   selectedRun: boolean;
   /** The selected run, whose evidence's still-failing items show above its records (EPOCH-432). */
   runId: string | null;
+  /** The selected analysis's name (EPOCH-555), now that no strip above the page names it. */
+  analysisName: string | null;
   /** A rerun started from the still-failing panel has finished: read the records again. */
   onRerunFinished?: () => void;
   records: ForensicRecordRow[];
@@ -82,6 +84,7 @@ function buildColumns(): DataTableColumn<ForensicRecordRow>[] {
 export function RecordsView({
   selectedRun,
   runId,
+  analysisName,
   onRerunFinished,
   records,
   loadedCount,
@@ -95,7 +98,13 @@ export function RecordsView({
   const columns = useMemo(buildColumns, []);
 
   return (
-    <ViewLayout section="records" title="Forensic Records" scroll="contained" className="overflow-hidden">
+    <ViewLayout
+      section="records"
+      title="Forensic Records"
+      description={analysisName ?? undefined}
+      scroll="contained"
+      className="overflow-hidden"
+    >
       {selectedRun && loadedCount < totalCount && (
         // A capped list must say so (R25). Filters below apply only to the
         // loaded rows until the server-side grid lands (EPOCH-411).

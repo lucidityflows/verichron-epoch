@@ -237,8 +237,8 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     await db.query(`INSERT INTO devices (device_id, device_key, label) VALUES
       ('99999999-9999-9999-9999-999999999999', repeat('a', 64), 'test device')`);
     await db.query(
-      `INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes)
-       VALUES ($1, repeat('b', 64), '99999999-9999-9999-9999-999999999999', 0, 0)`,
+      `INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes, product_type, ios_version, backup_date)
+       VALUES ($1, repeat('b', 64), '99999999-9999-9999-9999-999999999999', 0, 0, 'iPhone17,5', '26.6.1', '2026-10-15T18:05:25Z')`,
       [EVIDENCE]
     );
     await db.query(

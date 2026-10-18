@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 
 import { CopyButton } from './CopyButton';
 import { Disclosure } from './Disclosure';
-import { TableSkeleton } from './Skeleton';
+import { ListSkeleton, TableSkeleton } from './Skeleton';
 import { TOAST_DURATION_MS, ToastProvider, useToast, type ToastTone } from './Toast';
 
 afterEach(() => {
@@ -155,5 +155,13 @@ describe('TableSkeleton', () => {
     const table = screen.getByLabelText('Loading');
     assert.equal(table.getAttribute('aria-busy'), 'true');
     assert.equal(container.querySelectorAll('.animate-pulse').length, 4 * 3, 'a header and two rows of four');
+  });
+});
+
+describe('ListSkeleton', () => {
+  it('draws the list’s cards, and says it is loading', () => {
+    const { container } = render(<ListSkeleton rows={2} />);
+    assert.equal(screen.getByLabelText('Loading').getAttribute('aria-busy'), 'true');
+    assert.equal(container.querySelectorAll('.animate-pulse').length, 2 * 3, 'two cards of three lines');
   });
 });

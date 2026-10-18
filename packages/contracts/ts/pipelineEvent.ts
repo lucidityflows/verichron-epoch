@@ -234,6 +234,19 @@ export const STAGE_NAMES: Record<string, string> = {
 };
 export const stageName = (stage: string): string => STAGE_NAMES[stage] ?? stage;
 
+/**
+ * What each stage is called as a thing, where an examiner reads a list of
+ * them: the Investigations view's stage list (EPOCH-555, board 4), and the
+ * report once U5 renders it. STAGE_NAMES above says what a stage is doing.
+ */
+export const STAGE_TITLES: Record<string, string> = {
+  crash: 'Crash Reports',
+  ileapp_bridge: 'iLEAPP Artifacts',
+  indicator_match: 'Indicator Matching',
+  reporting: 'Report',
+};
+export const stageTitle = (stage: string): string => STAGE_TITLES[stage] ?? stage;
+
 /** What each step is called where an examiner reads it. */
 export const PREPARE_STEP_NAMES: Record<PrepareStep, string> = {
   hash: 'Checking the backup files',

@@ -152,6 +152,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         "SELECT to_regprocedure('public.verichron_epoch_adopt()') IS NOT NULL",
         _runtime_may_purge(),
     ),
+    "0019_evidence_description.sql": (
+        _column("evidence_items", "product_type"),
+        _column("evidence_items", "backup_date"),
+    ),
 }
 
 

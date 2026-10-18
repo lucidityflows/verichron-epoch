@@ -150,6 +150,9 @@ function infoPlist(udid: string, name: string): string {
 <plist version="1.0"><dict>
   <key>Device Name</key><string>${name}</string>
   <key>Unique Identifier</key><string>${udid}</string>
+  <key>Product Type</key><string>iPhone17,5</string>
+  <key>Product Version</key><string>26.6.1</string>
+  <key>Last Backup Date</key><date>2026-10-15T18:05:25Z</date>
 </dict></plist>`;
 }
 
@@ -815,6 +818,32 @@ describe('stages and the completeness predicate', live, () => {
     assert.match(result.error ?? '', /"GUID" is the backup's iTunes GUID, not the device UDID/);
     assert.equal(await count('evidence_items'), 0);
     assert.equal(await count('pipeline_runs'), 0);
+  });
+
+  it('records the model, iOS version and backup date that name the investigation (EPOCH-555)', async () => {
+    const ws = makeWorkspace('described');
+    const result = await run(ws.backupPath);
+    assert.equal(result.success, true, result.error);
+    const { rows } = await db.query(
+      `SELECT product_type, ios_version,
+              to_char(backup_date AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS backup_date
+         FROM evidence_items`
+    );
+    assert.deepEqual(rows, [
+      { product_type: 'iPhone17,5', ios_version: '26.6.1', backup_date: '2026-10-15T18:05:25Z' },
+    ]);
+  });
+
+  it('refuses a backup whose Info.plist does not say its model', async () => {
+    const ws = makeWorkspace('no-model');
+    writeFileSync(
+      path.join(ws.backupPath, 'Info.plist'),
+      infoPlist(UDID, 'Phone').replace('<key>Product Type</key><string>iPhone17,5</string>', '')
+    );
+    const result = await run(ws.backupPath);
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /has no "Product Type"; cannot name the investigation/);
+    assert.equal(await count('evidence_items'), 0);
   });
 
   it("records each derivative's tool, parameters and provenance key", async () => {

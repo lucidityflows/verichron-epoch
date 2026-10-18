@@ -9,6 +9,7 @@ import { DateTime } from '../components/ui/DateTime';
 import { Disclosure } from '../components/ui/Disclosure';
 import { formatDateTime } from '../../shared/time';
 import { EmptyState } from '../components/ui/EmptyState';
+import { analysisName } from '../features/investigations/investigations';
 import {
   inOrder,
   notCheckedLines,
@@ -262,7 +263,7 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
   }
 
   return (
-    <ViewLayout section="iocs" title="Indicator Matches">
+    <ViewLayout section="iocs" title="Indicator Matches" description={analysisName(selectedRun) ?? undefined}>
       {body}
     </ViewLayout>
   );

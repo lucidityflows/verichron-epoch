@@ -342,8 +342,10 @@ def test_the_runtime_registers_evidence_and_purges_through_the_audited_function(
         )
         device = fetched(cur)[0]
         cur.execute(
-            "INSERT INTO evidence_items (content_root, device_id, file_count, total_bytes) "
-            "VALUES (repeat('8', 64), %s, 0, 0) ON CONFLICT (content_root) DO NOTHING RETURNING evidence_id",
+            "INSERT INTO evidence_items "
+            "(content_root, device_id, file_count, total_bytes, product_type, ios_version, backup_date) "
+            "VALUES (repeat('8', 64), %s, 0, 0, 'iPhone17,5', '26.6.1', now()) "
+            "ON CONFLICT (content_root) DO NOTHING RETURNING evidence_id",
             (device,),
         )
         evidence = fetched(cur)[0]
