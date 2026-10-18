@@ -15,8 +15,9 @@ changes: it is idempotent.
 
 The login is a member of verichron_epoch_runtime and of nothing else: an
 existing role's other memberships are revoked. It is refused if it would be
-the administrative identity, a superuser, a role that owns anything, or one of
-the project's or PostgreSQL's own roles.
+the administrative identity, a superuser, a role that owns anything or holds a
+privilege granted to it directly (other than CONNECT), or one of the
+project's or PostgreSQL's own roles.
 """
 
 from __future__ import annotations
@@ -85,6 +86,32 @@ def provision(conn, login: str, password: str) -> str:
             cur.execute("SELECT 1 FROM pg_shdepend WHERE refobjid = %s AND deptype = 'o' LIMIT 1", (existing[0],))
             if cur.fetchone() is not None:
                 raise ProvisionError(f"{login} owns database objects; the runtime login must own nothing")
+            # A privilege granted to the login directly (a TRUNCATE, say) would
+            # survive provisioning: it may hold only CONNECT on a database,
+            # which provisioning grants itself; everything else comes from
+            # the runtime role.
+            cur.execute(
+                """
+                SELECT 1 FROM pg_shdepend
+                WHERE refobjid = %s AND deptype IN ('a', 'i') AND classid <> 'pg_database'::regclass
+                LIMIT 1
+                """,
+                (existing[0],),
+            )
+            direct = cur.fetchone() is not None
+            cur.execute(
+                """
+                SELECT 1 FROM pg_database d, aclexplode(d.datacl) a
+                WHERE a.grantee = %s AND a.privilege_type <> 'CONNECT'
+                LIMIT 1
+                """,
+                (existing[0],),
+            )
+            if direct or cur.fetchone() is not None:
+                raise ProvisionError(
+                    f"{login} holds privileges granted to it directly; the runtime login may hold only "
+                    f"{RUNTIME_ROLE}'s (and CONNECT)"
+                )
         verb = "ALTER" if existing else "CREATE"
         statement = sql.SQL(
             verb + " ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT NOREPLICATION NOBYPASSRLS PASSWORD {}"

@@ -203,8 +203,9 @@ def test_the_runtime_holds_no_owner_role_and_can_purge_only_through_the_function
         cur.execute("SELECT has_function_privilege(%s, 'public.purge_evidence(uuid, text)', 'EXECUTE')", (RUNTIME,))
         assert fetched(cur)[0] is True
         for table in PROTECTED:
-            cur.execute("SELECT has_table_privilege(%s, %s, 'TRUNCATE')", (RUNTIME, table))
-            assert fetched(cur)[0] is False, table
+            for role in (RUNTIME, LOGIN):
+                cur.execute("SELECT has_table_privilege(%s, %s, 'TRUNCATE')", (role, table))
+                assert fetched(cur)[0] is False, (role, table)
 
 
 # ---------------------------------------------------------------------------
@@ -456,5 +457,43 @@ def test_provisioning_refuses_a_role_that_owns_anything(db: PgReal):
             provision_roles.provision(admin, login, "p")
     finally:
         admin.rollback()
+        drop_login(admin, login)
+        admin.close()
+
+
+@pytest.mark.parametrize(
+    "grant",
+    [
+        "GRANT TRUNCATE ON public.ingested_files TO {}",
+        "GRANT DELETE ON public.evidence_events TO {}",
+        "GRANT EXECUTE ON PROCEDURE public.verichron_epoch_adopt() TO {}",
+        "GRANT CREATE ON SCHEMA public TO {}",
+        "GRANT CREATE ON DATABASE {db} TO {}",
+    ],
+)
+def test_provisioning_refuses_a_role_holding_a_privilege_granted_to_it_directly(db: PgReal, grant):
+    """A direct grant would survive provisioning beside the runtime role's."""
+    login = f"epoch_direct_{os.getpid()}"
+    admin = psycopg2.connect(admin_dsn())
+    try:
+        with admin.cursor() as cur:
+            cur.execute("SELECT current_database()")
+            database = fetched(cur)[0]
+            cur.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier(login)))
+            cur.execute(sql.SQL(grant).format(sql.Identifier(login), db=sql.Identifier(database)))
+        admin.commit()
+        with pytest.raises(provision_roles.ProvisionError, match="granted to it directly"):
+            provision_roles.provision(admin, login, "p")
+    finally:
+        admin.rollback()
+        with admin.cursor() as cur:
+            cur.execute("SELECT current_database()")
+            database = fetched(cur)[0]
+            cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (login,))
+            if cur.fetchone() is not None:
+                cur.execute(
+                    sql.SQL("REVOKE ALL ON DATABASE {} FROM {}").format(sql.Identifier(database), sql.Identifier(login))
+                )
+        admin.commit()
         drop_login(admin, login)
         admin.close()
