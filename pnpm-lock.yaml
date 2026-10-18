@@ -277,6 +277,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.12
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

@@ -60,6 +60,13 @@ jobs:
       - name: Build contracts
         run: pnpm --filter @verichron/contracts build
 
+      - name: Typecheck contracts tests
+        run: pnpm --filter @verichron/contracts typecheck:tests
+
+      # EPOCH-570: the task log's entries, the producers' events and the sanitizer.
+      - name: Test contracts
+        run: pnpm --filter @verichron/contracts test
+
       - name: Typecheck
         run: pnpm --filter @verichron/processor typecheck
 

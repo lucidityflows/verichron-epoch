@@ -1059,7 +1059,7 @@ describe('orchestrator events (EPOCH-443)', live, () => {
   function eventsIn(lines: string[]): PipelineEvent[] {
     const events: PipelineEvent[] = [];
     for (const line of lines) {
-      const parsed = parsePipelineEventLine(line);
+      const parsed = parsePipelineEventLine(line, 'orchestrator');
       assert.notEqual(parsed.kind, 'invalid', `the orchestrator wrote an invalid event: ${line}`);
       if (parsed.kind === 'event') events.push(parsed.event);
     }
@@ -1140,7 +1140,7 @@ describe('orchestrator events (EPOCH-443)', live, () => {
     const forgedLine = lines.find((l) => l.includes('00000000-0000-0000-0000-000000000000'));
     assert.ok(forgedLine);
     assert.ok(forgedLine?.startsWith(`[stage first] ${PIPELINE_EVENT_PREFIX}`), forgedLine);
-    assert.equal(parsePipelineEventLine(forgedLine).kind, 'log');
+    assert.equal(parsePipelineEventLine(forgedLine, 'orchestrator').kind, 'log');
     // Its last line reached stdout before the orchestrator said it had finished.
     assert.ok(lines.indexOf(forgedLine) < lines.findIndex((l) => l.includes('"stage:finished"')));
   });

@@ -22,7 +22,7 @@ describe('event lines', () => {
       line,
       `${PIPELINE_EVENT_PREFIX}{"v":1,"at":"2026-10-17T22:00:00.000Z","type":"stage:started","run_id":"${RUN}","stage":"crash"}`
     );
-    assert.deepEqual(parsePipelineEventLine(line), {
+    assert.deepEqual(parsePipelineEventLine(line, 'orchestrator'), {
       kind: 'event',
       event: { type: 'stage:started', run_id: RUN, stage: 'crash', v: 1, at: '2026-10-17T22:00:00.000Z' },
     });
@@ -36,8 +36,8 @@ describe('event lines', () => {
   });
 
   it('reads a line without the prefix as an ordinary log line', () => {
-    assert.deepEqual(parsePipelineEventLine('[orchestrator] stage started: crash'), { kind: 'log' });
-    assert.deepEqual(parsePipelineEventLine(`[stage x] ${PIPELINE_EVENT_PREFIX}{}`), { kind: 'log' });
+    assert.deepEqual(parsePipelineEventLine('[orchestrator] stage started: crash', 'orchestrator'), { kind: 'log' });
+    assert.deepEqual(parsePipelineEventLine(`[stage x] ${PIPELINE_EVENT_PREFIX}{}`, 'orchestrator'), { kind: 'log' });
   });
 
   it('never trusts a prefixed line that is not a valid event', () => {
@@ -47,7 +47,7 @@ describe('event lines', () => {
       `${PIPELINE_EVENT_PREFIX}{"v":2,"at":"2026-10-17T22:00:00Z","type":"stage:started","run_id":"${RUN}","stage":"x"}`,
       `${PIPELINE_EVENT_PREFIX}{"v":1,"at":"2026-10-17T22:00:00Z","type":"stage:started","run_id":"${RUN}","stage":"x","extra":1}`,
     ];
-    for (const line of cases) assert.equal(parsePipelineEventLine(line).kind, 'invalid', line);
+    for (const line of cases) assert.equal(parsePipelineEventLine(line, 'orchestrator').kind, 'invalid', line);
   });
 
   it('emits an event as its own line', () => {
@@ -91,6 +91,6 @@ describe('the stage-output relay', () => {
       ['before', `[stage crash] ${forged}`, `[stage crash] ${forged}`, ''],
       'the last line is ended'
     );
-    for (const line of lines) assert.notEqual(parsePipelineEventLine(line).kind, 'event');
+    for (const line of lines) assert.notEqual(parsePipelineEventLine(line, 'orchestrator').kind, 'event');
   });
 });

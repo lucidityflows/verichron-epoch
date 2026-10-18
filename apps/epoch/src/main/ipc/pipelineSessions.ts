@@ -157,7 +157,7 @@ export class AnalysisSession {
    */
   line(stream: PipelineLogEntry['stream'], text: string, now = Date.now()): PipelineLogEntry | null {
     if (stream === 'stdout') {
-      const parsed = parsePipelineEventLine(text);
+      const parsed = parsePipelineEventLine(text, 'orchestrator');
       if (parsed.kind === 'event') {
         const event = parsed.event;
         if (event.type === 'run:created') {

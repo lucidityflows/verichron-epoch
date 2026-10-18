@@ -65,13 +65,40 @@ export {
   provenanceKey,
 } from './ts/derivativeMarker.js';
 export {
+  EVENT_PRODUCERS,
+  LogLevel,
   PIPELINE_EVENT_PREFIX,
   PipelineEvent,
+  PrepareStep,
+  PrepareTool,
+  eventLevel,
   parsePipelineEventLine,
   renderPipelineEvent,
+  type EventProducer,
   type ParsedPipelineLine,
   type PipelineEventBody,
+  type PipelineEventType,
 } from './ts/pipelineEvent.js';
+export {
+  LogSource,
+  TASK_LOG_DIRECTORY,
+  TaskKind,
+  TaskLogEntry,
+  TaskOutcome,
+  readTaskLog,
+  renderTaskLogEntry,
+  taskLogFileName,
+  type ReadTaskLog,
+  type TaskLogProblem,
+} from './ts/taskLog.js';
+export {
+  Sanitizer,
+  type DeviceIdentifierSource,
+  type SanitizeReport,
+  type SanitizedClass,
+  type SanitizerNotice,
+  type WorkstationRoots,
+} from './ts/sanitize.js';
 export { SourceType, isSourceType } from './ts/sourceType';
 export type { SourceType as SourceTypeValue } from './ts/sourceType';
 export { loadRootEnv, resolveDatabaseUrl } from './ts/env.js';
