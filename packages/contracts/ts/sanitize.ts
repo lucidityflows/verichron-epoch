@@ -116,6 +116,9 @@ export class Sanitizer {
     private readonly roots: Rule[],
     private readonly identifiers: Rule[],
     private readonly user: RegExp | null,
+    /** Every value it replaces, for `residue`: never printed, never returned. */
+    private readonly known: { cls: SanitizedClass; value: string }[],
+    private readonly userName: string | null,
     /** Values that were not used, and why. */
     readonly notices: SanitizerNotice[]
   ) {}
@@ -123,6 +126,7 @@ export class Sanitizer {
   static create(devices: readonly DeviceIdentifierSource[], workstation: WorkstationRoots): Sanitizer {
     const notices: SanitizerNotice[] = [];
     const roots: Rule[] = [];
+    const known: { cls: SanitizedClass; value: string }[] = [];
     for (const name of ROOT_ORDER) {
       const raw = workstation[name];
       if (!raw) continue;
@@ -131,6 +135,7 @@ export class Sanitizer {
         notices.push({ label: null, class: name, reason: 'it is not an absolute folder, so it is not used' });
         continue;
       }
+      known.push({ cls: name, value: root });
       roots.push({
         cls: name,
         pattern: new RegExp(`(?<=^|[${PATH_EDGE}])${escape(root)}(?=$|[/${PATH_EDGE}])`, 'g'),
@@ -143,8 +148,10 @@ export class Sanitizer {
 
     const identifiers: Rule[] = [];
     for (const device of devices) {
-      const add = (cls: SanitizedClass, value: string, pattern: RegExp) =>
+      const add = (cls: SanitizedClass, value: string, pattern: RegExp) => {
         identifiers.push({ cls, pattern, marker: `[${cls} ${device.name}]`, length: value.length });
+        known.push({ cls, value });
+      };
       const values: string[] = [];
       if (device.folderName && UDID.test(device.folderName)) {
         values.push(device.folderName);
@@ -198,7 +205,7 @@ export class Sanitizer {
           reason: 'the account name is too short or unusual to match safely, so it is not used',
         });
     }
-    return new Sanitizer(roots, identifiers, user, notices);
+    return new Sanitizer(roots, identifiers, user, known, user ? workstation.user! : null, notices);
   }
 
   /** A password the examiner entered for this task: the tripwire (§6.2). Held only until `clearSecrets()`. */
@@ -240,6 +247,33 @@ export class Sanitizer {
       );
     }
     return { text: out, replaced };
+  }
+
+  /**
+   * What is left of a known value in text that was already sanitized: the
+   * real-data check (docs/event-log.md §6.5). Stricter than replacement: any
+   * occurrence counts, inside a longer token too, and the account name counts
+   * anywhere inside a path. Classes and counts only; never a value.
+   */
+  residue(text: string): Partial<Record<SanitizedClass, number>> {
+    const found: Partial<Record<SanitizedClass, number>> = {};
+    const count = (cls: SanitizedClass, n: number) => {
+      if (n > 0) found[cls] = (found[cls] ?? 0) + n;
+    };
+    const lower = text.toLowerCase();
+    // One value can be known more than once (a UDID is the folder name and two Info.plist keys).
+    const distinct = new Map(this.known.map((k) => [`${k.cls}\u0000${k.value.toLowerCase()}`, k]));
+    for (const { cls, value } of distinct.values()) {
+      const isRoot = ROOT_ORDER.includes(cls as (typeof ROOT_ORDER)[number]);
+      const haystack = isRoot ? text : lower;
+      const needle = isRoot ? value : value.toLowerCase();
+      count(cls, haystack.split(needle).length - 1);
+    }
+    if (this.userName) {
+      const name = this.userName;
+      for (const path of text.match(PATH_TOKEN) ?? []) count('user', path.split(name).length - 1);
+    }
+    return found;
   }
 
   /** Every string in a value (an event, a header), sanitized; the shape is unchanged. */

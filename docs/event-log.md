@@ -209,11 +209,12 @@ The identifier formats were checked on 2026-10-18 against the Info.plist of the 
    - a UDID in a source path, each root and its most-specific-first order, the account name inside a temporary folder's name, and the phone digit forms;
    - "no Device Name replacement" (a tool name that contains the device name stays intact), and no account-name replacement in free text;
    - the password tripwire, and that `password:required` carries no value.
-2. **Real-data check, run locally and never committed** (`pnpm --filter @verichron/epoch check:log-sanitizer <workspace>`). It runs the sanitizer over the saved logs of a real Prepare and Analyze of the workspace's real backups. Its output masks every identifier and root, and it prints:
-   - the number of replacements per class;
-   - every changed line, with the markers in place, for the owner to review;
-   - a check that no collected value remains anywhere in the output;
-   - every absolute path that remains, grouped by its first segments. This is a report, not a replacement, so it can't cause a false positive.
+2. **Real-data check, run locally, never in CI and never committed:**
+   `pnpm --filter @verichron/epoch check:log-sanitizer <workspace> --out <review file>`
+   (`apps/epoch/src/main/ipc/sanitizerCheck.ts`). It reads every saved log in the workspace and builds the sanitizer's known values from the workspace's own backups and the workstation's roots.
+   - **On screen, counts only:** the logs and entries read, unreadable lines, the markers by kind, what is left of a known value (`residue`: any occurrence counts, inside a longer token too, and the account name anywhere inside a path), and how many distinct absolute paths remain.
+   - **In the review file** (mode `0600`), because it quotes the logs: every line with a marker, and every remaining absolute path grouped by its first segments. The file is the owner's to read; it is never shown in a session or committed.
+   - It passes only when there are logs, every line reads, and nothing is left of a known value.
 3. **Acceptance:**
    - zero remaining identifier values, and no remaining path containing the home folder or the account name;
    - every changed line reviewed as a true replacement;

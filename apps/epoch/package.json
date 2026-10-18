@@ -24,7 +24,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "build:vite": "vite build -c vite.main.config.mts --outDir .vite/check/main && vite build -c vite.preload.config.mts --outDir .vite/check/preload && vite build -c vite.renderer.config.mts --outDir .vite/check/renderer",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:log-sanitizer": "tsx scripts/check-log-sanitizer.ts"
   },
   "keywords": [],
   "author": {

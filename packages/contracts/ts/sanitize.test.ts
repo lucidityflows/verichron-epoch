@@ -179,3 +179,15 @@ describe('sanitizeDeep', () => {
     });
   });
 });
+
+describe('residue', () => {
+  it('finds any known value left in sanitized text, inside a longer token too, and names only its class', () => {
+    const s = sanitizer();
+    assert.deepEqual(s.residue(s.sanitize(`(/home/examiner/Downloads/${LABEL}/${UDID})`)), {}, 'nothing left');
+    assert.deepEqual(s.residue(`hash ab${UDID.toLowerCase()}cd in /var/examiner/x and the examiner`), {
+      device: 1,
+      user: 1,
+    });
+    assert.deepEqual(s.residue('see /home/examiner'), { home: 1, user: 1 });
+  });
+});
