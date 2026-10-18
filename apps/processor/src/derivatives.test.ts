@@ -30,6 +30,8 @@ import {
   readIleappMarker,
 } from '@verichron/contracts';
 
+import { environmentDigest } from './utils/environment.js';
+
 let tmp: string;
 let source: string;
 let workspace: string;
@@ -43,6 +45,9 @@ const STUB_MODULES = [
   { module_name: 'AWESearch', artifact_name: 'get_AWESearch', module_status: 'No files found', file_count: 0 },
   { module_name: 'ZaloChats', artifact_name: 'zalo_messages', module_status: 'Error', file_count: 300 },
 ];
+
+/** The environment digest of a stub interpreter that lists stub==<version>. */
+const stubEnvironment = (version: string) => environmentDigest(['python==3.14.8', `stub==${version}`]);
 
 /** git in the stub iLEAPP checkout, with an identity so commits work anywhere. */
 const ileappGit = (...args: string[]) =>
@@ -64,6 +69,7 @@ before(() => {
   writeFileSync(path.join(source, 'BK2', 'version.txt'), 'w1');
 
   // The stub stands in for the decrypt tool's interpreter, so it is called as
+  //   <python> -I -c CODE                       -> its environment: Python and stub==$STUB_DECRYPT_ENV (default 1)
   //   <python> -I decrypt_backup.py --version   -> "iphone_backup_decrypt $STUB_DECRYPT_VERSION" (default 0.10.0)
   //   <python> -I decrypt_backup.py SRC DEST    -> DEST/from-<version>.txt and DEST/Manifest.db
   // Each decrypt appends its arguments and BACKUP_PASSWORD to $STUB_PASSWORDS.
@@ -76,6 +82,7 @@ before(() => {
   writeFileSync(
     stub,
     `#!/bin/sh
+if [ "$2" = -c ]; then echo '["python==3.14.8", "stub=='"\${STUB_DECRYPT_ENV-1}"'"]'; exit 0; fi
 if [ "$3" = --version ]; then echo "iphone_backup_decrypt \${STUB_DECRYPT_VERSION-0.10.0}"; exit 0; fi
 echo "$* | $BACKUP_PASSWORD" >> "$STUB_PASSWORDS"
 if [ "$STUB_DECRYPT" = wrong-once ] && [ "$BACKUP_PASSWORD" != right ]; then
@@ -99,12 +106,14 @@ exit 0
   //   <python> ileapp.py -t TYPE -i INPUT -o PARENT --custom_output_folder NAME
   // and writes PARENT/NAME/input-type and iLEAPP's module list (EPOCH-457),
   // logging one plugin error as iLEAPP does.
+  // Asked for its environment (<python> -I -c CODE), it lists Python and stub==$STUB_ILEAPP_ENV (default 1).
   // STUB_ILEAPP=fail: exit 1. =hang: never finish. =none: exit 0 having written nothing.
   // =nolist: a report with no module list.
   ileappPython = path.join(tmp, 'ileapp-python-stub');
   writeFileSync(
     ileappPython,
     `#!/bin/sh
+if [ "$2" = -c ]; then echo '["python==3.14.8", "stub=='"\${STUB_ILEAPP_ENV-1}"'"]'; exit 0; fi
 case "$STUB_ILEAPP" in
   fail) echo "iLEAPP crashed" >&2; exit 1 ;;
   hang) sleep 60 ;;
@@ -285,7 +294,11 @@ describe('the decrypt tool (EPOCH-489)', () => {
   it('records the decrypt library, its version and the repair outcome in the marker', async () => {
     await runCli();
     const decrypt = readDecryptMarker(decrypted())!;
-    assert.deepEqual(decrypt.tool, { name: 'iphone_backup_decrypt', version: '0.10.0' });
+    assert.deepEqual(decrypt.tool, {
+      name: 'iphone_backup_decrypt',
+      version: '0.10.0',
+      environment: stubEnvironment('1'),
+    });
     assert.equal(
       decrypt.params.repair.status,
       'skipped',
@@ -358,7 +371,11 @@ describe('iLEAPP output (EPOCH-416)', () => {
     const marker = readIleappMarker(ileapp())!;
     assert.ok(marker, 'marker written');
     assert.equal(marker.content_root, readDecryptMarker(decrypted())!.content_root);
-    assert.deepEqual(marker.tool, { name: 'iLEAPP', version: ileappGit('rev-parse', 'HEAD') });
+    assert.deepEqual(marker.tool, {
+      name: 'iLEAPP',
+      version: ileappGit('rev-parse', 'HEAD'),
+      environment: stubEnvironment('1'),
+    });
     assert.deepEqual(
       marker.params,
       {
@@ -397,6 +414,15 @@ describe('iLEAPP output (EPOCH-416)', () => {
     assert.match(out, /\[ileapp\]  re-running: iLEAPP changed/);
     assert.equal(readIleappMarker(ileapp())!.tool.version, ileappGit('rev-parse', 'HEAD'));
     assert.ok(!existsSync(path.join(ileapp(), 'stale-file')), 'the old report was removed, not merged into');
+  });
+
+  it('a changed iLEAPP environment runs it again, and records the environment it ran in (EPOCH-439)', async () => {
+    const out = await runCli([], '', { STUB_ILEAPP_ENV: '2' });
+    assert.match(out, /\[ileapp\]  re-running: iLEAPP's environment changed/);
+    assert.equal(readIleappMarker(ileapp())!.tool.environment, stubEnvironment('2'));
+    const back = await runCli();
+    assert.match(back, /\[ileapp\]  re-running: iLEAPP's environment changed/, 'and back again');
+    assert.equal(readIleappMarker(ileapp())!.tool.environment, stubEnvironment('1'));
   });
 
   it('refuses an iLEAPP checkout with local changes', async () => {

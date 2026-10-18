@@ -92,10 +92,22 @@ async function run(cfg: Config): Promise<void> {
       `no ileapp.py in ${cfg.ileappDir}. Run \`mise run setup\` to initialize the iLEAPP submodule, or pass --ileapp-dir`
     );
   }
-  const ileappTool = await ileappToolVersion(cfg.ileappDir);
+  const ileappTool = await ileappToolVersion(cfg.ileappDir, cfg.ileappPython);
   console.log(`[processor] iLEAPP ${ileappTool.version.slice(0, 12)} (${cfg.ileappDir})`);
 
   await runBackups(cfg, decryptTool, { decrypt: decryptToolV, ileapp: ileappTool });
+}
+
+/**
+ * Why output made by `previous` isn't this iLEAPP's, or null if it is: a
+ * different commit, or the same commit in a different environment (EPOCH-439).
+ */
+function ileappChange(previous: ToolVersion, current: ToolVersion): string | null {
+  if (previous.version !== current.version) {
+    return `iLEAPP changed (${previous.version.slice(0, 12)} -> ${current.version.slice(0, 12)})`;
+  }
+  if (previous.environment !== current.environment) return "iLEAPP's environment changed";
+  return null;
 }
 
 async function runBackups(
@@ -161,7 +173,7 @@ async function runBackups(
     const decryptIsCurrent = previousDecrypt?.content_root === contentRoot;
     const previousIleapp = readIleappMarker(ileDir);
     const ileappIsCurrent =
-      previousIleapp?.content_root === contentRoot && previousIleapp.tool.version === tools.ileapp.version;
+      previousIleapp?.content_root === contentRoot && ileappChange(previousIleapp.tool, tools.ileapp) === null;
     if (!cfg.forceDecrypt && decryptIsCurrent) {
       console.log('  [decrypt] already done, skipping');
       if (cfg.force || !ileappIsCurrent) {
@@ -363,9 +375,7 @@ async function runBackups(
       ? null
       : previousIleapp.content_root !== contentRoot
         ? 'the backup changed'
-        : previousIleapp.tool.version !== tools.ileapp.version
-          ? `iLEAPP changed (${previousIleapp.tool.version.slice(0, 12)} -> ${tools.ileapp.version.slice(0, 12)})`
-          : null;
+        : ileappChange(previousIleapp.tool, tools.ileapp);
     if (!cfg.force && !decryptRan && previousIleapp && ileappStaleBecause === null) {
       console.log('  [ileapp]  already done, skipping');
     } else {

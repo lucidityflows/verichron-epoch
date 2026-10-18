@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { promisify } from 'node:util';
 import type { IleappModules, IleappParams, ToolVersion } from '@verichron/contracts';
 
+import { pythonEnvironmentDigest } from './environment.js';
 import { closeWriteStream } from './fs.js';
 import { lineReader } from './lines.js';
 import { killProcessGroup, trackProcessGroup } from './processGroup.js';
@@ -20,10 +21,11 @@ const run = promisify(execFile);
 
 /**
  * iLEAPP's identity is the submodule commit, not its self-reported version
- * (version_info.py says 2026.3.0 at tag v2026.3.1). A checkout with local
+ * (version_info.py says 2026.3.0 at tag v2026.3.1), together with the
+ * environment its interpreter runs in (EPOCH-439). A checkout with local
  * changes is refused: its commit would not describe the code that ran.
  */
-export async function ileappToolVersion(ileappDir: string): Promise<ToolVersion> {
+export async function ileappToolVersion(ileappDir: string, python: string): Promise<ToolVersion> {
   let commit: string;
   let changes: string;
   try {
@@ -44,7 +46,7 @@ export async function ileappToolVersion(ileappDir: string): Promise<ToolVersion>
         `restore it with \`git -C ${ileappDir} checkout -- . && git -C ${ileappDir} clean -fd\``
     );
   }
-  return { name: 'iLEAPP', version: commit };
+  return { name: 'iLEAPP', version: commit, environment: await pythonEnvironmentDigest(python) };
 }
 
 /**

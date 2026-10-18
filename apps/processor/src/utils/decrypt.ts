@@ -2,6 +2,8 @@ import * as fsp from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import type { ToolVersion } from '@verichron/contracts';
 
+import { pythonEnvironmentDigest } from './environment.js';
+
 import { lineReader } from './lines.js';
 import { killProcessGroup, trackProcessGroup } from './processGroup.js';
 
@@ -98,7 +100,10 @@ export async function decryptBackup(opts: {
   });
 }
 
-/** The decrypt library and its version, from `decrypt_backup.py --version` ("iphone_backup_decrypt 0.10.0"). */
+/**
+ * The decrypt library and its version, from `decrypt_backup.py --version`
+ * ("iphone_backup_decrypt 0.10.0"), and the environment it runs in (EPOCH-439).
+ */
 export async function decryptToolVersion(tool: DecryptTool): Promise<ToolVersion> {
   const output = await new Promise<string>((resolve, reject) => {
     let out = '';
@@ -116,5 +121,5 @@ export async function decryptToolVersion(tool: DecryptTool): Promise<ToolVersion
       `could not read the decrypt tool's version from \`${tool.script} --version\`; every decrypt records it`
     );
   }
-  return { name: match[1], version: match[2] };
+  return { name: match[1], version: match[2], environment: await pythonEnvironmentDigest(tool.python) };
 }

@@ -10,6 +10,15 @@
 # `uv lock --project tools/ileapp`, whenever the submodule pin moves;
 # scripts/test_tool_environments.py fails if a requirement is missing here.
 #
+# Two of the submodule's requirements are deliberately not followed (EPOCH-439,
+# licensing audit B1 and B3); scripts/test_tool_environments.py lists both:
+#   - pillow-heif is replaced by pi-heif. Its wheel is GPLv2 because it bundles
+#     the x265 encoder; iLEAPP's HEIC plugins only decode, which pi-heif (LGPLv3,
+#     no x265) does with the same API. pillow-heif-alias/ provides the module
+#     name `pillow_heif`, so the submodule is unmodified.
+#   - pyinstaller is not installed. It builds iLEAPP's desktop executable; no
+#     code the processor runs imports it.
+#
 # The submodule's Windows-only wheel entries for pyliblzfse are omitted (they
 # are relative paths into the submodule). Its duplicate nska_deserialize /
 # nska-deserialize lines are one package on PyPI. Version markers for Python
@@ -40,10 +49,11 @@ dependencies = [
     "pgpy>=0.6.0",
     "standard-imghdr",
     "pillow",
-    "pillow-heif",
+    # pillow-heif is replaced by pi-heif, imported as pillow_heif (below).
+    "pi-heif",
+    "verichron-pillow-heif-alias",
     "protobuf==5.29.6",
     "pycryptodome",
-    "pyinstaller",
     "pyliblzfse",
     "pytz",
     "simplekml",
@@ -53,3 +63,6 @@ dependencies = [
 package = false
 python-preference = "only-managed"
 required-version = ">=0.12.23,<0.13"
+
+[tool.uv.sources]
+verichron-pillow-heif-alias = { path = "pillow-heif-alias" }
