@@ -40,7 +40,7 @@ def report(
         raise ValueError("a note for review is reported at 'warn'")
     if (index is None) != (total is None):
         raise ValueError("index and total go together")
-    if index is not None and not (1 <= index <= total):
+    if index is not None and total is not None and not (1 <= index <= total):
         raise ValueError(f"index {index} is not within 1..{total}")
     if not message:
         raise ValueError("a report says something")

@@ -48,7 +48,7 @@ import re
 from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import psycopg2
 import psycopg2.extras
@@ -59,39 +59,64 @@ TEST_DATABASE_URL_ENV = "TEST_DATABASE_URL"
 
 #: A test database says so in its name: verichron_test, epoch_test, verichron_ci.
 _TEST_NAME = re.compile(r"(?:^|[^a-z0-9])(?:test|ci)(?:[^a-z0-9]|$)")
+_REPO_ENV = Path(__file__).resolve().parents[3] / ".env"
 
 
-def _database_name(dsn: str) -> str:
-    """The database a URL or a libpq keyword string names."""
-    if "://" in dsn:
-        return urlsplit(dsn).path.lstrip("/")
-    match = re.search(r"(?:^|\s)dbname\s*=\s*'?([^'\s]+)", dsn)
-    return match.group(1) if match else ""
+def _database_name(url: str) -> str | None:
+    """The database a postgres URL names, decoded; None when `url` is not a URL."""
+    if "://" not in url:
+        return None
+    return unquote(urlsplit(url).path.lstrip("/"))
+
+
+def dev_database_from_env(text: str) -> str | None:
+    """The database a .env file's text names for the app: DATABASE_URL first, then DB_NAME (R28)."""
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        values[key.strip()] = value
+    if values.get("DATABASE_URL"):
+        return _database_name(values["DATABASE_URL"]) or None
+    return values.get("DB_NAME") or None
 
 
 def _dev_database_name() -> str | None:
-    """The database the repository's .env names for the app, if it names one."""
-    if os.environ.get("DB_NAME"):
-        return os.environ["DB_NAME"]
-    env = Path(__file__).resolve().parents[3] / ".env"
-    if env.is_file():
-        for line in env.read_text().splitlines():
-            key, _, value = line.partition("=")
-            if key.strip() == "DB_NAME":
-                return value.strip().strip("'\"")
+    """The database the repository's .env names for the app, read from .env alone."""
+    return dev_database_from_env(_REPO_ENV.read_text()) if _REPO_ENV.is_file() else None
+
+
+_UNSET = object()
+
+
+def database_refusal(dsn: str, dev: str | None | object = _UNSET) -> tuple[str, str] | None:
+    """Why `dsn` must not be used by tests that TRUNCATE, as (code, message), or None when it may.
+
+    The codes are the ones packages/contracts/test-database-vectors.json lists.
+    `dev` is the development database's name, read from .env when not given.
+    """
+    dev_name = _dev_database_name() if dev is _UNSET else dev
+    name = _database_name(dsn)
+    if name is None:
+        return ("not-url", "it is not a postgres URL")
+    if not name:
+        return ("no-database", "it names no database")
+    if name == dev_name:
+        return ("dev", f'its database "{name}" is the one .env names for the app')
+    if not _TEST_NAME.search(name.lower()):
+        return ("not-test", f'its database "{name}" is not named as a test database (for example verichron_test)')
     return None
 
 
 def unsafe_test_database(dsn: str) -> str | None:
     """Why `dsn` must not be used for tests that TRUNCATE, or None when it may."""
-    name = _database_name(dsn)
-    if not name:
-        return "it names no database"
-    if name == _dev_database_name():
-        return f'its database "{name}" is the one .env names for the app'
-    if not _TEST_NAME.search(name.lower()):
-        return f'its database "{name}" is not named as a test database (for example verichron_test)'
-    return None
+    refusal = database_refusal(dsn)
+    return refusal[1] if refusal else None
 
 
 def safe_test_database_url() -> str | None:

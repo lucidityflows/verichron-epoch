@@ -192,13 +192,13 @@ class ETLRunResult:
 
         for note in self.notes:
             kind = getattr(note, "kind", "info")
-            place = {"index": note.index, "total": note.total} if getattr(note, "index", None) else {}
+            index, total = getattr(note, "index", None), getattr(note, "total", None)
             if kind == "review":
-                report("warn", note, review=True, stream=summary_stream, **place)
+                report("warn", note, review=True, index=index, total=total, stream=summary_stream)
             elif kind == "warning":
-                report("warn", note, stream=summary_stream, **place)
+                report("warn", note, index=index, total=total, stream=summary_stream)
             else:
-                report("info", note, stream=summary_stream, **place)
+                report("info", note, index=index, total=total, stream=summary_stream)
             # Stored as a warning only when it is one, or is for review.
             if kind != "info":
                 print(f"[{tag}]   {note}", file=detail_stream)

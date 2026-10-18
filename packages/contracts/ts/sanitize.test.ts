@@ -161,9 +161,9 @@ describe('secrets', () => {
   it('replaces a password that reached the output, as a whole token, until the task ends (tripwire)', () => {
     const s = sanitizer();
     s.addSecret('correct-horse');
-    const report = s.report('error: wrong key correct-horse; correct-horses');
-    assert.equal(report.text, 'error: wrong key [password]; correct-horses');
-    assert.deepEqual(report.replaced, { password: 1 });
+    const report = s.report('error: wrong key correct-horse; key=correct-horsex');
+    assert.equal(report.text, 'error: wrong key [password]; key=[password]x', 'inside a longer token too');
+    assert.deepEqual(report.replaced, { password: 2 });
     s.clearSecrets();
     assert.equal(s.sanitize('correct-horse'), 'correct-horse');
   });

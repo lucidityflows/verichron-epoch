@@ -59,9 +59,12 @@ export function deviceIdentifierSources(backups: readonly { label: string; path:
       infoPlist = null;
     }
     const folderName = path.basename(backup.path);
-    const identifiers = [folderName, ...IDENTIFIER_KEYS.map((key) => infoPlist?.get(key)?.trim())].filter(
-      (value): value is string => !!value && value.length >= 6
-    );
+    // The folder name is an identifier only when it has a UDID's shape; a dated
+    // or plain folder (often the label itself) is not.
+    const identifiers = [
+      IDENTIFIER_SHAPED.test(folderName) ? folderName : undefined,
+      ...IDENTIFIER_KEYS.map((key) => infoPlist?.get(key)?.trim()),
+    ].filter((value): value is string => !!value && value.length >= 6);
     const label = backup.label.toLowerCase();
     const labelIsIdentifier =
       IDENTIFIER_SHAPED.test(backup.label) || identifiers.some((value) => label.includes(value.toLowerCase()));

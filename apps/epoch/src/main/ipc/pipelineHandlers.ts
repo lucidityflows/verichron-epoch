@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
-import { readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import type { Pool } from 'pg';
 import {
   EvidenceSidecar,
@@ -425,7 +425,17 @@ export function registerPipelineHandlers(
             : `Prepare Evidence finished: ${failedLabels.length} backup${failedLabels.length === 1 ? '' : 's'} need${
                 failedLabels.length === 1 ? 's' : ''
               } attention`,
-          { success: code === 0, exitCode: code, workspace: workspacePath, backups }
+          {
+            success: code === 0,
+            exitCode: code,
+            workspace: workspacePath,
+            backups,
+            failures: (backups ?? []).flatMap((b) =>
+              !b.success && b.failed_step && b.reason
+                ? [{ label: log.sanitize(b.label), step: b.failed_step, reason: b.reason }]
+                : []
+            ),
+          }
         );
       })();
     });
@@ -751,6 +761,8 @@ export function registerPipelineHandlers(
         ? read.entries.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
         : logFileText(read.entries);
       await writeFile(choice.filePath, content, { mode: 0o600 });
+      // The mode applies only to a file writeFile creates; an existing one chosen in the dialog keeps its own.
+      await chmod(choice.filePath, 0o600);
       return { saved: choice.filePath };
     }
   );

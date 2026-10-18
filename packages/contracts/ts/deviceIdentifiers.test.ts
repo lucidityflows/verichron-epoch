@@ -80,6 +80,12 @@ describe('deviceIdentifierSources', () => {
     );
   });
 
+  it('keeps the label as the name when the folder is the label itself, not a UDID', () => {
+    const dir = backup('BK1', PLIST);
+    const [source] = deviceIdentifierSources([{ label: 'BK1', path: dir }]);
+    assert.equal(source.name, 'BK1');
+  });
+
   it('keeps going when Info.plist is missing or binary, and the sanitizer says so', () => {
     const sources = deviceIdentifierSources([
       { label: 'none', path: backup('none', null) },

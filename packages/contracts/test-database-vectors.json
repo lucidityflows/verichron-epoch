@@ -1,0 +1,21 @@
+{
+  "description": "Shared cases for the test database guard (EPOCH-570, R4): testing.pg_real (Python) and ts/testDatabase.ts (TypeScript) must give each the same result. `refused` is null when the URL may be used.",
+  "urls": [
+    { "dsn": "postgresql://u:p@localhost:5432/verichron_test", "dev": "epoch-vault", "refused": null },
+    { "dsn": "postgresql://u:p@localhost:5432/verichron_ci", "dev": null, "refused": null },
+    { "dsn": "postgres://u:p@localhost/epoch-test", "dev": null, "refused": null },
+    { "dsn": "postgresql://u:p@localhost:5432/epoch-vault", "dev": "epoch-vault", "refused": "dev" },
+    { "dsn": "postgresql://u:p@localhost:5432/epoch%5Ftest", "dev": "epoch_test", "refused": "dev" },
+    { "dsn": "postgresql://u:p@localhost:5432/verichron", "dev": null, "refused": "not-test" },
+    { "dsn": "postgresql://u:p@localhost/latest", "dev": null, "refused": "not-test" },
+    { "dsn": "postgresql://u:p@localhost:5432/", "dev": null, "refused": "no-database" },
+    { "dsn": "dbname=test_epoch user=u", "dev": null, "refused": "not-url" }
+  ],
+  "env": [
+    { "text": "DATABASE_URL=postgresql://a:b@h:5432/dev_x\nDB_NAME=other\n", "dev": "dev_x" },
+    { "text": "# the app\nDB_NAME='epoch-vault'\n", "dev": "epoch-vault" },
+    { "text": "DB_NAME=\"quoted\"\n", "dev": "quoted" },
+    { "text": "DATABASE_URL=\nDB_NAME=fallback\n", "dev": "fallback" },
+    { "text": "OTHER=1\n", "dev": null }
+  ]
+}

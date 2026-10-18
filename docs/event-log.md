@@ -105,11 +105,11 @@ Each level has a fixed meaning. A typed event gets its level from `eventLevel()`
 | Level | Means | Examples |
 |---|---|---|
 | `error` | a step or the task failed; the result is missing something it should have | `[decrypt]` failed for a backup; the processor ended by a signal without reporting; an event didn't validate |
-| `warn` | finished, but needs a second look; counted and listed | repair could not recover 1 database; an iLEAPP plugin errored; a backup is partly prepared |
+| `warn` | finished, but needs a second look; counted and listed | an iLEAPP plugin errored; a password was wrong and is asked for again |
 | `info` | a milestone an examiner wants in the bar | task started or finished; a backup started; a step done or skipped as already done; the password requested |
 | `debug` | detail | progress ticks, tool versions, all raw tool and stage output |
 
-**For review** is how the log shows a `warn` that is not a problem with the run but something in the evidence worth an examiner's look: an impossible or future time, a value stored encoded or corrected for a tool defect, an indicator match (owner, 2026-10-18). A stage marks it when it reports it (`review`). A real problem, such as a database repair could not recover, is shown as a Warning.
+**For review** is how the log shows a `warn` that is not a problem with the run but something in the evidence worth an examiner's look: an impossible or future time, a value stored encoded or corrected for a tool defect, an indicator match (owner, 2026-10-18). A stage marks it when it reports it (`review`). A problem with the run is shown as a Warning. A database repair could not recover is more than that: the backup's data may be incomplete, so it is the repair step's `error` and the backup needs attention (owner, 2026-10-18).
 
 **Raw output is `debug` because of where it comes from.** iLEAPP, the decrypt tool, sqlite3 and stage scripts write free text that we don't control.
 - Their failures reach the log as the processor's or orchestrator's own `error`, with the step and the reason.
@@ -143,7 +143,7 @@ Each level has a fixed meaning. A typed event gets its level from `eventLevel()`
 - The database URL's password is already redacted in error messages (decisions.md, EPOCH-423/424).
 - **Tripwire:**
   - While a task runs, the writer holds the passwords the examiner entered for it.
-  - Any entry containing one exactly has it replaced with `[password]`, and an `error` entry says that a secret reached the output.
+  - Any entry containing one has it replaced with `[password]`, anywhere in the text, even inside a longer token, and an `error` entry says that a secret reached the output. A short password can match innocent text and raise a false alarm; that is accepted, since missing one costs more (owner, 2026-10-18).
   - This is never expected. It is a test of the prevention, not the mechanism.
   - The passwords are discarded when the task ends.
 

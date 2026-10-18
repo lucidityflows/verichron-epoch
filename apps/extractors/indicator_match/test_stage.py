@@ -187,6 +187,7 @@ def test_no_match_is_never_written_without_what_was_not_checked(db, tmp_path: Pa
     typed = [n for n in result.notes if n.index is not None]
     assert [(n.index, n.total) for n in typed] == [(1, 3), (2, 3), (3, 3)]
     assert {n.kind for n in result.notes} == {"info"}
+    assert result.summary is not None
     assert result.summary.startswith("no match against ")
 
 

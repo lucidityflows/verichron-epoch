@@ -154,7 +154,13 @@ export function parseWorkspaceManifest(raw: string | unknown, file = WORKSPACE_M
     const detail = parsed.error.issues
       .map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
       .join('; ');
-    throw new WorkspaceManifestError(`${file} is not a valid workspace manifest: ${detail}`);
+    // A manifest from before EPOCH-570 has no task_logs_path. It is refused, not
+    // defaulted (no legacy paths, AGENTS.md §2); the message says what to add.
+    const missingLogs =
+      value !== null && typeof value === 'object' && !('task_logs_path' in value)
+        ? ' Add "task_logs_path": "logs" to it (EPOCH-570).'
+        : '';
+    throw new WorkspaceManifestError(`${file} is not a valid workspace manifest: ${detail}.${missingLogs}`);
   }
   return parsed.data;
 }

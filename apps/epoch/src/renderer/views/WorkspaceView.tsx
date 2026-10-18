@@ -890,9 +890,7 @@ function ImportChoice({ icon, title, description, action, tone, onChoose }: Impo
   );
 }
 
-/** Each backup the processor reported as failed, with its step and reason (EPOCH-570). */
+/** Each backup the processor reported as failed, sanitized by the main process (EPOCH-570). */
 function prepareFailures(result: PipelineFinishedResult): PrepareFailure[] {
-  return (result.backups ?? []).flatMap((b) =>
-    !b.success && b.failed_step && b.reason ? [{ label: b.label, step: b.failed_step, reason: b.reason }] : []
-  );
+  return result.failures ?? [];
 }

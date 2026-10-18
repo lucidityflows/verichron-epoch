@@ -70,11 +70,9 @@ function useRunState<S extends { startedAt: number | null; log: PipelineLogEntry
 
     const unsubState = onState((next) => {
       if (loaded && next.startedAt !== startedAt) {
+        // The task id decides when a log starts again: a state change that
+        // arrives after a new task's first entries must not drop them.
         startedAt = next.startedAt;
-        taskId = null;
-        lastSeq = 0;
-        batch = [];
-        setLog([]);
       }
       setState(withoutLog(next));
     });

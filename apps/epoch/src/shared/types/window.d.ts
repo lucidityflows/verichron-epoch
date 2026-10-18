@@ -107,6 +107,12 @@ export interface PipelineFinishedResult {
     failed_step: PrepareStep | null;
     reason: string | null;
   }>;
+  /**
+   * Each backup that couldn't be prepared, with its step and reason, its label
+   * sanitized as the task log's entries are (EPOCH-570): what the failure
+   * banner and Copy Details show, so neither can carry an identifier.
+   */
+  failures?: Array<{ label: string; step: PrepareStep; reason: string }>;
   analysis?: Array<{
     backupPath: string;
     status: 'succeeded' | 'failed' | 'skipped';

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { chmod, mkdir, open, readdir, readFile, writeFile, type FileHandle } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { chmod, mkdir, open, readdir, readFile, rm, writeFile, type FileHandle } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -115,7 +116,7 @@ export class TaskLog {
     readonly file: string,
     private readonly handle: FileHandle,
     private readonly sanitizer: Sanitizer,
-    private readonly onEntry: (entry: TaskLogEntry) => void,
+    private deliver: (entry: TaskLogEntry) => void,
     private readonly now: () => Date
   ) {}
 
@@ -133,8 +134,7 @@ export class TaskLog {
     // mkdir sets the mode only on a folder it creates; the processor may have
     // made this one first, for iLEAPP's logs. Case material either way (owner, 2026-10-18).
     await chmod(dir, 0o700);
-    // 'wx': a task's log is never written over (the name holds the task id).
-    const handle = await open(path.join(dir, file), 'wx', 0o600);
+    // Built before the file exists: if it throws, nothing is left behind (R14).
     const sanitizer = Sanitizer.create(deviceIdentifierSources(setup.backups), {
       workspace: path.resolve(setup.workspace),
       source: setup.source ? path.resolve(setup.source) : null,
@@ -143,32 +143,49 @@ export class TaskLog {
       home: os.homedir(),
       user: os.userInfo().username,
     });
-    const log = new TaskLog(taskId, file, handle, sanitizer, onEntry, now);
-    log.push(
-      {
-        kind: 'task:started',
-        level: 'info',
-        source: 'app',
-        message: setup.message,
-        task: {
-          kind: setup.kind,
-          app_version: setup.appVersion,
-          labels: setup.labels.map((label) => sanitizer.sanitize(label)),
-          options: sanitizer.sanitizeDeep(setup.options),
+    // 'wx': a task's log is never written over (the name holds the task id).
+    const target = path.join(dir, file);
+    const handle = await open(target, 'wx', 0o600);
+    // The header and the first notes are handed on only once they are saved:
+    // a task whose log fails to open shows no entries of it.
+    const early: TaskLogEntry[] = [];
+    const log = new TaskLog(taskId, file, handle, sanitizer, (entry) => early.push(entry), now);
+    try {
+      log.push(
+        {
+          kind: 'task:started',
+          level: 'info',
+          source: 'app',
+          message: setup.message,
+          task: {
+            kind: setup.kind,
+            app_version: setup.appVersion,
+            labels: setup.labels.map((label) => sanitizer.sanitize(label)),
+            options: sanitizer.sanitizeDeep(setup.options),
+          },
         },
-      },
-      started
-    );
-    for (const notice of sanitizer.notices) {
-      log.app('warn', `${notice.label ? `${notice.label}: ` : ''}${notice.reason} (${notice.class})`);
-    }
-    for (const note of setup.notes ?? []) log.app(note.level, note.message);
-    await log.queue;
-    if (log.writeError) {
+        started
+      );
+      for (const notice of sanitizer.notices) {
+        log.app('warn', `${notice.label ? `${notice.label}: ` : ''}${notice.reason} (${notice.class})`);
+      }
+      for (const note of setup.notes ?? []) log.app(note.level, note.message);
+      await log.queue;
+      if (log.writeError) throw new Error(`the task log could not be written: ${log.writeError}`);
+    } catch (err) {
+      // A failed open leaves no trace: no handle, no empty file in the logs folder (R14).
       await handle.close().catch(() => undefined);
-      throw new Error(`the task log could not be written: ${log.writeError}`);
+      await rm(target, { force: true });
+      throw err;
     }
+    log.deliver = onEntry;
+    early.forEach(onEntry);
     return log;
+  }
+
+  /** Text sanitized as this task's entries are, for what the app shows beside its log (a failed backup's label). */
+  sanitize(text: string): string {
+    return this.sanitizer.sanitize(text);
   }
 
   /** A password the examiner entered for this task: the tripwire (§6.2). */
@@ -282,7 +299,7 @@ export class TaskLog {
     } as TaskLogEntry;
     // Validated before it is kept: a malformed entry is the writer's bug.
     const line = renderTaskLogEntry(entry);
-    this.onEntry(entry);
+    this.deliver(entry);
     const sync = entry.level === 'error' || entry.kind === 'task:finished';
     this.queue = this.queue.then(async () => {
       if (this.writeError) return;
@@ -327,6 +344,8 @@ export async function readSavedTaskLog(workspace: string, file: string): Promise
 
 /** The workspace's saved logs, newest first, each from its header and its result. */
 export async function listTaskLogs(workspace: string): Promise<TaskLogSummary[]> {
+  // A workspace never used has no manifest yet, so no logs: the reader would refuse the missing file.
+  if (!existsSync(path.join(path.resolve(workspace), WORKSPACE_MANIFEST_NAME))) return [];
   let files: string[];
   try {
     files = (await readdir(resolveTaskLogsPath(workspace, readWorkspaceManifestSync(workspace)))).filter((f) =>

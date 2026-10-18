@@ -521,7 +521,7 @@ and how it is sanitized, is `docs/event-log.md`; this is how it looks.
   search, "Times in UTC, <date>", Copy (the visible lines as text), Save As…
   (the whole saved log, as text under a header or as NDJSON), Pop Out (its own
   window, for a second monitor) and Following Latest, which becomes Jump to
-  Latest when you scroll up. The lines are 220px high, virtualized, in
+  Latest when you scroll up. The drawer's list is 220px high; its lines are virtualized, in
   monospace: the time muted, the tag in its role colour at weight 500, the
   label muted, the message. Text is built with real spaces, so a copied line
   reads as it shows. With nothing to show: "Nothing at this level."

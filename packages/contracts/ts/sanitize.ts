@@ -232,8 +232,10 @@ export class Sanitizer {
       });
 
     let out = text;
+    // A password is matched anywhere, even inside a longer token: missing one
+    // costs more than the occasional false alarm (owner, 2026-10-18).
     for (const secret of this.secrets) {
-      out = apply(out, { cls: 'password', pattern: wholeToken(secret, 'g'), marker: '[password]', length: 0 });
+      out = apply(out, { cls: 'password', pattern: new RegExp(escape(secret), 'g'), marker: '[password]', length: 0 });
     }
     for (const rule of this.roots) out = apply(out, rule);
     for (const rule of this.identifiers) out = apply(out, rule);

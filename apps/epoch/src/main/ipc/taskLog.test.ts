@@ -9,6 +9,7 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -183,6 +184,33 @@ describe('TaskLog', () => {
     const { log } = await openLog();
     await log.finish(result, 'done');
     assert.equal(statSync(path.join(workspace, 'logs')).mode & 0o777, 0o700);
+  });
+
+  it('leaves no file and shows no entry when its log fails to open (R14)', async () => {
+    const seen: TaskLogEntry[] = [];
+    // An empty label fails the header's validation, after the file is created.
+    await assert.rejects(
+      TaskLog.open(
+        {
+          workspace,
+          kind: 'prepare',
+          labels: [''],
+          options: {},
+          backups: [],
+          source,
+          appRoot: path.join(tmp, 'app'),
+          appVersion: '0.1.0',
+          message: 'Prepare Evidence started for 1 backup',
+        },
+        (entry) => seen.push(entry)
+      )
+    );
+    assert.deepEqual(seen, [], 'no entry of a log that does not exist');
+    assert.deepEqual(readdirSync(path.join(workspace, 'logs')), [], 'no file left behind');
+  });
+
+  it('lists no logs for a workspace never used', async () => {
+    assert.deepEqual(await listTaskLogs(path.join(tmp, 'never-used')), []);
   });
 
   it('does not start when its log cannot be created: no log, no task', async () => {
