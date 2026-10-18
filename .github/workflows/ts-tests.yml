@@ -66,6 +66,13 @@ jobs:
       - name: Typecheck processor tests
         run: pnpm --filter @verichron/processor typecheck:tests
 
+      # The orchestrator CLI validates the workspace's Python environment
+      # before it runs anything (EPOCH-456), and the processor reads a real
+      # interpreter's environment (EPOCH-439); uv builds it at the version
+      # .python-version pins.
+      - name: Install Python environment
+        run: uv sync --locked
+
       - name: Test
         run: pnpm --filter @verichron/processor test
 
@@ -83,12 +90,6 @@ jobs:
 
       - name: Typecheck orchestrator tests
         run: pnpm --filter @verichron/orchestrator typecheck:tests
-
-      # The orchestrator CLI validates the workspace's Python environment
-      # before it runs anything (EPOCH-456); uv builds it at the version
-      # .python-version pins.
-      - name: Install Python environment
-        run: uv sync --locked
 
       # EPOCH-404: pre-flight registration, evidence-keyed resume and the
       # completeness predicate, against a throwaway database on this server.

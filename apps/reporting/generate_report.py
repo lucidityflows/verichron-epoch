@@ -215,10 +215,13 @@ def describe_derivative(d: dict) -> list[str]:
     """One line of what produced a derivative, plus any repair failures."""
     tool = d["tool"]
     params = d["params"]
-    produced = f"produced by {tool['name']} {tool['version']}"
+    # The tools that run in their own Python environment (the decrypt, iLEAPP)
+    # also record that environment's digest (EPOCH-439); the others don't.
+    environment = f" in environment `{tool['environment'][:12]}`" if tool.get("environment") else ""
+    produced = f"produced by {tool['name']} {tool['version']}{environment}"
     if d["kind"] == "ileapp_output":
         return [
-            f"- **iLEAPP output** (`{d['path']}`): produced by iLEAPP {tool['version'][:12]}, "
+            f"- **iLEAPP output** (`{d['path']}`): produced by iLEAPP {tool['version'][:12]}{environment}, "
             f"read as `{params['input_type']}`"
         ]
     if d["kind"] == "crash_reports":

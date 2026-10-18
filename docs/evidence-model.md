@@ -82,12 +82,18 @@ A derivative's identity is **(evidence, kind, parent, provenance)**:
   - iLEAPP's output records the iLEAPP commit (the submodule's, because
     iLEAPP's self-reported version does not match its release tag) and how
     iLEAPP read the decrypt (`itunes` or `fs`);
+  - the decrypt and iLEAPP each run in their own Python environment, so their
+    `tool` also records that environment's `environment` digest: sha256 of its
+    Python version and every installed distribution with its version, as its
+    own interpreter lists them (EPOCH-439);
 - `provenance_key` is the sha256 of that provenance in canonical form, with
   each preserved original counted as the database it came from: when a copy
   was set aside shaped nothing, so a repeated decrypt with the same repair
   outcome is the same derivative (EPOCH-517);
-- a different tool version, repair outcome or iLEAPP commit is
-  therefore a **new derivative**. A derivative's identity is never rewritten.
+- a different tool version, tool environment, repair outcome or iLEAPP commit
+  is therefore a **new derivative**. iLEAPP output from another commit or
+  environment is made again; a finished decrypt is kept when only its tool
+  changed, and records the tool and environment that made it. A derivative's identity is never rewritten.
   Its path, its last-known location, is updated, and a repeated pass refreshes
   the preserved originals' names to the files that exist now.
 

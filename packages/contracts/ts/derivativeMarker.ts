@@ -49,6 +49,17 @@ export const ToolVersion = z
   .object({
     name: z.string().min(1),
     version: z.string().min(1),
+    /**
+     * For a tool that runs in its own Python environment (the decrypt,
+     * iLEAPP): sha256 of that environment's Python version and installed
+     * distributions, as its interpreter reports them (EPOCH-439). Part of the
+     * identity, so output from a different environment is a different
+     * derivative.
+     */
+    environment: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
   })
   .strict();
 export type ToolVersion = z.infer<typeof ToolVersion>;

@@ -1,0 +1,21 @@
+# The module name `pillow_heif`, provided by pi-heif (EPOCH-439, licensing
+# audit B1).
+#
+# iLEAPP's HEIC plugins import `pillow_heif`, whose wheel is GPLv2 as a whole
+# because it bundles the x265 encoder. They only decode, which pi-heif, the same
+# project's decode-only build (LGPLv3 wheel, no x265), does with the same API.
+# This package lets them import it under the old name, so the iLEAPP submodule
+# itself stays unmodified.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "verichron-pillow-heif-alias"
+version = "1"
+description = "pillow_heif, re-exporting pi_heif, for iLEAPP's decode-only HEIC plugins"
+requires-python = "==3.14.*"
+dependencies = ["pi-heif"]
+
+[tool.setuptools]
+packages = ["pillow_heif"]
