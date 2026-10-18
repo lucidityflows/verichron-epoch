@@ -17,6 +17,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import * as os from 'node:os';
@@ -263,6 +264,8 @@ describe('decrypt provenance', () => {
     assert.ok(decrypt, 'decrypt marker written');
     assert.equal(readIleappMarker(ileapp())?.content_root, decrypt.content_root);
     assert.ok(existsSync(path.join(decrypted(), 'from-v1.txt')));
+    // iLEAPP's logs share logs/ with the task logs: private to the examiner (EPOCH-570).
+    assert.equal(statSync(path.join(workspace, 'logs')).mode & 0o777, 0o700);
   });
 
   it('reuses a decrypt made from the unchanged backup', async () => {

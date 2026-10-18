@@ -203,7 +203,7 @@ line, still analyzes every prepared backup in the workspace.
 
 ```
 <workspace>/
-  workspace.json                           explicit paths for every backup and processor summary
+  workspace.json                           explicit paths for every backup, the processor summary and the task logs
   <manifest-declared paths>                evidence, derivatives, reports, run summaries and logs
 ```
 

@@ -5,10 +5,10 @@ import path from 'node:path';
 
 import {
   Sanitizer,
-  TASK_LOG_DIRECTORY,
   deviceIdentifierSources,
   readTaskLog,
   readWorkspaceManifestSync,
+  resolveTaskLogsPath,
   resolveWorkspaceBackup,
   type SanitizedClass,
 } from '@verichron/contracts';
@@ -62,7 +62,7 @@ export async function checkTaskLogs(
     user: os.userInfo().username,
   });
 
-  const dir = path.join(workspace, TASK_LOG_DIRECTORY);
+  const dir = resolveTaskLogsPath(workspace, manifest);
   const files = existsSync(dir) ? (await readdir(dir)).filter((f) => f.endsWith('.ndjson')).sort() : [];
   const report: SanitizerCheckReport = {
     logs: files.length,

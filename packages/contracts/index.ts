@@ -28,6 +28,7 @@ export {
   readWorkspaceManifestSync,
   resolveProcessorSummaryPaths,
   resolveRunSummaryPath,
+  resolveTaskLogsPath,
   resolveWorkspaceBackup,
   resolveWorkspacePath,
   workspaceEvidenceManifestPath,
@@ -88,7 +89,6 @@ export {
 } from './ts/pipelineEvent.js';
 export {
   LogSource,
-  TASK_LOG_DIRECTORY,
   TaskKind,
   TaskLogEntry,
   TaskOutcome,

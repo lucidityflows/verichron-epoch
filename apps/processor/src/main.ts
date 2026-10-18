@@ -627,10 +627,14 @@ async function updateWorkspaceManifest(cfg: Config, backups: Backup[]): Promise<
       path.dirname(resolved.decryptedPath),
       path.dirname(resolved.ileappOutputPath),
       path.dirname(resolved.crashReportsPath),
-      path.dirname(resolved.ileappLogPath),
     ]) {
       await fsp.mkdir(directory, { recursive: true });
     }
+    // iLEAPP's logs share the folder with the task logs: private to the
+    // examiner, like them (EPOCH-570, owner 2026-10-18).
+    const logs = path.dirname(resolved.ileappLogPath);
+    await fsp.mkdir(logs, { recursive: true, mode: 0o700 });
+    await fsp.chmod(logs, 0o700);
   }
   return updated;
 }

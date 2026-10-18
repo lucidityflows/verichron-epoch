@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, open, readdir, readFile, type FileHandle } from 'node:fs/promises';
+import { chmod, mkdir, open, readdir, readFile, writeFile, type FileHandle } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
 import {
   Sanitizer,
-  TASK_LOG_DIRECTORY,
   deviceIdentifierSources,
   eventLevel,
   eventMessage,
@@ -20,6 +19,10 @@ import {
   type TaskKind,
   type TaskLogEntry,
   type TaskOutcome,
+  WORKSPACE_MANIFEST_NAME,
+  emptyWorkspaceManifest,
+  readWorkspaceManifestSync,
+  resolveTaskLogsPath,
 } from '@verichron/contracts';
 
 import type { TaskLogSummary } from '../../shared/types/window';
@@ -108,7 +111,7 @@ export class TaskLog {
 
   private constructor(
     readonly taskId: string,
-    /** The file's name inside `<workspace>/logs/`. */
+    /** The file's name inside the workspace's task logs folder (its manifest's `task_logs_path`). */
     readonly file: string,
     private readonly handle: FileHandle,
     private readonly sanitizer: Sanitizer,
@@ -124,9 +127,12 @@ export class TaskLog {
     const now = setup.now ?? (() => new Date());
     const started = now();
     const taskId = randomUUID();
-    const dir = path.join(setup.workspace, TASK_LOG_DIRECTORY);
+    const dir = await taskLogsFolder(setup.workspace);
     const file = taskLogFileName(setup.kind, started, taskId);
     await mkdir(dir, { recursive: true, mode: 0o700 });
+    // mkdir sets the mode only on a folder it creates; the processor may have
+    // made this one first, for iLEAPP's logs. Case material either way (owner, 2026-10-18).
+    await chmod(dir, 0o700);
     // 'wx': a task's log is never written over (the name holds the task id).
     const handle = await open(path.join(dir, file), 'wx', 0o600);
     const sanitizer = Sanitizer.create(deviceIdentifierSources(setup.backups), {
@@ -292,19 +298,40 @@ export class TaskLog {
   }
 }
 
+/**
+ * The workspace's task logs folder, as its manifest declares it (EPOCH-570).
+ * A workspace used for the first time has no manifest yet, so one is created
+ * with the standard layout, only if there is none: the processor then adds
+ * its backups to it, and no path is ever built outside the manifest.
+ */
+async function taskLogsFolder(workspace: string): Promise<string> {
+  const file = path.join(path.resolve(workspace), WORKSPACE_MANIFEST_NAME);
+  await mkdir(path.dirname(file), { recursive: true });
+  try {
+    await writeFile(file, JSON.stringify(emptyWorkspaceManifest(), null, 2) + '\n', { flag: 'wx' });
+  } catch (err) {
+    if (!(err && typeof err === 'object' && 'code' in err && err.code === 'EEXIST')) throw err;
+  }
+  return resolveTaskLogsPath(workspace, readWorkspaceManifestSync(workspace));
+}
+
 const LOG_FILE = /^(prepare|analyze|pull)-\d{4}-\d{2}-\d{2}T\d{6}Z-[0-9a-f]{8}\.ndjson$/;
 
 /** One saved log, read and validated (§7). Only a log file's own name is accepted, never a path. */
 export async function readSavedTaskLog(workspace: string, file: string): Promise<ReadTaskLog> {
   if (!LOG_FILE.test(file)) throw new Error(`not a task log's name: ${file}`);
-  return readTaskLog(await readFile(path.join(workspace, TASK_LOG_DIRECTORY, file), 'utf8'));
+  return readTaskLog(
+    await readFile(path.join(resolveTaskLogsPath(workspace, readWorkspaceManifestSync(workspace)), file), 'utf8')
+  );
 }
 
 /** The workspace's saved logs, newest first, each from its header and its result. */
 export async function listTaskLogs(workspace: string): Promise<TaskLogSummary[]> {
   let files: string[];
   try {
-    files = (await readdir(path.join(workspace, TASK_LOG_DIRECTORY))).filter((f) => LOG_FILE.test(f));
+    files = (await readdir(resolveTaskLogsPath(workspace, readWorkspaceManifestSync(workspace)))).filter((f) =>
+      LOG_FILE.test(f)
+    );
   } catch (err) {
     if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') return [];
     throw err;

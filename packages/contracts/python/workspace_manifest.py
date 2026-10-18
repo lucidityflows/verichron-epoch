@@ -90,6 +90,13 @@ class WorkspaceManifest(BaseModel):
     schema_version: Literal[1]
     backups: list[WorkspaceManifestBackup]
     summary_files: WorkspaceManifestSummaryFiles
+    # The folder each task's log is saved in (EPOCH-570).
+    task_logs_path: str
+
+    @field_validator("task_logs_path")
+    @classmethod
+    def validate_task_logs_path(cls, value: str) -> str:
+        return _relative_workspace_path(value)
 
     @model_validator(mode="after")
     def labels_are_unique(self) -> WorkspaceManifest:

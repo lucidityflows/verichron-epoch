@@ -49,7 +49,9 @@ One saved record of what each task did, read in several places:
   - `prepare` (the processor) and `analyze` (the orchestrator) are wired in U2.
   - `pull` (iPhone backup) has the same contract and adopts it in U3.
 - **Task id:** a UUID the app creates when the task starts.
-- **File:** `<workspace>/logs/<kind>-<start, compact UTC>-<task id, first 8>.ndjson`, for example `logs/prepare-2026-10-18T153002Z-1f3a9c2e.ndjson`.
+- **File:** `<kind>-<start, compact UTC>-<task id, first 8>.ndjson`, for example `prepare-2026-10-18T153002Z-1f3a9c2e.ndjson`, in the folder the workspace's manifest declares as `task_logs_path` (`logs` in a new workspace). Like every workspace path, it is never built from a name in code (the manifest contract).
+  - The folder is `0700`: it also holds iLEAPP's logs, and both are case material (owner, 2026-10-18). The writer sets the mode each time it opens a log, because `mkdir` sets it only on a folder it creates.
+  - A workspace used for the first time gets its `workspace.json` from the app, with the standard layout and only if there is none, before the first log is opened.
   - The compact UTC form matches the folder labels ([DESIGN.md](../apps/epoch/DESIGN.md) §11).
 - **Permissions:** `0600`, like `summary.json`. The log is case material (§6.1).
 - **Retention:** the log is kept with the workspace, and the app never deletes it.

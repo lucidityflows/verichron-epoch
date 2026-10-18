@@ -4,7 +4,16 @@
  * reader can trust after a restart. Synthetic identifiers in real formats.
  */
 import assert from 'node:assert/strict';
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { renderPipelineEvent, type TaskLogEntry } from '@verichron/contracts';
@@ -166,6 +175,14 @@ describe('TaskLog', () => {
       log_write_error: null,
     });
     assert.throws(() => log.app('info', 'late'), /already finished/);
+  });
+
+  it('makes an existing logs folder private too, as the processor may have created it first', async () => {
+    mkdirSync(path.join(workspace, 'logs'), { recursive: true, mode: 0o775 });
+    chmodSync(path.join(workspace, 'logs'), 0o775);
+    const { log } = await openLog();
+    await log.finish(result, 'done');
+    assert.equal(statSync(path.join(workspace, 'logs')).mode & 0o777, 0o700);
   });
 
   it('does not start when its log cannot be created: no log, no task', async () => {

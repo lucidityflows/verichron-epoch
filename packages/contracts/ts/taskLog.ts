@@ -5,12 +5,10 @@ import { LogLevel, PipelineEvent, eventLevel } from './pipelineEvent.js';
 /**
  * One entry of a task's saved log (EPOCH-570, docs/event-log.md §4): what
  * Prepare, Analyze or a pull did, written by the app's main process as one
- * JSON line per entry to `<workspace>/logs/`. Every text field is sanitized
+ * JSON line per entry to the folder the workspace's manifest declares (`task_logs_path`). Every text field is sanitized
  * before the entry exists (§6); this schema is also what every reader
  * validates against, so a view can't show what the writer could not store.
  */
-
-export const TASK_LOG_DIRECTORY = 'logs';
 
 export const TaskKind = z.enum(['prepare', 'analyze', 'pull']);
 export type TaskKind = z.infer<typeof TaskKind>;
