@@ -110,7 +110,9 @@ Analyze and Prepare Evidence, from the source.
 **Two database identities (EPOCH-562).**
 - `DB_USER` and `DB_PASSWORD` are the administrative identity: the superuser Docker's Postgres is created with. Only `migrate.py` and `provision_roles.py` use it, through `mise run db`. `ADMIN_DATABASE_URL` overrides it.
 - The app, the orchestrator, the stages, the indicator registry and `db_peek.py` connect as the runtime login, `DB_APP_USER` / `DB_APP_PASSWORD` with `DB_NAME` (and optional `DB_HOST`, `DB_PORT`); `DATABASE_URL` overrides it. `mise run db` creates that login, or resets its password, as a member of `verichron_epoch_runtime` only. Run it again after recreating the database.
-- The runtime never falls back to the administrative identity. If its configuration is missing, the app, orchestrator and database inspection tool fail before connecting; there is no built-in development credential. The report is written by the `reporting` stage to the file declared
+- The runtime never falls back to the administrative identity. If its configuration is missing, the app, orchestrator and database inspection tool fail before connecting; there is no built-in development credential.
+
+The report is written by the `reporting` stage to the file declared
 in the selected workspace entry in `workspace.json`.
 A database created before EPOCH-489 that still holds mvt results is refused by
 migration 0009; recreate it with the command above.

@@ -24,6 +24,7 @@ import pytest
 from db_writer import IngestContext, ingest, record_failures
 from etl_run import ItemFailure
 from normalized_record import NormalizedRecord, SourceType
+from psycopg2 import sql
 from testing.pg_real import TEST_DATABASE_URL_ENV, PgReal, open_db
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -82,13 +83,25 @@ def runtime_dsn():
         yield urlunsplit(parts._replace(netloc=netloc))
     finally:
         admin.rollback()
-        with admin.cursor() as cur:
-            cur.execute("SELECT current_database()")
-            database = fetched(cur)[0]
-            cur.execute(f'REVOKE CONNECT ON DATABASE "{database}" FROM "{LOGIN}"')
-            cur.execute(f'DROP ROLE IF EXISTS "{LOGIN}"')
-        admin.commit()
+        drop_login(admin, LOGIN)
         admin.close()
+
+
+def drop_login(admin, login: str) -> None:
+    """Drops a test login, if it was created: a provisioning that failed first
+    leaves none, and its own error is the one to report."""
+    with admin.cursor() as cur:
+        cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (login,))
+        if cur.fetchone() is None:
+            return
+        cur.execute("SELECT current_database()")
+        database = fetched(cur)[0]
+        cur.execute(
+            sql.SQL("REVOKE CONNECT ON DATABASE {} FROM {}").format(sql.Identifier(database), sql.Identifier(login))
+        )
+        cur.execute(sql.SQL("DROP OWNED BY {}").format(sql.Identifier(login)))
+        cur.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(login)))
+    admin.commit()
 
 
 @pytest.fixture
@@ -372,3 +385,76 @@ def test_provisioning_is_rerunnable_and_refuses_the_administrative_identity(runt
     finally:
         admin.close()
     psycopg2.connect(runtime_dsn).close()
+
+
+@pytest.mark.parametrize("name", [SCHEMA_OWNER, PURGE_OWNER, RUNTIME, "pg_monitor", "verichron_epoch_new"])
+def test_provisioning_refuses_the_projects_and_postgresqls_own_role_names(db: PgReal, name):
+    """Making an owner role login-capable would undo the boundary."""
+    admin = psycopg2.connect(admin_dsn())
+    try:
+        with pytest.raises(provision_roles.ProvisionError, match="reserved"):
+            provision_roles.provision(admin, name, "x")
+        admin.rollback()
+        assert one(admin, "SELECT rolcanlogin FROM pg_roles WHERE rolname = %s", (SCHEMA_OWNER,)) == (False,)
+    finally:
+        admin.close()
+
+
+def test_provisioning_an_existing_role_leaves_it_only_the_runtime_role(db: PgReal):
+    """An existing role's other memberships are revoked, including one granted
+    by another role, so the login holds the runtime role and nothing else."""
+    login, helper, grantor = (
+        f"epoch_existing_{os.getpid()}",
+        f"epoch_helper_{os.getpid()}",
+        f"epoch_grantor_{os.getpid()}",
+    )
+    admin = psycopg2.connect(admin_dsn())
+    try:
+        with admin.cursor() as cur:
+            for name in (login, helper, grantor):
+                cur.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier(name)))
+            cur.execute(sql.SQL("GRANT pg_write_all_data, pg_read_all_data TO {}").format(sql.Identifier(login)))
+            cur.execute(
+                sql.SQL("GRANT {} TO {} WITH ADMIN OPTION").format(sql.Identifier(helper), sql.Identifier(grantor))
+            )
+            cur.execute(
+                sql.SQL("GRANT {} TO {} GRANTED BY {}").format(
+                    sql.Identifier(helper), sql.Identifier(login), sql.Identifier(grantor)
+                )
+            )
+        admin.commit()
+
+        assert provision_roles.provision(admin, login, "p") == "updated"
+        assert provision_roles.other_memberships(admin.cursor(), login) == []
+        with admin.cursor() as cur:
+            cur.execute(
+                "SELECT r.rolname FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid "
+                "JOIN pg_roles u ON u.oid = m.member WHERE u.rolname = %s",
+                (login,),
+            )
+            assert [row[0] for row in cur.fetchall()] == [RUNTIME]
+    finally:
+        admin.rollback()
+        drop_login(admin, login)
+        with admin.cursor() as cur:
+            for name in (helper, grantor):
+                cur.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(name)))
+        admin.commit()
+        admin.close()
+
+
+def test_provisioning_refuses_a_role_that_owns_anything(db: PgReal):
+    login = f"epoch_owner_{os.getpid()}"
+    admin = psycopg2.connect(admin_dsn())
+    try:
+        with admin.cursor() as cur:
+            cur.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier(login)))
+            cur.execute(sql.SQL("CREATE TABLE public.epoch_owned_by_test (a int)"))
+            cur.execute(sql.SQL("ALTER TABLE public.epoch_owned_by_test OWNER TO {}").format(sql.Identifier(login)))
+        admin.commit()
+        with pytest.raises(provision_roles.ProvisionError, match="owns database objects"):
+            provision_roles.provision(admin, login, "p")
+    finally:
+        admin.rollback()
+        drop_login(admin, login)
+        admin.close()
