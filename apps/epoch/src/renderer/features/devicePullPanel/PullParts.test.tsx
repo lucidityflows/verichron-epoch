@@ -42,7 +42,7 @@ const stats = {
 describe('the iPhone pull panel (EPOCH-554, board "iPhone Pull Flow")', () => {
   it('names a device by its model and iOS version, with a quiet Select', () => {
     render(<DeviceOption device={IPHONE} selected={false} disabled={false} onChoose={() => undefined} />);
-    assert.ok(screen.getByText('iPhone17,5 · iOS 26.6.1'));
+    assert.ok(screen.getByText('iPhone 17,5 · iOS 26.6.1'));
     assert.ok(screen.getByText("Connected by cable · Alex's iPhone"));
     assert.equal(screen.getByText('Select').className.includes('bg-accent'), false);
     assert.equal(screen.queryByText(IPHONE.id), null);
@@ -62,7 +62,7 @@ describe('the iPhone pull panel (EPOCH-554, board "iPhone Pull Flow")', () => {
         }}
       />
     );
-    assert.ok(screen.getByRole('heading', { name: 'Pulling iPhone17,5 · iOS 26.6.1' }));
+    assert.ok(screen.getByRole('heading', { name: 'Pulling iPhone 17,5 · iOS 26.6.1' }));
     assert.ok(screen.getByText('Copy files · 31.2 GB of about 58.4 GB'));
     assert.equal(screen.getByRole('progressbar').getAttribute('aria-valuenow'), '53');
     const steps = screen.getByRole('list', { name: 'What the pull is doing' });

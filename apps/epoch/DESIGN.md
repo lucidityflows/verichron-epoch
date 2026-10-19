@@ -207,7 +207,7 @@ content edge or the title (EPOCH-464).
 - **Every view has a description** (owner, 2026-10-19): one sentence under the
   title saying what the view is for, in `text-data`, so the five headers read
   alike. A view showing one analysis adds a `context` line beneath, in
-  `text-label`: the investigation and analysis it shows ("iPhone17,5 · iOS
+  `text-label`: the investigation and analysis it shows ("iPhone 17,5 · iOS
   26.6.1 · Investigation … · Analysis …"). A fixed approved sentence with its
   own source (Indicator Matches' limit sentence) stays in the view's body,
   not copied into the header.
@@ -262,8 +262,11 @@ Decided 2026-10-09 (EPOCH-464), following the common desktop convention
   Again adds an analysis to the same investigation, and analyses are listed
   newest first. "Run" is a pipeline term and doesn't appear in the UI.
 - **An investigation is named by its device model, iOS version and backup
-  date** ("iPhone17,5 · iOS 26.6.1", with the date beside it), as the backup's
-  Info.plist records them. A short ID (its first eight characters) is a small
+  date** ("iPhone 17,5 · iOS 26.6.1", with the date beside it), as the backup's
+  Info.plist records them. A model is shown with a space between the family
+  and its number ("iPhone 17,5" for the recorded "iPhone17,5"; owner's review,
+  2026-10-19, `shared/deviceModel.ts`); what is stored, copied for diagnosis
+  or logged keeps the recorded form. A short ID (its first eight characters) is a small
   detail beside the name. The device identifier never appears, and the
   Info.plist Device Name, often a person's name, is a detail in the
   investigation's card only.
@@ -506,9 +509,10 @@ forgot what was prepared. "We must guide clearly, or we look untrustworthy."
   - **Sources are equal.** Pulling from an iPhone and using an existing
     backup are two equal secondary buttons, never two primary cards. With
     no evidence chosen they sit in the page's one card ("Where Is the
-    Evidence?"); with a folder chosen they move below the list as one quiet
-    line, "Evidence somewhere else?", with no card and no heading. No tip
-    bar repeats them.
+    Evidence?"); with a folder chosen they move below the list into a small
+    raised panel headed "Evidence somewhere else?", one line and the two
+    buttons, never loose text on the page. The buttons' icons are in the
+    accent (owner's review, 2026-10-19). No tip bar repeats them.
   - **A card's header row holds only its title and where it is** ("Backups
     Found (2)" and "In ~/… · Change Folder", on one baseline). Controls
     never share the title's row (owner's review, 2026-10-19); the list's one
@@ -526,7 +530,11 @@ forgot what was prepared. "We must guide clearly, or we look untrustworthy."
     A stop the examiner asked for reads in the flag role, never as a failure.
   - **Prepared** states what Prepare did, from the workspace's records: the
     backup files checked, the damaged databases repaired, iLEAPP's modules,
-    and that the original backup was not changed.
+    and that the original backup was not changed. Each backup's header reads
+    as its row does (the name, the green "Prepared ·" chip on the right, when
+    it was backed up beneath), each fact carries an accent icon chip, and the
+    card is headed with a success icon chip as Analyze is with its own (owner's
+    review, 2026-10-19).
   - **One primary button per state:** Prepare Evidence while the selection
     needs preparing, then Analyze and Create Investigation.
 - **The iPhone pull follows the board "iPhone Pull Flow"** (EPOCH-554, U3b):

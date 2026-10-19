@@ -107,7 +107,7 @@ describe('App (EPOCH-575)', () => {
     );
     // The app opens on Investigations.
     await act(async () => fireEvent.click(screen.getByRole('button', { name: /New Investigation/ })));
-    await screen.findByRole('heading', { name: /Pulling iPhone17,5/ });
+    await screen.findByRole('heading', { name: /Pulling iPhone 17,5/ });
     expect(screen.getByRole('region', { name: 'Activity Log' })).toBeTruthy();
     // The examiner opens the drawer and picks the Full log.
     await act(async () => fireEvent.click(screen.getByRole('button', { name: /^Activity Log/ })));
@@ -117,7 +117,7 @@ describe('App (EPOCH-575)', () => {
     expect(screen.queryByRole('region', { name: 'Activity Log' })).toBeNull();
 
     await act(async () => fireEvent.click(screen.getByRole('button', { name: /New Investigation/ })));
-    await screen.findByRole('heading', { name: /Pulling iPhone17,5/ });
+    await screen.findByRole('heading', { name: /Pulling iPhone 17,5/ });
     await waitFor(() => expect(screen.getByRole('region', { name: 'Activity Log' })).toBeTruthy());
     expect(screen.getByRole('region', { name: 'Activity Log' }).textContent).toContain('Checking the backup settings');
     // The drawer comes back as it was left: open, on the Full log.

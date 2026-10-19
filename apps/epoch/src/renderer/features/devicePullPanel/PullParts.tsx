@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Check, CheckCircle2, Smartphone, X, XCircle } from 'lucide-react';
 import type { BackupStats, CrashReportsResult, DeviceInfo, PullStepTimes } from '../../../shared/types/tools';
 import { pullStepRows, type PullStepRow } from '../../../shared/pullSteps';
+import { shownModel } from '../../../shared/deviceModel';
 import { pipelineApi } from '../../api/pipeline';
 import { Button } from '../../components/ui/Button';
 import { DateTime } from '../../components/ui/DateTime';
@@ -15,9 +16,9 @@ import { formatBytes } from './BackupProgressCard';
  * pull's task log, which the Activity Log shows (EPOCH-436).
  */
 
-/** A device by its model and iOS version, never its identifier: "iPhone17,5 · iOS 26.6.1". */
+/** A device by its model and iOS version, never its identifier: "iPhone 17,5 · iOS 26.6.1". */
 export function deviceTitle(device: DeviceInfo): string {
-  return `${device.model ?? device.name}${device.osVersion ? ` · iOS ${device.osVersion}` : ''}`;
+  return `${device.model ? shownModel(device.model) : device.name}${device.osVersion ? ` · iOS ${device.osVersion}` : ''}`;
 }
 
 /** Ticks once a second while `active`, so elapsed times stay current. */

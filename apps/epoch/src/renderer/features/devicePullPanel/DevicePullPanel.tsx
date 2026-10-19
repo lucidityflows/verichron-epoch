@@ -32,7 +32,8 @@ import type { DeviceInfo } from '../../../shared/types/tools';
 function pullDiagnostics(error: string, device: DeviceInfo | null, log: string[]): string {
   const text = [
     `Epoch iPhone pull failed`,
-    `Device: ${device ? deviceTitle(device) : 'none selected'}`,
+    // The recorded model ("iPhone17,5"), not the shown one, so it matches the tool's output.
+    `Device: ${device ? `${device.model ?? device.name}${device.osVersion ? `, iOS ${device.osVersion}` : ''}` : 'none selected'}`,
     `Error: ${error}`,
     '',
     'Log:',

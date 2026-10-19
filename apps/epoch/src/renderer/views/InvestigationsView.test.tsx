@@ -99,8 +99,8 @@ describe('groupInvestigations', () => {
     assert.deepEqual(
       groups.map((g) => [g.title, g.analyses.map((a) => a.run_id)]),
       [
-        ['iPhone17,5 · iOS 26.6.1', [NEWER.run_id, OLDER.run_id]],
-        ['iPhone14,2 · iOS 17.6.1', [OTHER.run_id]],
+        ['iPhone 17,5 · iOS 26.6.1', [NEWER.run_id, OLDER.run_id]],
+        ['iPhone 14,2 · iOS 17.6.1', [OTHER.run_id]],
       ]
     );
   });
@@ -135,7 +135,7 @@ describe('warningLines', () => {
 
 describe('analysisName', () => {
   it('names the analysis for the other views, with no identifier', () => {
-    assert.equal(analysisName(NEWER), 'iPhone17,5 · iOS 26.6.1 · Investigation aaaaaaaa · Analysis 33333333');
+    assert.equal(analysisName(NEWER), 'iPhone 17,5 · iOS 26.6.1 · Investigation aaaaaaaa · Analysis 33333333');
     assert.equal(analysisName(null), null);
   });
 });
@@ -162,7 +162,7 @@ describe('InvestigationsView', () => {
     const { onSelectRun } = show(null);
     const list = screen.getByRole('list');
     assert.equal(within(list).getAllByRole('button').length, 2);
-    assert.ok(within(list).getByText('iPhone17,5 · iOS 26.6.1'));
+    assert.ok(within(list).getByText('iPhone 17,5 · iOS 26.6.1'));
     assert.ok(within(list).getByText('Interrupted'), 'a cancelled analysis is a stop, not a failure');
     assert.deepEqual(onSelectRun.mock.calls, [[NEWER]]);
   });

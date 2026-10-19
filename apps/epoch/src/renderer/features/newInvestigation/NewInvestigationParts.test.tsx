@@ -43,7 +43,7 @@ describe('backupName', () => {
       bytes: 0,
       infoPlistError: null,
     };
-    assert.equal(backupName(BACKUP, description), 'iPhone17,5 · iOS 26.6.1');
+    assert.equal(backupName(BACKUP, description), 'iPhone 17,5 · iOS 26.6.1');
     assert.equal(backupName(BACKUP, undefined), '2026-10-18T142446Z');
   });
 });
@@ -63,10 +63,10 @@ describe('EvidenceSourcePanel', () => {
 });
 
 describe('EvidenceSourcePanel, quiet', () => {
-  it('is one line and two buttons under the list, with no card and no heading', () => {
+  it('is a small raised panel under the list: a heading, one line and two buttons', () => {
     render(<EvidenceSourcePanel quiet title="Evidence somewhere else?" onPull={vi.fn()} onChooseFolder={vi.fn()} />);
-    assert.equal(screen.queryByRole('heading'), null);
-    assert.ok(screen.getByText(/^Evidence somewhere else\? Pull a backup/));
+    assert.ok(screen.getByRole('region', { name: 'Evidence somewhere else?' }));
+    assert.ok(screen.getByText(/^Pull a backup from a connected iPhone/));
     assert.equal(screen.getAllByRole('button').length, 2);
   });
 });
@@ -100,7 +100,7 @@ describe('PreparingCard', () => {
     const onStop = vi.fn();
     render(
       <PreparingCard
-        name="iPhone14,2 · iOS 17.6.1"
+        name="iPhone 14,2 · iOS 17.6.1"
         position="1 of 2"
         progress={progress({ decrypted: { bytes: 31_200_000_000, total: 58_400_000_000 } })}
         startedAt={Date.now() - 65_000}
@@ -108,7 +108,7 @@ describe('PreparingCard', () => {
         onStop={onStop}
       />
     );
-    assert.ok(screen.getByRole('heading', { name: /Preparing iPhone14,2 · iOS 17\.6\.1 · 1 of 2/ }));
+    assert.ok(screen.getByRole('heading', { name: /Preparing iPhone 14,2 · iOS 17\.6\.1 · 1 of 2/ }));
     assert.ok(screen.getByText(/Decrypting · 31\.2 GB of 58\.4 GB/));
     assert.ok(screen.getByText(/00:01:0\d elapsed/));
     fireEvent.click(screen.getByRole('button', { name: /Stop/ }));
@@ -167,13 +167,15 @@ describe('PreparedSummary', () => {
   };
 
   it('states what Prepare did, from the workspace records', () => {
-    render(<PreparedSummary name="iPhone14,2 · iOS 17.6.1" backupDate="2026-10-18T14:24:48Z" prepared={prepared} />);
+    render(<PreparedSummary name="iPhone 14,2 · iOS 17.6.1" backupDate="2026-10-18T14:24:48Z" prepared={prepared} />);
     assert.ok(screen.getByText('9,870'));
     assert.ok(screen.getByText('4 of 61'));
     assert.ok(screen.getByText('Damaged databases repaired · 1 still damaged'));
     assert.ok(screen.getByText('539 of 540'));
     assert.ok(screen.getByText('iLEAPP modules run · 1 reported an error'));
     assert.ok(screen.getByText('Unchanged'));
+    // The header reads as a backup's row does: the prepared time in its green chip.
+    assert.ok(screen.getByText(/Prepared · 2026-10-18 15:51:00/));
   });
 
   it('says so when the repair did not run', () => {
