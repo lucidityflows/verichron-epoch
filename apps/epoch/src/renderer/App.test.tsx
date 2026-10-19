@@ -196,7 +196,7 @@ describe('App (EPOCH-575)', () => {
       'iPhone 17,5 · iOS 26.6.1 finished. Its investigation and report are ready.'
     );
     expect(outcomes.textContent).toContain(
-      'iPhone 14,2 · iOS 17.6.1 interrupted. iLEAPP Artifacts stopped after 211 of 540 artifact tables.'
+      'iPhone 14,2 · iOS 17.6.1 interrupted. iLEAPP Artifacts stopped after reaching 211 of 540 artifact tables.'
     );
   });
 });

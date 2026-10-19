@@ -469,10 +469,13 @@ summary. The headline names what ended it, in the warning role for a cancel
 and danger for a failure, then counts the outcomes: "Analysis was cancelled.
 1 finished, 1 interrupted, 1 not started." Beneath, one line per backup, by
 its name: finished; already up to date; not started (with the reason when its
-registration was refused); or interrupted, saying what the stopped stage kept,
-in its own unit where it has one: "iLEAPP Artifacts stopped after 211 of 540
-artifact tables. Their records are kept; the rest were not reached. Analyze
-Again finishes them." Every sentence is built whole in
+registration was refused); interrupted, only when the examiner cancelled; or
+failed (danger), when a crash, a timeout or a process error stopped it. A
+stopped backup says what its stage kept, in the stage's own unit where it has
+one: "iLEAPP Artifacts stopped after reaching 211 of 540 artifact tables. Each
+table it finished is kept; Analyze Again reads the rest and retries any that
+failed." The count is how far it got, failed tables included, whose records
+were rolled back (R13, R14). Every sentence is built whole in
 `features/investigations/analysisOutcome.ts`, never joined across JSX lines.
 
 **A running Analyze names its stage's place and count** (EPOCH-551): "Stage 2

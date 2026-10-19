@@ -41,9 +41,10 @@ export function stageLine(stage: AnalysisStageNow, now: number): string {
 }
 
 /**
- * What happened to one backup, as one sentence after its name. An
- * interrupted stage says what it kept: each unit commits on its own (R13),
- * so the units it finished are kept, and Analyze Again resumes (R22).
+ * What happened to one backup, as one sentence after its name. A stopped
+ * stage says what it kept: each unit commits or rolls back on its own (R13,
+ * R14), so the units it finished are kept, and Analyze Again resumes (R22),
+ * reading the units not reached and retrying any that failed.
  */
 export function outcomeSentence(outcome: BackupAnalysisOutcome): string {
   switch (outcome.status) {
@@ -59,31 +60,34 @@ export function outcomeSentence(outcome: BackupAnalysisOutcome): string {
       return 'not started. Nothing was written for it.';
     case 'running':
       return 'still running.';
-    case 'interrupted': {
+    case 'interrupted':
+    case 'failed': {
       const detail = stoppedDetail(outcome.stopped);
-      return outcome.stopped?.progress ? `interrupted. ${detail}` : `interrupted ${detail}`;
+      return outcome.stopped?.progress ? `${outcome.status}. ${detail}` : `${outcome.status} ${detail}`;
     }
   }
 }
 
 /**
- * Where an interrupted backup stopped and what it kept, after "interrupted":
- * "iLEAPP Artifacts stopped after 211 of 540 artifact tables. Their records
- * are kept; …", or "during Crash Reports. …" when the stage gave no count.
+ * Where a stopped backup stopped and what it kept, after "interrupted" or
+ * "failed": "iLEAPP Artifacts stopped after reaching 211 of 540 artifact
+ * tables. Each table it finished is kept; …", or "during Crash Reports. …"
+ * when the stage gave no count. The count includes tables that failed, whose
+ * records were rolled back, so it says "reaching", and the retry covers them.
  */
 export function stoppedDetail(stopped: BackupAnalysisOutcome['stopped']): string {
   if (!stopped) return 'between stages. Finished stages are kept; Analyze Again runs the rest.';
-  const title = stopped.title;
-  if (!stopped.progress) return `during ${title}. What it finished is kept; Analyze Again finishes it.`;
-  return `${title} stopped after ${counted(stopped.stage, stopped.progress)}. Their records are kept; the rest were not reached. Analyze Again finishes them.`;
+  if (!stopped.progress) return `during ${stopped.title}. What it finished is kept; Analyze Again finishes it.`;
+  const each = COUNT_UNITS[stopped.stage] === 'artifact tables' ? 'Each table' : 'Each one';
+  return `${stopped.title} stopped after reaching ${counted(stopped.stage, stopped.progress)}. ${each} it finished is kept; Analyze Again reads the rest and retries any that failed.`;
 }
 
-/** The tone of one backup's line: done, a stop to come back to, or nothing to show. */
+/** The tone of one backup's line: done, a stop to come back to, a failure, or nothing to show. */
 export function outcomeTone(outcome: BackupAnalysisOutcome): 'success' | 'warning' | 'danger' | 'muted' {
   if (outcome.status === 'finished') return outcome.runState === 'complete' ? 'success' : 'warning';
   if (outcome.status === 'up-to-date') return 'success';
   if (outcome.status === 'interrupted') return 'warning';
-  if (outcome.status === 'refused') return 'danger';
+  if (outcome.status === 'refused' || outcome.status === 'failed') return 'danger';
   return 'muted';
 }
 
@@ -102,6 +106,7 @@ export function outcomeHeadline(
     count('finished') ? `${count('finished')} finished` : null,
     count('up-to-date') ? `${count('up-to-date')} already up to date` : null,
     count('interrupted') ? `${count('interrupted')} interrupted` : null,
+    count('failed') ? `${count('failed')} failed` : null,
     count('refused', 'not-started') ? `${count('refused', 'not-started')} not started` : null,
   ].filter(Boolean);
   const tally = parts.length ? ` ${parts.join(', ')}.` : '';

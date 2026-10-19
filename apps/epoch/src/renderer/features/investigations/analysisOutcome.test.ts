@@ -41,7 +41,7 @@ describe('after Analyze ends (EPOCH-550)', () => {
       stopped: { stage: 'ileapp_bridge', title: 'iLEAPP Artifacts', progress: { index: 211, total: 540 } },
     });
     expect(outcomeSentence(stopped)).toBe(
-      'interrupted. iLEAPP Artifacts stopped after 211 of 540 artifact tables. Their records are kept; the rest were not reached. Analyze Again finishes them.'
+      'interrupted. iLEAPP Artifacts stopped after reaching 211 of 540 artifact tables. Each table it finished is kept; Analyze Again reads the rest and retries any that failed.'
     );
     expect(outcomeTone(stopped)).toBe('warning');
     expect(
@@ -49,6 +49,20 @@ describe('after Analyze ends (EPOCH-550)', () => {
         outcome({ status: 'interrupted', stopped: { stage: 'crash', title: 'Crash Reports', progress: null } })
       )
     ).toBe('interrupted during Crash Reports. What it finished is kept; Analyze Again finishes it.');
+  });
+
+  it('calls a run that a crash or timeout stopped failed, in danger, never interrupted (CodeRabbit, PR #136)', () => {
+    const failed = outcome({
+      status: 'failed',
+      stopped: { stage: 'ileapp_bridge', title: 'iLEAPP Artifacts', progress: { index: 211, total: 540 } },
+    });
+    expect(outcomeSentence(failed)).toBe(
+      'failed. iLEAPP Artifacts stopped after reaching 211 of 540 artifact tables. Each table it finished is kept; Analyze Again reads the rest and retries any that failed.'
+    );
+    expect(outcomeTone(failed)).toBe('danger');
+    expect(outcomeHeadline({ success: false, timedOut: true }, [failed]).text).toBe(
+      'Analysis timed out and was stopped. 1 failed.'
+    );
   });
 
   it('gives each of the three outcomes its own words', () => {

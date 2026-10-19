@@ -91,7 +91,7 @@ function Tile({ value, label }: { value: React.ReactNode; label: string }) {
  * and one investigation on the right, following the board "Investigations
  * View"; stages are one top-aligned list that opens in place.
  */
-/** "Analyze Again was cancelled: iLEAPP Artifacts stopped after 211 of 540 artifact tables. …" (EPOCH-550). */
+/** "Analyze Again was cancelled: iLEAPP Artifacts stopped after reaching 211 of 540 artifact tables. …" (EPOCH-550). */
 function cancelledLine(outcome: BackupAnalysisOutcome | undefined): string {
   if (outcome?.status !== 'interrupted') return 'Analyze Again was cancelled.';
   const detail = stoppedDetail(outcome.stopped);

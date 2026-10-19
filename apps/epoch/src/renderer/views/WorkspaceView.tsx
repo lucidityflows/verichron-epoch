@@ -897,10 +897,10 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                 <ul className="flex flex-col gap-1.5 text-data" aria-label="What each backup did">
                   {analysisOutcomes.map((outcome) => (
                     <li key={outcome.label} className="flex items-start gap-2">
-                      <span
-                        className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${TONE_DOT[outcomeTone(outcome)]}`}
-                        aria-hidden
-                      />
+                      {/* An 8 px dot centred in a box one text line (20 px) high: on the grid, level with the first line. */}
+                      <span className="flex h-5 items-center shrink-0" aria-hidden>
+                        <span className={`h-2 w-2 rounded-full ${TONE_DOT[outcomeTone(outcome)]}`} />
+                      </span>
                       <span className="min-w-0">
                         <span className="font-medium text-foreground">{nameForLabel(outcome.label)}</span>{' '}
                         <span className="text-muted-foreground">{outcomeSentence(outcome)}</span>

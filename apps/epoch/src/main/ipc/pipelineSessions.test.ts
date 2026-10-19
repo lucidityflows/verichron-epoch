@@ -269,6 +269,22 @@ describe('AnalysisSession', () => {
     );
   });
 
+  it('calls a backup a timeout or crash stopped failed, not interrupted: interrupted is only a cancel (DESIGN.md §9)', () => {
+    for (const result of [
+      { success: false, timedOut: true },
+      { success: false, error: 'the orchestrator crashed' },
+    ]) {
+      const analysis = new AnalysisSession(() => {});
+      analysis.start('workspace', '/w', '/w', ['A'], 1000);
+      analysis.follow(created(RUN, 'A'));
+      analysis.follow(event({ type: 'stage:started', run_id: RUN, stage: 'crash' }));
+      analysis.finish(result);
+      const [backup] = analysis.snapshot().backups;
+      assert.equal(backup.status, 'failed');
+      assert.deepEqual(backup.stopped, { stage: 'crash', title: 'Crash Reports', progress: null });
+    }
+  });
+
   it('refuses an event for a backup this Analyze did not ask for', () => {
     const analysis = new AnalysisSession(() => {});
     analysis.start('workspace', '/w', '/w', ['A'], 1000);

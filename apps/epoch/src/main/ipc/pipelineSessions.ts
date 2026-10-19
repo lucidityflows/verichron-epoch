@@ -310,13 +310,14 @@ export class AnalysisSession {
   }
 
   /**
-   * Ends the call. A backup whose run was created and never finished was
-   * interrupted, where its last stage stopped (EPOCH-550).
+   * Ends the call. A backup whose run was created and never finished stopped
+   * where its last stage was (EPOCH-550): interrupted when the examiner
+   * cancelled, failed when a crash, a timeout or a process error ended it
+   * (DESIGN.md §9).
    */
   finish(result: PipelineFinishedResult): void {
-    const backups = this.state.backups.map((b) =>
-      b.status === 'running' ? { ...b, status: 'interrupted' as const } : b
-    );
+    const ended = result.cancelled ? ('interrupted' as const) : ('failed' as const);
+    const backups = this.state.backups.map((b) => (b.status === 'running' ? { ...b, status: ended } : b));
     this.state = { ...this.state, status: 'finished', currentStage: null, backups, result };
     this.notifier.now();
   }

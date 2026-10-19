@@ -216,12 +216,16 @@ export interface AnalysisStageNow {
  * - `finished`: its run finished; `runState` is run_completeness's word for it.
  * - `up-to-date`: a complete run already covered it.
  * - `refused`: its registration was refused, for `reason`.
- * - `interrupted`: its run was created and the call ended before it finished;
- *   `stopped` is the stage that was running, and how far it had got.
+ * - `interrupted`: its run was created and the examiner cancelled the call
+ *   before it finished; `stopped` is the stage that was running, and how far
+ *   it had got.
+ * - `failed`: its run was created and the call ended any other way first (a
+ *   crash, a timeout, a process error); `stopped` as for `interrupted`.
+ *   DESIGN.md §9: Interrupted is only a stop the examiner asked for.
  */
 export interface BackupAnalysisOutcome {
   label: string;
-  status: 'not-started' | 'running' | 'finished' | 'up-to-date' | 'refused' | 'interrupted';
+  status: 'not-started' | 'running' | 'finished' | 'up-to-date' | 'refused' | 'interrupted' | 'failed';
   runId: string | null;
   runState: 'running' | 'incomplete' | 'complete' | null;
   reason: string | null;

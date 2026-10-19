@@ -312,7 +312,7 @@ describe('InvestigationsView', () => {
     show(NEWER, [stage({})]);
     assert.ok(
       screen.getByText(
-        'Analyze Again was cancelled: iLEAPP Artifacts stopped after 211 of 540 artifact tables. Their records are kept; the rest were not reached. Analyze Again finishes them.'
+        'Analyze Again was cancelled: iLEAPP Artifacts stopped after reaching 211 of 540 artifact tables. Each table it finished is kept; Analyze Again reads the rest and retries any that failed.'
       )
     );
   });
