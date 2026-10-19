@@ -37,6 +37,12 @@ export interface DeviceIdentifierSource {
   folderName: string | null;
   /** Info.plist's top-level strings, or null when it could not be read. */
   infoPlist: ReadonlyMap<string, string> | null;
+  /**
+   * The backup is being written by this task, an iPhone pull: it has no
+   * Info.plist yet, so only its folder name, the UDID, is known, as designed
+   * (docs/event-log.md §6.3). No notice is given for the missing Info.plist.
+   */
+  beingWritten?: boolean;
 }
 
 /** The examiner's workstation, as absolute paths and the account name. */
@@ -158,11 +164,13 @@ export class Sanitizer {
         add('device', device.folderName, wholeToken(device.folderName, 'gi'));
       }
       if (device.infoPlist === null) {
-        notices.push({
-          label: device.label,
-          class: 'device',
-          reason: 'its Info.plist could not be read, so only its folder name is replaced',
-        });
+        if (!device.beingWritten) {
+          notices.push({
+            label: device.label,
+            class: 'device',
+            reason: 'its Info.plist could not be read, so only its folder name is replaced',
+          });
+        }
       } else {
         for (const { key, cls, form } of INFO_PLIST_CLASSES) {
           const value = device.infoPlist.get(key)?.trim();

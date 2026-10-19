@@ -50,13 +50,18 @@ const IDENTIFIER_KEYS = [
  * backup date, with a counter when two would read the same (owner,
  * 2026-10-18).
  */
-export function deviceIdentifierSources(backups: readonly { label: string; path: string }[]): DeviceIdentifierSource[] {
+export function deviceIdentifierSources(
+  backups: readonly { label: string; path: string; beingWritten?: boolean }[]
+): DeviceIdentifierSource[] {
   const sources = backups.map((backup) => {
-    let infoPlist: Map<string, string> | null;
-    try {
-      infoPlist = readPlistValues(path.join(backup.path, 'Info.plist'));
-    } catch {
-      infoPlist = null;
+    let infoPlist: Map<string, string> | null = null;
+    // A backup this task is writing (an iPhone pull) has no Info.plist yet.
+    if (!backup.beingWritten) {
+      try {
+        infoPlist = readPlistValues(path.join(backup.path, 'Info.plist'));
+      } catch {
+        infoPlist = null;
+      }
     }
     const folderName = path.basename(backup.path);
     // The folder name is an identifier only when it has a UDID's shape; a dated
@@ -75,7 +80,13 @@ export function deviceIdentifierSources(backups: readonly { label: string; path:
   return sources.map(({ backup, infoPlist, folderName, name }) => {
     const n = (seen.get(name) ?? 0) + 1;
     seen.set(name, n);
-    return { label: backup.label, name: n === 1 ? name : `${name} (${n})`, folderName, infoPlist };
+    return {
+      label: backup.label,
+      name: n === 1 ? name : `${name} (${n})`,
+      folderName,
+      infoPlist,
+      ...(backup.beingWritten ? { beingWritten: true } : {}),
+    };
   });
 }
 

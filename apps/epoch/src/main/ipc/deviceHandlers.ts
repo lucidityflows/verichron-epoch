@@ -225,7 +225,7 @@ export function registerDeviceHandlers(
             kind: 'pull',
             labels: [label],
             options: { turn_on_encryption: Boolean(options.enableEncryption) },
-            backups: [{ label, path: path.join(pullDir, device.id) }],
+            backups: [{ label, path: path.join(pullDir, device.id), beingWritten: true }],
             source: destDir,
             appRoot: repoRoot,
             appVersion,

@@ -158,7 +158,7 @@ So the sanitizer replaces only **exact values that the workspace and the worksta
 **Where the values come from** (collected by the app before the task starts, then held by the writer):
 - each selected backup's folder name, which is its UDID (measured: the folder name equals Info.plist `Unique Identifier`);
 - from each backup's `Info.plist`: `Unique Identifier`, `Target Identifier`, `GUID`, `Serial Number`, `IMEI`, `IMEI 2`, `MEID`, `ICCID`, `Phone Number`;
-- for a pull (U3), the connected device's UDID, known from the start because the backup's folder is named by it;
+- for a pull (U3), the connected device's UDID, known from the start because the backup's folder is named by it. The backup has no Info.plist yet, so a pull gives no notice for it (EPOCH-554); Prepare and Analyze still warn when a backup's Info.plist can't be read;
 - the workstation's roots: the workspace, the evidence source folder the examiner chose, the app's install folder, the temporary folder (`os.tmpdir()`), the home folder (`os.homedir()`), and the account name (`os.userInfo().username`).
 
 **Class policy:**

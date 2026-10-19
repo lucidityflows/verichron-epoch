@@ -98,6 +98,15 @@ describe('deviceIdentifierSources', () => {
     );
     assert.equal(Sanitizer.create(sources, {}).notices.length, 2);
   });
+
+  it('gives no notice for a backup a pull is still writing, and still replaces its UDID folder', () => {
+    const dir = backup(path.join('pull-2026-10-19T165305Z', UDID), null);
+    const sources = deviceIdentifierSources([{ label: '2026-10-19T165305Z', path: dir, beingWritten: true }]);
+    assert.equal(sources[0].beingWritten, true);
+    const s = Sanitizer.create(sources, {});
+    assert.deepEqual(s.notices, []);
+    assert.equal(s.sanitize(`${dir}/Manifest.db`).includes(UDID), false);
+  });
 });
 
 describe('event wording', () => {
