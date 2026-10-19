@@ -242,6 +242,22 @@ def test_a_record_count_mismatch_fails_that_artifact_and_leaves_no_partial_inges
     assert len(stored(db)) == 2
 
 
+def test_each_table_reports_its_place_so_a_stopped_analyze_can_say_how_far_it_read(db, tmp_path, capsys):
+    """EPOCH-550: after each artifact table, failed or not, the stage reports
+    "n of total" at debug, as the orchestrator reads a stage report."""
+    short = dict(SAFARI, record_count=3)
+    other = dict(SAFARI, name="Safari Copy", tablename="safaricopy", module="safariCopy")
+    ingest_report(db, CTX, write_report(tmp_path / "BK1", short, other))
+    reports = [
+        json.loads(line.removeprefix("@@verichron-stage "))
+        for line in capsys.readouterr().out.splitlines()
+        if line.startswith("@@verichron-stage ")
+    ]
+    progress = [(r["level"], r["index"], r["total"]) for r in reports if "index" in r]
+    assert progress == [("debug", 1, 2), ("debug", 2, 2)]
+    assert reports[0]["message"] == "Artifact table 1 of 2: Safari Browser - History"
+
+
 def test_a_failed_artifact_is_named_as_the_ledger_names_it_with_its_hash_once_checked(db, tmp_path, monkeypatch):
     """EPOCH-432: a table that fails its check has no hash; one that fails
     while it is written keeps the hash its check computed."""

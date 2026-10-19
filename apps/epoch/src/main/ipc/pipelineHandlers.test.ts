@@ -313,7 +313,7 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     spawnMock.mockReturnValueOnce(orchestrator);
     await invoke('epoch:retryRun', RETRIED);
     orchestrator.stdout.write(
-      `${renderPipelineEvent({ type: 'run:created', run_id: CREATED, evidence_id: EVIDENCE, derivative_id: EVIDENCE })}\n`
+      `${renderPipelineEvent({ type: 'run:created', run_id: CREATED, evidence_id: EVIDENCE, derivative_id: EVIDENCE, label: 'BK', stages: ['crash'] })}\n`
     );
     await new Promise((resolve) => setImmediate(resolve));
 
@@ -377,7 +377,7 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     spawnMock.mockReturnValueOnce(orchestrator);
     await invoke('epoch:retryRun', RETRIED);
     orchestrator.stdout.write(
-      `${renderPipelineEvent({ type: 'run:created', run_id: CRASHED, evidence_id: EVIDENCE, derivative_id: EVIDENCE })}\n`
+      `${renderPipelineEvent({ type: 'run:created', run_id: CRASHED, evidence_id: EVIDENCE, derivative_id: EVIDENCE, label: 'BK', stages: ['crash'] })}\n`
     );
     await new Promise((resolve) => setImmediate(resolve));
     orchestrator.emit('close', 1);

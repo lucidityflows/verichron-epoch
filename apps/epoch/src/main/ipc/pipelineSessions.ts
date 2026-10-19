@@ -1,10 +1,11 @@
 import { StringDecoder } from 'node:string_decoder';
 
-import type { PipelineEvent } from '@verichron/contracts';
+import { stageTitle, type PipelineEvent } from '@verichron/contracts';
 
 import { applyPrepareEvent, initPrepareProgress } from '../../shared/prepareProgress';
 import type {
   AnalysisState,
+  BackupAnalysisOutcome,
   PipelineFinishedResult,
   PipelineLogEntry,
   PrepareState,
@@ -195,6 +196,7 @@ export class AnalysisSession {
     target: null,
     startedAt: null,
     currentStage: null,
+    backups: [],
     result: null,
     taskLog: null,
     workspace: null,
@@ -203,20 +205,31 @@ export class AnalysisSession {
   private readonly notifier: Notifier<AnalysisState>;
   /** The runs this call's orchestrator created, from its run:created events (EPOCH-443). */
   private createdRuns: string[] = [];
+  /** Each created run's label and stages, in order (EPOCH-550, EPOCH-551). */
+  private runPlans = new Map<string, { label: string; stages: string[] }>();
 
   constructor(send: (state: AnalysisState) => void) {
     this.notifier = new Notifier<AnalysisState>(send, () => ({ ...this.state, log: [] }));
   }
 
-  start(kind: 'workspace' | 'retry', target: string, workspace: string, now = Date.now()): void {
+  start(kind: 'workspace' | 'retry', target: string, workspace: string, labels: string[], now = Date.now()): void {
     this.log.clear();
     this.createdRuns = [];
+    this.runPlans = new Map();
     this.state = {
       status: 'running',
       kind,
       target,
       startedAt: now,
       currentStage: null,
+      backups: labels.map((label) => ({
+        label,
+        status: 'not-started',
+        runId: null,
+        runState: null,
+        reason: null,
+        stopped: null,
+      })),
       result: null,
       taskLog: null,
       workspace,
@@ -236,19 +249,59 @@ export class AnalysisSession {
   }
 
   /**
-   * Follows one of the orchestrator's events (EPOCH-443): the runs it created
-   * and the running stage. Nothing is taken from text.
+   * Follows one of the orchestrator's events (EPOCH-443): the runs it created,
+   * what each backup did (EPOCH-550), and the running stage with its place
+   * and its own count (EPOCH-551). Nothing is taken from text.
    */
   follow(event: PipelineEvent, now = Date.now()): void {
     if (event.type === 'run:created') {
       this.createdRuns.push(event.run_id);
+      this.runPlans.set(event.run_id, { label: event.label, stages: event.stages });
+      this.backup(event.label, { status: 'running', runId: event.run_id });
+    } else if (event.type === 'run:skipped') {
+      this.backup(event.label, { status: 'up-to-date' });
+    } else if (event.type === 'registration:refused') {
+      this.backup(event.label, { status: 'refused', reason: event.reason });
+    } else if (event.type === 'run:finished') {
+      this.backup(event.label, { status: 'finished', runState: event.state, stopped: null });
     } else if (event.type === 'stage:started') {
-      this.state = { ...this.state, currentStage: { name: event.stage, startedAt: now } };
-      this.notifier.soon();
+      const plan = this.runPlans.get(event.run_id);
+      if (!plan)
+        throw new Error(`stage ${event.stage} started for run ${event.run_id}, which no run:created announced`);
+      const currentStage = {
+        name: event.stage,
+        title: stageTitle(event.stage),
+        startedAt: now,
+        label: plan.label,
+        index: plan.stages.indexOf(event.stage) + 1,
+        total: plan.stages.length,
+        progress: null,
+      };
+      this.state = { ...this.state, currentStage };
+      this.backup(plan.label, { stopped: { stage: event.stage, title: currentStage.title, progress: null } });
+    } else if (event.type === 'stage:log' && event.index !== undefined && event.total !== undefined) {
+      const current = this.state.currentStage;
+      if (!current || current.name !== event.stage) return;
+      const progress = { index: event.index, total: event.total };
+      this.state = { ...this.state, currentStage: { ...current, progress } };
+      this.backup(current.label, { stopped: { stage: current.name, title: current.title, progress } });
     } else if (event.type === 'stage:finished') {
+      const plan = this.runPlans.get(event.run_id);
       this.state = { ...this.state, currentStage: null };
-      this.notifier.soon();
+      if (plan) this.backup(plan.label, { stopped: null });
     }
+  }
+
+  /** Updates one backup's outcome; a label the call wasn't asked for is a contract breach. */
+  private backup(label: string, change: Partial<BackupAnalysisOutcome>): void {
+    if (!this.state.backups.some((b) => b.label === label)) {
+      throw new Error(`the orchestrator reported backup ${label}, which this Analyze did not ask for`);
+    }
+    this.state = {
+      ...this.state,
+      backups: this.state.backups.map((b) => (b.label === label ? { ...b, ...change } : b)),
+    };
+    this.notifier.soon();
   }
 
   /** The runs the current or last call's orchestrator created, in order. */
@@ -256,8 +309,15 @@ export class AnalysisSession {
     return [...this.createdRuns];
   }
 
+  /**
+   * Ends the call. A backup whose run was created and never finished was
+   * interrupted, where its last stage stopped (EPOCH-550).
+   */
   finish(result: PipelineFinishedResult): void {
-    this.state = { ...this.state, status: 'finished', currentStage: null, result };
+    const backups = this.state.backups.map((b) =>
+      b.status === 'running' ? { ...b, status: 'interrupted' as const } : b
+    );
+    this.state = { ...this.state, status: 'finished', currentStage: null, backups, result };
     this.notifier.now();
   }
 

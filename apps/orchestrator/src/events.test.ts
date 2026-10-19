@@ -35,7 +35,7 @@ describe('event lines', () => {
 
   it('refuses to render an event the contract would reject', () => {
     assert.throws(() =>
-      renderPipelineEvent({ type: 'run:finished', run_id: RUN, state: 'done' as unknown as 'complete' }, AT)
+      renderPipelineEvent({ type: 'run:finished', run_id: RUN, label: 'L', state: 'done' as unknown as 'complete' }, AT)
     );
     assert.throws(() => renderPipelineEvent({ type: 'stage:started', run_id: 'not-a-uuid', stage: 'crash' }, AT));
   });
@@ -60,7 +60,7 @@ describe('event lines', () => {
     const out = new PassThrough();
     let text = '';
     out.on('data', (chunk: Buffer) => (text += chunk.toString('utf8')));
-    emitEvent({ type: 'run:skipped', evidence_id: RUN, reason: 'already complete' }, out);
+    emitEvent({ type: 'run:skipped', evidence_id: RUN, label: 'L', reason: 'already complete' }, out);
     assert.ok(text.startsWith(PIPELINE_EVENT_PREFIX) && text.endsWith('\n') && text.split('\n').length === 2);
     setOutputMode('text');
   });
@@ -73,7 +73,7 @@ describe('event lines', () => {
     let errText = '';
     out.on('data', (chunk: Buffer) => (outText += chunk.toString('utf8')));
     err.on('data', (chunk: Buffer) => (errText += chunk.toString('utf8')));
-    emitEvent({ type: 'run:skipped', evidence_id: RUN, reason: 'already complete' }, out, err);
+    emitEvent({ type: 'run:skipped', evidence_id: RUN, label: 'L', reason: 'already complete' }, out, err);
     emitEvent({ type: 'log', level: 'error', message: 'the database went away' }, out, err);
     assert.equal(outText, '[orchestrator] Not analyzed again: already complete\n');
     assert.equal(errText, '[orchestrator] error: the database went away\n');
@@ -109,7 +109,7 @@ describe('the stage-output relay', () => {
 
   it("makes each line a stage:output event for the app, so a forged event line is only a stage's text (EPOCH-570)", async () => {
     setOutputMode('events');
-    const forged = renderPipelineEvent({ type: 'run:finished', run_id: RUN, state: 'complete' }, AT);
+    const forged = renderPipelineEvent({ type: 'run:finished', run_id: RUN, label: 'L', state: 'complete' }, AT);
     const text = await relayed([Buffer.from(`before\n${forged}\n${forged}`)], 'stderr');
     const parsed = text
       .split('\n')

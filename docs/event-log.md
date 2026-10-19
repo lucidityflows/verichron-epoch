@@ -312,6 +312,8 @@ The events below extend the existing `PipelineEvent` union (EPOCH-443): one cont
 - Its own lines become `log` events, and stage output becomes `stage:output`.
 - It no longer prints its argument list or its interpreter's path. The app's header records the labels and options as fields.
 - A failed stage's `stage:finished` is its one `error`, with its reason (§8.1).
+- `run:created`, `run:skipped`, `run:finished` and `registration:refused` carry the backup's workspace `label`, and `run:created` the run's stages in order (EPOCH-550, EPOCH-551). The app follows them to say what each backup did, even after a cancel, and which stage of how many is running.
+- The iLEAPP bridge reports its place after each artifact table, at `debug`, with `index` and `total` ("Artifact table 211 of 540: …"), so a stopped Analyze can say how far it read. The total is the number of artifacts in iLEAPP's LAVA manifest.
 - Registration reads Info.plist with the contract's reader (`readPlistValues`), the same one the sanitizer uses.
 
 ### 8.4 App

@@ -313,13 +313,13 @@ function stageReason(outcome: StageOutcome): { reason?: string } {
 }
 
 /** `run:finished` with the run's state as run_completeness says it (R23). */
-async function emitRunFinished(client: Client, runId: string): Promise<void> {
+async function emitRunFinished(client: Client, runId: string, label: string): Promise<void> {
   const { rows } = await client.query<{ state: 'running' | 'incomplete' | 'complete' }>(
     `SELECT state FROM run_completeness WHERE run_id = $1`,
     [runId]
   );
   if (!rows[0]) throw new Error(`run ${runId} has no run_completeness row`);
-  emitEvent({ type: 'run:finished', run_id: runId, state: rows[0].state });
+  emitEvent({ type: 'run:finished', run_id: runId, label, state: rows[0].state });
 }
 
 export async function runPipelineForBackup(
@@ -335,7 +335,12 @@ export async function runPipelineForBackup(
   // unverifiable sidecar must not leave an orphaned run row (EPOCH-404).
   const validation = await validateBackupPath(backupPath);
   if (!validation.ok) {
-    emitEvent({ type: 'registration:refused', backup_path: backupPath, reason: validation.reason });
+    emitEvent({
+      type: 'registration:refused',
+      backup_path: backupPath,
+      label: target.label,
+      reason: validation.reason,
+    });
     return { success: false, error: validation.reason };
   }
 
@@ -350,7 +355,7 @@ export async function runPipelineForBackup(
     });
   } catch (err) {
     if (err instanceof RegistrationError) {
-      emitEvent({ type: 'registration:refused', backup_path: backupPath, reason: err.message });
+      emitEvent({ type: 'registration:refused', backup_path: backupPath, label: target.label, reason: err.message });
       return { success: false, error: err.message };
     }
     throw err;
@@ -381,6 +386,7 @@ export async function runPipelineForBackup(
     emitEvent({
       type: 'run:skipped',
       evidence_id: registration.evidenceId,
+      label: target.label,
       reason: `a complete run (${completeRun}) already covers this evidence with the stages enabled now`,
     });
     return { success: true, skipped: true, evidenceId: registration.evidenceId };
@@ -392,6 +398,8 @@ export async function runPipelineForBackup(
     run_id: runId,
     evidence_id: registration.evidenceId,
     derivative_id: registration.decryptedDerivativeId,
+    label: target.label,
+    stages: stages.enabled.map((stage) => stage.name),
   });
   const results: { stage: string; success: boolean }[] = [];
   // Registration located the workspace, so a backup that reached here has one.
@@ -437,7 +445,7 @@ export async function runPipelineForBackup(
     const message = err instanceof Error ? err.message : String(err);
     await markRunFailed(client, runId, message);
     // Best effort: the run's own error is the one to report, not this one's.
-    await emitRunFinished(client, runId).catch((eventErr: unknown) =>
+    await emitRunFinished(client, runId, target.label).catch((eventErr: unknown) =>
       log(
         'error',
         `could not report run ${runId} finished: ${eventErr instanceof Error ? eventErr.message : String(eventErr)}`
@@ -446,7 +454,7 @@ export async function runPipelineForBackup(
     await exportRunSummary(client, runId, summaryPath);
     throw err;
   }
-  await emitRunFinished(client, runId);
+  await emitRunFinished(client, runId, target.label);
   // EPOCH-409: each run's summary in its own file, so no run touches another's.
   await exportRunSummary(client, runId, summaryPath);
   return { runId, results, evidenceId: registration.evidenceId, success: results.every((result) => result.success) };

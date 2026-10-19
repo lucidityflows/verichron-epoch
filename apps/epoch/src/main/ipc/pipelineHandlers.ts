@@ -514,7 +514,7 @@ export function registerPipelineHandlers(
   }
 
   async function runOrchestratorCall(call: OrchestratorCall, releasePipeline: () => void): Promise<void> {
-    analysisSession.start(call.kind, call.target, call.workspace);
+    analysisSession.start(call.kind, call.target, call.workspace, call.labels);
     let log: TaskLog;
     try {
       log = await TaskLog.open(
@@ -592,7 +592,18 @@ export function registerPipelineHandlers(
       log,
       'orchestrator',
       child,
-      (event) => analysisSession.follow(event),
+      (event) => {
+        // An event that breaks the contract is said in the task log, as an
+        // error, rather than thrown from a stream listener into the app.
+        try {
+          analysisSession.follow(event);
+        } catch (err) {
+          log.app(
+            'error',
+            `The orchestrator's events could not be followed: ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+      },
       armOutsideStageTimeout
     );
 

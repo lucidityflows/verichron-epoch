@@ -1178,7 +1178,11 @@ describe('orchestrator events (EPOCH-443)', live, () => {
       run_id: result.runId,
       evidence_id: result.evidenceId,
       derivative_id: rows[0].derivative_id,
+      // The backup's label and the stages in order, so the app can say what each backup did (EPOCH-550).
+      label: 'A',
+      stages: ['first', 'second'],
     });
+    assert.equal((events[5] as Extract<PipelineEvent, { type: 'run:finished' }>).label, 'A');
     for (const e of events) if ('run_id' in e) assert.equal(e.run_id, result.runId, 'every event names this run');
     const firstDone = events[2] as Extract<PipelineEvent, { type: 'stage:finished' }>;
     assert.deepEqual(
@@ -1313,6 +1317,7 @@ describe('orchestrator events (EPOCH-443)', live, () => {
     );
     const skipped = events[0] as Extract<PipelineEvent, { type: 'run:skipped' }>;
     assert.equal(skipped.evidence_id, first.evidenceId);
+    assert.equal(skipped.label, 'C');
     assert.match(skipped.reason, new RegExp(first.runId ?? 'missing'));
   });
 });

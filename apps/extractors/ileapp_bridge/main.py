@@ -19,6 +19,7 @@ from db_writer import IngestContext, add_context_args, context_from_args, incomp
 from etl_run import ETLRunResult
 from normalized_record import NormalizedRecord, SourceType
 from runtime_env import redact_password, require_database_url
+from stage_report import report
 from tool_defects import defects_for
 
 try:
@@ -185,7 +186,8 @@ def ingest_report(conn, ctx: IngestContext, report_dir: str | Path) -> ETLRunRes
         # The tool defects registered for this iLEAPP version (R36).
         defects = defects_for(TOOL, output.tool_version)
         result = ETLRunResult()
-        for artifact in output.artifacts:
+        total = len(output.artifacts)
+        for index, artifact in enumerate(output.artifacts, start=1):
             item = failure_item(artifact)
             scan: ArtifactScan | None = None
             try:
@@ -197,6 +199,10 @@ def ingest_report(conn, ctx: IngestContext, report_dir: str | Path) -> ETLRunRes
                 # its check has no content hash.
                 reason = exc if item != DATABASE else f"table {artifact.tablename!r}: {type(exc).__name__}: {exc}"
                 result.fail(item, reason, scan.content_hash if scan else None)
+            # Where the stage has got to, live, so a stopped Analyze can say
+            # how far it read: each table before this one is committed or
+            # failed on its own (EPOCH-550). Debug, so the Summary isn't flooded.
+            report("debug", f"Artifact table {index} of {total}: {artifact.name}", index=index, total=total)
         return result
     finally:
         lava_conn.close()

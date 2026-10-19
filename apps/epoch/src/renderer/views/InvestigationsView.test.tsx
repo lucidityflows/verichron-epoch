@@ -144,7 +144,9 @@ describe('InvestigationsView', () => {
   function show(selected: PipelineRunRow | null, stages: StageStatusRow[] = [], runs = [OLDER, OTHER, NEWER]) {
     const onSelectRun = vi.fn();
     const onViewReport = vi.fn();
-    const view = render(
+    const onRefreshRun = vi.fn(async () => undefined);
+    const onRefreshStages = vi.fn();
+    const element = () => (
       <InvestigationsView
         runs={runs}
         loading={false}
@@ -153,9 +155,14 @@ describe('InvestigationsView', () => {
         stages={stages}
         onSelectRun={onSelectRun}
         onViewReport={onViewReport}
+        onRefreshRun={onRefreshRun}
+        onRefreshStages={onRefreshStages}
       />
     );
-    return { ...view, onSelectRun, onViewReport };
+    const view = render(element());
+    // A new element each time, as a parent's render makes one, so React renders again.
+    const renderAgain = () => view.rerender(element());
+    return { ...view, renderAgain, onSelectRun, onViewReport, onRefreshRun, onRefreshStages };
   }
 
   it('lists investigations by model and iOS version, and shows the newest until another is chosen', () => {
@@ -216,6 +223,7 @@ describe('InvestigationsView', () => {
       target: NEWER.run_id,
       status: 'finished',
       currentStage: null,
+      backups: [],
       result: { success: true, analysis: [{ backupPath: '/x', status: 'skipped' }] },
     };
     show(NEWER, [stage({})]);
@@ -247,6 +255,7 @@ describe('InvestigationsView', () => {
       target: NEWER.run_id,
       status: 'finished',
       currentStage: null,
+      backups: [],
       result: { success: true, analysis: [{ backupPath: '/x', status: 'succeeded', runId: created.run_id }] },
     };
     const { onSelectRun } = show(NEWER, [stage({})], [OLDER, OTHER, NEWER, created]);
@@ -259,6 +268,7 @@ describe('InvestigationsView', () => {
       target: NEWER.run_id,
       status: 'finished',
       currentStage: null,
+      backups: [],
       result: { success: false, error: 'the orchestrator stopped unexpectedly' },
     };
     show(NEWER, [stage({})]);
@@ -273,10 +283,69 @@ describe('InvestigationsView', () => {
       target: NEWER.run_id,
       status: 'finished',
       currentStage: null,
+      backups: [],
       result: { success: false, cancelled: true, error: 'Analysis was cancelled.' },
     };
     show(NEWER, [stage({})]);
     banner = screen.getByRole('alert');
     assert.match(banner.className, /text-warning/, 'a stop the examiner asked for is not a failure');
+  });
+
+  it('says where a cancelled Analyze Again stopped and what it kept (EPOCH-550)', () => {
+    hook.analysis = {
+      kind: 'retry',
+      target: NEWER.run_id,
+      status: 'finished',
+      currentStage: null,
+      backups: [
+        {
+          label: 'BK',
+          status: 'interrupted',
+          runId: null,
+          runState: null,
+          reason: null,
+          stopped: { stage: 'ileapp_bridge', title: 'iLEAPP Artifacts', progress: { index: 211, total: 540 } },
+        },
+      ],
+      result: { success: false, cancelled: true },
+    };
+    show(NEWER, [stage({})]);
+    assert.ok(
+      screen.getByText(
+        'Analyze Again was cancelled: iLEAPP Artifacts stopped after 211 of 540 artifact tables. Their records are kept; the rest were not reached. Analyze Again finishes them.'
+      )
+    );
+  });
+
+  it("reads the analysis's stages again as soon as a stage starts or finishes, with no polling interval (EPOCH-563)", () => {
+    vi.useFakeTimers();
+    const running = (stageNow: { name: string; index: number } | null) => ({
+      kind: 'retry',
+      target: NEWER.run_id,
+      status: 'running',
+      currentStage: stageNow && {
+        ...stageNow,
+        title: stageNow.name,
+        startedAt: 0,
+        label: 'BK',
+        total: 4,
+        progress: null,
+      },
+      backups: [],
+      result: null,
+    });
+    hook.analysis = running({ name: 'crash', index: 1 });
+    const { renderAgain, onRefreshStages } = show(NEWER, [stage({})], [OLDER, OTHER, { ...NEWER, state: 'running' }]);
+    const before = onRefreshStages.mock.calls.length;
+
+    hook.analysis = running(null); // stage:finished
+    renderAgain();
+    hook.analysis = running({ name: 'ileapp_bridge', index: 2 }); // stage:started
+    renderAgain();
+    assert.equal(onRefreshStages.mock.calls.length, before + 2, 'one read per event');
+
+    vi.advanceTimersByTime(10_000);
+    assert.equal(onRefreshStages.mock.calls.length, before + 2, 'no polling while this window follows the analysis');
+    vi.useRealTimers();
   });
 });

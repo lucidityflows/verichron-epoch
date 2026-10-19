@@ -113,7 +113,10 @@ describe('App (EPOCH-575)', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', { name: /^Activity Log/ })));
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Full log' })));
 
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Investigations/ })));
+    // Investigations docks the same Activity Log (U4b); Forensic Records has none, so leaving for it removes the dock.
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /^Investigations/ })));
+    expect(screen.getByRole('region', { name: 'Activity Log' })).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Forensic Records/ })));
     expect(screen.queryByRole('region', { name: 'Activity Log' })).toBeNull();
 
     await act(async () => fireEvent.click(screen.getByRole('button', { name: /New Investigation/ })));
@@ -123,5 +126,77 @@ describe('App (EPOCH-575)', () => {
     // The drawer comes back as it was left: open, on the Full log.
     expect(screen.getByRole('button', { name: /^Activity Log/ }).getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByRole('button', { name: 'Full log' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('says what each backup did after a cancelled Analyze, as a stop, not a failure (EPOCH-550)', async () => {
+    const source = '/home/examiner/pulls';
+    const prepared = (label: string) => ({
+      label,
+      state: 'prepared',
+      preparedAt: '2026-10-19T19:57:52Z',
+      details: { filesChecked: 1, repair: { status: 'ran', scanned: 1, repaired: 0, failed: 0 }, modules: null },
+    });
+    Object.assign(answers, {
+      getDevicePullState: null,
+      getPullLogState: idle,
+      getPrepareState: {
+        ...idle,
+        status: 'finished',
+        source,
+        workspace: '/w',
+        labels: ['A', 'B'],
+        startedAt: 1_000,
+        progress: null,
+        passwordFor: null,
+        result: { success: true },
+      },
+      getAnalysisState: {
+        ...idle,
+        status: 'finished',
+        kind: 'workspace',
+        target: '/w',
+        workspace: '/w',
+        startedAt: 2_000,
+        currentStage: null,
+        result: { success: false, cancelled: true },
+        backups: [
+          { label: 'A', status: 'finished', runId: null, runState: 'complete', reason: null, stopped: null },
+          {
+            label: 'B',
+            status: 'interrupted',
+            runId: null,
+            runState: null,
+            reason: null,
+            stopped: { stage: 'ileapp_bridge', title: 'iLEAPP Artifacts', progress: { index: 211, total: 540 } },
+          },
+        ],
+      },
+      discoverBackups: [
+        { label: 'A', path: `${source}/A/00008140-0000000000000000` },
+        { label: 'B', path: `${source}/B/00008140-0000000000000001` },
+      ],
+      describeBackups: [
+        { productType: 'iPhone17,5', iosVersion: '26.6.1', backupDate: null, bytes: 1, infoPlistError: null },
+        { productType: 'iPhone14,2', iosVersion: '17.6.1', backupDate: null, bytes: 1, infoPlistError: null },
+      ],
+      getPreparedBackups: { workspace: '/w', backups: [prepared('A'), prepared('B')] },
+      findCrashReportsRetryTargets: { targets: [], errors: [] },
+    });
+    render(
+      <ToastProvider>
+        <App />
+      </ToastProvider>
+    );
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /New Investigation/ })));
+    const headline = await screen.findByText('Analysis was cancelled. 1 finished, 1 interrupted.');
+    expect(headline.closest('p')?.className).toMatch(/text-warning/);
+    expect(headline.closest('p')?.className).not.toMatch(/text-danger/);
+    const outcomes = screen.getByRole('list', { name: 'What each backup did' });
+    expect(outcomes.textContent).toContain(
+      'iPhone 17,5 · iOS 26.6.1 finished. Its investigation and report are ready.'
+    );
+    expect(outcomes.textContent).toContain(
+      'iPhone 14,2 · iOS 17.6.1 interrupted. iLEAPP Artifacts stopped after 211 of 540 artifact tables.'
+    );
   });
 });
