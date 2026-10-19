@@ -184,7 +184,7 @@ describe('StageCard', () => {
         loadFailures={NO_FAILURES}
       />
     );
-    assert.ok(screen.getByText('Interrupted'), 'a stop, in the flag role, never Failed (board 6)');
+    assert.ok(screen.getByText('Interrupted'), 'a stop, in the warning role, never Failed (board 6)');
     assert.equal(screen.queryByText('Running'), null);
     assert.ok(screen.getByText('Stopped: the analysis was cancelled · 2 min 4 s'));
     fireEvent.click(card());

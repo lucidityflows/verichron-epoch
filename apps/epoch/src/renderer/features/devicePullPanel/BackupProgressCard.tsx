@@ -107,8 +107,8 @@ export function IncompleteBackupNotice({
   secondary,
 }: IncompleteBackupNoticeProps) {
   return (
-    <section className="rounded-lg bg-flag/10 border border-flag/30 shadow-elevation-1 p-5 mt-4 flex flex-col gap-3">
-      <h3 className="font-display text-heading text-flag">Incomplete Backup</h3>
+    <section className="rounded-lg bg-warning/10 border border-warning/30 shadow-elevation-1 p-5 mt-4 flex flex-col gap-3">
+      <h3 className="font-display text-heading text-warning">Incomplete Backup</h3>
       <p className="text-data text-foreground">
         A backup of {deviceName} that didn't finish is taking {formatBytes(incomplete.bytes)} in{' '}
         <span className="font-mono break-all">{incomplete.path}</span>. It can't be resumed or used.

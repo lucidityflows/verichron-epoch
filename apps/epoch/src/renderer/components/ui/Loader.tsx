@@ -10,12 +10,12 @@
  *     (DevicePullPanel.tsx's `checking`/`acquiring` states).
  *
  * `variant="pulse-dot"` replaces TerminalLog.tsx's bespoke "live" indicator
- * (`<span className="w-1.5 h-1.5 rounded-full bg-flag animate-pulse" />`).
+ * (`<span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />`).
  *
  * Both variants render in `currentColor` rather than taking a color prop.
  * Every existing spinner instance in the app was already just matching
  * whatever text color it sat inside (`text-background` inside an accent
- * button, `text-flag` inside a flag-toned status row, `text-accent` for a
+ * button, `text-warning` inside a warning-toned status row, `text-accent` for a
  * bare "checking..." line) -- inheriting `currentColor` reproduces every one
  * of those without a color enum that would need to be kept in sync with the
  * app's token set (and, per EPOCH-201/VER-8, that token set is still being

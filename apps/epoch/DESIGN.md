@@ -5,11 +5,14 @@ Source of truth for EPOCH-201 (VER-8) and every ticket downstream of it
 pattern that contradicts this file. All tokens live in
 `apps/epoch/src/renderer/index.css`.
 
-## 1. Elevation, not borders
+## 1. Elevation is lightness, and cards have a hairline border
 
-`shadow-elevation-{1,2,3}` is the only way a **panel-level container**
-(card, page section, modal) expresses separation from the background.
-Flat `border`/`border-*` utilities are reserved for two cases only:
+Decided 2026-10-19 (EPOCH-574, the Theme Foundation), replacing "elevation,
+not borders". In a dark theme a shadow barely shows, so a **panel-level
+container** (card, page section, modal) separates from the background by
+being lighter (§9's tiers) and by a 1 px hairline `border`. A section card is
+the `card` utility in `index.css`: `surface`, the hairline border and
+`shadow-elevation-1`. Shadows remain, as support. Other `border` uses:
 
 - **Functional borders** — form inputs, textareas, anything with a focus
   ring. A shadow doesn't communicate "this is editable" the way a border
@@ -18,8 +21,9 @@ Flat `border`/`border-*` utilities are reserved for two cases only:
   under a header, dashed drop-zone affordances. These separate content
   *within* a container, not the container from its background.
 
-If you're adding `border` to something that reads as its own card/panel,
-it's the wrong tool — use elevation.
+A card is `card`, never a hand-built `bg-surface` plus shadow. Panels inside
+a card (`surface-raised`: tiles, rows) rely on the lightness step and carry no
+border of their own.
 
 | Tier | Use for |
 |---|---|
@@ -36,9 +40,9 @@ selection, not elevation — and can coexist with a shadow tier).
 an expanded row has `shadow-elevation-1`, and a row that is both has both
 (EPOCH-470). Selection is never hidden by expansion.
 
-**State-color banners (flag/danger/accent) are always `shadow-elevation-1`
+**State-color banners (warning/danger/accent) are always `shadow-elevation-1`
 + the state-color border together, never border alone.** This was
-previously inconsistent — e.g. `DevicePullPanel.tsx` had two flag-toned
+previously inconsistent — e.g. `DevicePullPanel.tsx` had two warning-toned
 banners in the same file, one with `shadow-elevation-1` and one without,
 for no reason other than having been written at different times. Fixed
 in that file (see §5); the rule going forward is that every state-color
@@ -146,32 +150,32 @@ section is the enforcement mechanism for now, the same way §1 and §2
 are enforced by code review against a written rule rather than by a
 lint rule.
 
-## 4. Token structure — dark-only today, light/dark-ready by design
+## 4. Token structure — dark by default, light ready in the same file
 
-A light theme is a confirmed future requirement (not speculative), so
-tokens are structured now to make that a same-file addition later
-rather than a second migration:
+The tokens are in three layers (EPOCH-574): raw OKLCH values on `:root`, the
+semantic roles they fill (§9), and the components, which use only the roles
+through Tailwind's `@theme` mapping (`bg-surface`, `text-warning`). The dark
+theme is the default on `:root`; the light theme is the same roles remapped
+under `:root[data-theme="light"]`, already measured, and ships when the theme
+setting does (U7). OKLCH keeps equal lightness steps looking equal across
+hues.
 
 ```css
 :root {
-  /* current dark values — this is the DEFAULT, not a "dark" override */
-  --background: 217 17% 9%;
-  --surface: 217 17% 14%;
-  /* ...existing tokens, unchanged... */
+  --surface: oklch(0.245 0.006 260);   /* dark, the default */
+  --accent: oklch(0.78 0.12 210);
+  /* ... */
 }
-
-/* Placeholder for the future toggle. Adding a light theme later means
-   filling in this block — no restructuring of :root, no renaming of
-   any token, no changes to any component. */
 :root[data-theme="light"] {
-  /* intentionally empty until EPOCH-XXX (light theme) */
+  --surface: oklch(1 0 0);
+  --accent: oklch(0.50 0.12 215);
+  /* ... the same names, no others */
 }
 ```
 
-Components must keep referencing the semantic token names
-(`bg-background`, `text-foreground`, etc.) exactly as they do today —
-never a raw HSL value or a hardcoded dark-specific assumption. That's
-what makes the future toggle a CSS-only change.
+Components never use a raw colour (`#…`, `hsl(…)`, `oklch(…)`) or a value
+that suits one theme only; a shadow mixes `--shadow-tint`. That is what makes
+the theme a CSS-only change.
 
 ## 5. Per-component migration status (this pass)
 
@@ -226,7 +230,7 @@ content edge or the title (EPOCH-464).
   *into a table or a list* shows a skeleton of it (`TableSkeleton` or
   `ListSkeleton` in `components/ui/Skeleton.tsx`; `InvestigationsView` shows
   the list's), so the layout doesn't jump from a centered spinner to the full
-  table or list when the rows arrive. Errors are not empty states: they use the flag banner (§1).
+  table or list when the rows arrive. Errors are not empty states: they use the warning banner (§1).
 
 ## 7. Capitalization and wording — names are Title Case, sentences are not
 
@@ -289,65 +293,85 @@ times as text on that page), the three surface tiers barely separated
 (1.14:1 and 1.17:1), and 13 improvised surface opacities layered panels
 unevenly.
 
+**Revised 2026-10-19 (EPOCH-574, the Theme Foundation; approved by the
+project owner).** The app had become a world of blues: saturated navy
+surfaces, cyan on every button, selection and running state, and three
+blue-family section colours. Surfaces are now neutral, the accent covers
+about a tenth of a screen, and the roles are the conventional six. The
+proposal and its research are the Linear project document "Epoch Theme
+Foundation". The owner may still change the colours before the Release
+Candidate.
+
 **Each colour has one meaning.** A state uses its role's colour, never
 another state's.
 
-| Token | Means | Examples |
+| Role (token) | Means | Examples |
 |---|---|---|
-| `accent` | Interactive, selected, current, in progress | Primary button, selected device, the current step, a running pull or analysis |
+| primary (`accent`) | The one main action, focus, the current item | The step's primary button, the focus ring, the current step, a running pull or analysis |
+| secondary (neutral) | Every other action | `outline` buttons: `foreground` on `surface-raised` with a `border-strong` border |
 | `success` | Done and verified | A backup verified as finished, installed tools, a completed step |
-| `flag` | You must act, or caution | "Action Needed" on the iPhone, an unfinished backup, encryption consent |
-| `danger` | Failed or destructive | A failed pull, setup failure, Delete |
-| `foreground` / `muted-foreground` | Information | Notes, paths, explanations |
+| `warning` (was `flag`) | You must act, or caution | "Action Needed" on the iPhone, an unfinished backup, encryption consent, Interrupted |
+| `danger` | Failed or destructive | A failed pull, setup failure, Delete, Stop |
+| `info` | Information that needs a banner | Informational banners only |
+| `foreground` / `muted-foreground` | Text | Notes, paths, explanations |
+
+**About a tenth of a screen is colour.** Colour means an action, a state or a
+status. Surfaces, cards and secondary buttons stay neutral, and a screen has
+one filled accent button per state. Selection and the current step use an
+accent tint or outline, never the shape of a button.
 
 **Role tints have three strengths:** `/10` for a banner or row fill, `/20`
 for an icon chip on a tinted banner, `/30` for a state banner's border (§1).
 
 **Surfaces have four tiers, lightest on top:** `inset` (wells: logs, inputs,
 command lines, progress tracks), `background` (the page), `surface` (cards),
-`surface-raised` (panels inside a card). Components use these tokens, never a
-`bg-surface/NN` opacity. The one exception is the dimmed scrim behind a
-modal (`bg-background/80`).
+`surface-raised` (panels inside a card, secondary buttons), plus
+`surface-hover`. They are a near-neutral grey with a faint cool tint (OKLCH
+hue 260, chroma 0.006; HSL saturation 6–11%, where it was 32%). Components
+use these tokens, never a `bg-surface/NN` opacity. The one exception is the
+dimmed scrim behind a modal (`bg-background/80`).
 
 **Contrast is measured, not judged.** Every role and section colour is at
-least 4.5:1 (WCAG AA for body text) on every surface tier. Values on
-2026-10-12, as contrast against inset / background / surface / surface-raised:
+least 4.5:1 (WCAG AA for body text) on every surface tier, in both themes, and
+is checked with APCA too, since WCAG 2 can pass dark-theme text that reads
+poorly. Values on 2026-10-19 (EPOCH-574), dark theme, against inset /
+background / surface / surface-raised:
 
-| Token | HSL | Contrast |
-|---|---|---|
-| `foreground` | 220 15% 92% | 16.1 / 15.6 / 13.7 / 11.2 |
-| `muted-foreground` | 222 18% 68% | 8.1 / 7.8 / 6.9 / 5.7 |
-| `accent` | 188 78% 52% | 9.9 / 9.6 / 8.4 / 6.9 |
-| `success` | 152 60% 50% | 9.4 / 9.1 / 8.0 / 6.5 |
-| `flag` | 36 90% 58% | 9.7 / 9.4 / 8.2 / 6.7 |
-| `danger` | 4 85% 67% | 6.6 / 6.4 / 5.6 / 4.6 |
-| `section-runs` | 268 80% 74% | 7.3 / 7.0 / 6.2 / 5.1 |
-| `section-records` | 212 85% 66% | 7.4 / 7.2 / 6.3 / 5.2 |
-| `section-iocs` | 326 75% 70% | 7.4 / 7.2 / 6.3 / 5.2 |
-| `section-reports` | 244 80% 76% | 7.1 / 6.9 / 6.0 / 4.9 |
+| Token | OKLCH | Contrast | APCA (Lc) |
+|---|---|---|---|
+| `foreground` | 0.950 0.004 260 | 17.0 / 16.3 / 14.0 / 11.6 | 92–97 |
+| `muted-foreground` | 0.790 0.008 260 | 10.2 / 9.7 / 8.4 / 6.9 | 60–65 |
+| `accent` | 0.78 0.12 210 | 10.2 / 9.8 / 8.4 / 7.0 | 61–66 |
+| `success` | 0.78 0.15 155 | 10.4 / 10.0 / 8.6 / 7.1 | 62–67 |
+| `warning` | 0.82 0.15 75 | 11.0 / 10.6 / 9.1 / 7.5 | 65–70 |
+| `danger` | 0.75 0.15 25 | 8.3 / 7.9 / 6.8 / 5.7 | 51–56 |
+| `info` | 0.78 0.09 255 | 9.8 / 9.4 / 8.1 / 6.7 | 59–64 |
+| `section-runs` | hsl 268 80% 74% | 7.4 / 7.0 / 6.1 / 5.0 | |
+| `section-records` | hsl 212 85% 66% | 7.5 / 7.2 / 6.2 / 5.1 | |
+| `section-iocs` | hsl 326 75% 70% | 7.5 / 7.2 / 6.2 / 5.1 | |
+| `section-reports` | hsl 244 80% 76% | 7.2 / 6.9 / 5.9 / 4.9 | |
 
-Text on a filled accent, success or danger button uses `background`: 9.6,
-9.1 and 6.4:1. The tiers separate by 1.03 (inset to background), 1.14
-(background to surface) and 1.22 (surface to raised).
+`danger` is the lowest on APCA, so it is used with an icon and a label, never
+for running text. The tiers separate by 1.05 (inset to background), 1.16
+(background to surface) and 1.21 (surface to raised); a card's hairline border
+stands 1.54 off the background.
 
-**A secondary button is tinted, never surface-coloured** (EPOCH-506, decided
-2026-10-14): `outline` is `bg-accent/15` with `text-accent`, so it reads as a
-button on every tier, including the raised panels where a surface-coloured
-button disappeared. Accent text on that fill is 7.7, 7.3, 6.2 and 5.1:1 on
-inset, background, surface and surface-raised, and the fill stands 1.29 to
-1.35:1 off each tier. A destructive one (`tone="danger"`: Delete It, Cancel) is
-`bg-danger/15` with `foreground` text: danger text on that fill is only 3.8:1
-on surface-raised, while foreground is 9.2 to 13.4:1.
+**The light theme** (`[data-theme="light"]`, ships with U7) is measured the
+same way: every role is at least 4.7:1 on inset, background and surface, and
+the section colours (same hues, darker) at least 5.4:1. White on the primary
+button is 5.5:1.
 
-The surface tiers are `inset` 6%, `background` 8%, `surface` 14% and
-`surface-raised` 21% lightness, at hue 224, saturation 32%: deep blue ink
-rather than grey, so the page itself carries colour. A new colour token is
-added only with its contrast on every tier recorded here, and is defined in
-`:root` so the light theme (§4) stays a same-file change.
+**Buttons.** Text on a filled accent button uses `on-accent`: 9.8:1. A
+filled danger button uses `background`: 7.9:1. **A secondary button is
+neutral** (`outline`, EPOCH-574, replacing EPOCH-506's accent tint):
+`foreground` on `surface-raised`, 11.6:1 (10.2:1 on hover), with a
+`border-strong` border that stands 1.9 to 2.2 off the surface and background.
+A destructive secondary (`tone="danger"`: Delete It, Stop) keeps that button
+with `danger` text and a `danger/60` border: 5.7:1 on raised.
 
-**Each section has a colour.** The five sidebar sections each have an
-identity colour, in the hue range 210–330 that no role uses, so a section
-colour never reads as a state:
+**Each section has a colour, as a marker.** The five sidebar sections each
+have an identity colour, in the hue range 210–330 that no role uses, so a
+section colour never reads as a state:
 
 | Section | Token |
 |---|---|
@@ -357,10 +381,12 @@ colour never reads as a state:
 | Indicator Matches | `section-iocs`, pink |
 | Reports | `section-reports`, periwinkle |
 
-A section colour marks only where you are: the section's icon in the sidebar
-(always), the current section's sidebar tint and bar, the view's title chip
-and the soft glow behind its header, the view's empty states and its tip. It
-is never used for a state, an action or data. Components use it as
+A section colour marks only where you are, and only as a marker (EPOCH-574):
+the section's icon in the sidebar (always), the current section's sidebar
+bar, the view's title chip, and the icon of its empty states. The current
+sidebar item's fill is neutral (`surface-raised`), and there is no glow
+behind the page title. It is never used for a fill, a state, an action or
+data. Components use it as
 `text-section` and `bg-section/NN`; `ViewLayout` sets `--section` for its view
 (`components/layout/sections.ts`).
 
@@ -378,7 +404,7 @@ button; it becomes an outline button once the step is done.
 
 **Steps show their state.** A multi-step flow (§8) shows its steps as a
 numbered rail: pending (muted), current (accent ring), done (success check),
-blocked (flag). It is the shared `StepList` (EPOCH-455); the iPhone pull and
+blocked (warning). It is the shared `StepList` (EPOCH-455); the iPhone pull and
 New Investigation use it (§10).
 
 **Long steps show what they have done** (EPOCH-487). A step that runs for
@@ -410,26 +436,26 @@ it ended incomplete any other way.
 
 | Chip | Role | Shown when | Fill, text | Contrast on background / surface / raised |
 |---|---|---|---|---|
-| Complete | success | the stage succeeded | `success/10`, `success` | 7.8 / 6.6 / 5.4 |
-| Complete with warnings | flag | it succeeded with warnings ("Complete, 2 warnings" once counted) | `flag/10`, `flag` | 8.0 / 6.9 / 5.6 |
-| Skipped | neutral | it had nothing to work on; never shown as a clean result | `muted-foreground/14`, `foreground` | 12.4 / 10.6 / 8.7 |
-| Interrupted | flag | it was pending or running when the examiner cancelled, or the app was closed (detail: "the app was closed") | `flag/10`, `flag` | 8.0 / 6.9 / 5.6 |
-| Not started | muted | it was pending when the run ended any other way | `muted-foreground/8`, `muted-foreground` | 7.0 / 6.0 / 4.9 |
-| Failed | danger | it failed, or was running when the run crashed or timed out | `danger/10`, `foreground`, with a `danger` × | 13.9 / 12.0 / 9.9 (× 5.7 / 4.9 / 4.1) |
-| Running | accent | it is running in a live run | `accent/10`, `accent` | 8.1 / 7.0 / 5.7 |
+| Complete | success | the stage succeeded | `success/10`, `success` | 8.4 / 7.1 / 5.8 |
+| Complete with warnings | warning | it succeeded with warnings ("Complete, 2 warnings" once counted) | `warning/10`, `warning` | 8.9 / 7.4 / 6.1 |
+| Skipped | neutral | it had nothing to work on; never shown as a clean result | `muted-foreground/14`, `foreground` | 12.5 / 10.5 / 8.6 |
+| Interrupted | warning | it was pending or running when the examiner cancelled, or the app was closed (detail: "the app was closed") | `warning/10`, `warning` | 8.9 / 7.4 / 6.1 |
+| Not started | muted | it was pending when the run ended any other way | `muted-foreground/8`, `muted-foreground` | 8.5 / 7.2 / 5.9 |
+| Failed | danger | it failed, or was running when the run crashed or timed out | `danger/10`, `foreground`, with a `danger` × | 14.1 / 11.9 / 9.8 (× 6.9 / 5.8 / 4.8) |
+| Running | accent | it is running in a live run | `accent/10`, `accent` | 8.3 / 7.0 / 5.7 |
 
 Role chips use the `/10` row-fill strength. **Failed** uses `foreground` text
-with a `danger` ×, not `danger` text, for the same reason as the destructive
-button above. `danger` text measures 3.95:1 on its fill over `surface-raised`,
-and stage cards sit on `surface-raised`. The × is a graphic, so it needs only
-3:1 (WCAG 1.4.11). Danger is only for a failure; a stop the examiner asked
-for is Interrupted.
+with a `danger` ×. `danger` text on its fill over `surface-raised` now
+measures 4.8:1 (it was 3.95:1 before EPOCH-574), but foreground stays the
+stronger choice for a chip's word. The × is a graphic, so it needs only 3:1
+(WCAG 1.4.11). Danger is only for a failure; a stop the examiner asked for is
+Interrupted.
 
 **A chip's reason is written, never hover-only:** "Interrupted · the app was
 closed", the reason in `muted-foreground` after a middle dot, so keyboard and
 touch users read it too. `muted-foreground` on a `/10` role fill measures at
-least 6.7 / 5.7 / 4.6 on background / surface / raised (flag 6.7 / 5.8 / 4.7,
-danger 7.0 / 6.1 / 5.0).
+least 8.2 / 6.8 / 5.6 on background / surface / raised (warning 8.2 / 6.8 /
+5.6, danger 8.4 / 7.1 / 5.9).
 
 **Keyboard focus is the accent** (EPOCH-558): every focusable element shows a
 2 px `accent` outline, 2 px out, from one `:focus-visible` rule in
@@ -449,7 +475,7 @@ forgot what was prepared. "We must guide clearly, or we look untrustworthy."
 - **State comes from the evidence, not memory.** What a step has done is read
   from the workspace (the completion markers), so a restart or another
   session shows the same state. New Investigation shows each backup as
-  "Not prepared", "Partly prepared · prepare again" (flag) or
+  "Not prepared", "Partly prepared · prepare again" (warning) or
   "Prepared · <date>" (success).
 - **The next step leads.** Once a step is done, its action becomes a
   secondary outline button with a name that says what it would do again
@@ -520,7 +546,7 @@ and how it is sanitized, is `docs/event-log.md`; this is how it looks.
   (`ActivityLogDock`, rendered by `App.tsx` below the scrolling page). It
   shows **Activity Log**, the latest entry that isn't debug, and the counts:
   errors (`danger/10`, `foreground` text, as the Failed chip), warnings
-  (`flag/10`, `flag`) and notes for review (`accent/10`, `accent`). One click
+  (`warning/10`, `warning`) and notes for review (`accent/10`, `accent`). One click
   opens the drawer above it; the page above gets shorter and nothing nests.
 - **Two views (owner, 2026-10-18).** **Summary**, the default, shows `info`,
   warnings and errors in plain sentences; only an error, a warning or a note
@@ -530,7 +556,7 @@ and how it is sanitized, is `docs/event-log.md`; this is how it looks.
   written, so colour is never the only signal.
 - **"For review"** marks something in the evidence worth a look, never a
   problem with the run and never a lead (owner, 2026-10-18); it uses the
-  `accent` role, not `flag`.
+  `accent` role, not `warning`.
 - **The drawer:** View (Summary, Full log), Filter (All, Warnings, Errors),
   search, "Times in UTC, <date>", Copy (the visible lines as text), Save As…
   (the whole saved log, as text under a header or as NDJSON), Pop Out (its own

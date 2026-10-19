@@ -80,7 +80,7 @@ export function BackupRow({
         <div className="px-11 pb-3">
           {retryConfirming ? (
             <div className="flex items-center justify-between gap-3">
-              <p className="text-label text-flag">
+              <p className="text-label text-warning">
                 Look at {crashReportsRetryTarget.deviceName}: unlock it and keep it connected before copying.
               </p>
               <div className="flex items-center gap-2 shrink-0">
@@ -151,7 +151,7 @@ function PreparedState({ prepared }: { prepared?: PreparedBackup }) {
     // Why, written out, not on hover (DESIGN.md §9): the last Prepare's reason, else what is missing.
     return (
       <span className="flex flex-col items-end text-right shrink-0 max-w-[22rem]">
-        <span className="text-label text-flag">Partly prepared · prepare again</span>
+        <span className="text-label text-warning">Partly prepared · prepare again</span>
         <span className="text-label text-muted-foreground">
           {prepared.reason ?? `Decrypted ${when}; iLEAPP's output is missing`}
         </span>
@@ -238,7 +238,7 @@ function LiveBackupRow({
       : runningStage
         ? `${STAGE_LABELS[runningStage]}…`
         : 'Working…';
-    statusClass = awaitingPassword ? 'text-flag' : 'text-accent';
+    statusClass = awaitingPassword ? 'text-warning' : 'text-accent';
   } else if (progress.overall === 'done') {
     icon = <CheckCircle2 size="1.125rem" className="text-success shrink-0" />;
     statusText = 'Complete';
@@ -263,7 +263,7 @@ function LiveBackupRow({
               : ''
       }`}
     >
-      {awaitingPassword ? <KeyRound size="1.125rem" className="text-flag shrink-0 animate-bounce" /> : icon}
+      {awaitingPassword ? <KeyRound size="1.125rem" className="text-warning shrink-0 animate-bounce" /> : icon}
       <div className="min-w-0 flex-1">
         <div className="font-mono text-foreground truncate font-medium" title={backup.path}>
           {backup.label}

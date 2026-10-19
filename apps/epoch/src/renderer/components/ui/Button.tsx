@@ -44,7 +44,7 @@
  *
  * Loading state renders `Loader` (see ./Loader.tsx) inheriting
  * `currentColor` rather than taking a color prop. Every existing spinner in
- * the app (`border-background`, `border-flag`, `border-accent` variants) was
+ * the app (`border-background`, `border-warning`, `border-accent` variants) was
  * already just matching whatever text color surrounded it -- this component
  * sets that text color per `variant`, so the spinner needs no color of its
  * own to stay in sync.
@@ -64,12 +64,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        accent: 'bg-accent text-background shadow-elevation-2 hover:bg-accent/90 active:scale-[0.99]',
-        // A secondary action is tinted in the accent so it reads as a button on
-        // every surface tier, including the raised panels it often sits on
-        // (EPOCH-506; contrast in DESIGN.md §9).
+        // The primary action: the one filled accent button of a step (DESIGN.md §9).
+        accent: 'bg-accent text-on-accent shadow-elevation-2 hover:bg-accent/90 active:scale-[0.99]',
+        // A secondary action is neutral, with a border, so the primary action is
+        // the only coloured button on a screen (EPOCH-574, DESIGN.md §9).
         outline:
-          'bg-accent/15 text-accent shadow-elevation-1 hover:bg-accent/25 hover:shadow-elevation-2 active:scale-[0.99]',
+          'bg-surface-raised text-foreground border border-border-strong shadow-elevation-1 hover:bg-surface-hover active:scale-[0.99]',
         ghost: 'text-muted-foreground hover:text-foreground',
         danger: 'bg-danger text-background shadow-elevation-2 hover:bg-danger/90 active:scale-[0.99]',
       },
@@ -94,9 +94,9 @@ const buttonVariants = cva(
       { variant: ['accent', 'outline', 'danger'], size: 'sm', class: 'px-3 py-2' },
       // `tone` only applies to `outline` -- `accent`/`danger` already carry
       // their own fixed colour, and `ghost` has no danger call site yet.
-      // A destructive secondary action (Delete It) is tinted in the danger
-      // colour, with foreground text: danger text on the tint misses 4.5:1.
-      { variant: 'outline', tone: 'danger', class: 'bg-danger/15 text-foreground hover:bg-danger/25' },
+      // A destructive secondary action (Delete It, Stop) keeps the neutral
+      // button and says so in the danger colour: its text and its border.
+      { variant: 'outline', tone: 'danger', class: 'text-danger border-danger/60 hover:bg-danger/10' },
     ],
     defaultVariants: {
       variant: 'accent',

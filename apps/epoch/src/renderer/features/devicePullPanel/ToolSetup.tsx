@@ -90,7 +90,7 @@ export function ToolSetup({
       {failure && !running && <FailureBanner failure={failure} />}
 
       {note && !running && (
-        <div className="flex items-start gap-3 text-data text-flag bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-lg p-4">
+        <div className="flex items-start gap-3 text-data text-warning bg-warning/10 border border-warning/30 shadow-elevation-1 rounded-lg p-4">
           <ShieldCheck size="1.125rem" className="shrink-0 mt-0.5" />
           <span>{note}</span>
         </div>
@@ -136,7 +136,7 @@ export function ToolSetup({
 function RequirementRow({ requirement }: { requirement: ToolSetupRequirement }) {
   const { ok, group, label, version, detail } = requirement;
   const Icon = ok ? CheckCircle2 : group === 'libraries' ? Circle : XCircle;
-  const tone = ok ? 'text-success' : group === 'libraries' ? 'text-muted-foreground' : 'text-flag';
+  const tone = ok ? 'text-success' : group === 'libraries' ? 'text-muted-foreground' : 'text-warning';
   return (
     <li className="flex items-start gap-3">
       <Icon size="1rem" className={`${tone} shrink-0 mt-0.5`} aria-label={ok ? 'Installed' : 'Missing'} />

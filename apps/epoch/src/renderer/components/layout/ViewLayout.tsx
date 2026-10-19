@@ -28,8 +28,8 @@ interface ViewLayoutProps {
  * The frame of every sidebar-navigated view (EPOCH-464). The gutter belongs
  * to the app shell's content area alone; a view sets no outer padding or
  * margin of its own, so the content edge and the title sit in the same place
- * on every view (DESIGN.md §6). The header carries the section's colour: an
- * icon chip, and a soft glow behind it (§9).
+ * on every view (DESIGN.md §6). The header carries the section's colour on its
+ * icon chip only, a marker, never a fill (§9, EPOCH-574).
  */
 export function ViewLayout({
   section,
@@ -51,10 +51,6 @@ export function ViewLayout({
       style={sectionStyle(section)}
       className={cn('relative flex flex-col flex-1', fit, width === 'readable' && 'w-full max-w-4xl')}
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-8 -left-8 h-80 w-3xl bg-[radial-gradient(ellipse_at_top_left,hsl(var(--section)/0.22),transparent_70%)]"
-      />
       <header className="relative mb-6 shrink-0 flex items-start gap-4">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-section/20 text-section ring-1 ring-section/40 shadow-elevation-1">
           <Icon size="1.25rem" />

@@ -63,8 +63,10 @@ export function Sidebar({ active, onSelect, dbStatus }: SidebarProps) {
               style={sectionStyle(id)}
               aria-current={current ? 'page' : undefined}
               className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-data font-medium transition-colors cursor-pointer select-none ${
+                // The current section: a neutral fill, its colour on the marker
+                // and the icon only (DESIGN.md §9, EPOCH-574).
                 current
-                  ? 'bg-section/15 text-section font-semibold'
+                  ? 'bg-surface-raised text-foreground font-semibold'
                   : 'text-foreground/75 hover:bg-surface hover:text-foreground'
               }`}
             >

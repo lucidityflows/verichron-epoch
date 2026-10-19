@@ -72,7 +72,7 @@ export function StillFailingPanel({
   return (
     <div
       role="status"
-      className="flex items-start gap-3 text-data text-flag bg-flag/10 shadow-elevation-1 border border-flag/30 rounded-lg p-4 mb-5 shrink-0 max-h-[40vh] overflow-auto"
+      className="flex items-start gap-3 text-data text-warning bg-warning/10 shadow-elevation-1 border border-warning/30 rounded-lg p-4 mb-5 shrink-0 max-h-[40vh] overflow-auto"
     >
       <AlertTriangle size="1rem" className="shrink-0 mt-0.5" aria-hidden />
       <div className="flex-1 min-w-0">

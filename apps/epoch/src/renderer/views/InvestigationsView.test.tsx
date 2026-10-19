@@ -253,7 +253,7 @@ describe('InvestigationsView', () => {
     assert.deepEqual(onSelectRun.mock.calls.at(-1), [created]);
   });
 
-  it('shows a failed Analyze Again in danger, and a cancelled one in flag, with Copy', () => {
+  it('shows a failed Analyze Again in danger, and a cancelled one in warning, with Copy', () => {
     hook.analysis = {
       kind: 'retry',
       target: NEWER.run_id,
@@ -277,6 +277,6 @@ describe('InvestigationsView', () => {
     };
     show(NEWER, [stage({})]);
     banner = screen.getByRole('alert');
-    assert.match(banner.className, /text-flag/, 'a stop the examiner asked for is not a failure');
+    assert.match(banner.className, /text-warning/, 'a stop the examiner asked for is not a failure');
   });
 });

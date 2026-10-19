@@ -189,7 +189,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
   if (!sourceId) return null;
 
   return (
-    <div className="bg-surface shadow-elevation-1 rounded-xl p-6">
+    <div className="card rounded-xl p-6">
       <div className="flex items-center gap-3 mb-5">
         <div className="p-2 rounded-lg bg-accent/10 text-accent">
           <Smartphone size="1.25rem" />
@@ -246,15 +246,15 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
       {/* Windows: the acquisition actions (WSL build). */}
       {phase === 'unavailable' && !setupStatus && toolStatus && !toolStatus.available && (
         <div>
-          {/* Flag banner, standard 1 of 2 in this file -- see the Setup
+          {/* Warning banner, standard 1 of 2 in this file -- see the Setup
            * Error card below. Both now share the same treatment
-           * (rounded-xl, p-4, border-flag/30, shadow-elevation-1) per the
-           * "all flag banners should be the same standard" directive on
+           * (rounded-xl, p-4, border-warning/30, shadow-elevation-1) per the
+           * "all warning banners should be the same standard" directive on
            * VER-10. Previously this one was rounded-lg/px-4 py-3/
-           * border-flag/20 with no elevation -- a different, weaker
+           * border-warning/20 with no elevation -- a different, weaker
            * treatment than its sibling three lines down for no reason
            * other than having been written at a different time. */}
-          <div className="flex items-center gap-3 text-data text-flag bg-flag/10 border border-flag/30 shadow-elevation-1 p-4 rounded-xl mb-5">
+          <div className="flex items-center gap-3 text-data text-warning bg-warning/10 border border-warning/30 shadow-elevation-1 p-4 rounded-xl mb-5">
             <XCircle size="1.125rem" className="shrink-0" />
             <span>iPhone import is not set up on this computer yet.</span>
           </div>
@@ -377,7 +377,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
             {!stickToBottom && acquisitionOutput.length > 0 && (
               <button
                 onClick={jumpToLatest}
-                className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-accent text-background text-label rounded-full px-3 py-1.5 shadow-elevation-2 hover:bg-accent/90 transition-all cursor-pointer"
+                className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-accent text-on-accent text-label rounded-full px-3 py-1.5 shadow-elevation-2 hover:bg-accent/90 transition-all cursor-pointer"
               >
                 <ArrowDown size="0.75rem" />
                 Jump to latest
@@ -438,7 +438,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                         className="sr-only"
                       />
                       <span
-                        className={`p-2 rounded-lg shrink-0 ${selected ? 'bg-accent text-background' : 'bg-accent/10 text-accent'}`}
+                        className={`p-2 rounded-lg shrink-0 ${selected ? 'bg-accent text-on-accent' : 'bg-accent/10 text-accent'}`}
                       >
                         <Smartphone size="1.25rem" />
                       </span>
@@ -451,7 +451,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                       </span>
                       <span
                         className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-label transition-colors ${
-                          selected ? 'bg-accent/20 text-accent' : 'bg-accent text-background shadow-elevation-2'
+                          selected ? 'bg-accent/20 text-accent' : 'bg-accent text-on-accent shadow-elevation-2'
                         }`}
                       >
                         {selected ? (
@@ -519,9 +519,9 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           )}
 
           {selectedDevice && encryptionConsent && (
-            <section className="rounded-lg bg-flag/10 border border-flag/30 shadow-elevation-1 p-5 flex flex-col gap-3">
+            <section className="rounded-lg bg-warning/10 border border-warning/30 shadow-elevation-1 p-5 flex flex-col gap-3">
               <h3 className="flex items-center gap-2 font-display text-heading text-foreground">
-                <ShieldCheck size="1.125rem" className="text-flag" /> Turn On Encrypted Backups?
+                <ShieldCheck size="1.125rem" className="text-warning" /> Turn On Encrypted Backups?
               </h3>
               <p className="text-data text-foreground">
                 Encrypted backups are off on {selectedDevice.name}. To continue, Epoch will turn them on with the
@@ -558,18 +558,18 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           {deviceAction && phase === 'pulling' && (
             <div
               role="alert"
-              className="flex items-center gap-4 bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-lg p-5 mt-5"
+              className="flex items-center gap-4 bg-warning/10 border border-warning/30 shadow-elevation-1 rounded-lg p-5 mt-5"
             >
-              <div className="p-3 rounded-full bg-flag/20 text-flag shrink-0">
+              <div className="p-3 rounded-full bg-warning/20 text-warning shrink-0">
                 <Smartphone size="1.5rem" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-display text-heading text-flag">
+                <h3 className="font-display text-heading text-warning">
                   Action Needed on {selectedDevice?.name ?? 'the iPhone'}
                 </h3>
                 <p className="text-data text-foreground mt-1">{deviceAction}</p>
               </div>
-              <Loader className="text-flag" />
+              <Loader className="text-warning" />
             </div>
           )}
 
@@ -662,9 +662,9 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
               {crashReports && crashReports.outcome === 'failed' && (
                 <div
                   role="alert"
-                  className="flex items-center gap-4 bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-lg p-4 mb-4"
+                  className="flex items-center gap-4 bg-warning/10 border border-warning/30 shadow-elevation-1 rounded-lg p-4 mb-4"
                 >
-                  <div className="p-2 rounded-full bg-flag/20 text-flag shrink-0">
+                  <div className="p-2 rounded-full bg-warning/20 text-warning shrink-0">
                     <Smartphone size="1.25rem" />
                   </div>
                   <p className="flex-1 min-w-0 text-data text-foreground">

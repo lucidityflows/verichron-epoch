@@ -31,7 +31,7 @@ function ResultBadge({ check }: { check: IndicatorCheckRow }) {
   if (check.status === 'failed') return <Badge variant="failed">Check failed</Badge>;
   if (check.status !== 'succeeded' || check.matches === null) return <Badge variant="skipped">Not checked</Badge>;
   return check.matches ? (
-    <Badge variant="flag">{check.matches.toLocaleString('en-US')} match(es)</Badge>
+    <Badge variant="warning">{check.matches.toLocaleString('en-US')} match(es)</Badge>
   ) : (
     <Badge variant="neutral">No match</Badge>
   );
@@ -48,7 +48,7 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
       {check.set_name && (
         <p className="text-data text-foreground/90">
           {setLine(check)}
-          {stale && <span className="block text-flag mt-1">{stale}</span>}
+          {stale && <span className="block text-warning mt-1">{stale}</span>}
         </p>
       )}
       <p className="text-data text-foreground">{resultLine(check, results.nothingChecked)}</p>
@@ -128,7 +128,7 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
                     <td className={cell}>
                       {match_mode}
                       {indicator.expired && (
-                        <span className="text-flag">, expired {(indicator.valid_until ?? '').slice(0, 10)}</span>
+                        <span className="text-warning">, expired {(indicator.valid_until ?? '').slice(0, 10)}</span>
                       )}
                     </td>
                     <td className={cell}>
@@ -198,7 +198,7 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
   } else if (error) {
     // §1 state-colour banner rule: shadow-elevation-1 + the state colour's border together.
     body = (
-      <div className="text-flag bg-flag/10 shadow-elevation-1 border border-flag/30 rounded-lg p-4 text-data">
+      <div className="text-warning bg-warning/10 shadow-elevation-1 border border-warning/30 rounded-lg p-4 text-data">
         Error: {error}
       </div>
     );
@@ -226,12 +226,12 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
     body = (
       <div className="space-y-6">
         <p className="text-data text-muted-foreground">{results.limit}</p>
-        <section className="bg-surface shadow-elevation-1 rounded-lg p-5">
+        <section className="card rounded-lg p-5">
           <div className="flex items-center gap-3 mb-4">
             <h2 className="font-display text-heading text-foreground">This run's check</h2>
             {thisRun && <ResultBadge check={thisRun} />}
             {thisRun?.set_name && staleLine(thisRun, results.staleAfterDays) && (
-              <Badge variant="flag">Older than {results.staleAfterDays} days</Badge>
+              <Badge variant="warning">Older than {results.staleAfterDays} days</Badge>
             )}
             {thisRun && <span className="text-data text-muted-foreground">{checkedOn(thisRun)}</span>}
           </div>
@@ -242,7 +242,7 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
           )}
         </section>
         {others.length > 0 && (
-          <section className="bg-surface shadow-elevation-1 rounded-lg p-5 space-y-3">
+          <section className="card rounded-lg p-5 space-y-3">
             <h2 className="font-display text-heading text-foreground">Other checks of this evidence</h2>
             {others.map((check) => (
               <div key={check.run_id} className="space-y-2">
