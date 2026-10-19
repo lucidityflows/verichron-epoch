@@ -263,7 +263,12 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
   }
 
   return (
-    <ViewLayout section="iocs" title="Indicator Matches" description={analysisName(selectedRun) ?? undefined}>
+    <ViewLayout
+      section="iocs"
+      title="Indicator Matches"
+      description="Every check of this evidence against a registered indicator set, and what each check could not cover."
+      context={analysisName(selectedRun)}
+    >
       {body}
     </ViewLayout>
   );

@@ -46,7 +46,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
   };
 
   return (
-    <ViewLayout section="reports" title="Reports" description={analysisName(selectedRun) ?? undefined}>
+    <ViewLayout
+      section="reports"
+      title="Reports"
+      description="The investigation report for the selected investigation."
+      context={analysisName(selectedRun)}
+    >
       {!selectedRun ? (
         <EmptyState
           icon={MousePointerClick}

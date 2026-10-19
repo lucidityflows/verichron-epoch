@@ -101,7 +101,8 @@ export function RecordsView({
     <ViewLayout
       section="records"
       title="Forensic Records"
-      description={analysisName ?? undefined}
+      description="Every fact extracted from this evidence, with where it came from. Records show what was found, not what was not examined."
+      context={analysisName}
       scroll="contained"
       className="overflow-hidden"
     >

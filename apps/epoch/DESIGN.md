@@ -202,9 +202,15 @@ content edge or the title (EPOCH-464).
   between 32px and 64px.
 - **Title:** `ViewLayout` renders the view's one `text-display` title (§2) as
   an `h1` in the foreground colour, beside an icon chip in the view's section
-  colour (§9), with 24px (`mb-6`) below the header. An optional description
-  sits under it, and an optional aside (e.g. a count) beside it. Each view
-  passes its `section`.
+  colour (§9), with 24px (`mb-6`) below the header, and an optional aside
+  (e.g. a count) beside it. Each view passes its `section`.
+- **Every view has a description** (owner, 2026-10-19): one sentence under the
+  title saying what the view is for, in `text-data`, so the five headers read
+  alike. A view showing one analysis adds a `context` line beneath, in
+  `text-label`: the investigation and analysis it shows ("iPhone17,5 · iOS
+  26.6.1 · Investigation … · Analysis …"). A fixed approved sentence with its
+  own source (Indicator Matches' limit sentence) stays in the view's body,
+  not copied into the header.
 - **Width:** `full` by default. Form-like views use `readable`, which caps the
   width at `max-w-4xl` (896px) but stays left-aligned, so the left edge
   matches every other view. Views are never centered.

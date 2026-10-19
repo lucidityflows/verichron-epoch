@@ -9,8 +9,10 @@ interface ViewLayoutProps {
   title: React.ReactNode;
   /** Inline beside the title, e.g. a count. */
   titleAside?: React.ReactNode;
-  /** One line under the title. */
-  description?: React.ReactNode;
+  /** What the view is for, in one sentence under the title. Every view has one. */
+  description: React.ReactNode;
+  /** What the view is showing now, under the description: the selected analysis. */
+  context?: string | null;
   /** `readable` caps the width for form-like views; the left edge never moves. */
   width?: 'full' | 'readable';
   /**
@@ -36,6 +38,7 @@ export function ViewLayout({
   title,
   titleAside,
   description,
+  context,
   width = 'full',
   scroll = 'page',
   className,
@@ -60,7 +63,8 @@ export function ViewLayout({
             {title}
             {titleAside}
           </h1>
-          {description && <p className="text-data text-muted-foreground mt-1">{description}</p>}
+          <p className="text-data text-muted-foreground mt-1">{description}</p>
+          {context && <p className="text-label text-muted-foreground mt-0.5">{context}</p>}
         </div>
       </header>
       <div className={cn('relative flex flex-col flex-1', scroll === 'contained' && 'min-h-0', className)}>
