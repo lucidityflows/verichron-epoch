@@ -25,7 +25,7 @@
  * apps/reporting/generate_report.py can't disagree about them (R27).
  */
 
-import { findWorkspaceBackupForPath } from '@verichron/contracts';
+import { findWorkspaceBackupForPath, stageTitle } from '@verichron/contracts';
 import pg from 'pg';
 import type { Client, CustomTypesConfig, Pool, PoolClient } from 'pg';
 
@@ -67,11 +67,22 @@ export interface PipelineRunRow {
   ended_detail: string | null;
   /** The device's name, as registered with the evidence; null without evidence. */
   device_label: string | null;
+  /** What names the investigation (EPOCH-555), from the backup's Info.plist;
+   * null without evidence: the model identifier, the iOS version, and when the
+   * backup began. */
+  product_type: string | null;
+  ios_version: string | null;
+  backup_date: string | null;
+  /** The evidence's size in bytes (BIGINT, so a string, R26); null without evidence. */
+  total_bytes: string | null;
   /** How many of the run's stages are in each status, for a one-line summary
    * (EPOCH-430). `state` stays the verdict; never derive it from these. */
   stage_counts: Record<StageStatus, number>;
   /** How many of the run's stages succeeded with warnings (EPOCH-420). */
   stages_with_warnings: number;
+  /** The records in the completed units this run labelled (R7's links), as
+   * the stage rows count them (EPOCH-431): what the analysis covered. */
+  records: number;
 }
 
 export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
@@ -82,6 +93,8 @@ export type EndedReason = 'completed' | 'cancelled' | 'timeout' | 'crashed' | 'a
 export interface StageStatusRow {
   run_id: string;
   stage_name: string;
+  /** What an examiner calls the stage (EPOCH-555), from the contracts' one map. */
+  stage_title: string;
   /** The stage's declared order, from its stage.json (EPOCH-414). */
   stage_order: number;
   status: StageStatus;
@@ -138,10 +151,10 @@ const RECORD_COLUMNS = `id, ingest_id, evidence_id, derivative_id, file_hash, pa
  * Most recent pipeline runs, newest first.
  */
 export async function getPipelineRuns(client: Db, limit = 100): Promise<PipelineRunRow[]> {
-  const result = await client.query<PipelineRunRow>(
+  const result = await client.query<Omit<PipelineRunRow, 'records'>>(
     `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id,
             r.contract_version, r.tool_versions, c.state, r.ended_reason, r.ended_detail, d.label AS device_label,
-            s.stage_counts, s.stages_with_warnings
+            e.product_type, e.ios_version, e.backup_date, e.total_bytes, s.stage_counts, s.stages_with_warnings
        FROM pipeline_runs r
        JOIN run_completeness c USING (run_id)
        LEFT JOIN evidence_items e ON e.evidence_id = r.evidence_id
@@ -162,7 +175,20 @@ export async function getPipelineRuns(client: Db, limit = 100): Promise<Pipeline
       LIMIT $1`,
     [limit]
   );
-  return result.rows;
+  // The records in a query of its own, through R7's links: a statement that
+  // reads facts never also reaches them through pipeline_runs
+  // (scripts/test_evidence_reads.py).
+  const counts = await client.query<{ run_id: string; records: number }>(
+    `SELECT l.run_id, coalesce(sum(f.record_count), 0)::int AS records
+       FROM ingest_run_links l
+       JOIN ingested_files f ON f.ingest_id = l.ingest_id
+      WHERE l.run_id = ANY($1::uuid[])
+        AND f.ingest_complete
+      GROUP BY l.run_id`,
+    [result.rows.map((row) => row.run_id)]
+  );
+  const records = new Map(counts.rows.map((row) => [row.run_id, row.records]));
+  return result.rows.map((row) => ({ ...row, records: records.get(row.run_id) ?? 0 }));
 }
 
 /**
@@ -219,7 +245,7 @@ export async function getRunReportLocation(client: Db, runId: string): Promise<s
  * The order has one owner (R2); no list of stage names lives here.
  */
 export async function getStageStatus(client: Db, runId: string): Promise<StageStatusRow[]> {
-  const result = await client.query<Omit<StageStatusRow, 'run_ended_reason' | 'run_finished_at'>>(
+  const result = await client.query<Omit<StageStatusRow, 'stage_title' | 'run_ended_reason' | 'run_finished_at'>>(
     `SELECT s.run_id, s.stage_name, s.stage_order, s.status, s.error_message, s.warnings, s.started_at, s.finished_at,
             s.parser_version, s.derivative_id, d.kind AS derivative_kind, d.tool AS derivative_tool,
             u.units, u.records
@@ -247,7 +273,12 @@ export async function getStageStatus(client: Db, runId: string): Promise<StageSt
     [runId]
   );
   const end = run.rows[0] ?? { ended_reason: null, finished_at: null };
-  return result.rows.map((row) => ({ ...row, run_ended_reason: end.ended_reason, run_finished_at: end.finished_at }));
+  return result.rows.map((row) => ({
+    ...row,
+    stage_title: stageTitle(row.stage_name),
+    run_ended_reason: end.ended_reason,
+    run_finished_at: end.finished_at,
+  }));
 }
 
 /**

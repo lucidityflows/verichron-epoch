@@ -117,8 +117,8 @@ before(async () => {
     [OTHER, 'c'],
   ]) {
     await db.query(
-      `INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes)
-       VALUES ($1, repeat($2, 64), '99999999-9999-9999-9999-999999999999', 0, 0)`,
+      `INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes, product_type, ios_version, backup_date)
+       VALUES ($1, repeat($2, 64), '99999999-9999-9999-9999-999999999999', 0, 0, 'iPhone17,5', '26.6.1', '2026-10-15T18:05:25Z')`,
       [evidence, root]
     );
     await db.query(
@@ -449,9 +449,13 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
   it("gives each run its device's name and its stage counts", async () => {
     const run = (await getPipelineRuns(db)).find((r) => r.run_id === RUN)!;
     assert.equal(run.device_label, 'test device');
+    // What names the investigation (EPOCH-555).
+    assert.deepEqual([run.product_type, run.ios_version, run.total_bytes], ['iPhone17,5', '26.6.1', '0']);
+    assert.equal(new Date(run.backup_date as unknown as string).toISOString(), '2026-10-15T18:05:25.000Z');
     assert.deepEqual(run.stage_counts, { pending: 5, running: 4, failed: 3, skipped: 2, succeeded: 1 });
     assert.equal(run.state, 'running', 'the verdict comes from run_completeness, not the counts');
     assert.equal(run.stages_with_warnings, 1, 'EPOCH-420: the succeeded crash stage left warnings');
+    assert.equal(run.records, 7, 'the complete units this run linked; not the incomplete one, not another run’s');
   });
 
   it("returns a run's stages in their declared order, never a hard-coded list (EPOCH-414)", async () => {
@@ -466,6 +470,7 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
     assert.equal(crash.parser_version, 1);
     assert.equal(crash.derivative_kind, 'decrypted');
     assert.deepEqual(crash.derivative_tool, { name: 'test', version: '0' });
+    assert.equal(crash.stage_title, 'Crash Reports');
     assert.deepEqual([crash.units, crash.records], [2, 7], 'incomplete units and other runs are not counted');
     assert.equal(
       crash.warnings,

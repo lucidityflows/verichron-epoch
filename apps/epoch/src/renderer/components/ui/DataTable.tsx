@@ -4,8 +4,8 @@ import type { ColumnDef, Row } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
 /**
- * Generic virtualized data table for the investigation views (RunsView,
- * RecordsView today; anything columnar later).
+ * Generic virtualized data table for columnar views (RecordsView today;
+ * anything columnar later).
  */
 
 export interface DataTableColumnMeta {
@@ -43,7 +43,7 @@ export interface DataTableProps<TData extends Record<string, any>> {
    * existing click-to-expand pattern already used by RecordsView/IocsView. */
   expandedId?: string | null;
   /** Highlights a row with the accent-bar selected treatment, independent
-   * of expansion -- RunsView selects a run without expanding any detail;
+   * of expansion -- a view can select a row without expanding any detail;
    * RecordsView expands a row's JSON without it being "selected" in any
    * lasting sense. Kept as two props rather than overloading expandedId,
    * since a future view could plausibly want both at once. */
@@ -55,7 +55,7 @@ export interface DataTableProps<TData extends Record<string, any>> {
   emptyState?: React.ReactNode;
   /** Height of the scroll viewport. A virtualizer needs a bounded
    * scrollport to compute which rows are visible; callers embed this in
-   * a flex/grid layout that already constrains height (see RunsView). */
+   * a flex/grid layout that already constrains height (see RecordsView). */
   className?: string;
 }
 

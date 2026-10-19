@@ -80,6 +80,8 @@ export {
   eventMessage,
   formatBytes,
   stageName,
+  stageTitle,
+  STAGE_TITLES,
   parsePipelineEventLine,
   renderPipelineEvent,
   type EventProducer,

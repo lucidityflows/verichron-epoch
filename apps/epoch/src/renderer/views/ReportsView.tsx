@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { reportsApi } from '../api/reports';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
+import { analysisName } from '../features/investigations/investigations';
 
 interface ReportsViewProps {
   selectedRun: PipelineRunRow | null;
@@ -45,7 +46,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
   };
 
   return (
-    <ViewLayout section="reports" title="Reports">
+    <ViewLayout section="reports" title="Reports" description={analysisName(selectedRun) ?? undefined}>
       {!selectedRun ? (
         <EmptyState
           icon={MousePointerClick}

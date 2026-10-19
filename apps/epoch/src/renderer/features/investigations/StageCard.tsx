@@ -1,15 +1,17 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import type { ItemFailurePage, StageStatusRow } from '@verichron/etl-db-reader';
-import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { CopyButton } from '../../components/ui/CopyButton';
 import { DateTime } from '../../components/ui/DateTime';
 import { Disclosure } from '../../components/ui/Disclosure';
+import { StatusChip } from '../../components/ui/StatusChip';
+import { stageChip } from '../../components/ui/statusChip';
 import { reportsApi } from '../../api/reports';
 import { runsApi } from '../../api/runs';
 import { FailedItems, failedItemsText } from './FailedItems';
 import { interruptionPhrase, stoppedStage } from './endedReason';
+import { warningLines } from './investigations';
 
 /** The report stage, named after its directory as the orchestrator names stages. */
 const REPORT_STAGE = 'reporting';
@@ -124,19 +126,12 @@ function StageFailures({ stage, loadFailures }: { stage: StageStatusRow; loadFai
   );
 }
 
-/** The status colour (DESIGN.md §9): running is current work, not an alert. */
-function statusColour(stage: StageStatusRow): string {
-  if (stoppedStage(stage)) return 'var(--flag)';
-  if (stage.status === 'succeeded') return 'var(--success)';
-  if (stage.status === 'running') return 'var(--accent)';
-  if (stage.status === 'failed') return 'var(--danger)';
-  return 'var(--muted-foreground)';
-}
-
 /**
- * One stage of an investigation (EPOCH-431): its status and what it produced
- * at a glance, and everything else (what it read, what it wrote, exact times,
- * its output) when opened. The whole card opens, by click, Enter or Space.
+ * One stage of an analysis (EPOCH-431, EPOCH-555): its name, where it stands
+ * and what it produced at a glance, and everything else (what it read, what
+ * it wrote, exact times, its warnings and output) when opened. A row in one
+ * top-aligned list, so opening it changes only its own height. The whole row
+ * opens, by click, Enter or Space.
  */
 export function StageCard({
   stage,
@@ -147,11 +142,12 @@ export function StageCard({
 }) {
   const [open, setOpen] = useState(false);
   const durationMs = stageDurationMs(stage);
-  const colour = statusColour(stage);
   const stopped = stoppedStage(stage);
   const read = describeRead(stage);
-  // A succeeded stage's notes (EPOCH-420): it still succeeded, but said something.
-  const warnings = stage.status === 'succeeded' && stage.warnings ? stage.warnings : null;
+  const chip = stageChip({ status: stage.status, warnings: stage.warnings, runEndedReason: stage.run_ended_reason });
+  // A succeeded stage's notes (EPOCH-420): it still succeeded, but said
+  // something. Counted and written as sentences (EPOCH-555).
+  const warnings = stage.status === 'succeeded' ? warningLines(stage.warnings) : [];
 
   const toggle = () => setOpen((v) => !v);
   const onKeyDown = (e: KeyboardEvent) => {
@@ -169,14 +165,17 @@ export function StageCard({
       aria-expanded={open}
       onClick={toggle}
       onKeyDown={onKeyDown}
-      className="group relative overflow-hidden bg-surface-raised rounded-lg p-5 border-l-2 shadow-elevation-1 transition-all hover:shadow-elevation-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-      style={{
-        borderLeftColor: `hsl(${colour} / ${stage.status === 'pending' || stage.status === 'skipped' ? '0.5' : '1'})`,
-      }}
+      className="group bg-surface-raised rounded-lg px-5 py-4 shadow-elevation-1 transition-shadow hover:shadow-elevation-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
-      <div className="flex items-center gap-2">
-        <h4 className="font-display text-label flex-1 truncate">{stage.stage_name}</h4>
-        {stopped ? <Badge variant="flag">stopped</Badge> : <Badge variant={stage.status}>{stage.status}</Badge>}
+      <div className="flex items-center gap-3">
+        <h4 className="font-display text-heading text-foreground flex-1 truncate" title={stage.stage_name}>
+          {stage.stage_title}
+        </h4>
+        <StatusChip
+          state={chip.state}
+          detail={chip.detail}
+          warningCount={chip.state === 'warnings' ? warnings.length : undefined}
+        />
         {open ? (
           <ChevronDown size="1rem" className="text-muted-foreground shrink-0" aria-hidden />
         ) : (
@@ -186,7 +185,6 @@ export function StageCard({
       <p className="text-data text-muted-foreground mt-2 truncate">
         {summary(stage)}
         {durationMs !== null && ` · ${formatDuration(durationMs)}`}
-        {warnings && <span className="text-flag"> · with warnings</span>}
       </p>
 
       {open && (
@@ -222,8 +220,8 @@ export function StageCard({
 
           {stopped && stage.status === 'running' && (
             <p className="text-data text-flag mt-3">
-              This stage never finished: {interruptionPhrase(stage.run_ended_reason)}. A rerun retries what it
-              didn&apos;t complete.
+              This stage never finished: {interruptionPhrase(stage.run_ended_reason)}. What it wrote is kept, and
+              Analyze Again finishes the rest.
             </p>
           )}
 
@@ -237,7 +235,21 @@ export function StageCard({
 
           {stage.status === 'failed' && <StageFailures stage={stage} loadFailures={loadFailures} />}
 
-          {warnings && <StageOutput label="Warnings" labelClass="text-flag" text={warnings} />}
+          {warnings.length > 0 && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-data text-flag">
+                  {warnings.length} warning{warnings.length === 1 ? '' : 's'}
+                </p>
+                <CopyButton text={warnings.join('\n')} title="Copy warnings" />
+              </div>
+              <ul className="list-disc pl-5 space-y-1 text-data text-foreground">
+                {warnings.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {stage.stage_name === REPORT_STAGE && stage.status === 'succeeded' && (
             <Button variant="outline" size="sm" className="mt-3" onClick={() => reportsApi.openReport(stage.run_id)}>

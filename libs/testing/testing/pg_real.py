@@ -177,8 +177,9 @@ class PgReal:
                         raise RuntimeError("Postgres INSERT did not return the newly created device")
                     device_id = device_row[0]
                     cur.execute(
-                        "INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes) "
-                        "VALUES (%s, %s, %s, 0, 0)",
+                        "INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes, "
+                        "product_type, ios_version, backup_date) "
+                        "VALUES (%s, %s, %s, 0, 0, 'iPhone17,5', '26.6.1', '2026-10-15T18:05:25Z')",
                         (evidence_id, _hex64(f"root:{evidence_id}"), device_id),
                     )
                     cur.execute(

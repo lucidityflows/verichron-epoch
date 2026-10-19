@@ -6,8 +6,8 @@ import type { EndedReason, StageStatusRow } from '@verichron/etl-db-reader';
  * Forensic Records.
  */
 export const ENDED_REASON_PHRASE: Record<Exclude<EndedReason, 'completed'>, string> = {
-  cancelled: 'the run was cancelled',
-  timeout: 'the run stalled and was stopped',
+  cancelled: 'the analysis was cancelled',
+  timeout: 'the analysis stalled and was stopped',
   crashed: 'the orchestrator stopped unexpectedly',
   // Only that the process is gone is recorded, not why (review on PR #125).
   abandoned: 'its orchestrator ended without finishing it',

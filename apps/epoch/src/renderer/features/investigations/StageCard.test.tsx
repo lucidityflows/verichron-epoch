@@ -17,6 +17,7 @@ function stage(overrides: Partial<StageStatusRow>): StageStatusRow {
   return {
     run_id: '33333333-3333-3333-3333-333333333333',
     stage_name: 'crash',
+    stage_title: 'Crash Reports',
     status: 'succeeded',
     error_message: null,
     warnings: null,
@@ -38,7 +39,7 @@ const NO_FAILURES = async (): Promise<ItemFailurePage> => ({ rows: [], total: 0 
 
 /** The card itself: the one button named by its stage. */
 function card(): HTMLElement {
-  return screen.getByRole('button', { name: /^crash/ });
+  return screen.getByRole('button', { name: /^Crash Reports/ });
 }
 
 describe('StageCard', () => {
@@ -82,20 +83,25 @@ describe('StageCard', () => {
   });
 
   it('shows a succeeded stage’s warnings as warnings, never as an error (EPOCH-420)', () => {
-    const warnings = '[ileapp]   Calendar Events: 57 time(s) in Last Modification Time fall before 2007-06-29';
+    const warnings = [
+      '[ileapp]   Calendar Events: 57 time(s) in Last Modification Time fall before 2007-06-29',
+      '[ileapp]   zalo_messages raised IndexError; its table was not read',
+    ].join('\n');
     render(<StageCard stage={stage({ warnings })} />);
-    assert.ok(screen.getByText(/with warnings/), 'said on the closed card');
+    assert.ok(screen.getByText('Complete, 2 warnings'), 'counted on the closed card (EPOCH-555)');
     fireEvent.click(card());
-    assert.ok(screen.getByText('Warnings'));
-    assert.ok(screen.getByText(/57 time\(s\) in Last Modification Time/));
+    assert.ok(screen.getByText('2 warnings'));
+    // Each one a sentence, without the stage's own [tag].
+    assert.ok(screen.getByText('Calendar Events: 57 time(s) in Last Modification Time fall before 2007-06-29'));
+    assert.ok(screen.getByText('zalo_messages raised IndexError; its table was not read'));
     assert.equal(screen.queryByText('Error'), null);
   });
 
   it('says nothing about warnings when a succeeded stage printed none', () => {
     render(<StageCard stage={stage({})} />);
-    assert.equal(screen.queryByText(/with warnings/), null);
+    assert.ok(screen.getByText('Complete'));
     fireEvent.click(card());
-    assert.equal(screen.queryByText('Warnings'), null);
+    assert.equal(screen.queryByText(/warning/), null);
   });
 
   it('opens and closes from the keyboard, and says so', () => {
@@ -129,11 +135,16 @@ describe('StageCard', () => {
       ],
       total: 3,
     }));
-    const failed = stage({ stage_name: 'ileapp_bridge', status: 'failed', derivative_kind: 'ileapp_output' });
+    const failed = stage({
+      stage_name: 'ileapp_bridge',
+      stage_title: 'iLEAPP Artifacts',
+      status: 'failed',
+      derivative_kind: 'ileapp_output',
+    });
     render(<StageCard stage={failed} loadFailures={loadFailures} />);
     assert.equal(loadFailures.mock.calls.length, 0, 'nothing is read while the card is closed');
 
-    fireEvent.click(screen.getByRole('button', { name: /^ileapp_bridge/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^iLEAPP Artifacts/ }));
     const toggle = await screen.findByRole('button', { name: '3 artifact tables failed' });
     assert.deepEqual(loadFailures.mock.calls, [['33333333-3333-3333-3333-333333333333', 'ileapp_bridge']]);
     assert.ok(screen.getByTitle('Copy list'));
@@ -173,12 +184,14 @@ describe('StageCard', () => {
         loadFailures={NO_FAILURES}
       />
     );
-    assert.ok(screen.getByText('stopped'));
-    assert.equal(screen.queryByText('running'), null);
-    assert.ok(screen.getByText('Stopped: the run was cancelled · 2 min 4 s'));
+    assert.ok(screen.getByText('Interrupted'), 'a stop, in the flag role, never Failed (board 6)');
+    assert.equal(screen.queryByText('Running'), null);
+    assert.ok(screen.getByText('Stopped: the analysis was cancelled · 2 min 4 s'));
     fireEvent.click(card());
     assert.ok(
-      screen.getByText("This stage never finished: the run was cancelled. A rerun retries what it didn't complete.")
+      screen.getByText(
+        'This stage never finished: the analysis was cancelled. What it wrote is kept, and Analyze Again finishes the rest.'
+      )
     );
   });
 
@@ -189,13 +202,15 @@ describe('StageCard', () => {
         loadFailures={NO_FAILURES}
       />
     );
-    assert.ok(screen.getByText('stopped'));
+    assert.ok(screen.getByText('Interrupted'));
+    assert.ok(screen.getByText('· the app was closed'));
     assert.ok(screen.getByText('Not run: its orchestrator ended without finishing it'));
   });
 
   it('still shows a stage of a run that is going as running', () => {
     render(<StageCard stage={stage({ status: 'running', finished_at: null, run_ended_reason: null })} />);
     assert.ok(screen.getByText('Running…'));
-    assert.equal(screen.queryByText('stopped'), null);
+    assert.ok(screen.getByText('Running'));
+    assert.equal(screen.queryByText('Interrupted'), null);
   });
 });

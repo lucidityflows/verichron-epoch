@@ -51,7 +51,7 @@ describe('InterruptedStagesPanel', () => {
       />
     );
     assert.ok(await screen.findByText('A stage stopped before it finished'));
-    assert.ok(screen.getByText('crash: the run was cancelled'));
+    assert.ok(screen.getByText('crash: the analysis was cancelled'));
     assert.ok(
       screen.getByText("Facts from the files it didn't finish may be missing, and which files failed is not recorded.")
     );
