@@ -71,7 +71,7 @@ One JSON object per line, validated with zod in `packages/contracts` (`TaskLogEn
 | `source` | `app` \| `processor` \| `orchestrator` \| `stage:<name>` \| `tool:<name>` | who said it; tools are `ileapp`, `decrypt`, `sqlite3`, `idevicebackup2` |
 | `kind` | `task:started` \| `task:finished` \| `event` \| `message` \| `output` | what the entry is: the header, the result, a producer's event, the app's own line, or a line of output that is not an event |
 | `label` | string \| null | the backup's dated label, when the entry concerns one |
-| `step` | string \| null | the processor step (`hash`, `decrypt`, `repair`, `ileapp`, `crash`) or the stage name |
+| `step` | string \| null | the processor step (`hash`, `decrypt`, `repair`, `ileapp`, `crash`), the stage name, or the pull step (`check`, `encryption`, `approve`, `copy`, `verify`, `crash-logs`; §8.5) |
 | `message` | string | one sanitized sentence, shown as is |
 | `event` | `PipelineEvent` | `kind: event` only: the typed event, every text field sanitized |
 | `task` | object | `kind: task:started` only (below) |
@@ -158,7 +158,7 @@ So the sanitizer replaces only **exact values that the workspace and the worksta
 **Where the values come from** (collected by the app before the task starts, then held by the writer):
 - each selected backup's folder name, which is its UDID (measured: the folder name equals Info.plist `Unique Identifier`);
 - from each backup's `Info.plist`: `Unique Identifier`, `Target Identifier`, `GUID`, `Serial Number`, `IMEI`, `IMEI 2`, `MEID`, `ICCID`, `Phone Number`;
-- for a pull (U3), the connected device's UDID, known from the start because the backup's folder is named by it;
+- for a pull (U3), the connected device's UDID, known from the start because the backup's folder is named by it. The backup has no Info.plist yet, so a pull gives no notice for it (EPOCH-554); Prepare and Analyze still warn when a backup's Info.plist can't be read;
 - the workstation's roots: the workspace, the evidence source folder the examiner chose, the app's install folder, the temporary folder (`os.tmpdir()`), the home folder (`os.homedir()`), and the account name (`os.userInfo().username`).
 
 **Class policy:**
@@ -337,12 +337,21 @@ itself (EPOCH-436).
 - **What it keeps:**
   - Epoch's own messages (what it is doing, what to do on the iPhone) are `info`;
   - each line idevicebackup2 prints, on stdout or stderr, is `debug`, from `tool:idevicebackup2`, with its stream;
-  - the failure is the result, `task:finished`, so one failure is one `error`.
+  - the failure is the result, `task:finished`, so one failure is one `error`;
+  - each entry's `step` is the pull step it belongs to (EPOCH-554): checking
+    the iPhone and the destination, turning on encrypted backups (only when
+    Epoch does), approving the backup on the iPhone, copying files, verifying
+    the backup (Status.plist's snapshot finished, Manifest.db present), and
+    copying crash logs. The panel's step list is built from the same steps
+    (`shared/pullSteps.ts`), never from the messages' text.
 - **Identifiers:** the backup is written into a folder named by the device's
   UDID, so the sanitizer has the UDID before any Info.plist exists (§6.3). The
   backup password is the tripwire's secret (§6.2).
 - **Outcome:** `succeeded`, `cancelled` when the examiner stopped it, or
-  `failed`. No log, no pull: a log that can't be created stops the pull before
+  `failed`. A cancel counts only when it stopped the backup: before the backup
+  process starts (checking, or turning on encryption while the iPhone waits
+  for its passcode), Cancel is refused and says so, and a later error is a
+  failure. No log, no pull: a log that can't be created stops the pull before
   its folder holds anything (§7).
 - The one-time tool setup is not a case's task, so it has no task log; its
   output stays in a disclosure in the setup card (owner, 2026-10-18).

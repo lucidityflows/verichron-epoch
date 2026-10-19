@@ -27,11 +27,11 @@ describe('ViewLayout header', () => {
         section="reports"
         title="Reports"
         description="The investigation report."
-        context="iPhone17,5 · iOS 26.6.1 · Investigation aaaaaaaa · Analysis 33333333"
+        context="iPhone 17,5 · iOS 26.6.1 · Investigation aaaaaaaa · Analysis 33333333"
       >
         <p>body</p>
       </ViewLayout>
     );
-    assert.ok(screen.getByText('iPhone17,5 · iOS 26.6.1 · Investigation aaaaaaaa · Analysis 33333333'));
+    assert.ok(screen.getByText('iPhone 17,5 · iOS 26.6.1 · Investigation aaaaaaaa · Analysis 33333333'));
   });
 });

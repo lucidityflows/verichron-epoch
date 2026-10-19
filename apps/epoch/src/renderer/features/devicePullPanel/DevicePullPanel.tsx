@@ -1,44 +1,59 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Smartphone,
   CheckCircle2,
   XCircle,
   Wrench,
-  ArrowDown,
-  Copy,
-  Check,
   AlertTriangle,
   FolderOpen,
   RefreshCw,
   Terminal,
   Lock,
   ShieldCheck,
-  ArrowRight,
 } from 'lucide-react';
-import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { DateTime } from '../../components/ui/DateTime';
 import { Loader } from '../../components/ui/Loader';
 import { useDevicePull } from '../../hooks/useDevicePull';
 import { PasswordField } from '../../components/ui/PasswordField';
 import { FieldError } from '../../components/ui/FieldError';
+import { TerminalLog } from '../../components/layout/TerminalLog';
 import { ToolSetup } from './ToolSetup';
 import { StepList, type Step } from '../../components/ui/StepList';
 import { CopyButton } from '../../components/ui/CopyButton';
-import { BackupProgressCard, formatBytes, IncompleteBackupNotice } from './BackupProgressCard';
+import { IncompleteBackupNotice } from './BackupProgressCard';
+import { DeviceOption, PulledCard, PullingCard, deviceTitle, useShownPath } from './PullParts';
 import type { DeviceInfo } from '../../../shared/types/tools';
 
 /**
- * What the Copy button on a pull error copies: enough to diagnose it
- * elsewhere. The device's UDID is replaced, since the copy may be pasted
- * somewhere public; the password never reaches the tool's output (R30).
+ * What Copy Details on a pull error copies: enough to diagnose it elsewhere.
+ * The device's UDID is replaced, since the copy may be pasted somewhere
+ * public; the password never reaches the tool's output (R30).
  */
 function pullDiagnostics(error: string, device: DeviceInfo | null, log: string[]): string {
-  const deviceLine = device
-    ? `${device.name}${device.model ? ` (${device.model})` : ''}${device.osVersion ? `, iOS ${device.osVersion}` : ''}`
-    : 'none selected';
-  const text = [`Epoch iPhone pull failed`, `Device: ${deviceLine}`, `Error: ${error}`, '', 'Log:', ...log].join('\n');
+  const text = [
+    `Epoch iPhone pull failed`,
+    // The recorded model ("iPhone17,5"), not the shown one, so it matches the tool's output.
+    `Device: ${device ? `${device.model ?? device.name}${device.osVersion ? `, iOS ${device.osVersion}` : ''}` : 'none selected'}`,
+    `Error: ${error}`,
+    '',
+    'Log:',
+    ...log,
+  ].join('\n');
   return device ? text.split(device.id).join('<device UDID>') : text;
+}
+
+/** A link-styled control inside a summary line ("Change"). */
+function LinkButton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="text-label text-accent hover:underline disabled:text-muted-foreground disabled:no-underline disabled:cursor-not-allowed"
+    >
+      {children}
+    </button>
+  );
 }
 
 interface DevicePullPanelProps {
@@ -47,6 +62,13 @@ interface DevicePullPanelProps {
   onChangeSource: () => void;
 }
 
+/**
+ * Pulling a backup from a connected iPhone, following the board "iPhone Pull
+ * Flow" (EPOCH-554, U3b). While choosing, one card holds the pull's own small
+ * step rail (Device, Destination, Password, Start), and each finished choice
+ * folds into a summary line. While pulling, the card is replaced by the running
+ * pull, with progress and Cancel in its first lines (DESIGN.md §10).
+ */
 export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPanelProps) {
   const {
     sources,
@@ -63,12 +85,13 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
     setSelectedDevice,
     destDir,
     pullProgress,
+    pullSteps,
     pullError,
+    pullCancelled,
     encryptionConsent,
     cancelEncryptionConsent,
     deviceAction,
     pullStats,
-    pulledAt,
     cancelPull,
     cancelling,
     incomplete,
@@ -93,11 +116,11 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
 
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
   // Incomplete backups in other folders the user set aside; not shown again this session.
   const [setAside, setSetAside] = useState<string[]>([]);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const terminalRef = useRef<HTMLPreElement>(null);
-  const [stickToBottom, setStickToBottom] = useState(true);
+  const destShown = useShownPath(destDir);
+  const savedShown = useShownPath(pulledDir ?? destDir);
 
   const passwordProvided = password.trim() !== '';
 
@@ -109,38 +132,12 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
     setPassword('');
     setPasswordError(null);
   };
-  const onChooseDevice = (device: DeviceInfo) => {
-    if (device.id !== selectedDevice?.id) clearPassword();
+  const onChooseDevice = (device: DeviceInfo | null) => {
+    if (device?.id !== selectedDevice?.id) clearPassword();
     setSelectedDevice(device);
   };
   const onChooseDestination = async () => {
     if (await handleSelectDestination()) clearPassword();
-  };
-
-  const handleCopy = (text: string, index: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  };
-
-  useEffect(() => {
-    if (stickToBottom && terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-    }
-  }, [acquisitionOutput, stickToBottom]);
-
-  const handleTerminalScroll = () => {
-    const el = terminalRef.current;
-    if (!el) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setStickToBottom(distanceFromBottom <= 64);
-  };
-
-  const jumpToLatest = () => {
-    setStickToBottom(true);
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-    }
   };
 
   const onPullClick = async (enableEncryption = false) => {
@@ -149,10 +146,15 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
       return;
     }
     setPasswordError(null);
+    setStarting(true);
     let result: 'consent-needed' | 'finished' = 'finished';
     try {
-      result = await handlePull(password, enableEncryption, clearPassword);
+      result = await handlePull(password, enableEncryption, () => {
+        clearPassword();
+        setStarting(false);
+      });
     } finally {
+      setStarting(false);
       // Kept while the user decides whether to turn on encrypted backups.
       if (result !== 'consent-needed') setPassword('');
     }
@@ -163,14 +165,13 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
     setPassword('');
   };
 
-  const pullLocked = phase === 'pulling' || encryptionConsent;
+  const pullLocked = phase === 'pulling' || encryptionConsent || starting;
   // Each pull writes into a new dated folder inside the one chosen (EPOCH-504),
   // so any chosen folder can take a pull.
   const askPassword = !!selectedDevice && !!destDir && phase !== 'pulling' && phase !== 'pulled';
 
-  // The step rail (DESIGN.md §9): each step's state, in order.
-  const started = phase === 'pulling' || phase === 'pulled';
-  const pullSteps: Step[] = [
+  // The pull's own step rail, at the small size (board "iPhone Pull Flow"): each step's state, in order.
+  const pullSteps4: Step[] = [
     { label: 'Device', state: selectedDevice ? 'done' : 'current' },
     {
       label: 'Destination',
@@ -178,22 +179,99 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
     },
     {
       label: 'Password',
-      state: started ? 'done' : !askPassword ? 'pending' : passwordProvided ? 'done' : 'current',
+      state: encryptionConsent ? 'done' : !askPassword ? 'pending' : passwordProvided ? 'done' : 'current',
     },
     {
-      label: 'Pull',
-      state: phase === 'pulled' ? 'done' : started || (askPassword && passwordProvided) ? 'current' : 'pending',
+      label: 'Start',
+      state: askPassword && (passwordProvided || encryptionConsent) ? 'current' : 'pending',
     },
   ];
 
   if (!sourceId) return null;
 
+  // Running: the Action Needed banner, then the running pull (board "iPhone Pull Flow").
+  if (phase === 'pulling' && selectedDevice) {
+    return (
+      <div className="flex flex-col gap-4">
+        {deviceAction && (
+          <div
+            role="alert"
+            className="flex items-center gap-4 bg-warning/10 border border-warning/30 shadow-elevation-1 rounded-lg p-5"
+          >
+            <div className="p-3 rounded-full bg-warning/20 text-warning shrink-0">
+              <Smartphone size="1.5rem" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-display text-heading text-warning">
+                Action Needed on {selectedDevice?.name ?? 'the iPhone'}
+              </h3>
+              <p className="text-data text-foreground mt-1">{deviceAction}</p>
+            </div>
+            <Loader className="text-warning" />
+          </div>
+        )}
+        <PullingCard
+          device={selectedDevice}
+          destShown={destShown}
+          times={pullSteps}
+          stats={pullStats}
+          cancelling={cancelling}
+          onCancel={cancelPull}
+        />
+      </div>
+    );
+  }
+
+  // Finished: what was made, then the one next step (EPOCH-437).
+  if (phase === 'pulled' && destDir) {
+    return (
+      <div className="flex flex-col gap-4">
+        <PulledCard
+          device={selectedDevice}
+          times={pullSteps}
+          stats={pullStats}
+          crashReports={crashReports}
+          savedShown={savedShown}
+          onContinue={() => onBackupPulled(destDir)}
+        />
+        {/* EPOCH-519: a failed copy can be made again now, while the device is
+         * connected, so the logs stay close in time to the backup. */}
+        {crashReports && crashReports.outcome === 'failed' && (
+          <div
+            role="alert"
+            className="flex items-center gap-4 bg-warning/10 border border-warning/30 shadow-elevation-1 rounded-lg p-5"
+          >
+            <div className="p-3 rounded-full bg-warning/20 text-warning shrink-0">
+              <Smartphone size="1.25rem" />
+            </div>
+            <div className="flex-1 min-w-0 text-data">
+              <h3 className="font-display text-heading text-warning">Crash Logs Could Not Be Copied</h3>
+              <p className="text-foreground mt-1">
+                The backup itself is complete and verified. Look at {selectedDevice?.name ?? 'the iPhone'}:{' '}
+                {crashReports.locked ? 'it was locked. ' : ''}Unlock it, keep it connected, then copy its crash logs
+                again. Without them, the report says crash logs were not acquired.
+              </p>
+              {crashReports.error && <p className="text-muted-foreground mt-1">{crashReports.error}</p>}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={copyCrashReportsAgain}
+              loading={copyingCrashReports}
+              className="shrink-0"
+            >
+              <RefreshCw size="0.875rem" />
+              Copy Crash Logs Again
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="card rounded-xl p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="p-2 rounded-lg bg-accent/10 text-accent">
-          <Smartphone size="1.25rem" />
-        </div>
+    <div className="card rounded-xl p-6 flex flex-col gap-5">
+      <div className="flex items-center gap-3">
         <h2 className="font-display text-heading text-foreground">Pull from a Connected iPhone</h2>
         {sources.length > 1 && (
           <select
@@ -222,7 +300,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
       </div>
 
       {phase === 'checking' && !setupStatus && (
-        <p className="text-data text-muted-foreground flex items-center gap-2 py-2">
+        <p className="text-data text-muted-foreground flex items-center gap-2">
           <Loader className="text-accent" /> Checking for the required tool…
         </p>
       )}
@@ -245,22 +323,14 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
 
       {/* Windows: the acquisition actions (WSL build). */}
       {phase === 'unavailable' && !setupStatus && toolStatus && !toolStatus.available && (
-        <div>
-          {/* Warning banner, standard 1 of 2 in this file -- see the Setup
-           * Error card below. Both now share the same treatment
-           * (rounded-xl, p-4, border-warning/30, shadow-elevation-1) per the
-           * "all warning banners should be the same standard" directive on
-           * VER-10. Previously this one was rounded-lg/px-4 py-3/
-           * border-warning/20 with no elevation -- a different, weaker
-           * treatment than its sibling three lines down for no reason
-           * other than having been written at a different time. */}
-          <div className="flex items-center gap-3 text-data text-warning bg-warning/10 border border-warning/30 shadow-elevation-1 p-4 rounded-xl mb-5">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3 text-data text-warning bg-warning/10 border border-warning/30 shadow-elevation-1 p-4 rounded-xl">
             <XCircle size="1.125rem" className="shrink-0" />
             <span>iPhone import is not set up on this computer yet.</span>
           </div>
 
           {acquisitionError && (
-            <div className="bg-danger/10 border border-danger/30 shadow-elevation-1 p-4 rounded-xl text-data text-danger mb-5">
+            <div className="bg-danger/10 border border-danger/30 shadow-elevation-1 p-4 rounded-xl text-data text-danger">
               <div className="flex items-start gap-3">
                 <AlertTriangle size="1.125rem" className="shrink-0 mt-0.5" />
                 <div className="flex-1">
@@ -272,31 +342,24 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
           )}
 
           {actions.map((action, i) => (
-            <div
-              key={i}
-              className="rounded-xl p-5 mb-4 bg-surface-raised shadow-elevation-1 hover:shadow-elevation-2 hover:bg-surface transition-all"
-            >
-              <div className="flex items-start justify-between gap-4 mb-2">
-                <div>
-                  <h3 className="font-display text-heading text-foreground">
-                    {action.kind === 'install-instructions'
-                      ? 'Install the Required System Tools'
-                      : action.kind === 'compile-from-source'
-                        ? 'Set Up iPhone Import Automatically'
-                        : 'Use a Verified Tool Package'}
-                  </h3>
-                  <p className="text-data text-muted-foreground mt-1">
-                    {action.kind === 'install-instructions'
-                      ? 'Complete this one-time setup in your terminal, then return here to import a backup directly from your iPhone.'
-                      : action.kind === 'compile-from-source'
-                        ? 'Epoch can build and configure the required components locally on this computer.'
-                        : 'A verified package can provide the components needed for direct iPhone import.'}
-                  </p>
-                </div>
-              </div>
+            <div key={i} className="rounded-xl p-5 bg-surface-raised shadow-elevation-1">
+              <h3 className="font-display text-heading text-foreground">
+                {action.kind === 'install-instructions'
+                  ? 'Install the Required System Tools'
+                  : action.kind === 'compile-from-source'
+                    ? 'Set Up iPhone Import Automatically'
+                    : 'Use a Verified Tool Package'}
+              </h3>
+              <p className="text-data text-muted-foreground mt-1">
+                {action.kind === 'install-instructions'
+                  ? 'Complete this one-time setup in your terminal, then return here to import a backup directly from your iPhone.'
+                  : action.kind === 'compile-from-source'
+                    ? 'Epoch can build and configure the required components locally on this computer.'
+                    : 'A verified package can provide the components needed for direct iPhone import.'}
+              </p>
 
               {action.kind === 'install-instructions' && (
-                <div className="mt-4 pt-3 shadow-elevation-1">
+                <div className="mt-4">
                   <div className="text-label text-muted-foreground mb-2 flex items-center gap-1.5">
                     <Terminal size="0.875rem" /> Terminal command (one-time setup)
                   </div>
@@ -304,33 +367,13 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
                     {action.commands.map((c: string, j: number) => (
                       <div
                         key={j}
-                        className="flex items-center justify-between gap-3 bg-inset shadow-elevation-1 rounded-lg px-4 py-3 font-mono text-data text-foreground/90 group"
+                        className="flex items-center justify-between gap-3 bg-inset shadow-elevation-1 rounded-lg px-4 py-3 font-mono text-data text-foreground/90"
                       >
                         <span className="truncate select-all">
                           <span className="text-accent select-none mr-2">$</span>
                           {c}
                         </span>
-                        {/* Icon + copied-state swap micro-interaction -- distinct enough
-                            from a plain Button call site that it's deferred rather than
-                            forced through the shared component this pass. */}
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(c, j)}
-                          className="flex items-center gap-1 text-label font-sans text-muted-foreground hover:text-foreground bg-surface-raised shadow-elevation-1 px-3 py-1 rounded-md transition-colors shrink-0 cursor-pointer"
-                          title="Copy command"
-                        >
-                          {copiedIndex === j ? (
-                            <>
-                              <Check size="0.75rem" className="text-success" />
-                              <span className="text-success">Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size="0.75rem" />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
+                        <CopyButton text={c} title="Copy command" />
                       </div>
                     ))}
                   </div>
@@ -353,7 +396,7 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
             </div>
           ))}
 
-          <div className="mt-5">
+          <div>
             <Button variant="outline" size="sm" onClick={checkAvailability}>
               <RefreshCw size="0.875rem" /> Check Again
             </Button>
@@ -361,233 +404,43 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
         </div>
       )}
 
+      {/* The build's output is behind a closed disclosure (owner, 2026-10-18): it is not case material. */}
       {phase === 'acquiring' && (
-        <div>
-          <p className="text-data text-foreground flex items-center gap-2 mb-3">
+        <div className="flex flex-col gap-3">
+          <p className="text-data text-foreground flex items-center gap-2">
             <Loader className="text-accent" /> {acquisitionStep ?? 'Working…'}
           </p>
-          <div className="relative">
-            <pre
-              ref={terminalRef}
-              onScroll={handleTerminalScroll}
-              className="bg-inset shadow-elevation-1 rounded-xl p-4 text-data font-mono whitespace-pre-wrap overflow-auto max-h-72 text-foreground/80 leading-relaxed"
-            >
-              {acquisitionOutput.join('\n')}
-            </pre>
-            {!stickToBottom && acquisitionOutput.length > 0 && (
-              <button
-                onClick={jumpToLatest}
-                className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-accent text-on-accent text-label rounded-full px-3 py-1.5 shadow-elevation-2 hover:bg-accent/90 transition-all cursor-pointer"
-              >
-                <ArrowDown size="0.75rem" />
-                Jump to latest
-              </button>
-            )}
-          </div>
+          <TerminalLog
+            lines={acquisitionOutput.map((line) => ({ stream: 'stdout' as const, line }))}
+            live
+            label="Setup details"
+          />
         </div>
       )}
 
-      {(phase === 'available' || phase === 'pulling' || phase === 'pulled') && toolStatus?.available && (
-        <div>
-          <div className="flex items-center gap-1.5 text-label text-success mb-4">
-            <CheckCircle2 size="1rem" /> Device service ready
-          </div>
-
-          <StepList steps={pullSteps} label="Pull steps" />
-
-          {devices.length === 0 ? (
-            // The current step, and the examiner has to act: accent, with its action as the primary button (§9).
-            <div className="flex items-center gap-4 p-4 rounded-xl bg-accent/10 border border-accent/30 shadow-elevation-1">
-              <div className="p-3 rounded-full bg-accent/20 text-accent shrink-0">
-                <Smartphone size="1.25rem" className="animate-pulse" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-display text-heading text-foreground">Connect an iPhone</p>
-                <p className="text-data text-muted-foreground">
-                  Plug the iPhone into this computer by USB and unlock its screen, then check again.
-                </p>
-              </div>
-              <Button size="sm" onClick={checkAvailability} className="shrink-0">
-                <RefreshCw size="0.875rem" /> Check Again
-              </Button>
-            </div>
-          ) : (
-            <div className="mb-5">
-              <p className="text-label text-foreground mb-2">Choose the iPhone to back up</p>
-              <div className="flex flex-col gap-3" role="radiogroup" aria-label="iPhone to back up">
-                {devices.map((d) => {
-                  const selected = selectedDevice?.id === d.id;
-                  // A selectable option (DESIGN.md §9): an accent outline on hover, filled when selected.
-                  return (
-                    <label
-                      key={d.id}
-                      className={`group flex items-center gap-4 rounded-xl border-2 px-4 py-4 text-data transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent ${
-                        pullLocked ? 'cursor-not-allowed' : 'cursor-pointer'
-                      } ${
-                        selected
-                          ? 'border-accent bg-accent/10 shadow-elevation-2'
-                          : 'border-accent/30 bg-surface-raised shadow-elevation-1 hover:border-accent hover:shadow-elevation-2'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="device"
-                        checked={selected}
-                        onChange={() => onChooseDevice(d)}
-                        disabled={pullLocked}
-                        className="sr-only"
-                      />
-                      <span
-                        className={`p-2 rounded-lg shrink-0 ${selected ? 'bg-accent text-on-accent' : 'bg-accent/10 text-accent'}`}
-                      >
-                        <Smartphone size="1.25rem" />
-                      </span>
-                      <span className="flex flex-1 min-w-0 items-center gap-3">
-                        <span className="font-display text-heading text-foreground truncate">{d.name}</span>
-                        {d.model && <Badge variant="neutral">{d.model}</Badge>}
-                        {d.osVersion && (
-                          <span className="text-label text-muted-foreground font-mono">iOS {d.osVersion}</span>
-                        )}
-                      </span>
-                      <span
-                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-label transition-colors ${
-                          selected ? 'bg-accent/20 text-accent' : 'bg-accent text-on-accent shadow-elevation-2'
-                        }`}
-                      >
-                        {selected ? (
-                          <>
-                            <Check size="0.875rem" /> Selected
-                          </>
-                        ) : (
-                          'Select'
-                        )}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {selectedDevice && (
-            <div className="flex flex-col gap-3 mb-5 p-4 rounded-lg bg-surface-raised shadow-elevation-1">
-              <p className="text-label text-foreground">Choose where to save the backup</p>
-              <div className="flex items-center gap-3">
-                {/* The current step's action is the primary button (DESIGN.md §9). */}
-                <Button
-                  variant={destDir ? 'outline' : 'accent'}
-                  size="sm"
-                  onClick={onChooseDestination}
-                  disabled={pullLocked}
-                >
-                  <FolderOpen size="0.875rem" />
-                  {destDir ? 'Change Destination' : 'Choose Destination'}
-                </Button>
-                {destDir ? (
-                  <span className="text-data font-mono text-foreground/80 truncate" title={destDir}>
-                    {destDir}
-                  </span>
-                ) : (
-                  <span className="text-data text-muted-foreground italic">No destination chosen yet</span>
-                )}
-              </div>
-
-              {askPassword && (
-                <div className="mt-2 pt-3 shadow-elevation-1">
-                  <label className="text-label text-foreground mb-1 flex items-center gap-2">
-                    <Lock size="0.875rem" className="text-accent" /> Backup password (required)
-                  </label>
-                  <p className="text-data text-muted-foreground mb-2">
-                    Epoch makes encrypted backups only, because unencrypted ones leave out Keychain and Health data. If
-                    this iPhone already makes encrypted backups, enter its backup password. Otherwise, this becomes its
-                    backup password.
-                  </p>
-                  <PasswordField
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (passwordError) setPasswordError(null);
-                    }}
-                    disabled={pullLocked}
-                    placeholder="Backup password"
-                    invalid={!!passwordError}
-                  />
-                  <FieldError>{passwordError}</FieldError>
-                </div>
-              )}
-            </div>
-          )}
-
-          {selectedDevice && encryptionConsent && (
-            <section className="rounded-lg bg-warning/10 border border-warning/30 shadow-elevation-1 p-5 flex flex-col gap-3">
-              <h3 className="flex items-center gap-2 font-display text-heading text-foreground">
-                <ShieldCheck size="1.125rem" className="text-warning" /> Turn On Encrypted Backups?
-              </h3>
-              <p className="text-data text-foreground">
-                Encrypted backups are off on {selectedDevice.name}. To continue, Epoch will turn them on with the
-                password you entered.
-              </p>
-              <ul className="text-data text-muted-foreground list-disc pl-5 flex flex-col gap-1">
-                <li>You'll unlock {selectedDevice.name} and enter its passcode on it to approve the change.</li>
-                <li>The setting stays on after the backup, and later backups of this iPhone use this password.</li>
-                <li>Epoch records the change with this pull.</li>
-              </ul>
-              <div className="flex items-center gap-3 mt-1">
-                <Button onClick={() => onPullClick(true)}>
-                  <ShieldCheck size="1rem" /> Turn On and Continue
-                </Button>
-                <Button variant="outline" onClick={onCancelConsent}>
-                  Cancel
-                </Button>
-              </div>
-            </section>
-          )}
-
-          {selectedDevice && destDir && phase !== 'pulled' && !encryptionConsent && (
-            <Button
-              onClick={() => onPullClick()}
-              disabled={!passwordProvided}
-              loading={phase === 'pulling'}
-              loadingText="Pulling encrypted backup…"
-              title={!passwordProvided ? 'Enter a backup password to continue' : undefined}
-            >
-              Pull Encrypted Backup
-            </Button>
-          )}
-
-          {deviceAction && phase === 'pulling' && (
+      {phase === 'available' && toolStatus?.available && (
+        <>
+          {pullError && (
             <div
               role="alert"
-              className="flex items-center gap-4 bg-warning/10 border border-warning/30 shadow-elevation-1 rounded-lg p-5 mt-5"
+              className={`flex items-start gap-4 rounded-xl p-5 shadow-elevation-1 border ${
+                pullCancelled ? 'bg-warning/10 border-warning/30' : 'bg-danger/10 border-danger/30'
+              }`}
             >
-              <div className="p-3 rounded-full bg-warning/20 text-warning shrink-0">
-                <Smartphone size="1.5rem" />
+              <XCircle
+                className={`shrink-0 mt-1 ${pullCancelled ? 'text-warning' : 'text-danger'}`}
+                size="1.25rem"
+                aria-hidden
+              />
+              <div className="flex-1 min-w-0 text-data">
+                <p className={`font-medium ${pullCancelled ? 'text-warning' : 'text-danger'}`}>
+                  {pullCancelled ? 'Pull Cancelled' : 'The Pull Failed'}
+                </p>
+                <p className="text-foreground mt-1">{pullError}</p>
               </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-display text-heading text-warning">
-                  Action Needed on {selectedDevice?.name ?? 'the iPhone'}
-                </h3>
-                <p className="text-data text-foreground mt-1">{deviceAction}</p>
-              </div>
-              <Loader className="text-warning" />
-            </div>
-          )}
-
-          {phase === 'pulling' && pullStats && (
-            <BackupProgressCard stats={pullStats} cancelling={cancelling} onCancel={cancelPull} />
-          )}
-
-          {pullProgress.length > 0 && (
-            <pre className="bg-inset shadow-elevation-1 rounded-xl p-4 text-data font-mono whitespace-pre-wrap overflow-auto max-h-48 text-foreground/80 mt-5 leading-relaxed">
-              {pullProgress.map((p) => p.message).join('\n')}
-            </pre>
-          )}
-          {pullError && (
-            <div className="text-data text-danger bg-danger/10 border border-danger/30 shadow-elevation-1 rounded-lg p-4 mt-4 flex items-start gap-2">
-              <XCircle size="1rem" className="shrink-0 mt-0.5" />
-              <span className="flex-1 min-w-0">{pullError}</span>
               <CopyButton
-                title="Copy the error, device and log"
+                label="Copy Details"
+                title="Copy the error, the device's model and the pull's log"
                 text={() =>
                   pullDiagnostics(
                     pullError,
@@ -598,93 +451,155 @@ export function DevicePullPanel({ onBackupPulled, onChangeSource }: DevicePullPa
               />
             </div>
           )}
-          {phase !== 'pulling' &&
-            selectedDevice &&
-            incomplete
-              .filter((backup) => !setAside.includes(backup.path))
-              // A leftover never blocks a pull: each pull gets a new folder (EPOCH-504).
-              .map((backup) => (
-                <IncompleteBackupNotice
-                  key={backup.path}
-                  deviceName={selectedDevice.name}
-                  incomplete={backup}
-                  deleting={deletingIncomplete === backup.path}
-                  onDelete={() => deleteIncomplete(backup)}
-                  secondary={{ label: 'Not Now', onClick: () => setSetAside((prev) => [...prev, backup.path]) }}
-                />
-              ))}
-          {phase === 'pulled' && destDir && (
-            // The pull's results (EPOCH-437): what was made, then the one next step.
-            <div className="bg-success/10 border border-success/30 shadow-elevation-1 rounded-lg p-5 mt-4">
-              <p className="flex items-center gap-2 font-display text-heading text-success mb-3">
-                <CheckCircle2 size="1.25rem" className="shrink-0" /> Backup Pulled and Verified
+
+          <StepList steps={pullSteps4} label="Pull steps" size="sm" className="" />
+
+          {devices.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <div className="p-3 rounded-xl bg-accent/10 text-accent">
+                <Smartphone size="1.25rem" />
+              </div>
+              <p className="font-display text-heading text-foreground">No iPhone Found</p>
+              <p className="text-data text-muted-foreground max-w-md">
+                Connect it with a cable, unlock it, and tap Trust This Computer if the iPhone asks. Then check again.
               </p>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-data mb-4">
-                {selectedDevice && (
-                  <>
-                    <dt className="text-muted-foreground">Device</dt>
-                    <dd className="text-foreground">{selectedDevice.name}</dd>
-                  </>
-                )}
-                {pullStats && (
-                  <>
-                    <dt className="text-muted-foreground">Size</dt>
-                    <dd className="text-foreground">{formatBytes(pullStats.receivedBytes)}</dd>
-                  </>
-                )}
-                {pulledAt !== null && (
-                  <>
-                    <dt className="text-muted-foreground">Finished</dt>
-                    <dd className="text-foreground">
-                      <DateTime value={pulledAt} />
-                    </dd>
-                  </>
-                )}
-                <dt className="text-muted-foreground">Saved to</dt>
-                <dd className="font-mono text-foreground truncate" title={pulledDir ?? destDir}>
-                  {pulledDir ?? destDir}
-                </dd>
-                {crashReports && (
-                  <>
-                    <dt className="text-muted-foreground">Crash logs</dt>
-                    <dd className="text-foreground">
-                      {crashReports.outcome === 'copied'
-                        ? crashReports.files
-                          ? `${crashReports.files} file(s) copied; they are still on the device`
-                          : 'The device held none'
-                        : `Not copied: ${crashReports.error}`}
-                    </dd>
-                  </>
-                )}
-              </dl>
-              {/* EPOCH-519: a failed copy can be made again now, while the
-               * device is connected, so the logs stay close in time to the backup. */}
-              {crashReports && crashReports.outcome === 'failed' && (
-                <div
-                  role="alert"
-                  className="flex items-center gap-4 bg-warning/10 border border-warning/30 shadow-elevation-1 rounded-lg p-4 mb-4"
-                >
-                  <div className="p-2 rounded-full bg-warning/20 text-warning shrink-0">
-                    <Smartphone size="1.25rem" />
-                  </div>
-                  <p className="flex-1 min-w-0 text-data text-foreground">
-                    Look at {selectedDevice?.name ?? 'the iPhone'}: {crashReports.locked ? 'it was locked. ' : ''}Unlock
-                    it, keep it connected, then copy its crash logs again. Without them, the report says crash logs were
-                    not acquired.
-                  </p>
-                  <Button variant="outline" size="sm" onClick={copyCrashReportsAgain} loading={copyingCrashReports}>
-                    <RefreshCw size="0.875rem" />
-                    Copy Crash Logs Again
-                  </Button>
-                </div>
-              )}
-              <Button onClick={() => onBackupPulled(destDir)}>
-                Continue to Prepare Evidence
-                <ArrowRight size="1rem" />
+              <Button variant="outline" size="sm" onClick={checkAvailability}>
+                <RefreshCw size="0.875rem" /> Check Again
               </Button>
             </div>
+          ) : !selectedDevice ? (
+            <div className="flex flex-col gap-3">
+              <h3 className="text-label text-muted-foreground">Choose the iPhone to back up</h3>
+              <div className="flex flex-col gap-3" role="radiogroup" aria-label="iPhone to back up">
+                {devices.map((d) => (
+                  <DeviceOption
+                    key={d.id}
+                    device={d}
+                    selected={false}
+                    disabled={pullLocked}
+                    onChoose={() => onChooseDevice(d)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Each finished choice folds into one line (board "iPhone Pull Flow"). */}
+              <div className="bg-surface-raised rounded-lg shadow-elevation-1 px-4 py-3 flex flex-col gap-2 text-data">
+                <p className="flex flex-wrap items-center gap-2">
+                  <CheckCircle2 size="1rem" className="text-success shrink-0" aria-label="Chosen" />
+                  <span className="text-foreground">{deviceTitle(selectedDevice)}</span>
+                  <LinkButton onClick={() => onChooseDevice(null)} disabled={pullLocked}>
+                    Change
+                  </LinkButton>
+                </p>
+                {destDir ? (
+                  <p className="flex flex-wrap items-center gap-2 min-w-0">
+                    <CheckCircle2 size="1rem" className="text-success shrink-0" aria-label="Chosen" />
+                    <span className="text-foreground">Save to</span>
+                    <span className="font-mono text-foreground/80 truncate" title={destDir}>
+                      {destShown}
+                    </span>
+                    <LinkButton onClick={onChooseDestination} disabled={pullLocked}>
+                      Change…
+                    </LinkButton>
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* The current step's action is the primary button (DESIGN.md §9). */}
+                    <Button size="sm" onClick={onChooseDestination} disabled={pullLocked}>
+                      <FolderOpen size="0.875rem" /> Choose Destination
+                    </Button>
+                    <span className="text-muted-foreground">Choose where to save the backup.</span>
+                  </div>
+                )}
+              </div>
+
+              {askPassword && !encryptionConsent && (
+                <div className="flex flex-col gap-3">
+                  <div className="max-w-md">
+                    <label htmlFor="pull-password" className="text-label text-foreground mb-1 flex items-center gap-2">
+                      <Lock size="0.875rem" className="text-accent" /> Backup password (required)
+                    </label>
+                    <PasswordField
+                      id="pull-password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      disabled={pullLocked}
+                      placeholder="Backup password"
+                      invalid={!!passwordError}
+                    />
+                    <FieldError>{passwordError}</FieldError>
+                    <p className="text-label text-muted-foreground mt-1">
+                      Epoch makes encrypted backups only, because unencrypted ones leave out Keychain and Health data.
+                      If this iPhone already makes encrypted backups, enter its backup password. Otherwise, this becomes
+                      its backup password. It is not stored and never written to the Activity Log.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      onClick={() => onPullClick()}
+                      disabled={!passwordProvided}
+                      loading={starting}
+                      loadingText="Starting…"
+                      title={!passwordProvided ? 'Enter a backup password to continue' : undefined}
+                    >
+                      {pullError ? 'Pull Again' : 'Start Pull'}
+                    </Button>
+                    {pullError && (
+                      <span className="text-label text-muted-foreground">
+                        Pull Again starts from the beginning in a new folder. An incomplete one stays until you delete
+                        it.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {encryptionConsent && (
+                <section className="rounded-lg bg-warning/10 border border-warning/30 shadow-elevation-1 p-5 flex flex-col gap-3">
+                  <h3 className="flex items-center gap-2 font-display text-heading text-foreground">
+                    <ShieldCheck size="1.125rem" className="text-warning" /> Turn On Encrypted Backups?
+                  </h3>
+                  <p className="text-data text-foreground">
+                    Encrypted backups are off on {selectedDevice.name}. To continue, Epoch will turn them on with the
+                    password you entered.
+                  </p>
+                  <ul className="text-data text-muted-foreground list-disc pl-5 flex flex-col gap-1">
+                    <li>You'll unlock {selectedDevice.name} and enter its passcode on it to approve the change.</li>
+                    <li>The setting stays on after the backup, and later backups of this iPhone use this password.</li>
+                    <li>Epoch records the change with this pull.</li>
+                  </ul>
+                  <div className="flex items-center gap-3 mt-1">
+                    <Button onClick={() => onPullClick(true)} loading={starting} loadingText="Starting…">
+                      <ShieldCheck size="1rem" /> Turn On and Continue
+                    </Button>
+                    <Button variant="outline" onClick={onCancelConsent} disabled={starting}>
+                      Cancel
+                    </Button>
+                  </div>
+                </section>
+              )}
+
+              {incomplete
+                .filter((backup) => !setAside.includes(backup.path))
+                // A leftover never blocks a pull: each pull gets a new folder (EPOCH-504).
+                .map((backup) => (
+                  <IncompleteBackupNotice
+                    key={backup.path}
+                    deviceName={deviceTitle(selectedDevice)}
+                    incomplete={backup}
+                    deleting={deletingIncomplete === backup.path}
+                    onDelete={() => deleteIncomplete(backup)}
+                    secondary={{ label: 'Not Now', onClick: () => setSetAside((prev) => [...prev, backup.path]) }}
+                  />
+                ))}
+            </>
           )}
-        </div>
+        </>
       )}
     </div>
   );

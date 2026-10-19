@@ -207,7 +207,7 @@ content edge or the title (EPOCH-464).
 - **Every view has a description** (owner, 2026-10-19): one sentence under the
   title saying what the view is for, in `text-data`, so the five headers read
   alike. A view showing one analysis adds a `context` line beneath, in
-  `text-label`: the investigation and analysis it shows ("iPhone17,5 · iOS
+  `text-label`: the investigation and analysis it shows ("iPhone 17,5 · iOS
   26.6.1 · Investigation … · Analysis …"). A fixed approved sentence with its
   own source (Indicator Matches' limit sentence) stays in the view's body,
   not copied into the header.
@@ -262,8 +262,11 @@ Decided 2026-10-09 (EPOCH-464), following the common desktop convention
   Again adds an analysis to the same investigation, and analyses are listed
   newest first. "Run" is a pipeline term and doesn't appear in the UI.
 - **An investigation is named by its device model, iOS version and backup
-  date** ("iPhone17,5 · iOS 26.6.1", with the date beside it), as the backup's
-  Info.plist records them. A short ID (its first eight characters) is a small
+  date** ("iPhone 17,5 · iOS 26.6.1", with the date beside it), as the backup's
+  Info.plist records them. A model is shown with a space between the family
+  and its number ("iPhone 17,5" for the recorded "iPhone17,5"; owner's review,
+  2026-10-19, `shared/deviceModel.ts`); what is stored, copied for diagnosis
+  or logged keeps the recorded form. A short ID (its first eight characters) is a small
   detail beside the name. The device identifier never appears, and the
   Info.plist Device Name, often a person's name, is a detail in the
   investigation's card only.
@@ -402,16 +405,19 @@ accent: a title isn't interactive. The brand mark is the one gradient
 (accent, blue, violet) in the app.
 
 **Choices look choosable.** A selectable option (an iPhone to back up) is a
-card with a 2px `accent/30` outline at rest, the full `accent` outline on
+row with a 1px `border-strong` outline at rest, the `accent` outline on
 hover, and an `accent/10` fill with the `accent` outline once selected. Its
-action reads **Select**, as a filled accent button, while choosing is the
-current step. The current step's action is always the primary (filled)
-button; it becomes an outline button once the step is done.
+**Select** is a quiet outline control, never a filled accent button, because
+a list of options would otherwise show one primary button per row (EPOCH-554,
+U3b). The current step's action is always the primary (filled) button; it
+becomes an outline button once the step is done.
 
 **Steps show their state.** A multi-step flow (§8) shows its steps as a
 numbered rail: pending (muted), current (accent ring), done (success check),
 blocked (warning). It is the shared `StepList` (EPOCH-455); the iPhone pull and
-New Investigation use it (§10).
+New Investigation use it (§10). A page's rail has 28 px circles; a step's own
+steps inside a card use the 20 px size, so the two levels never read as one
+rail (EPOCH-554).
 
 **Long steps show what they have done** (EPOCH-487). A step that runs for
 minutes or hours says how far it has got and how long it has taken, never
@@ -503,9 +509,10 @@ forgot what was prepared. "We must guide clearly, or we look untrustworthy."
   - **Sources are equal.** Pulling from an iPhone and using an existing
     backup are two equal secondary buttons, never two primary cards. With
     no evidence chosen they sit in the page's one card ("Where Is the
-    Evidence?"); with a folder chosen they move below the list as one quiet
-    line, "Evidence somewhere else?", with no card and no heading. No tip
-    bar repeats them.
+    Evidence?"); with a folder chosen they move below the list into a small
+    raised panel headed "Evidence somewhere else?", one line and the two
+    buttons, never loose text on the page. The buttons' icons are in the
+    accent (owner's review, 2026-10-19). No tip bar repeats them.
   - **A card's header row holds only its title and where it is** ("Backups
     Found (2)" and "In ~/… · Change Folder", on one baseline). Controls
     never share the title's row (owner's review, 2026-10-19); the list's one
@@ -523,9 +530,46 @@ forgot what was prepared. "We must guide clearly, or we look untrustworthy."
     A stop the examiner asked for reads in the flag role, never as a failure.
   - **Prepared** states what Prepare did, from the workspace's records: the
     backup files checked, the damaged databases repaired, iLEAPP's modules,
-    and that the original backup was not changed.
+    and that the original backup was not changed. Each backup's header reads
+    as its row does (the name, the green "Prepared ·" chip on the right, when
+    it was backed up beneath), each fact carries an accent icon chip, and the
+    card is headed with a success icon chip as Analyze is with its own (owner's
+    review, 2026-10-19). Several backups are a table instead, one row per
+    backup (its name, when it was backed up and its chip) and the facts as
+    columns headed with their accent icons, styled as the Backups Found list,
+    so they compare across rows.
   - **One primary button per state:** Prepare Evidence while the selection
     needs preparing, then Analyze and Create Investigation.
+- **The iPhone pull follows the board "iPhone Pull Flow"** (EPOCH-554, U3b):
+  - **Choosing** is one card with the pull's own small rail (Device,
+    Destination, Password, Start). A device is named by its model and iOS
+    version, with "Connected by cable" and its name beneath, never its
+    identifier. Each finished choice folds into a summary line with
+    **Change**; the next choice appears beneath it.
+  - **Encryption consent is one explicit button,** "Turn On and Continue",
+    with no checkbox (owner, 2026-10-18). It says what Epoch does: it turns
+    on encrypted backups only when they are off, the iPhone asks for its
+    passcode, the setting stays on, and the pull record notes the change.
+  - **Running** replaces the card. The Action Needed banner sits above it,
+    unchanged. The card's first lines hold what it is pulling, when it
+    started, **Cancel Pull**, what the current step is doing with the data
+    received, the time elapsed and the bar, so they stay in view at the
+    window's minimum size, 1024 × 720 (owner, 2026-10-18). The pull's own
+    steps follow, each with its duration; in a window under 860 px high they
+    fold into "Step 3 of 5 · Copy files · Show Steps". Raw tool output is
+    never in the card: it is in the Activity Log.
+  - **No data for 3 minutes** (`STALL_WARNING_MS`) puts the Action Needed
+    banner up with what to check; it clears when data arrives, and the pull
+    never stops itself.
+  - **Pulled** states what was verified, in the code's terms: "Status:
+    finished · Manifest present" (idevicebackup2 reported success, Status.plist's
+    snapshot is finished, Manifest.db exists; Prepare hashes the files), with
+    the size, the crash logs, where it was saved and how long it took.
+  - **A failed pull** shows a danger banner with Copy Details, and the
+    password field returns with **Pull Again**, which starts in a new folder.
+    A pull the examiner cancelled reads in the warning role. **A leftover
+    incomplete backup** offers Delete It and Not Now: it can't be resumed,
+    because the iPhone treats it as empty.
 
 ## 11. Dates and times — every time says its zone
 
@@ -537,8 +581,9 @@ only how they are shown.
   can choose a zone in Settings (EPOCH-560), and it then applies everywhere,
   the report included. The report's header names the zone.
 - **One format:** a 24-hour clock with seconds, the value in monospace, and
-  the zone beside it in muted `text-label`. Hovering shows the exact time
-  with its offset.
+  the zone beside it in muted `text-label`, after a real space rather than a
+  margin, so text selected and copied from the page reads `18:17:10 UTC`
+  (EPOCH-554). Hovering shows the exact time with its offset.
 
   | Where | UTC (default) | A chosen zone |
   |---|---|---|
@@ -582,6 +627,8 @@ and how it is sanitized, is `docs/event-log.md`; this is how it looks.
   errors (`danger/10`, `foreground` text, as the Failed chip), warnings
   (`warning/10`, `warning`) and notes for review (`accent/10`, `accent`). One click
   opens the drawer above it; the page above gets shorter and nothing nests.
+  The drawer stays as the examiner left it (open or closed, the view and the
+  filter) when they leave the page and come back, for the session (EPOCH-575).
 - **Two views (owner, 2026-10-18).** **Summary**, the default, shows `info`,
   warnings and errors in plain sentences; only an error, a warning or a note
   for review carries a word tag (Error, Warning, For review), and progress

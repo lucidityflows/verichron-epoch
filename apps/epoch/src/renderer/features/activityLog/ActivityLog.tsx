@@ -14,6 +14,7 @@ import {
 } from '../../../shared/activityLog';
 import { CopyButton } from '../../components/ui/CopyButton';
 import { cn } from '../../libs/utils';
+import { useDockState } from './dockState';
 
 /**
  * The Activity Log (EPOCH-570, the board "New Investigation View" and
@@ -96,9 +97,16 @@ function IconButton({
 
 export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked', error = null }: ActivityLogProps) {
   const docked = mode === 'docked';
-  const [open, setOpen] = useState(!docked);
-  const [view, setView] = useState<LogView>('summary');
-  const [filter, setFilter] = useState<LogFilter>('all');
+  // The dock keeps its drawer as the examiner left it across pages (EPOCH-575);
+  // the pop-out window is always open and keeps its own.
+  const dock = useDockState();
+  const [windowView, setWindowView] = useState<LogView>('summary');
+  const [windowFilter, setWindowFilter] = useState<LogFilter>('all');
+  const open = docked ? dock.open : true;
+  const view = docked ? dock.view : windowView;
+  const setView = docked ? dock.setView : setWindowView;
+  const filter = docked ? dock.filter : windowFilter;
+  const setFilter = docked ? dock.setFilter : setWindowFilter;
   const [search, setSearch] = useState('');
   const [follow, setFollow] = useState(true);
 
@@ -160,7 +168,7 @@ export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked'
         <button
           type="button"
           aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => dock.setOpen(!dock.open)}
           className="flex items-center gap-3 px-4 py-2.5 text-left hover:bg-surface/40"
         >
           <ChevronUp

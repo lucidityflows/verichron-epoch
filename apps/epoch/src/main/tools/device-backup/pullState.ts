@@ -1,4 +1,5 @@
 import type { BackupProgress, BackupStats, DevicePullState, DeviceInfo } from '../../../shared/types/tools';
+import { emptyPullStepTimes, nextPullStepTimes } from '../../../shared/pullSteps';
 
 /**
  * The device pull that is running, kept in the main process (EPOCH-467).
@@ -36,13 +37,15 @@ export class PullStateTracker {
       startedAt: now,
       progress: [],
       stats: null,
+      steps: emptyPullStepTimes(),
       deviceAction: null,
       ended: false,
     };
   }
 
-  progress(progress: BackupProgress): void {
+  progress(progress: BackupProgress, now = Date.now()): void {
     if (!this.state) return;
+    this.state.steps = nextPullStepTimes(this.state.steps, progress, now);
     const kept = [...this.state.progress, progress];
     this.state.progress = kept.length > PULL_STATE_PROGRESS_LIMIT ? kept.slice(-PULL_STATE_PROGRESS_LIMIT) : kept;
     this.state.deviceAction = nextDeviceAction(this.state.deviceAction, progress);

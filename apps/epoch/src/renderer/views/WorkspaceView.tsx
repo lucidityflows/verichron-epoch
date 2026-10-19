@@ -35,6 +35,8 @@ import { AnalysisStageProgress } from '../features/investigations/AnalysisStageP
 import {
   EvidenceSourcePanel,
   PreparedSummary,
+  PreparedTable,
+  type PreparedRow,
   PreparingCard,
   backupName,
   preparingTarget,
@@ -660,23 +662,39 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
               aria-labelledby="prepared-title"
               className="card rounded-xl border-t-2 border-t-success p-6 flex flex-col gap-5"
             >
-              <h2 id="prepared-title" className="font-display text-heading text-foreground">
-                Evidence Prepared
-              </h2>
-              {backups
-                .filter((b) => selectedLabels.has(b.label))
-                .map((b) => {
-                  const prepared = preparedByLabel.get(b.label);
-                  const description = descriptions.get(b.path);
-                  return prepared ? (
-                    <PreparedSummary
-                      key={b.label}
-                      name={backupName(b, description)}
-                      backupDate={description?.backupDate ?? null}
-                      prepared={prepared}
-                    />
-                  ) : null;
-                })}
+              {/* Headed as the Analyze card is: an icon chip, here in the success role. */}
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-success/10 text-success">
+                  <CheckCircle2 size="1.25rem" />
+                </div>
+                <h2 id="prepared-title" className="font-display text-heading text-foreground">
+                  Evidence Prepared
+                </h2>
+              </div>
+              {(() => {
+                const rows: PreparedRow[] = backups
+                  .filter((b) => selectedLabels.has(b.label))
+                  .flatMap((b) => {
+                    const prepared = preparedByLabel.get(b.label);
+                    const description = descriptions.get(b.path);
+                    return prepared
+                      ? [
+                          {
+                            key: b.label,
+                            name: backupName(b, description),
+                            backupDate: description?.backupDate ?? null,
+                            prepared,
+                          },
+                        ]
+                      : [];
+                  });
+                // One backup reads as tiles; several compare best as a table (owner's review, 2026-10-19).
+                return rows.length === 1 ? (
+                  <PreparedSummary name={rows[0].name} backupDate={rows[0].backupDate} prepared={rows[0].prepared} />
+                ) : (
+                  <PreparedTable rows={rows} />
+                );
+              })()}
             </section>
           )}
 
@@ -733,10 +751,11 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             failedCount === 0 ? 'bg-success/10 border border-success/30' : 'bg-danger/10 border border-danger/30'
           }`}
         >
+          {/* A 16 px icon, centred on the first 20 px line of text (owner's review, 2026-10-19). */}
           {failedCount === 0 ? (
-            <CheckCircle2 className="text-success shrink-0 mt-1" size="1.25rem" />
+            <CheckCircle2 className="text-success shrink-0 mt-0.5" size="1rem" />
           ) : (
-            <XCircle className="text-danger shrink-0 mt-1" size="1.25rem" />
+            <XCircle className="text-danger shrink-0 mt-0.5" size="1rem" />
           )}
           <div className="text-data">
             <p className={failedCount === 0 ? 'text-success' : 'text-danger'}>

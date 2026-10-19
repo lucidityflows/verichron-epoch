@@ -12,7 +12,9 @@ import type {
   ToolSetupFailure,
   ToolSetupStatus,
   ToolSetupStep,
+  PullStepTimes,
 } from '../../shared/types/tools';
+import { emptyPullStepTimes, nextPullStepTimes } from '../../shared/pullSteps';
 import { devicesApi } from '../api/devices';
 import { useToast } from '../components/ui/Toast';
 
@@ -27,6 +29,17 @@ function parentFolder(dir: string): string {
   const trimmed = dir.replace(/[\\/]+$/, '');
   const cut = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
   return cut > 0 ? trimmed.slice(0, cut) : trimmed;
+}
+
+/**
+ * The pull's messages the panel keeps, newest last: for Copy Details on a
+ * failure. The main process keeps the same number (pullState.ts); every line
+ * is in the pull's task log, which the Activity Log shows (EPOCH-436).
+ */
+const PULL_PROGRESS_LIMIT = 500;
+
+function keepNewest(lines: BackupProgress[]): BackupProgress[] {
+  return lines.length > PULL_PROGRESS_LIMIT ? lines.slice(-PULL_PROGRESS_LIMIT) : lines;
 }
 
 function formatGB(bytes: number): string {
@@ -63,6 +76,8 @@ export function useDevicePull() {
   const [selectedDevice, setSelectedDevice] = useState<DeviceInfo | null>(null);
   const [destDir, setDestDir] = useState<string | null>(null);
   const [pullProgress, setPullProgress] = useState<BackupProgress[]>([]);
+  // When each of the pull's steps started (EPOCH-554).
+  const [pullSteps, setPullSteps] = useState<PullStepTimes>(emptyPullStepTimes);
   const [pullError, setPullError] = useState<string | null>(null);
   // EPOCH-466: encrypted backups are off and the user is being asked to turn them on.
   const [encryptionConsent, setEncryptionConsent] = useState(false);
@@ -70,6 +85,9 @@ export function useDevicePull() {
   const [deviceAction, setDeviceAction] = useState<string | null>(null);
   const [pullStats, setPullStats] = useState<BackupStats | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  // The pull ended because the examiner cancelled it: a stop they asked for, not a failure (DESIGN.md §10).
+  const [pullCancelled, setPullCancelled] = useState(false);
+  const cancelAsked = useRef(false);
   // A backup folder left by a pull that didn't finish, offered for deletion.
   const [incomplete, setIncomplete] = useState<IncompleteBackup[]>([]);
   // The path being deleted, if any.
@@ -79,9 +97,6 @@ export function useDevicePull() {
   const [copyingCrashReports, setCopyingCrashReports] = useState(false);
   // The folder the finished pull wrote into, inside destDir (EPOCH-504).
   const [pulledDir, setPulledDir] = useState<string | null>(null);
-
-  // When this panel saw the pull finish; null when it finished before a remount.
-  const [pulledAt, setPulledAt] = useState<number | null>(null);
 
   const destDirRef = useRef(destDir);
   // Advanced by every new attempt, so a superseded pull's result is never applied.
@@ -111,6 +126,7 @@ export function useDevicePull() {
     setPulledDir(running.destDir);
     setPullProgress(running.progress.filter((p) => p.phase !== 'error'));
     setPullStats(running.stats);
+    setPullSteps(running.steps);
     setDeviceAction(running.deviceAction);
     const last = running.progress[running.progress.length - 1];
     if (running.ended && last?.phase === 'error') {
@@ -219,13 +235,14 @@ export function useDevicePull() {
         progress.phase === 'device-action' ? progress.message : progress.phase === 'preparing' ? prev : null
       );
       // An error is shown once, as the pull error, not also in the log.
-      if (progress.phase !== 'error') setPullProgress((prev) => [...prev, progress]);
+      if (progress.phase !== 'error') setPullProgress((prev) => keepNewest([...prev, progress]));
+      setPullSteps((prev) => nextPullStepTimes(prev, progress, Date.now()));
       if (progress.phase === 'done' || progress.phase === 'error') setCancelling(false);
       if (progress.phase === 'done') {
         setPhase('pulled');
-        setPulledAt(Date.now());
       } else if (progress.phase === 'error') {
         setPullError(progress.message);
+        setPullCancelled(cancelAsked.current);
         setPhase('available');
       }
     });
@@ -315,7 +332,10 @@ export function useDevicePull() {
   const clearAttempt = () => {
     attempt.current += 1;
     setPullProgress([]);
+    setPullSteps(emptyPullStepTimes());
     setPullError(null);
+    setPullCancelled(false);
+    cancelAsked.current = false;
     setDeviceAction(null);
     setPullStats(null);
     setPulledDir(null);
@@ -353,10 +373,22 @@ export function useDevicePull() {
   const cancelPull = async () => {
     if (!sourceId) return;
     setCancelling(true);
+    cancelAsked.current = true;
     try {
-      await devicesApi.cancelDeviceBackup(sourceId);
+      // Refused while no backup process runs yet: checking, or turning on
+      // encryption while the iPhone waits for its passcode. The pull goes on,
+      // and a later error stays a failure, not a stop that was asked for.
+      if (!(await devicesApi.cancelDeviceBackup(sourceId))) {
+        setCancelling(false);
+        cancelAsked.current = false;
+        toast.show(
+          "The pull can't be cancelled until the backup starts on the iPhone. If the iPhone is asking for its passcode, enter it, or wait for the request to time out.",
+          'info'
+        );
+      }
     } catch (err) {
       setCancelling(false);
+      cancelAsked.current = false;
       setPullError(ipcErrorMessage(err));
     }
   };
@@ -439,6 +471,11 @@ export function useDevicePull() {
       if (attempt.current === thisAttempt) {
         setPullError((prev) => prev ?? ipcErrorMessage(err));
         setPhase('available');
+        // The pull's error arrives as progress before the main process has
+        // closed its log and ended the pull, so the lookup on that error skips
+        // the folder as still being written. This call returns only once the
+        // pull has ended: look again, so its incomplete backup is offered.
+        void refreshIncomplete();
       }
     } finally {
       if (attempt.current === thisAttempt) {
@@ -473,12 +510,13 @@ export function useDevicePull() {
     setSelectedDevice,
     destDir,
     pullProgress,
+    pullSteps,
     pullError,
+    pullCancelled,
     encryptionConsent,
     cancelEncryptionConsent,
     deviceAction,
     pullStats,
-    pulledAt,
     cancelPull,
     cancelling,
     incomplete,

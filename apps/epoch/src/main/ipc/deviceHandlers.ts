@@ -102,8 +102,11 @@ export function registerDeviceHandlers(
   ipcMain.handle('epoch:cancelDeviceBackup', async (_event, sourceId: string) => {
     const source = getDeviceBackupSource(sourceId);
     if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
-    if (pull.running()) cancelRequested = true;
-    return source.cancelPull();
+    // Only a stop that happened makes the pull's outcome "cancelled"; a refused
+    // one (no backup process yet) leaves a later failure a failure (§8.5).
+    const stopping = source.cancelPull();
+    if (pull.running() && stopping) cancelRequested = true;
+    return stopping;
   });
 
   // Incomplete backups in every folder pulls have written to, plus the
@@ -225,7 +228,7 @@ export function registerDeviceHandlers(
             kind: 'pull',
             labels: [label],
             options: { turn_on_encryption: Boolean(options.enableEncryption) },
-            backups: [{ label, path: path.join(pullDir, device.id) }],
+            backups: [{ label, path: path.join(pullDir, device.id), beingWritten: true }],
             source: destDir,
             appRoot: repoRoot,
             appVersion,

@@ -27,6 +27,7 @@ describe('PullStateTracker', () => {
       startedAt: 1000,
       progress: [],
       stats: null,
+      steps: { startedAt: {}, endedAt: null, failed: false },
       deviceAction: null,
       ended: false,
     });
@@ -54,6 +55,17 @@ describe('PullStateTracker', () => {
     pull.stats(stats);
     assert.deepEqual(pull.current()?.stats, stats);
     assert.equal(pull.current()?.progress.length, 3);
+  });
+
+  it('keeps when each step started, even after its lines are dropped', () => {
+    const pull = new PullStateTracker();
+    pull.start('ios', IPHONE, '/backups', 1000);
+    pull.progress({ phase: 'preparing', step: 'check', message: 'Checking the backup settings.' }, 1000);
+    pull.progress({ phase: 'transferring', step: 'copy', message: 'Receiving files' }, 5000);
+    for (let i = 0; i < PULL_STATE_PROGRESS_LIMIT + 5; i++)
+      pull.progress({ phase: 'transferring', step: 'copy', message: `line ${i}` }, 6000 + i);
+    pull.progress({ phase: 'done', message: 'Backup complete.' }, 9000);
+    assert.deepEqual(pull.current()?.steps, { startedAt: { check: 1000, copy: 5000 }, endedAt: 9000, failed: false });
   });
 
   it('keeps only the newest progress lines', () => {

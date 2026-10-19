@@ -127,14 +127,21 @@ describe('TaskLog', () => {
     // A pull's backup is written into a folder named by the device's UDID,
     // so the identifier is known from the folder's name, with no Info.plist yet.
     const pullDir = path.join(tmp, 'pulls', '2026-10-18T142446Z');
-    const { log } = await openLog({
+    const { log, seen } = await openLog({
       kind: 'pull',
       labels: ['2026-10-18T142446Z'],
       options: { turn_on_encryption: false },
-      backups: [{ label: '2026-10-18T142446Z', path: path.join(pullDir, '00008140-001A2B3C4D5E6F70') }],
+      backups: [
+        { label: '2026-10-18T142446Z', path: path.join(pullDir, '00008140-001A2B3C4D5E6F70'), beingWritten: true },
+      ],
       source: path.join(tmp, 'pulls'),
       message: 'iPhone pull started for iPhone17,5, iOS 26.6.1',
     });
+    // No Info.plist yet is how a pull starts, not a gap: no warning (EPOCH-554).
+    assert.deepEqual(
+      seen.filter((e) => e.level === 'warn'),
+      []
+    );
     log.addSecret('hunter22');
     const entry = log.toolOutput('idevicebackup2', 'Backup directory is "00008140-001A2B3C4D5E6F70"', {
       label: '2026-10-18T142446Z',

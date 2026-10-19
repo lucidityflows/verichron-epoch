@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, it, vi } from 'vitest';
 
 import type { BackupProgress } from '../../../shared/prepareProgress';
@@ -13,6 +13,7 @@ import type { PreparedBackup } from '../../../shared/types/window';
 import {
   EvidenceSourcePanel,
   PreparedSummary,
+  PreparedTable,
   PreparingCard,
   backupName,
   formatElapsed,
@@ -43,7 +44,7 @@ describe('backupName', () => {
       bytes: 0,
       infoPlistError: null,
     };
-    assert.equal(backupName(BACKUP, description), 'iPhone17,5 · iOS 26.6.1');
+    assert.equal(backupName(BACKUP, description), 'iPhone 17,5 · iOS 26.6.1');
     assert.equal(backupName(BACKUP, undefined), '2026-10-18T142446Z');
   });
 });
@@ -63,10 +64,10 @@ describe('EvidenceSourcePanel', () => {
 });
 
 describe('EvidenceSourcePanel, quiet', () => {
-  it('is one line and two buttons under the list, with no card and no heading', () => {
+  it('is a small raised panel under the list: a heading, one line and two buttons', () => {
     render(<EvidenceSourcePanel quiet title="Evidence somewhere else?" onPull={vi.fn()} onChooseFolder={vi.fn()} />);
-    assert.equal(screen.queryByRole('heading'), null);
-    assert.ok(screen.getByText(/^Evidence somewhere else\? Pull a backup/));
+    assert.ok(screen.getByRole('region', { name: 'Evidence somewhere else?' }));
+    assert.ok(screen.getByText(/^Pull a backup from a connected iPhone/));
     assert.equal(screen.getAllByRole('button').length, 2);
   });
 });
@@ -100,7 +101,7 @@ describe('PreparingCard', () => {
     const onStop = vi.fn();
     render(
       <PreparingCard
-        name="iPhone14,2 · iOS 17.6.1"
+        name="iPhone 14,2 · iOS 17.6.1"
         position="1 of 2"
         progress={progress({ decrypted: { bytes: 31_200_000_000, total: 58_400_000_000 } })}
         startedAt={Date.now() - 65_000}
@@ -108,7 +109,7 @@ describe('PreparingCard', () => {
         onStop={onStop}
       />
     );
-    assert.ok(screen.getByRole('heading', { name: /Preparing iPhone14,2 · iOS 17\.6\.1 · 1 of 2/ }));
+    assert.ok(screen.getByRole('heading', { name: /Preparing iPhone 14,2 · iOS 17\.6\.1 · 1 of 2/ }));
     assert.ok(screen.getByText(/Decrypting · 31\.2 GB of 58\.4 GB/));
     assert.ok(screen.getByText(/00:01:0\d elapsed/));
     fireEvent.click(screen.getByRole('button', { name: /Stop/ }));
@@ -167,13 +168,15 @@ describe('PreparedSummary', () => {
   };
 
   it('states what Prepare did, from the workspace records', () => {
-    render(<PreparedSummary name="iPhone14,2 · iOS 17.6.1" backupDate="2026-10-18T14:24:48Z" prepared={prepared} />);
+    render(<PreparedSummary name="iPhone 14,2 · iOS 17.6.1" backupDate="2026-10-18T14:24:48Z" prepared={prepared} />);
     assert.ok(screen.getByText('9,870'));
     assert.ok(screen.getByText('4 of 61'));
     assert.ok(screen.getByText('Damaged databases repaired · 1 still damaged'));
     assert.ok(screen.getByText('539 of 540'));
     assert.ok(screen.getByText('iLEAPP modules run · 1 reported an error'));
     assert.ok(screen.getByText('Unchanged'));
+    // The header reads as a backup's row does: the prepared time in its green chip.
+    assert.ok(screen.getByText(/Prepared · 2026-10-18 15:51:00/));
   });
 
   it('says so when the repair did not run', () => {
@@ -189,5 +192,52 @@ describe('PreparedSummary', () => {
     );
     assert.ok(screen.getByText('Not run'));
     assert.ok(screen.getByText('Database repair: no sqlite3'));
+  });
+});
+
+describe('PreparedTable', () => {
+  const base: PreparedBackup = {
+    label: 'a',
+    state: 'prepared',
+    preparedAt: '2026-10-19T19:57:52Z',
+    details: {
+      filesChecked: 9870,
+      repair: { status: 'ran', scanned: 61, repaired: 4, failed: 0 },
+      modules: { total: 540, complete: 540, errors: 0 },
+    },
+  };
+
+  it('puts several backups in one table, a row each, with the facts as columns', () => {
+    render(
+      <PreparedTable
+        rows={[
+          { key: 'a', name: 'iPhone 17,5 · iOS 26.6.1', backupDate: '2026-10-19T18:05:15Z', prepared: base },
+          {
+            key: 'b',
+            name: 'iPhone 14,2 · iOS 17.6.1',
+            backupDate: null,
+            prepared: {
+              ...base,
+              label: 'b',
+              details: { ...base.details!, modules: { total: 540, complete: 539, errors: 1 } },
+            },
+          },
+          {
+            key: 'c',
+            name: 'iPad 13,1 · iOS 18.1',
+            backupDate: null,
+            prepared: { ...base, label: 'c', details: null, detailsError: 'its sidecar is missing' },
+          },
+        ]}
+      />
+    );
+    const rows = screen.getAllByRole('row');
+    assert.equal(rows.length, 4, 'a header and a row per backup');
+    assert.ok(within(rows[0]).getByText('Files checked'));
+    assert.ok(within(rows[1]).getByText('9,870'));
+    assert.ok(within(rows[1]).getByText(/Prepared · 2026-10-19 19:57:52/));
+    assert.ok(within(rows[2]).getByText('539 of 540'));
+    assert.ok(within(rows[2]).getByText('1 reported an error'));
+    assert.ok(within(rows[3]).getByText('What Prepare did is not shown: its sidecar is missing.'));
   });
 });

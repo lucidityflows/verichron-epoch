@@ -8,6 +8,7 @@
 import type { PipelineRunRow } from '@verichron/etl-db-reader';
 
 import type { ChipState } from '../../components/ui/statusChip';
+import { shownModel } from '../../../shared/deviceModel';
 
 export interface Investigation {
   evidenceId: string;
@@ -25,9 +26,10 @@ export interface Investigation {
 /** The first eight characters of an ID, as a small detail beside a name. */
 export const shortId = (id: string): string => id.slice(0, 8);
 
-/** "iPhone17,5 · iOS 26.6.1", from what the backup's Info.plist says. */
+/** "iPhone 17,5 · iOS 26.6.1", from what the backup's Info.plist says. Callers name only registered evidence. */
 export function investigationTitle(run: Pick<PipelineRunRow, 'product_type' | 'ios_version'>): string {
-  return `${run.product_type} · iOS ${run.ios_version}`;
+  if (!run.product_type) throw new Error('an investigation is named only once its evidence records its model');
+  return `${shownModel(run.product_type)} · iOS ${run.ios_version}`;
 }
 
 /**

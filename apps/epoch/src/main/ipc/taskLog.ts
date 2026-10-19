@@ -46,8 +46,11 @@ export interface TaskLogSetup {
   labels: string[];
   /** The choices that change what the task does. */
   options: Record<string, boolean | number | string>;
-  /** Where each selected backup is, so its identifiers are known (§6.3). */
-  backups: readonly { label: string; path: string }[];
+  /**
+   * Where each selected backup is, so its identifiers are known (§6.3).
+   * `beingWritten`: this task writes it (a pull), so it has no Info.plist yet.
+   */
+  backups: readonly { label: string; path: string; beingWritten?: boolean }[];
   /** The folder the backups were chosen from, when there is one. */
   source: string | null;
   /** The app's install folder; in development, the repository. */

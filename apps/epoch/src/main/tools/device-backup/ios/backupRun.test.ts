@@ -308,3 +308,21 @@ describe('backupFinishedAt and backupDeviceId (EPOCH-519)', () => {
     assert.equal(await backupDeviceId(fakePlistutil(info(guid)), tmp), null);
   });
 });
+
+describe('reading a large Info.plist (EPOCH-519)', () => {
+  it("reads the device from an Info.plist larger than Node's 1 MiB default, as real backups are", async () => {
+    // About 3 MB of XML, as measured on real backups, with the identifier first.
+    const file = path.join(tmp, 'plistutil');
+    fs.writeFileSync(
+      file,
+      `#!/bin/sh
+printf '<plist version="1.0"><dict><key>Unique Identifier</key><string>UDID-1</string>'
+awk 'BEGIN { for (i = 0; i < 50000; i++) printf "<key>Application%d</key><string>%060d</string>", i, 0 }'
+printf '</dict></plist>'
+`,
+      { mode: 0o755 }
+    );
+    fs.writeFileSync(path.join(tmp, 'Info.plist'), 'bplist00');
+    assert.equal(await backupDeviceId(file, tmp), 'UDID-1');
+  });
+});

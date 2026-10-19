@@ -46,8 +46,23 @@ export type ToolAvailabilityStatus = { available: true; path: string } | { avail
 /** `device-action`: the pull is waiting for the user to do something on the device. */
 export type BackupProgressPhase = 'preparing' | 'device-action' | 'transferring' | 'verifying' | 'done' | 'error';
 
+/** The iPhone pull's own steps, in order (EPOCH-554, shared/pullSteps.ts). */
+export type PullStep = 'check' | 'encryption' | 'approve' | 'copy' | 'verify' | 'crash-logs';
+
+/** When each of a pull's steps started, and how the pull ended. */
+export interface PullStepTimes {
+  /** When each step started (ms since the epoch). */
+  startedAt: Partial<Record<PullStep, number>>;
+  /** When the pull reported done or an error; null while it runs. */
+  endedAt: number | null;
+  /** True when it ended with an error. */
+  failed: boolean;
+}
+
 export interface BackupProgress {
   phase: BackupProgressPhase;
+  /** The pull step this message belongs to; done and error belong to none. */
+  step?: PullStep;
   /** 0-100 when known; omit when the underlying tool gives no percentage. */
   percent?: number;
   /** Short human-readable status line, safe to show directly in the UI. */
@@ -130,6 +145,8 @@ export interface DevicePullState {
   /** Progress so far, oldest first; the newest 500 are kept. */
   progress: BackupProgress[];
   stats: BackupStats | null;
+  /** When each of the pull's steps started (EPOCH-554). */
+  steps: PullStepTimes;
   /** The "Action Needed" banner's message, if one is up. */
   deviceAction: string | null;
   /** True once the pull has reported done or an error. */
