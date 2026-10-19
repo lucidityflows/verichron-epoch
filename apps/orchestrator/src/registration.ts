@@ -214,6 +214,9 @@ export function readPlistStrings(file: string): Map<string, string> {
   }
 }
 
+/** A full ISO 8601 time with seconds and its UTC offset, as a property list's <date> holds it. */
+const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
 /** The device a backup came from, and how the investigation is named (EPOCH-555). */
 interface BackupDevice {
   udid: string;
@@ -245,9 +248,13 @@ function readDevice(candidates: string[]): BackupDevice {
     if (!value) throw new RegistrationError(`${plistPath} has no "${key}"; cannot name the investigation`);
     return value;
   };
-  const backupDate = new Date(required('Last Backup Date'));
-  if (Number.isNaN(backupDate.getTime())) {
-    throw new RegistrationError(`${plistPath} has a "Last Backup Date" that is not a date`);
+  // A time with no offset would be read in this host's zone: a guessed time (R11).
+  const rawBackupDate = required('Last Backup Date');
+  const backupDate = new Date(rawBackupDate);
+  if (!ISO_WITH_OFFSET.test(rawBackupDate) || Number.isNaN(backupDate.getTime())) {
+    throw new RegistrationError(
+      `${plistPath} has a "Last Backup Date" that is not an ISO 8601 time with its offset: ${rawBackupDate}`
+    );
   }
   return {
     udid,

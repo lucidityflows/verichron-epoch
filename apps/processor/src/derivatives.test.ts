@@ -55,10 +55,24 @@ const STUB_MODULES = [
 const stubEnvironment = (version: string) => environmentDigest(['python==3.14.8', `stub==${version}`]);
 
 /** git in the stub iLEAPP checkout, with an identity so commits work anywhere. */
+// The stub checkout's commits are never signed, so the suite doesn't depend on
+// the developer's signing agent (a locked one cancelled every test here).
 const ileappGit = (...args: string[]) =>
-  execFileSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@example.invalid', '-C', ileappDir, ...args], {
-    encoding: 'utf8',
-  }).trim();
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'user.name=test',
+      '-c',
+      'user.email=test@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      '-C',
+      ileappDir,
+      ...args,
+    ],
+    { encoding: 'utf8' }
+  ).trim();
 
 before(() => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'decrypt-provenance-'));

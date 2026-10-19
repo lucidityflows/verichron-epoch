@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict';
 import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, it, vi } from 'vitest';
 
 const hook = vi.hoisted(() => ({ analysis: null as unknown }));
@@ -141,12 +141,12 @@ describe('analysisName', () => {
 });
 
 describe('InvestigationsView', () => {
-  function show(selected: PipelineRunRow | null, stages: StageStatusRow[] = []) {
+  function show(selected: PipelineRunRow | null, stages: StageStatusRow[] = [], runs = [OLDER, OTHER, NEWER]) {
     const onSelectRun = vi.fn();
     const onViewReport = vi.fn();
     const view = render(
       <InvestigationsView
-        runs={[OLDER, OTHER, NEWER]}
+        runs={runs}
         loading={false}
         error={null}
         selectedRun={selected}
@@ -224,5 +224,59 @@ describe('InvestigationsView', () => {
         'Already up to date: a complete analysis covers this backup with the stages and indicator set in use now.'
       )
     );
+  });
+
+  it('copies times as ISO 8601 with their offset, and no identifier (DESIGN.md §11)', async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    show(NEWER, [stage({})]);
+    fireEvent.click(screen.getByRole('button', { name: /Copy Details/ }));
+    await waitFor(() => assert.equal(writeText.mock.calls.length, 1));
+    const copied = String((writeText.mock.calls[0] as unknown[])[0]);
+    assert.match(copied, /Backup began: 2026-10-15T18:05:25Z/);
+    assert.match(copied, /started 2026-10-16T09:00:00Z/);
+    assert.equal(copied.includes(UDID), false);
+    assert.equal(copied.includes('Alex'), false);
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the analysis an Analyze Again created once the list holds it', () => {
+    const created = run({ run_id: '55555555-5555-5555-5555-555555555555', started_at: '2026-10-17T09:00:00.000Z' });
+    hook.analysis = {
+      kind: 'retry',
+      target: NEWER.run_id,
+      status: 'finished',
+      currentStage: null,
+      result: { success: true, analysis: [{ backupPath: '/x', status: 'succeeded', runId: created.run_id }] },
+    };
+    const { onSelectRun } = show(NEWER, [stage({})], [OLDER, OTHER, NEWER, created]);
+    assert.deepEqual(onSelectRun.mock.calls.at(-1), [created]);
+  });
+
+  it('shows a failed Analyze Again in danger, and a cancelled one in flag, with Copy', () => {
+    hook.analysis = {
+      kind: 'retry',
+      target: NEWER.run_id,
+      status: 'finished',
+      currentStage: null,
+      result: { success: false, error: 'the orchestrator stopped unexpectedly' },
+    };
+    show(NEWER, [stage({})]);
+    let banner = screen.getByRole('alert');
+    assert.match(banner.className, /text-danger/);
+    assert.match(banner.className, /shadow-elevation-1/);
+    assert.ok(within(banner).getByRole('button', { name: /Copy/ }));
+    cleanup();
+
+    hook.analysis = {
+      kind: 'retry',
+      target: NEWER.run_id,
+      status: 'finished',
+      currentStage: null,
+      result: { success: false, cancelled: true, error: 'Analysis was cancelled.' },
+    };
+    show(NEWER, [stage({})]);
+    banner = screen.getByRole('alert');
+    assert.match(banner.className, /text-flag/, 'a stop the examiner asked for is not a failure');
   });
 });

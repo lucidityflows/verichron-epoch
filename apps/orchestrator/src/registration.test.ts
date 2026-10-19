@@ -846,6 +846,18 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(await count('evidence_items'), 0);
   });
 
+  it('refuses a backup date with no UTC offset, which would be a guessed time (R11)', async () => {
+    const ws = makeWorkspace('zoneless-date');
+    writeFileSync(
+      path.join(ws.backupPath, 'Info.plist'),
+      infoPlist(UDID, 'Phone').replace('2026-10-15T18:05:25Z', '2026-10-15T18:05:25')
+    );
+    const result = await run(ws.backupPath);
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /"Last Backup Date" that is not an ISO 8601 time with its offset/);
+    assert.equal(await count('evidence_items'), 0);
+  });
+
   it("records each derivative's tool, parameters and provenance key", async () => {
     const ws = makeWorkspace('provenance');
     await run(ws.backupPath);

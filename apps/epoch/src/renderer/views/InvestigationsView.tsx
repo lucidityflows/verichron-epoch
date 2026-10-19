@@ -22,7 +22,7 @@ import {
   warningLines,
   type Investigation,
 } from '../features/investigations/investigations';
-import { formatDateTime } from '../../shared/time';
+import { isoWithOffset } from '../../shared/time';
 
 interface InvestigationsViewProps {
   runs: PipelineRunRow[];
@@ -55,8 +55,9 @@ function notExamined(stage: StageStatusRow): boolean {
 function analysisDetails(investigation: Investigation, run: PipelineRunRow, stages: StageStatusRow[]): string {
   return [
     `Investigation: ${investigation.title} (${shortId(investigation.evidenceId)})`,
-    `Backup began: ${formatDateTime(investigation.backupDate)}`,
-    `Analysis ${shortId(run.run_id)}: started ${formatDateTime(run.started_at)}, ${chipLabel(analysisChip(run))}`,
+    // Copied times are ISO 8601 with their offset (DESIGN.md §11).
+    `Backup began: ${isoWithOffset(investigation.backupDate)}`,
+    `Analysis ${shortId(run.run_id)}: started ${isoWithOffset(run.started_at)}, ${chipLabel(analysisChip(run))}`,
     '',
     ...stages.map((stage) => {
       const chip = stageChip({
@@ -131,6 +132,17 @@ export function InvestigationsView({
   // Nothing new to analyze: the orchestrator found a complete analysis for the
   // same evidence, stages and indicator set, and added none (R22).
   const upToDate = !!againResult?.success && (againResult.analysis ?? []).some((result) => result.status === 'skipped');
+  // A stop the examiner asked for is not a failure (DESIGN.md §9).
+  const againStopped = !!againResult?.cancelled;
+  // The analysis an Analyze Again created: shown once the list holds it,
+  // rather than the one it started from.
+  const createdRunId =
+    againResult?.analysis?.find((result) => result.status !== 'skipped' && result.runId)?.runId ?? null;
+  useEffect(() => {
+    if (!createdRunId || createdRunId === selectedRun?.run_id) return;
+    const created = runs.find((run) => run.run_id === createdRunId);
+    if (created) onSelectRun(created);
+  }, [createdRunId, runs, selectedRun, onSelectRun]);
 
   // When this analysis's Analyze Again ends, read the analyses and stages again.
   const wasAnalyzing = useRef(false);
@@ -191,8 +203,12 @@ export function InvestigationsView({
       description="Every analysis you have started, and exactly how far each one got."
     >
       {viewError ? (
-        <div role="alert" className="text-flag bg-flag/10 border border-flag/30 rounded-md px-4 py-3 text-data">
-          {viewError}
+        <div
+          role="alert"
+          className="flex items-start gap-3 text-flag bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-md px-4 py-3 text-data"
+        >
+          <span className="flex-1 min-w-0">{viewError}</span>
+          <CopyButton title="Copy the error" text={`Investigations could not be shown: ${viewError}`} />
         </div>
       ) : loading ? (
         <ListSkeleton />
@@ -279,8 +295,21 @@ export function InvestigationsView({
                 </div>
 
                 {againError && (
-                  <div className="text-flag bg-flag/10 border border-flag/30 rounded-md px-4 py-3 text-data">
-                    {againError}
+                  <div
+                    role="alert"
+                    className={`flex items-start gap-3 shadow-elevation-1 rounded-md px-4 py-3 text-data ${
+                      againStopped
+                        ? 'text-flag bg-flag/10 border border-flag/30'
+                        : 'text-danger bg-danger/10 border border-danger/30'
+                    }`}
+                  >
+                    <span className="flex-1 min-w-0">{againError}</span>
+                    <CopyButton
+                      title="Copy the error, the investigation and each stage, with no device identifier"
+                      text={() =>
+                        `Analyze Again: ${againError}\n\n${analysisDetails(selected, selectedRun, stagesShown)}`
+                      }
+                    />
                   </div>
                 )}
                 {upToDate && (
