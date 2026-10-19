@@ -242,6 +242,24 @@ export class TaskLog {
     return result;
   }
 
+  /**
+   * A line printed by a tool the app runs itself, such as idevicebackup2 for
+   * a pull (EPOCH-436): debug, by its source, like any tool output.
+   */
+  toolOutput(tool: string, text: string, where: Where = {}): TaskLogEntry {
+    const tripped = (this.sanitizer.report(text).replaced.password ?? 0) > 0;
+    const entry = this.push({
+      kind: 'output',
+      level: 'debug',
+      source: `tool:${tool}`,
+      stream: 'stdout',
+      message: this.sanitizer.sanitize(text),
+      ...this.where(where),
+    });
+    if (tripped) this.app('error', 'a password reached the output; it was removed before it was kept or shown');
+    return entry;
+  }
+
   /** A line the app writes for itself: a spawn, a stop, how a process ended. */
   app(level: LogLevel, message: string, where: Where = {}): TaskLogEntry {
     return this.push({

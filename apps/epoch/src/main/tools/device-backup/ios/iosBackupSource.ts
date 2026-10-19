@@ -752,7 +752,7 @@ function runBackup(
           });
         } else {
           if (event.text === 'Receiving files') receiving = true;
-          onProgress({ phase: receiving ? 'transferring' : 'preparing', message: event.text });
+          onProgress({ phase: receiving ? 'transferring' : 'preparing', message: event.text, tool: true });
         }
       }
     };

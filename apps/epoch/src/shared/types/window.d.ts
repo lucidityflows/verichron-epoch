@@ -166,6 +166,17 @@ export interface AnalysisState {
   log: PipelineLogEntry[];
 }
 
+/** The iPhone pull's task log (EPOCH-436), as the Activity Log follows it; the pull's own state is DevicePullState. */
+export interface PullLogState {
+  status: 'idle' | 'running' | 'finished';
+  startedAt: number | null;
+  /** This pull's saved log in the default workspace's logs folder, once it has one. */
+  taskLog: string | null;
+  /** The workspace the log is in. */
+  workspace: string | null;
+  log: PipelineLogEntry[];
+}
+
 declare global {
   interface Window {
     epoch: {
@@ -205,6 +216,10 @@ declare global {
       onOrchestratorLog: (callback: (entry: PipelineLogEntry) => void) => () => void;
       getAnalysisState: () => Promise<AnalysisState>;
       onAnalysisState: (callback: (state: AnalysisState) => void) => () => void;
+      // EPOCH-436: the iPhone pull's task log.
+      getPullLogState: () => Promise<PullLogState>;
+      onPullLogState: (callback: (state: PullLogState) => void) => () => void;
+      onPullLog: (callback: (entry: PipelineLogEntry) => void) => () => void;
       // EPOCH-570: the workspace's saved task logs, read back after a restart.
       listTaskLogs: (workspace: string) => Promise<TaskLogSummary[]>;
       readTaskLog: (workspace: string, file: string) => Promise<ReadTaskLog>;

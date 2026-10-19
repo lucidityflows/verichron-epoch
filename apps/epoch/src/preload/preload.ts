@@ -8,6 +8,7 @@ import type {
   ReadTaskLog,
   TaskLogSummary,
   PrepareState,
+  PullLogState,
   ReportResult,
 } from '../shared/types/window';
 import type {
@@ -115,6 +116,18 @@ const dbApi = {
     const listener = (_event: Electron.IpcRendererEvent, state: AnalysisState) => callback(state);
     ipcRenderer.on('epoch:analysisState', listener);
     return () => ipcRenderer.removeListener('epoch:analysisState', listener);
+  },
+  // EPOCH-436: the iPhone pull's task log, kept in the main process like Prepare's.
+  getPullLogState: (): Promise<PullLogState> => ipcRenderer.invoke('epoch:getPullLogState'),
+  onPullLogState: (callback: (state: PullLogState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: PullLogState) => callback(state);
+    ipcRenderer.on('epoch:pullLogState', listener);
+    return () => ipcRenderer.removeListener('epoch:pullLogState', listener);
+  },
+  onPullLog: (callback: (entry: PipelineLogEntry) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, entry: PipelineLogEntry) => callback(entry);
+    ipcRenderer.on('epoch:pullLog', listener);
+    return () => ipcRenderer.removeListener('epoch:pullLog', listener);
   },
 
   // Device backup acquisition -- see apps/epoch/src/tools/device-backup.

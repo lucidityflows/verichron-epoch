@@ -1,4 +1,10 @@
-import type { StartPipelineOptions, PipelineLogEntry, AnalysisState, PrepareState } from '../../shared/types/window';
+import type {
+  StartPipelineOptions,
+  PipelineLogEntry,
+  AnalysisState,
+  PrepareState,
+  PullLogState,
+} from '../../shared/types/window';
 
 export const pipelineApi = {
   selectBackupDirectory: () => window.epoch.selectBackupDirectory(),
@@ -17,4 +23,8 @@ export const pipelineApi = {
   onOrchestratorLog: (callback: (entry: PipelineLogEntry) => void) => window.epoch.onOrchestratorLog(callback),
   getAnalysisState: () => window.epoch.getAnalysisState(),
   onAnalysisState: (callback: (state: AnalysisState) => void) => window.epoch.onAnalysisState(callback),
+
+  getPullLogState: () => window.epoch.getPullLogState(),
+  onPullLogState: (callback: (state: PullLogState) => void) => window.epoch.onPullLogState(callback),
+  onPullLog: (callback: (entry: PipelineLogEntry) => void) => window.epoch.onPullLog(callback),
 };

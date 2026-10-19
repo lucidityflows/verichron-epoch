@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { TaskLogEntry } from '@verichron/contracts';
 
 import { pipelineApi } from '../../api/pipeline';
-import { useAnalysisState, usePrepareState } from '../../hooks/usePipelineState';
+import { useAnalysisState, usePrepareState, usePullLogState } from '../../hooks/usePipelineState';
 
 export interface ActivityLogSource {
   entries: TaskLogEntry[];
@@ -15,19 +15,20 @@ export interface ActivityLogSource {
 }
 
 /**
- * The task the Activity Log follows (EPOCH-570): the running Prepare or
- * Analyze, else the one started last. After a restart neither has run in
+ * The task the Activity Log follows (EPOCH-570, EPOCH-436): the running pull,
+ * Prepare or Analyze, else the one started last. After a restart neither has run in
  * this session, so the workspace's newest saved log is read back; one that
  * never finished reads as such (docs/event-log.md §4).
  */
 export function useActivityLog(): ActivityLogSource {
   const { state: prepare, log: prepareLog } = usePrepareState();
   const { state: analysis, log: analysisLog } = useAnalysisState();
+  const { state: pull, log: pullLog } = usePullLogState();
   const [saved, setSaved] = useState<{ workspace: string; file: string; entries: TaskLogEntry[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const ranThisSession = Boolean(prepare?.startedAt || analysis?.startedAt);
-  const loaded = prepare !== null && analysis !== null;
+  const ranThisSession = Boolean(prepare?.startedAt || analysis?.startedAt || pull?.startedAt);
+  const loaded = prepare !== null && analysis !== null && pull !== null;
 
   useEffect(() => {
     if (!loaded || ranThisSession) return;
@@ -55,10 +56,19 @@ export function useActivityLog(): ActivityLogSource {
       error,
     };
   }
+  const followed = followedTask(prepare, analysis, pull);
+  if (followed === 'pull') {
+    return {
+      entries: pullLog,
+      live: pull?.status === 'running',
+      workspace: pull?.workspace ?? null,
+      file: pull?.taskLog ?? null,
+      error,
+    };
+  }
   const analysisRunning = analysis?.status === 'running';
   const prepareRunning = prepare?.status === 'running';
-  const useAnalysis = analysisRunning || (!prepareRunning && (analysis?.startedAt ?? 0) > (prepare?.startedAt ?? 0));
-  return useAnalysis
+  return followed === 'analysis'
     ? {
         entries: analysisLog,
         live: analysisRunning,
@@ -73,4 +83,25 @@ export function useActivityLog(): ActivityLogSource {
         file: prepare?.taskLog ?? null,
         error,
       };
+}
+
+type TaskTiming = { status: string; startedAt: number | null } | null;
+
+/**
+ * Which task's log the drawer follows: a running one, else the one started
+ * last. A pull runs on its own (it holds the device), so while it runs it is
+ * the task.
+ */
+export function followedTask(
+  prepare: TaskTiming,
+  analysis: TaskTiming,
+  pull: TaskTiming
+): 'prepare' | 'analysis' | 'pull' {
+  if (pull?.status === 'running') return 'pull';
+  if (analysis?.status === 'running') return 'analysis';
+  if (prepare?.status === 'running') return 'prepare';
+  const started = (task: TaskTiming) => task?.startedAt ?? 0;
+  const newest = Math.max(started(prepare), started(analysis), started(pull));
+  if (started(pull) === newest && newest > 0) return 'pull';
+  return started(analysis) > started(prepare) ? 'analysis' : 'prepare';
 }

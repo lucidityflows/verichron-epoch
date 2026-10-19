@@ -47,7 +47,7 @@ One saved record of what each task did, read in several places:
 
 - **Task kinds:**
   - `prepare` (the processor) and `analyze` (the orchestrator) are wired in U2.
-  - `pull` (iPhone backup) has the same contract and adopts it in U3.
+  - `pull` (iPhone backup) is wired in U3 (EPOCH-436), as §8.5 describes.
 - **Task id:** a UUID the app creates when the task starts.
 - **File:** `<kind>-<start, compact UTC>-<task id, first 8>.ndjson`, for example `prepare-2026-10-18T153002Z-1f3a9c2e.ndjson`, in the folder the workspace's manifest declares as `task_logs_path` (`logs` in a new workspace). Like every workspace path, it is never built from a name in code (the manifest contract).
   - The folder is `0700`: it also holds iLEAPP's logs, and both are case material (owner, 2026-10-18). The writer sets the mode each time it opens a log, because `mkdir` sets it only on a folder it creates.
@@ -158,7 +158,7 @@ So the sanitizer replaces only **exact values that the workspace and the worksta
 **Where the values come from** (collected by the app before the task starts, then held by the writer):
 - each selected backup's folder name, which is its UDID (measured: the folder name equals Info.plist `Unique Identifier`);
 - from each backup's `Info.plist`: `Unique Identifier`, `Target Identifier`, `GUID`, `Serial Number`, `IMEI`, `IMEI 2`, `MEID`, `ICCID`, `Phone Number`;
-- for a pull (U3), the connected device's UDID;
+- for a pull (U3), the connected device's UDID, known from the start because the backup's folder is named by it;
 - the workstation's roots: the workspace, the evidence source folder the examiner chose, the app's install folder, the temporary folder (`os.tmpdir()`), the home folder (`os.homedir()`), and the account name (`os.userInfo().username`).
 
 **Class policy:**
@@ -325,6 +325,27 @@ The events below extend the existing `PipelineEvent` union (EPOCH-443): one cont
   - the tripwire, and any identifier the sanitizer could not use.
 - Prepare's progress comes from the processor's events (`applyPrepareEvent`), and the password dialog from `password:required`. The text parsing they replaced (`applyPrepareLogLine`, `PASSWORD_PROMPT_RE`) is gone.
 - After a restart, `epoch:listTaskLogs` lists a workspace's logs from their headers and results, and `epoch:readTaskLog` reads one, by its file name only.
+
+### 8.5 Pull
+
+The iPhone pull runs in the app's main process, so the app writes its log
+itself (EPOCH-436).
+
+- **Where:** the default workspace's `task_logs_path`, never the pull's
+  folder, which is evidence (owner, 2026-10-18). A pull runs before there is an
+  investigation; its Prepare normally uses that workspace.
+- **What it keeps:**
+  - Epoch's own messages (what it is doing, what to do on the iPhone) are `info`;
+  - each line idevicebackup2 prints is `debug`, from `tool:idevicebackup2`;
+  - the failure is the result, `task:finished`, so one failure is one `error`.
+- **Identifiers:** the backup is written into a folder named by the device's
+  UDID, so the sanitizer has the UDID before any Info.plist exists (§6.3). The
+  backup password is the tripwire's secret (§6.2).
+- **Outcome:** `succeeded`, `cancelled` when the examiner stopped it, or
+  `failed`. No log, no pull: a log that can't be created stops the pull before
+  its folder holds anything (§7).
+- The one-time tool setup is not a case's task, so it has no task log; its
+  output stays in a disclosure in the setup card (owner, 2026-10-18).
 
 ## 9. Display
 
