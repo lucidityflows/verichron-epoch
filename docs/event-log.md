@@ -71,7 +71,7 @@ One JSON object per line, validated with zod in `packages/contracts` (`TaskLogEn
 | `source` | `app` \| `processor` \| `orchestrator` \| `stage:<name>` \| `tool:<name>` | who said it; tools are `ileapp`, `decrypt`, `sqlite3`, `idevicebackup2` |
 | `kind` | `task:started` \| `task:finished` \| `event` \| `message` \| `output` | what the entry is: the header, the result, a producer's event, the app's own line, or a line of output that is not an event |
 | `label` | string \| null | the backup's dated label, when the entry concerns one |
-| `step` | string \| null | the processor step (`hash`, `decrypt`, `repair`, `ileapp`, `crash`) or the stage name |
+| `step` | string \| null | the processor step (`hash`, `decrypt`, `repair`, `ileapp`, `crash`), the stage name, or the pull step (`check`, `encryption`, `approve`, `copy`, `verify`, `crash-logs`; §8.5) |
 | `message` | string | one sanitized sentence, shown as is |
 | `event` | `PipelineEvent` | `kind: event` only: the typed event, every text field sanitized |
 | `task` | object | `kind: task:started` only (below) |
@@ -337,7 +337,13 @@ itself (EPOCH-436).
 - **What it keeps:**
   - Epoch's own messages (what it is doing, what to do on the iPhone) are `info`;
   - each line idevicebackup2 prints, on stdout or stderr, is `debug`, from `tool:idevicebackup2`, with its stream;
-  - the failure is the result, `task:finished`, so one failure is one `error`.
+  - the failure is the result, `task:finished`, so one failure is one `error`;
+  - each entry's `step` is the pull step it belongs to (EPOCH-554): checking
+    the iPhone and the destination, turning on encrypted backups (only when
+    Epoch does), approving the backup on the iPhone, copying files, verifying
+    the backup (Status.plist's snapshot finished, Manifest.db present), and
+    copying crash logs. The panel's step list is built from the same steps
+    (`shared/pullSteps.ts`), never from the messages' text.
 - **Identifiers:** the backup is written into a folder named by the device's
   UDID, so the sanitizer has the UDID before any Info.plist exists (§6.3). The
   backup password is the tripwire's secret (§6.2).

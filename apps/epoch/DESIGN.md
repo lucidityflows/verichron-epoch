@@ -402,16 +402,19 @@ accent: a title isn't interactive. The brand mark is the one gradient
 (accent, blue, violet) in the app.
 
 **Choices look choosable.** A selectable option (an iPhone to back up) is a
-card with a 2px `accent/30` outline at rest, the full `accent` outline on
+row with a 1px `border-strong` outline at rest, the `accent` outline on
 hover, and an `accent/10` fill with the `accent` outline once selected. Its
-action reads **Select**, as a filled accent button, while choosing is the
-current step. The current step's action is always the primary (filled)
-button; it becomes an outline button once the step is done.
+**Select** is a quiet outline control, never a filled accent button, because
+a list of options would otherwise show one primary button per row (EPOCH-554,
+U3b). The current step's action is always the primary (filled) button; it
+becomes an outline button once the step is done.
 
 **Steps show their state.** A multi-step flow (§8) shows its steps as a
 numbered rail: pending (muted), current (accent ring), done (success check),
 blocked (warning). It is the shared `StepList` (EPOCH-455); the iPhone pull and
-New Investigation use it (§10).
+New Investigation use it (§10). A page's rail has 28 px circles; a step's own
+steps inside a card use the 20 px size, so the two levels never read as one
+rail (EPOCH-554).
 
 **Long steps show what they have done** (EPOCH-487). A step that runs for
 minutes or hours says how far it has got and how long it has taken, never
@@ -526,6 +529,36 @@ forgot what was prepared. "We must guide clearly, or we look untrustworthy."
     and that the original backup was not changed.
   - **One primary button per state:** Prepare Evidence while the selection
     needs preparing, then Analyze and Create Investigation.
+- **The iPhone pull follows the board "iPhone Pull Flow"** (EPOCH-554, U3b):
+  - **Choosing** is one card with the pull's own small rail (Device,
+    Destination, Password, Start). A device is named by its model and iOS
+    version, with "Connected by cable" and its name beneath, never its
+    identifier. Each finished choice folds into a summary line with
+    **Change**; the next choice appears beneath it.
+  - **Encryption consent is one explicit button,** "Turn On and Continue",
+    with no checkbox (owner, 2026-10-18). It says what Epoch does: it turns
+    on encrypted backups only when they are off, the iPhone asks for its
+    passcode, the setting stays on, and the pull record notes the change.
+  - **Running** replaces the card. The Action Needed banner sits above it,
+    unchanged. The card's first lines hold what it is pulling, when it
+    started, **Cancel Pull**, what the current step is doing with the data
+    received, the time elapsed and the bar, so they stay in view at the
+    window's minimum size, 1024 × 720 (owner, 2026-10-18). The pull's own
+    steps follow, each with its duration; in a window under 860 px high they
+    fold into "Step 3 of 5 · Copy files · Show Steps". Raw tool output is
+    never in the card: it is in the Activity Log.
+  - **No data for 3 minutes** (`STALL_WARNING_MS`) puts the Action Needed
+    banner up with what to check; it clears when data arrives, and the pull
+    never stops itself.
+  - **Pulled** states what was verified, in the code's terms: "Status:
+    finished · Manifest present" (idevicebackup2 reported success, Status.plist's
+    snapshot is finished, Manifest.db exists; Prepare hashes the files), with
+    the size, the crash logs, where it was saved and how long it took.
+  - **A failed pull** shows a danger banner with Copy Details, and the
+    password field returns with **Pull Again**, which starts in a new folder.
+    A pull the examiner cancelled reads in the warning role. **A leftover
+    incomplete backup** offers Delete It and Not Now: it can't be resumed,
+    because the iPhone treats it as empty.
 
 ## 11. Dates and times — every time says its zone
 

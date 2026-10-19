@@ -15,14 +15,33 @@ const STATE_CLASSES: Record<StepState, { circle: string; label: string }> = {
   blocked: { circle: 'bg-warning/10 text-warning ring-2 ring-warning', label: 'text-warning' },
 };
 
+/** The page's rail has 28 px circles; a step's own steps inside a card have 20 px (board "iPhone Pull Flow"). */
+const SIZE_CLASSES = {
+  md: { circle: 'h-7 w-7 text-label', icon: '0.875rem', rule: 'w-6' },
+  sm: { circle: 'h-5 w-5 text-[0.6875rem]', icon: '0.75rem', rule: 'w-4' },
+};
+
 /**
  * A task's steps in order (DESIGN.md §8, §10), coloured by state (§9): what is
- * done, what is current, what is next, and what is blocked. Used for the
- * iPhone pull and for New Investigation as a whole (EPOCH-455, EPOCH-497).
+ * done, what is current, what is next, and what is blocked. Used for New
+ * Investigation as a whole (EPOCH-455, EPOCH-497), and, at the small size, for
+ * the iPhone pull's own steps inside its card, so the two levels never read as
+ * one rail (EPOCH-554).
  */
-export function StepList({ steps, label, className = 'mb-5' }: { steps: Step[]; label: string; className?: string }) {
+export function StepList({
+  steps,
+  label,
+  className = 'mb-5',
+  size = 'md',
+}: {
+  steps: Step[];
+  label: string;
+  className?: string;
+  size?: 'md' | 'sm';
+}) {
+  const sizes = SIZE_CLASSES[size];
   return (
-    <ol className={`flex items-center gap-2 ${className}`} aria-label={label}>
+    <ol className={`flex flex-wrap items-center gap-2 ${className}`} aria-label={label}>
       {steps.map((step, index) => {
         const classes = STATE_CLASSES[step.state];
         return (
@@ -34,16 +53,16 @@ export function StepList({ steps, label, className = 'mb-5' }: { steps: Step[]; 
             {index > 0 && (
               <span
                 aria-hidden
-                className={`h-px w-6 shrink-0 ${step.state === 'pending' ? 'bg-border' : 'bg-success/30'}`}
+                className={`h-px ${sizes.rule} shrink-0 ${step.state === 'pending' ? 'bg-border' : 'bg-success/30'}`}
               />
             )}
             <span
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-label font-mono ${classes.circle}`}
+              className={`flex ${sizes.circle} shrink-0 items-center justify-center rounded-full font-mono ${classes.circle}`}
             >
               {step.state === 'done' ? (
-                <Check size="0.875rem" aria-label="Done" />
+                <Check size={sizes.icon} aria-label="Done" />
               ) : step.state === 'blocked' ? (
-                <AlertTriangle size="0.875rem" aria-label="Blocked" />
+                <AlertTriangle size={sizes.icon} aria-label="Blocked" />
               ) : (
                 index + 1
               )}

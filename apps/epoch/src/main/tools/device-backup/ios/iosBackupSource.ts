@@ -429,6 +429,7 @@ export class IosBackupSource implements DeviceBackupSource {
       if (estimatedBytes !== null) {
         onProgress({
           phase: 'preparing',
+          step: 'check',
           message: `${device.name} holds up to about ${formatGB(estimatedBytes)}; ${formatGB(freeBytes)} is free in ${destDir}. A large backup can take an hour or more.`,
         });
         if (freeBytes < estimatedBytes) {
@@ -439,7 +440,7 @@ export class IosBackupSource implements DeviceBackupSource {
         }
       }
 
-      onProgress({ phase: 'preparing', message: `Checking the backup settings of ${device.name}…` });
+      onProgress({ phase: 'preparing', step: 'check', message: `Checking the backup settings of ${device.name}…` });
       if (await this.backupEncryptionEnabled(device)) {
         record.backup_encryption = 'already-on';
       } else {
@@ -450,6 +451,7 @@ export class IosBackupSource implements DeviceBackupSource {
         record.backup_encryption = 'turn-on-failed';
         onProgress({
           phase: 'device-action',
+          step: 'encryption',
           message: `Look at ${device.name} now: unlock it and enter its passcode to allow encrypted backups. Epoch waits up to ${PASSCODE_TIMEOUT_MS / 60_000} minutes.`,
         });
         const result = await enableBackupEncryption({ idevicebackup2, udid: device.id, password });
@@ -466,13 +468,14 @@ export class IosBackupSource implements DeviceBackupSource {
           );
         }
         record.backup_encryption = 'turned-on-by-epoch';
-        onProgress({ phase: 'preparing', message: `Encrypted backups are on for ${device.name}.` });
+        onProgress({ phase: 'preparing', step: 'encryption', message: `Encrypted backups are on for ${device.name}.` });
       }
 
       // iOS refuses a backup from a locked device (ErrorCode 208), and 16.1 and
       // later ask for the passcode to start one: say so before it starts.
       onProgress({
         phase: 'device-action',
+        step: 'approve',
         message: `Unlock ${device.name} and keep it unlocked until the backup finishes and its crash logs are copied. It will ask for its passcode to start.`,
       });
       record.received_bytes = await runBackup(
@@ -494,6 +497,11 @@ export class IosBackupSource implements DeviceBackupSource {
       const plistutil = trustedToolPath('plistutil');
       if (!plistutil) return fail('plistutil is not available, so the backup could not be checked.');
       const backupDir = backupFolder(destDir, device);
+      onProgress({
+        phase: 'verifying',
+        step: 'verify',
+        message: `Checking that the backup finished: its Status.plist and Manifest.db.`,
+      });
       const reason = await incompleteReason(plistutil, backupDir);
       if (reason) {
         fail(`idevicebackup2 reported success, but the backup in ${backupDir} isn't complete: ${reason}.`);
@@ -504,6 +512,7 @@ export class IosBackupSource implements DeviceBackupSource {
       // The device must still be unlocked: a locked one refuses (EPOCH-519).
       onProgress({
         phase: 'device-action',
+        step: 'crash-logs',
         message: `Keep ${device.name} unlocked: copying its crash logs. They stay on the device.`,
       });
       record.crash_reports = await copyCrashLogs(plistutil, device, backupDir);
@@ -697,6 +706,11 @@ const CANCEL_GRACE_MS = 30_000;
 /** Output kept for the error message; bars are redrawn constantly, so it is capped. */
 const OUTPUT_TAIL_CHARS = 64 * 1024;
 
+/** A backup line's phase and step: setup until "Receiving files", then copying. */
+function stepOf(receiving: boolean): Pick<BackupProgress, 'phase' | 'step'> {
+  return receiving ? { phase: 'transferring', step: 'copy' } : { phase: 'preparing', step: 'approve' };
+}
+
 interface RunControl {
   /** The running backup process, so Cancel can stop it. */
   setProcess: (proc: ChildProcess | null) => void;
@@ -748,11 +762,12 @@ function runBackup(
         } else if (event.text.includes(BACKUP_PASSCODE_PROMPT)) {
           onProgress({
             phase: 'device-action',
+            step: 'approve',
             message: `Enter the passcode on ${device.name} now to start the backup.`,
           });
         } else {
           if (event.text === 'Receiving files') receiving = true;
-          onProgress({ phase: receiving ? 'transferring' : 'preparing', message: event.text, tool: true });
+          onProgress({ ...stepOf(receiving), message: event.text, tool: true });
         }
       }
     };
@@ -767,12 +782,7 @@ function runBackup(
     const relayStderr = (events: OutputEvent[]) => {
       for (const event of events) {
         if (event.kind === 'line') {
-          onProgress({
-            phase: receiving ? 'transferring' : 'preparing',
-            message: event.text,
-            tool: true,
-            stream: 'stderr',
-          });
+          onProgress({ ...stepOf(receiving), message: event.text, tool: true, stream: 'stderr' });
         }
       }
     };
@@ -797,12 +807,13 @@ function runBackup(
           stats.percent = receivedPercent(received, estimatedBytes, finished);
           if (stallWarned) {
             stallWarned = false;
-            onProgress({ phase: 'transferring', message: `Data is arriving from ${device.name} again.` });
+            onProgress({ phase: 'transferring', step: 'copy', message: `Data is arriving from ${device.name} again.` });
           }
         } else if (receiving && !stallWarned && now - (stats.lastDataAt ?? startedAt) >= STALL_WARNING_MS) {
           stallWarned = true;
           onProgress({
             phase: 'device-action',
+            step: 'copy',
             message: `No data from ${device.name} for ${STALL_WARNING_MS / 60_000} minutes. Make sure it's connected and unlocked.`,
           });
         }

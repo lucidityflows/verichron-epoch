@@ -16,10 +16,12 @@ function fakeLog() {
 describe('logPullProgress', () => {
   it("keeps idevicebackup2's lines as tool output, and Epoch's own messages as info", () => {
     const log = fakeLog();
-    logPullProgress(log as never, 'L', { phase: 'transferring', message: 'Receiving files', tool: true });
-    logPullProgress(log as never, 'L', { phase: 'device-action', message: 'Look at the iPhone now' });
-    assert.deepEqual(log.toolOutput.mock.calls, [['idevicebackup2', 'Receiving files', { label: 'L' }, 'stdout']]);
-    assert.deepEqual(log.app.mock.calls, [['info', 'Look at the iPhone now', { label: 'L' }]]);
+    logPullProgress(log as never, 'L', { phase: 'transferring', step: 'copy', message: 'Receiving files', tool: true });
+    logPullProgress(log as never, 'L', { phase: 'device-action', step: 'approve', message: 'Look at the iPhone now' });
+    assert.deepEqual(log.toolOutput.mock.calls, [
+      ['idevicebackup2', 'Receiving files', { label: 'L', step: 'copy' }, 'stdout'],
+    ]);
+    assert.deepEqual(log.app.mock.calls, [['info', 'Look at the iPhone now', { label: 'L', step: 'approve' }]]);
   });
 
   it('leaves the failure to the result, so one failure is one error', () => {
@@ -36,6 +38,8 @@ describe('logPullProgress', () => {
       tool: true,
       stream: 'stderr',
     });
-    assert.deepEqual(log.toolOutput.mock.calls, [['idevicebackup2', 'ERROR: lockdown', { label: 'L' }, 'stderr']]);
+    assert.deepEqual(log.toolOutput.mock.calls, [
+      ['idevicebackup2', 'ERROR: lockdown', { label: 'L', step: null }, 'stderr'],
+    ]);
   });
 });

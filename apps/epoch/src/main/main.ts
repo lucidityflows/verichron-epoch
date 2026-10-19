@@ -91,6 +91,10 @@ const createWindow = (): void => {
   const windowOptions: BrowserWindowConstructorOptions = {
     width: 1400,
     height: 900,
+    // The smallest window the pages are designed for: a running pull's
+    // progress and Cancel stay in view at this size (owner, 2026-10-18; EPOCH-554).
+    minWidth: 1024,
+    minHeight: 720,
     webPreferences,
   };
 
