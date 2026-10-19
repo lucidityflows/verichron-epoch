@@ -83,3 +83,5 @@ def _init_repo(path):
     subprocess.run(["git", "init", "-q", str(path)], check=True)
     subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=path, check=True)
     subprocess.run(["git", "config", "user.name", "Forensic guard test"], cwd=path, check=True)
+    # Unsigned, so the test doesn't depend on the developer's signing agent.
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=path, check=True)

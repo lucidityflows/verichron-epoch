@@ -498,6 +498,26 @@ forgot what was prepared. "We must guide clearly, or we look untrustworthy."
   chevron; closed, they show the status and what the stage produced; open,
   what it read, what it wrote, exact times and its output (EPOCH-431). A card
   with nothing to open has no hover lift.
+- **New Investigation follows the board "New Investigation View"** (EPOCH-554,
+  U3):
+  - **Sources are equal.** Pulling from an iPhone and using an existing
+    backup are two equal secondary buttons in one quiet panel, never two
+    primary cards; with a folder chosen the panel moves below the list as
+    "Evidence Somewhere Else?". No tip bar repeats them.
+  - **A backup is named by its model and iOS version**, with its size, when
+    it was backed up and its folder's name beneath, and its state as a chip.
+    Never its device identifier. The chosen folder shows the home folder as
+    `~`.
+  - **Only what still needs preparing starts selected**, and the line above
+    the list says what the selection will do and roughly how long.
+  - **Preparing** is a card under the step rail: the backup, what the step is
+    doing ("Decrypting · 31.2 GB of 58.4 GB"), the time elapsed, and **Stop**.
+    A stop the examiner asked for reads in the flag role, never as a failure.
+  - **Prepared** states what Prepare did, from the workspace's records: the
+    backup files checked, the damaged databases repaired, iLEAPP's modules,
+    and that the original backup was not changed.
+  - **One primary button per state:** Prepare Evidence while the selection
+    needs preparing, then Analyze and Create Investigation.
 
 ## 11. Dates and times — every time says its zone
 

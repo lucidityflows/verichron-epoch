@@ -1,16 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  FolderOpen,
-  HardDrive,
   Play,
-  Smartphone,
   AlertCircle,
-  Lightbulb,
   ChevronDown,
   ChevronRight,
   CheckCircle2,
+  PauseCircle,
   XCircle,
-  Pencil,
   Microscope,
   ArrowRight,
   RotateCcw,
@@ -20,7 +16,12 @@ import { FailureBanner, type PrepareFailure } from '../features/activityLog/Fail
 import { DevicePullPanel } from '../features/devicePullPanel/DevicePullPanel';
 import { Button } from '../components/ui/Button';
 import { Loader } from '../components/ui/Loader';
-import type { PipelineFinishedResult, PreparedBackup, StartPipelineOptions } from '../../shared/types/window';
+import type {
+  BackupDescription,
+  PipelineFinishedResult,
+  PreparedBackup,
+  StartPipelineOptions,
+} from '../../shared/types/window';
 import { StepList, type Step } from '../components/ui/StepList';
 import type { Backup } from '@verichron/contracts';
 import { pipelineApi } from '../api/pipeline';
@@ -31,6 +32,13 @@ import { devicesApi } from '../api/devices';
 import type { CrashReportsRetryTarget } from '../../shared/types/tools';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { AnalysisStageProgress } from '../features/investigations/AnalysisStageProgress';
+import {
+  EvidenceSourcePanel,
+  PreparedSummary,
+  PreparingCard,
+  backupName,
+} from '../features/newInvestigation/NewInvestigationParts';
+import { formatBytes } from '../features/devicePullPanel/BackupProgressCard';
 
 export interface WorkspaceViewProps {
   onAnalysisComplete: () => void;
@@ -55,6 +63,11 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   }, []);
 
   const [backups, setBackups] = useState<Backup[]>([]);
+  // Each backup's model, iOS version, backup date and size, by path (EPOCH-554).
+  const [descriptions, setDescriptions] = useState<Map<string, BackupDescription>>(new Map());
+  // The chosen folder as the page shows it, with the home folder as ~.
+  const [folderShown, setFolderShown] = useState<string | null>(null);
+  const [stoppingPrepare, setStoppingPrepare] = useState(false);
   const [discoveringBackups, setDiscoveringBackups] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
@@ -161,22 +174,38 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     setSelectedPath(dir);
   }, []);
 
+  // The latest prepared backups, read when discovery ends.
+  const preparedRef = useRef(preparedByLabel);
+  preparedRef.current = preparedByLabel;
+
   useEffect(() => {
     if (!selectedPath) {
       setBackups([]);
       setSelectedLabels(new Set());
       setDiscoverError(null);
+      setDescriptions(new Map());
+      setFolderShown(null);
       return;
     }
     let cancelled = false;
     setDiscoveringBackups(true);
     setDiscoverError(null);
+    pipelineApi.displayPath(selectedPath).then((shown) => !cancelled && setFolderShown(shown));
     pipelineApi
       .discoverBackups(selectedPath)
       .then((found) => {
         if (cancelled) return;
         setBackups(found);
-        setSelectedLabels(new Set(found.map((b) => b.label)));
+        // Only what still needs preparing starts selected (board 5).
+        setSelectedLabels(
+          new Set(found.filter((b) => preparedRef.current.get(b.label)?.state !== 'prepared').map((b) => b.label))
+        );
+        pipelineApi
+          .describeBackups(found.map((b) => b.path))
+          .then((described) => {
+            if (!cancelled) setDescriptions(new Map(found.map((b, i) => [b.path, described[i]])));
+          })
+          .catch((err) => console.error('Failed to describe backups:', err));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -310,6 +339,18 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     }
   };
 
+  const handleStopPrepare = async () => {
+    setStoppingPrepare(true);
+    try {
+      await pipelineApi.cancelPrepare();
+    } catch (err) {
+      setStartError(err instanceof Error ? err.message : 'Prepare Evidence could not be stopped.');
+      setStoppingPrepare(false);
+    }
+  };
+  // A new run starts with Stop available again.
+  if (stoppingPrepare && !isRunning) setStoppingPrepare(false);
+
   const handleStartAnalysis = async () => {
     if (!analysisWorkspace || selection.included.length === 0) return;
     // EPOCH-305 retry actionability: clear every piece of state a stale
@@ -384,13 +425,41 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     (runProgress ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'failed').length : 0);
   const analysisFailedCount = analysisResult?.analysis?.filter((result) => result.status === 'failed').length ?? 0;
 
+  // The backup being prepared now, for the Preparing card (board 5).
+  const preparing = (() => {
+    if (!isRunning || !runProgress) return null;
+    const label =
+      runProgress.currentLabel ?? runProgress.order.find((l) => runProgress.byLabel[l].overall === 'running') ?? null;
+    const backup = label ? backups.find((b) => b.label === label) : undefined;
+    if (!label || !backup) return null;
+    const index = runProgress.order.indexOf(label);
+    return {
+      backup,
+      progress: runProgress.byLabel[label],
+      position: runProgress.order.length > 1 ? `${index + 1} of ${runProgress.order.length}` : null,
+    };
+  })();
+
   // The page's steps (DESIGN.md §10, EPOCH-497): what is done, what is
   // current, what comes next.
   const selected = Array.from(selectedLabels);
+  const selectedBytes = backups
+    .filter((b) => selectedLabels.has(b.label))
+    .reduce((sum, b) => sum + (descriptions.get(b.path)?.bytes ?? 0), 0);
   const selectedAllPrepared =
     selected.length > 0 && selected.every((label) => preparedByLabel.get(label)?.state === 'prepared');
   const analyzed = !!analysisResult?.success && analysisFailedCount === 0;
   const showAnalyze = !!selectedPath && !busy && (preparedCount > 0 || analysisForRun);
+  // What the selection will do (board 5): only unprepared backups start selected.
+  const selectionHint = busy
+    ? 'Choices are locked while Prepare Evidence runs.'
+    : selected.length === 0
+      ? 'Select a backup to prepare it.'
+      : selectedAllPrepared
+        ? 'The selected backups are prepared. Analyze them next; Prepare Again decrypts and reads them again from the start.'
+        : `Only unprepared backups start selected. Preparing ${selected.length} backup${selected.length === 1 ? '' : 's'}${
+            selectedBytes > 0 ? ` (${formatBytes(selectedBytes)})` : ''
+          } can take an hour or more.`;
   const steps: Step[] = [
     { label: 'Choose Evidence', state: selectedPath ? 'done' : 'current' },
     {
@@ -407,7 +476,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     <ViewLayout
       section="workspace"
       title="New Investigation"
-      description="Import an iPhone backup or connect a device to examine evidence for suspicious activity."
+      description="Choose evidence, prepare it, then analyze it. Each step shows what is done and what comes next."
       width="readable"
       className="gap-7"
     >
@@ -415,49 +484,46 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       {!selectedPath && importSource === 'device' ? (
         <DevicePullPanel onBackupPulled={handleBackupPulled} onChangeSource={() => setImportSource(null)} />
       ) : !selectedPath ? (
-        <div className="grid gap-5 sm:grid-cols-2">
-          <ImportChoice
-            icon={<Smartphone size="2rem" />}
-            title="Pull from a Connected iPhone"
-            description="Make a new encrypted backup of an iPhone connected to this computer by USB."
-            action="Connect an iPhone"
-            tone="accent"
-            onChoose={() => setImportSource('device')}
-          />
-          <ImportChoice
-            icon={<FolderOpen size="2rem" />}
-            title="Use an Existing Backup"
-            description="Choose the folder containing your iPhone backups. Epoch will identify compatible backups automatically."
-            action="Choose Backup Folder"
-            tone="neutral"
-            onChoose={handleSelectDirectory}
-          />
-        </div>
+        <EvidenceSourcePanel
+          title="Where Is the Evidence?"
+          onPull={() => setImportSource('device')}
+          onChooseFolder={handleSelectDirectory}
+        />
       ) : (
         <>
-          <div className="flex items-center gap-3 card rounded-xl px-4 py-3">
-            <div className="p-2 rounded-lg bg-accent/10 text-accent shrink-0">
-              <HardDrive size="1.125rem" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-label text-muted-foreground uppercase tracking-wider">Evidence location</p>
-              <p className="text-data font-mono text-foreground truncate" title={selectedPath}>
-                {selectedPath}
-              </p>
-            </div>
-            {!busy && (
-              <Button variant="outline" size="sm" onClick={handleSelectDirectory} className="shrink-0">
-                <Pencil size="0.75rem" />
-                Change
-              </Button>
-            )}
-          </div>
+          {preparing && (
+            <PreparingCard
+              name={backupName(preparing.backup, descriptions.get(preparing.backup.path))}
+              position={preparing.position}
+              progress={preparing.progress}
+              startedAt={prepare?.startedAt ?? Date.now()}
+              stopping={stoppingPrepare}
+              onStop={handleStopPrepare}
+            />
+          )}
 
           <div className="card rounded-xl p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-display text-heading text-foreground">
-                Backups Found{backups.length > 0 ? ` (${backups.length})` : ''}
-              </h2>
+              <div className="min-w-0">
+                <h2 className="font-display text-heading text-foreground">
+                  Backups Found{backups.length > 0 ? ` (${backups.length})` : ''}
+                </h2>
+                <p className="text-label text-muted-foreground truncate">
+                  In <span className="font-mono">{folderShown ?? '…'}</span>
+                  {!busy && (
+                    <>
+                      {' · '}
+                      <button
+                        type="button"
+                        onClick={handleSelectDirectory}
+                        className="text-accent underline underline-offset-2 hover:text-accent/80 cursor-pointer"
+                      >
+                        Change Folder
+                      </button>
+                    </>
+                  )}
+                </p>
+              </div>
               <div className="flex items-center gap-3">
                 {backups.length > 1 && !busy && (
                   <div className="flex items-center gap-2 text-label bg-surface-raised shadow-elevation-1 rounded-lg p-1">
@@ -504,11 +570,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                 )}
               </div>
             </div>
-            <p className="text-data text-muted-foreground mb-4">
-              {selectedAllPrepared && !busy
-                ? 'The selected backups are prepared. Analyze them next; Prepare Again decrypts and reads them again from the start.'
-                : 'Hashes, decrypts and repairs each backup, then reads it with iLEAPP. A large backup takes a while; you can leave this page and come back.'}
-            </p>
+            <p className="text-data text-muted-foreground mb-4">{selectionHint}</p>
 
             {discoveringBackups && (
               <p className="text-data text-muted-foreground">Looking for compatible iPhone backups…</p>
@@ -543,6 +605,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                       awaitingPassword={isLive && pendingPasswordFor === b.label}
                       lastResult={lastResult}
                       prepared={preparedByLabel.get(b.label)}
+                      description={descriptions.get(b.path)}
                       crashReportsRetryTarget={crashReportsRetryTargets.find(
                         (target) => target.backupIndex === backupIndex
                       )}
@@ -612,6 +675,42 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
               )}
             </div>
           </div>
+
+          {!busy && selectedAllPrepared && (
+            <section
+              aria-labelledby="prepared-title"
+              className="card rounded-xl border-t-2 border-success p-6 flex flex-col gap-5"
+            >
+              <h2 id="prepared-title" className="font-display text-heading text-foreground">
+                Evidence Prepared
+              </h2>
+              {backups
+                .filter((b) => selectedLabels.has(b.label))
+                .map((b) => {
+                  const prepared = preparedByLabel.get(b.label);
+                  const description = descriptions.get(b.path);
+                  return prepared ? (
+                    <PreparedSummary
+                      key={b.label}
+                      name={backupName(b, description)}
+                      backupDate={description?.backupDate ?? null}
+                      prepared={prepared}
+                    />
+                  ) : null;
+                })}
+            </section>
+          )}
+
+          {!busy && (
+            <EvidenceSourcePanel
+              title="Evidence Somewhere Else?"
+              onPull={() => {
+                setSelectedPath(null);
+                setImportSource('device');
+              }}
+              onChooseFolder={handleSelectDirectory}
+            />
+          )}
         </>
       )}
 
@@ -625,7 +724,21 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         </div>
       )}
 
-      {finishResult && runProgress && prepareFailures(finishResult).length > 0 && (
+      {finishResult?.cancelled && (
+        // A stop the examiner asked for is not a failure (DESIGN.md §9).
+        <div
+          role="status"
+          className="flex items-start gap-4 rounded-xl p-5 shadow-elevation-1 bg-warning/10 border border-warning/30 text-data"
+        >
+          <PauseCircle className="text-warning shrink-0 mt-1" size="1.25rem" />
+          <p className="text-warning">
+            Prepare Evidence was stopped. What finished is kept; a backup it did not finish reads partly prepared and
+            can be prepared again.
+          </p>
+        </div>
+      )}
+
+      {finishResult && !finishResult.cancelled && runProgress && prepareFailures(finishResult).length > 0 && (
         <FailureBanner
           failures={prepareFailures(finishResult)}
           entries={prepareLog}
@@ -634,7 +747,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         />
       )}
 
-      {finishResult && runProgress && prepareFailures(finishResult).length === 0 && (
+      {finishResult && !finishResult.cancelled && runProgress && prepareFailures(finishResult).length === 0 && (
         <div
           className={`flex items-start gap-4 rounded-xl p-5 shadow-elevation-1 ${
             failedCount === 0 ? 'bg-success/10 border border-success/30' : 'bg-danger/10 border border-danger/30'
@@ -701,6 +814,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                 </div>
               )}
               <Button
+                // One primary action per step (DESIGN.md §9): Analyze leads once the selection is prepared.
+                variant={selectedAllPrepared ? 'accent' : 'outline'}
                 onClick={handleStartAnalysis}
                 disabled={selection.included.length === 0 || isRunning || orchestratorRunning}
               >
@@ -813,18 +928,6 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         </div>
       )}
 
-      {!selectedPath && importSource === null && (
-        <div className="flex items-start gap-4 card rounded-xl p-4 sm:p-5">
-          <div className="p-2 rounded-lg bg-section/15 text-section shrink-0">
-            <Lightbulb size="1.125rem" />
-          </div>
-          <p className="text-data text-muted-foreground">
-            <strong className="text-foreground font-semibold">Tip:</strong> Connect an iPhone by USB to import a fresh
-            backup, or choose an existing backup folder from your computer.
-          </p>
-        </div>
-      )}
-
       {pendingPasswordFor && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-surface border border-border shadow-elevation-3 rounded-xl p-6 w-full max-w-sm">
@@ -856,40 +959,6 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     </ViewLayout>
   );
 }
-interface ImportChoiceProps {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  action: string;
-  /** The icon chip's colour, so the two paths read apart at a glance (DESIGN.md §9). */
-  tone: 'accent' | 'neutral';
-  onChoose: () => void;
-}
-
-/** One way to import evidence; choosing it hides the other (EPOCH-467). */
-function ImportChoice({ icon, title, description, action, tone, onChoose }: ImportChoiceProps) {
-  return (
-    <button
-      type="button"
-      onClick={onChoose}
-      className="group flex flex-col items-center text-center p-8 rounded-2xl bg-surface border-2 border-accent/30 hover:border-accent hover:bg-accent/5 shadow-elevation-1 hover:shadow-elevation-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:border-accent"
-    >
-      <div
-        className={`p-4 rounded-full mb-4 group-hover:scale-105 transition-transform ${
-          tone === 'accent' ? 'bg-accent/15 text-accent ring-1 ring-accent/30' : 'bg-surface-raised text-foreground'
-        }`}
-      >
-        {icon}
-      </div>
-      <h2 className="font-display text-heading text-foreground mb-1">{title}</h2>
-      <p className="text-data text-muted-foreground mb-5 max-w-md">{description}</p>
-      <span className="inline-flex items-center gap-1.5 bg-accent text-on-accent shadow-elevation-2 group-hover:bg-accent/90 px-4 py-2 rounded-lg text-label font-semibold transition-all">
-        {action}
-      </span>
-    </button>
-  );
-}
-
 /** Each backup the processor reported as failed, sanitized by the main process (EPOCH-570). */
 function prepareFailures(result: PipelineFinishedResult): PrepareFailure[] {
   return result.failures ?? [];

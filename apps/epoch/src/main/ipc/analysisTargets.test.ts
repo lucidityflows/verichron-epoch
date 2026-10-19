@@ -19,6 +19,7 @@ import {
 } from '@verichron/contracts';
 
 import { analysisTargets, orchestratorArgs } from './analysisTargets';
+import { writeSidecarFixture } from './sidecarFixture';
 
 const ROOT = 'a'.repeat(64);
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'analysis-targets-'));
@@ -45,6 +46,7 @@ function prepared(
       { repair: { status: 'skipped', reason: 'test' } }
     )
   );
+  writeSidecarFixture(resolved.sidecarPath, label, ROOT);
   if (!withIleapp) return;
   const ile = resolved.ileappOutputPath;
   mkdirSync(ile, { recursive: true });

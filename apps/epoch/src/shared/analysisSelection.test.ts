@@ -8,10 +8,15 @@ import type { PreparedBackup } from './types/window';
 import { analysisSelection, listLabels } from './analysisSelection';
 
 const at = '2026-10-15T12:00:00.000Z';
+const details: PreparedBackup['details'] = {
+  filesChecked: 1,
+  repair: { status: 'skipped', reason: 'test' },
+  modules: null,
+};
 const prepared: PreparedBackup[] = [
-  { label: '2026-10-14T120000Z', state: 'prepared', preparedAt: at },
-  { label: '2026-10-15T163900Z', state: 'prepared', preparedAt: at },
-  { label: '2026-10-15T170000Z', state: 'partial', preparedAt: at },
+  { label: '2026-10-14T120000Z', state: 'prepared', preparedAt: at, details },
+  { label: '2026-10-15T163900Z', state: 'prepared', preparedAt: at, details },
+  { label: '2026-10-15T170000Z', state: 'partial', preparedAt: at, details },
 ];
 
 describe('analysisSelection', () => {
