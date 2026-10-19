@@ -570,8 +570,9 @@ only how they are shown.
   can choose a zone in Settings (EPOCH-560), and it then applies everywhere,
   the report included. The report's header names the zone.
 - **One format:** a 24-hour clock with seconds, the value in monospace, and
-  the zone beside it in muted `text-label`. Hovering shows the exact time
-  with its offset.
+  the zone beside it in muted `text-label`, after a real space rather than a
+  margin, so text selected and copied from the page reads `18:17:10 UTC`
+  (EPOCH-554). Hovering shows the exact time with its offset.
 
   | Where | UTC (default) | A chosen zone |
   |---|---|---|

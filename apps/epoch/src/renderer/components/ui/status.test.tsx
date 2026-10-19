@@ -103,6 +103,11 @@ describe('DateTime', () => {
     );
   });
 
+  it('copies as it reads, with a space before the zone', () => {
+    const { container } = render(<DateTime value="2026-10-19T18:17:10Z" />);
+    assert.equal(container.textContent, '2026-10-19 18:17:10 UTC');
+  });
+
   it('shows a recorded calendar date as recorded, with no zone', () => {
     const { container } = render(<DateTime value="2026-10-15" dateOnly zone="America/Chicago" />);
     assert.equal(container.textContent, '2026-10-15');

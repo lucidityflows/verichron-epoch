@@ -30,7 +30,13 @@ export function DateTime({ value, zone = DEFAULT_ZONE, dateOnly = false, classNa
   return (
     <span className={cn('whitespace-nowrap', className)} title={isoWithOffset(value!, zone)}>
       <span className="font-mono">{parts.value}</span>
-      {parts.label && <span className="text-label text-muted-foreground ml-1">{parts.label}</span>}
+      {/* A real space, not a margin, so a copied time reads "18:17:10 UTC". */}
+      {parts.label && (
+        <>
+          {' '}
+          <span className="text-label text-muted-foreground">{parts.label}</span>
+        </>
+      )}
     </span>
   );
 }

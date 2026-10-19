@@ -104,12 +104,27 @@ export async function snapshotState(plistutil: string, backupDir: string): Promi
   return match[1];
 }
 
+/**
+ * The most XML a plist may print. Node's default for execFile is 1 MiB, but
+ * a real backup's Info.plist is about 3 MB of XML (2.9 to 3.2 MB measured on
+ * three iPhone17,5 backups, 2026-10-19), so the default refused every one.
+ */
+export const PLIST_XML_LIMIT = 64 * 1024 * 1024;
+
 /** A plist as XML, whatever form it is stored in, through the toolchain's plistutil. */
 function plistXml(plistutil: string, file: string): Promise<string> {
   return new Promise<string>((resolve, reject) =>
-    execFile(plistutil, ['-i', file, '-f', 'xml'], { encoding: 'utf-8' }, (err, stdout) =>
-      err ? reject(err) : resolve(stdout)
-    )
+    execFile(plistutil, ['-i', file, '-f', 'xml'], { encoding: 'utf-8', maxBuffer: PLIST_XML_LIMIT }, (err, stdout) => {
+      if (!err) return resolve(stdout);
+      if ((err as NodeJS.ErrnoException).code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+        return reject(
+          new Error(`${file} is larger than ${PLIST_XML_LIMIT / 1024 / 1024} MiB as XML, so it was not read.`, {
+            cause: err,
+          })
+        );
+      }
+      reject(err);
+    })
   );
 }
 
