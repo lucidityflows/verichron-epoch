@@ -8,11 +8,11 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ListSkeleton } from '../components/ui/Skeleton';
 import { StatusChip } from '../components/ui/StatusChip';
 import { chipLabel, stageChip } from '../components/ui/statusChip';
-import { TerminalLog } from '../components/layout/TerminalLog';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { pipelineApi } from '../api/pipeline';
 import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
 import { AnalysisStageProgress } from '../features/investigations/AnalysisStageProgress';
+import { stoppedDetail } from '../features/investigations/analysisOutcome';
 import { StageCard } from '../features/investigations/StageCard';
 import { formatBytes } from '../features/devicePullPanel/BackupProgressCard';
 import {
@@ -23,6 +23,7 @@ import {
   type Investigation,
 } from '../features/investigations/investigations';
 import { isoWithOffset } from '../../shared/time';
+import type { BackupAnalysisOutcome } from '../../shared/types/window';
 
 interface InvestigationsViewProps {
   runs: PipelineRunRow[];
@@ -90,6 +91,13 @@ function Tile({ value, label }: { value: React.ReactNode; label: string }) {
  * and one investigation on the right, following the board "Investigations
  * View"; stages are one top-aligned list that opens in place.
  */
+/** "Analyze Again was cancelled: iLEAPP Artifacts stopped after reaching 211 of 540 artifact tables. …" (EPOCH-550). */
+function cancelledLine(outcome: BackupAnalysisOutcome | undefined): string {
+  if (outcome?.status !== 'interrupted') return 'Analyze Again was cancelled.';
+  const detail = stoppedDetail(outcome.stopped);
+  return `Analyze Again was cancelled${/^(during|between) /.test(detail) ? ' ' : ': '}${detail}`;
+}
+
 export function InvestigationsView({
   runs,
   loading,
@@ -120,15 +128,21 @@ export function InvestigationsView({
 
   // Analyze Again is an analysis kept in the main process (EPOCH-487), so it
   // is still shown after leaving this view and coming back.
-  const { state: analysis, log: analysisLog } = useAnalysisState();
+  const { state: analysis } = useAnalysisState();
   const { state: prepare } = usePrepareState();
   const pipelineBusy = analysis?.status === 'running' || prepare?.status === 'running';
   const againThis = analysis?.kind === 'retry' && analysis.target === selectedRun?.run_id;
   const analyzingAgain = againThis && analysis?.status === 'running';
-  const againLog = againThis ? analysisLog : [];
   const againResult = againThis && analysis?.status === 'finished' ? analysis.result : null;
+  // A cancel says where the backup stopped and what it kept (EPOCH-550).
+  const againOutcome = againResult ? analysis?.backups[0] : undefined;
   const againError =
-    startError ?? (againResult && !againResult.success ? (againResult.error ?? 'Analyze Again failed.') : null);
+    startError ??
+    (againResult?.cancelled
+      ? cancelledLine(againOutcome)
+      : againResult && !againResult.success
+        ? (againResult.error ?? 'Analyze Again failed.')
+        : null);
   // Nothing new to analyze: the orchestrator found a complete analysis for the
   // same evidence, stages and indicator set, and added none (R22).
   const upToDate = !!againResult?.success && (againResult.analysis ?? []).some((result) => result.status === 'skipped');
@@ -165,9 +179,23 @@ export function InvestigationsView({
     }
   };
 
+  // EPOCH-563: while this window follows an Analyze, each stage that starts
+  // or finishes reads the analyses and the selected one's stages again at
+  // once. The database stays the only source of their state (R23).
+  const stageEvent =
+    analysis?.status === 'running' ? `${analysis.currentStage?.label}:${analysis.currentStage?.name}` : null;
+  useEffect(() => {
+    if (stageEvent === null || !selectedRun) return;
+    onRefreshRun?.(selectedRun.run_id);
+    onRefreshStages?.(selectedRun.run_id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageEvent]);
+
+  // Polling remains for a run this window is not following, e.g. one started
+  // before the app was opened (EPOCH-429).
   useEffect(() => {
     const hasInProgressRun = runs.some((run) => run.state === 'running');
-    if (!hasInProgressRun || !selectedRun) return;
+    if (!hasInProgressRun || !selectedRun || analysis?.status === 'running') return;
 
     const interval = setInterval(async () => {
       try {
@@ -179,7 +207,7 @@ export function InvestigationsView({
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [runs, selectedRun, onRefreshRun, onRefreshStages]);
+  }, [runs, selectedRun, onRefreshRun, onRefreshStages, analysis?.status]);
 
   const viewError = error ?? grouped.error;
   const stagesShown = selectedRun ? stages.filter((stage) => stage.run_id === selectedRun.run_id) : [];
@@ -320,9 +348,6 @@ export function InvestigationsView({
                 )}
                 {analyzingAgain && analysis?.currentStage && (
                   <AnalysisStageProgress stage={analysis.currentStage} className="text-data text-muted-foreground" />
-                )}
-                {(analyzingAgain || againLog.length > 0) && (
-                  <TerminalLog lines={againLog} live={analyzingAgain} label="Analyze Again details" />
                 )}
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

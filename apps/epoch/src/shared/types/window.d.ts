@@ -181,13 +181,55 @@ export interface AnalysisState {
   /** The workspace, or the retried backup's source. */
   target: string | null;
   startedAt: number | null;
-  currentStage: { name: string; startedAt: number } | null;
+  currentStage: AnalysisStageNow | null;
+  /** What each backup asked for did, from the orchestrator's events (EPOCH-550), in the order asked. */
+  backups: BackupAnalysisOutcome[];
   result: PipelineFinishedResult | null;
   /** This task's saved log in `<workspace>/logs/`, once it has one (EPOCH-570). */
   taskLog: string | null;
   /** The workspace the log is in. */
   workspace: string | null;
   log: PipelineLogEntry[];
+}
+
+/** The stage running now (EPOCH-551): its place in the run, and how far it has got when it says. */
+export interface AnalysisStageNow {
+  /** The stage's name as the orchestrator knows it, e.g. `ileapp_bridge`. */
+  name: string;
+  /** What the examiner reads: "iLEAPP Artifacts" (STAGE_TITLES, set by the main process). */
+  title: string;
+  startedAt: number;
+  /** The backup it is for. */
+  label: string;
+  /** Its place among the run's stages, from 1. */
+  index: number;
+  total: number;
+  /** The stage's own count, from its latest report that gave one ("211 of 540"). */
+  progress: { index: number; total: number } | null;
+}
+
+/**
+ * What Analyze did for one backup (EPOCH-550), from the events alone, so a
+ * cancel, which leaves no call summary, still says it.
+ * - `not-started`: no event for it yet; after the call, it was never reached.
+ * - `running`: its run was created and has not finished.
+ * - `finished`: its run finished; `runState` is run_completeness's word for it.
+ * - `up-to-date`: a complete run already covered it.
+ * - `refused`: its registration was refused, for `reason`.
+ * - `interrupted`: its run was created and the examiner cancelled the call
+ *   before it finished; `stopped` is the stage that was running, and how far
+ *   it had got.
+ * - `failed`: its run was created and the call ended any other way first (a
+ *   crash, a timeout, a process error); `stopped` as for `interrupted`.
+ *   DESIGN.md §9: Interrupted is only a stop the examiner asked for.
+ */
+export interface BackupAnalysisOutcome {
+  label: string;
+  status: 'not-started' | 'running' | 'finished' | 'up-to-date' | 'refused' | 'interrupted' | 'failed';
+  runId: string | null;
+  runState: 'running' | 'incomplete' | 'complete' | null;
+  reason: string | null;
+  stopped: { stage: string; title: string; progress: { index: number; total: number } | null } | null;
 }
 
 /** The iPhone pull's task log (EPOCH-436), as the Activity Log follows it; the pull's own state is DevicePullState. */

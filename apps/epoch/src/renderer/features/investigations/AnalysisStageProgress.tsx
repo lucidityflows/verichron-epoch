@@ -1,23 +1,20 @@
 import { useEffect, useState } from 'react';
-import { formatDuration } from './StageCard';
 
-export interface AnalysisStage {
-  name: string;
-  startedAt: number;
-}
+import type { AnalysisStageNow } from '../../../shared/types/window';
+import { stageLine } from './analysisOutcome';
 
-export function AnalysisStageProgress({ stage, className }: { stage: AnalysisStage; className?: string }) {
+/**
+ * The running Analyze's stage (EPOCH-551, DESIGN.md §9: long steps show what
+ * they have done): "Stage 2 of 4 · iLEAPP Artifacts · 211 of 540 artifact
+ * tables · 04:12 elapsed", from the orchestrator's events, never from text.
+ */
+export function AnalysisStageProgress({ stage, className }: { stage: AnalysisStageNow; className?: string }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    setNow(Date.now());
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [stage.startedAt]);
+  }, []);
 
-  return (
-    <span className={className}>
-      Stage: {stage.name.replaceAll('_', ' ')} · {formatDuration(Math.max(0, now - stage.startedAt))} elapsed
-    </span>
-  );
+  return <span className={className}>{stageLine(stage, Math.max(now, stage.startedAt))}</span>;
 }

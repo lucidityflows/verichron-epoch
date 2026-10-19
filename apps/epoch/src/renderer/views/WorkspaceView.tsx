@@ -32,6 +32,15 @@ import { devicesApi } from '../api/devices';
 import type { CrashReportsRetryTarget } from '../../shared/types/tools';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { AnalysisStageProgress } from '../features/investigations/AnalysisStageProgress';
+import { outcomeHeadline, outcomeSentence, outcomeTone } from '../features/investigations/analysisOutcome';
+
+const TONE_TEXT = { success: 'text-success', warning: 'text-warning', danger: 'text-danger' } as const;
+const TONE_DOT = {
+  success: 'bg-success',
+  warning: 'bg-warning',
+  danger: 'bg-danger',
+  muted: 'bg-muted-foreground',
+} as const;
 import {
   EvidenceSourcePanel,
   PreparedSummary,
@@ -433,6 +442,13 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     failedBackups?.length ??
     (runProgress ? runProgress.order.filter((l) => runProgress.byLabel[l].overall === 'failed').length : 0);
   const analysisFailedCount = analysisResult?.analysis?.filter((result) => result.status === 'failed').length ?? 0;
+  // What each backup did, from the main process's record of the events (EPOCH-550).
+  const analysisOutcomes = analysisResult && analysisForRun ? (analysis?.backups ?? []) : [];
+  const headline = analysisResult ? outcomeHeadline(analysisResult, analysisOutcomes) : null;
+  const nameForLabel = (label: string) => {
+    const backup = backups.find((b) => b.label === label);
+    return backup ? backupName(backup, descriptions.get(backup.path)) : label;
+  };
 
   // The backup being prepared now, for the Preparing card (board 5).
   // Shown, with Stop, from the moment Prepare runs: before the first backup
@@ -864,64 +880,53 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
           )}
 
           {analysisResult && (
-            <div>
-              {analysisResult.success && analysisFailedCount === 0 ? (
-                <div>
-                  <p className="text-data text-success flex items-center gap-1.5 mb-3">
-                    <CheckCircle2 size="1rem" /> Investigation created.
-                  </p>
-                  {analysisResult.analysis && (
-                    <p className="text-data text-muted-foreground mb-3">
-                      {analysisResult.analysis.filter((result) => result.status === 'succeeded').length} investigation
-                      {analysisResult.analysis.filter((result) => result.status === 'succeeded').length === 1
-                        ? ''
-                        : 's'}
-                      analyzed
-                      {analysisResult.analysis.filter((result) => result.status === 'skipped').length > 0
-                        ? `, ${analysisResult.analysis.filter((result) => result.status === 'skipped').length} already up to date`
-                        : ''}
-                      .
-                    </p>
-                  )}
+            // What ended Analyze, then what each backup did (EPOCH-550): a
+            // cancel is a stop in the warning role, never a failure.
+            <div className="flex flex-col gap-3">
+              <p role="status" className={`text-data flex items-start gap-1.5 ${TONE_TEXT[headline!.tone]}`}>
+                {headline!.tone === 'success' ? (
+                  <CheckCircle2 size="1rem" className="shrink-0 mt-0.5" />
+                ) : headline!.tone === 'warning' ? (
+                  <PauseCircle size="1rem" className="shrink-0 mt-0.5" />
+                ) : (
+                  <XCircle size="1rem" className="shrink-0 mt-0.5" />
+                )}
+                <span>{headline!.text}</span>
+              </p>
+              {analysisOutcomes.length > 0 && (
+                <ul className="flex flex-col gap-1.5 text-data" aria-label="What each backup did">
+                  {analysisOutcomes.map((outcome) => (
+                    <li key={outcome.label} className="flex items-start gap-2">
+                      {/* An 8 px dot centred in a box one text line (20 px) high: on the grid, level with the first line. */}
+                      <span className="flex h-5 items-center shrink-0" aria-hidden>
+                        <span className={`h-2 w-2 rounded-full ${TONE_DOT[outcomeTone(outcome)]}`} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="font-medium text-foreground">{nameForLabel(outcome.label)}</span>{' '}
+                        <span className="text-muted-foreground">{outcomeSentence(outcome)}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div>
+                {analyzed ? (
                   <Button onClick={onAnalysisComplete}>
                     View Investigation
                     <ArrowRight size="1rem" />
                   </Button>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-data text-danger flex items-center gap-1.5">
-                    <XCircle size="1rem" />
-                    {/* EPOCH-305: cancelled/timedOut/interrupted all reach
-                     * this same branch (success: false) -- distinguish them
-                     * so "I clicked Cancel" doesn't read as "something broke". */}
-                    {analysisResult.cancelled
-                      ? 'Analysis was cancelled.'
-                      : analysisResult.timedOut
-                        ? (analysisResult.error ?? 'Analysis timed out and was stopped.')
-                        : analysisFailedCount > 0
-                          ? `Analysis completed with ${analysisFailedCount} investigation${analysisFailedCount === 1 ? '' : 's'} needing attention.`
-                          : `Analysis failed${analysisResult.error ? `: ${analysisResult.error}` : '.'}`}
-                  </p>
-                  {analysisResult.analysis && (
-                    <p className="text-data text-muted-foreground mt-1">
-                      {analysisResult.analysis.filter((result) => result.status === 'failed').length} investigation
-                      {analysisResult.analysis.filter((result) => result.status === 'failed').length === 1 ? '' : 's'}
-                      need attention.
-                    </p>
-                  )}
+                ) : (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleStartAnalysis}
                     disabled={selection.included.length === 0 || isRunning || orchestratorRunning}
-                    className="mt-3"
                   >
                     <RotateCcw size="0.875rem" />
-                    Try Again
+                    Analyze Again
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>

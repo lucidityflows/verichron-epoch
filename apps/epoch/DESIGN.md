@@ -463,6 +463,24 @@ stronger choice for a chip's word. The × is a graphic, so it needs only 3:1
 (WCAG 1.4.11). Danger is only for a failure; a stop the examiner asked for is
 Interrupted.
 
+**After Analyze ends, each backup says what happened to it** (EPOCH-550,
+U4b), from the orchestrator's events, because a cancel leaves no call
+summary. The headline names what ended it, in the warning role for a cancel
+and danger for a failure, then counts the outcomes: "Analysis was cancelled.
+1 finished, 1 interrupted, 1 not started." Beneath, one line per backup, by
+its name: finished; already up to date; not started (with the reason when its
+registration was refused); interrupted, only when the examiner cancelled; or
+failed (danger), when a crash, a timeout or a process error stopped it. A
+stopped backup says what its stage kept, in the stage's own unit where it has
+one: "iLEAPP Artifacts stopped after reaching 211 of 540 artifact tables. Each
+table it finished is kept; Analyze Again reads the rest and retries any that
+failed." The count is how far it got, failed tables included, whose records
+were rolled back (R13, R14). Every sentence is built whole in
+`features/investigations/analysisOutcome.ts`, never joined across JSX lines.
+
+**A running Analyze names its stage's place and count** (EPOCH-551): "Stage 2
+of 4 · iLEAPP Artifacts · 211 of 540 artifact tables · 04:12 elapsed".
+
 **A chip's reason is written, never hover-only:** "Interrupted · the app was
 closed", the reason in `muted-foreground` after a middle dot, so keyboard and
 touch users read it too. `muted-foreground` on a `/10` role fill measures at
@@ -651,7 +669,8 @@ and how it is sanitized, is `docs/event-log.md`; this is how it looks.
   the log, and **Copy Details** copies the step, the evidence and the log
   around it, never debug and never a password. A partly prepared backup's row
   writes the reason under its chip, not on hover.
-- **Where:** New Investigation shows the running task's log, else the last
-  one; after a restart, the workspace's newest saved log. U4 adds the same
-  drawer to Investigations in place of Show Raw Log.
+- **Where:** New Investigation and Investigations dock the same drawer
+  (Investigations from U4b, in place of the inline "Analyze Again details"):
+  the running task's log, else the last one; after a restart, the
+  workspace's newest saved log.
 

@@ -44,8 +44,23 @@ export type PrepareTool = z.infer<typeof PrepareTool>;
 const outputStream = z.enum(['stdout', 'stderr']);
 
 export const PipelineEvent = z.discriminatedUnion('type', [
-  z.object({ ...envelope, type: z.literal('run:created'), run_id: id, evidence_id: id, derivative_id: id }).strict(),
-  z.object({ ...envelope, type: z.literal('run:skipped'), evidence_id: id, reason: z.string().min(1) }).strict(),
+  /**
+   * A run started for one backup (EPOCH-550): its workspace label, so the app
+   * can say what happened to each backup even when a cancel leaves no call
+   * summary, and the stages it will run, in order, for "stage 3 of 5".
+   */
+  z
+    .object({
+      ...envelope,
+      type: z.literal('run:created'),
+      run_id: id,
+      evidence_id: id,
+      derivative_id: id,
+      label,
+      stages: z.array(text).min(1),
+    })
+    .strict(),
+  z.object({ ...envelope, type: z.literal('run:skipped'), evidence_id: id, label, reason: z.string().min(1) }).strict(),
   z.object({ ...envelope, type: z.literal('stage:started'), run_id: id, stage: z.string().min(1) }).strict(),
   z
     .object({
@@ -69,6 +84,7 @@ export const PipelineEvent = z.discriminatedUnion('type', [
       ...envelope,
       type: z.literal('run:finished'),
       run_id: id,
+      label,
       state: z.enum(['running', 'incomplete', 'complete']),
     })
     .strict(),
@@ -77,6 +93,7 @@ export const PipelineEvent = z.discriminatedUnion('type', [
       ...envelope,
       type: z.literal('registration:refused'),
       backup_path: z.string().min(1),
+      label,
       reason: z.string().min(1),
     })
     .strict(),

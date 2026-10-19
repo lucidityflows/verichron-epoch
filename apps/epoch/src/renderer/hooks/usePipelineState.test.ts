@@ -17,6 +17,7 @@ const idle: AnalysisState = {
   target: null,
   startedAt: null,
   currentStage: null,
+  backups: [],
   result: null,
   taskLog: null,
   workspace: null,

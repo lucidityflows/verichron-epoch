@@ -173,7 +173,7 @@ describe('AnalysisSession', () => {
 
   it('records whether a run is a workspace analysis or one retried backup, and its workspace', () => {
     const analysis = new AnalysisSession(() => {});
-    analysis.start('retry', 'run-123', '/w', 1000);
+    analysis.start('retry', 'run-123', '/w', ['BK'], 1000);
     analysis.entry(entry(1, 'Analyze started for 1 backup'));
     assert.deepEqual(
       (({ status, kind, target, workspace }) => ({ status, kind, target, workspace }))(analysis.snapshot()),
@@ -184,32 +184,111 @@ describe('AnalysisSession', () => {
     assert.equal(analysis.snapshot().log.length, 1);
   });
 
-  it('tracks the running stage and the runs created from events, and clears the stage at completion (EPOCH-443)', () => {
-    const analysis = new AnalysisSession(() => {});
-    analysis.start('workspace', '/w', '/w', 1000);
-    analysis.follow(event({ type: 'run:created', run_id: RUN, evidence_id: RUN, derivative_id: RUN }));
-    analysis.follow(event({ type: 'stage:started', run_id: RUN, stage: 'ileapp_bridge' }), 2500);
-    assert.deepEqual(analysis.snapshot().currentStage, { name: 'ileapp_bridge', startedAt: 2500 });
-    assert.equal(analysis.hasActiveStage(), true);
+  const created = (run: string, label: string) =>
+    event({
+      type: 'run:created',
+      run_id: run,
+      evidence_id: run,
+      derivative_id: run,
+      label,
+      stages: ['crash', 'ileapp_bridge', 'reporting'],
+    });
+  const stageFinished = (run: string, stage: string) =>
+    event({
+      type: 'stage:finished',
+      run_id: run,
+      stage,
+      status: 'succeeded',
+      parser_version: 5,
+      derivative_id: run,
+    });
 
+  it("tracks the running stage's place and its own count, and clears the stage at completion (EPOCH-443, EPOCH-551)", () => {
+    const analysis = new AnalysisSession(() => {});
+    analysis.start('workspace', '/w', '/w', ['A'], 1000);
+    analysis.follow(created(RUN, 'A'));
+    analysis.follow(event({ type: 'stage:started', run_id: RUN, stage: 'ileapp_bridge' }), 2500);
     analysis.follow(
       event({
-        type: 'stage:finished',
-        run_id: RUN,
+        type: 'stage:log',
         stage: 'ileapp_bridge',
-        status: 'succeeded',
-        parser_version: 5,
-        derivative_id: RUN,
-      }),
-      3500
+        level: 'debug',
+        message: 'Artifact table 211 of 540: x',
+        index: 211,
+        total: 540,
+      })
     );
+    assert.deepEqual(analysis.snapshot().currentStage, {
+      name: 'ileapp_bridge',
+      title: 'iLEAPP Artifacts',
+      startedAt: 2500,
+      label: 'A',
+      index: 2,
+      total: 3,
+      progress: { index: 211, total: 540 },
+    });
+    assert.equal(analysis.hasActiveStage(), true);
+
+    analysis.follow(stageFinished(RUN, 'ileapp_bridge'), 3500);
     assert.equal(analysis.snapshot().currentStage, null);
     assert.deepEqual(analysis.runIds(), [RUN]);
-
-    analysis.follow(event({ type: 'stage:started', run_id: RUN, stage: 'reporting' }), 4000);
-    analysis.finish({ success: false });
-    assert.equal(analysis.snapshot().currentStage, null);
     assert.equal(analysis.snapshot().log.length, 0, 'following an event adds no entry; the task log does');
+  });
+
+  it('says what each backup did when a cancel ends the call: finished, interrupted where it stopped, not started (EPOCH-550)', () => {
+    const OTHER = '44444444-4444-4444-4444-444444444444';
+    const analysis = new AnalysisSession(() => {});
+    analysis.start('workspace', '/w', '/w', ['A', 'B', 'C', 'D'], 1000);
+    analysis.follow(created(RUN, 'A'));
+    analysis.follow(event({ type: 'run:finished', run_id: RUN, label: 'A', state: 'complete' }));
+    analysis.follow(
+      event({ type: 'run:skipped', evidence_id: RUN, label: 'D', reason: 'a complete run already covers it' })
+    );
+    analysis.follow(created(OTHER, 'B'));
+    analysis.follow(event({ type: 'stage:started', run_id: OTHER, stage: 'crash' }));
+    analysis.follow(stageFinished(OTHER, 'crash'));
+    analysis.follow(event({ type: 'stage:started', run_id: OTHER, stage: 'ileapp_bridge' }));
+    analysis.follow(
+      event({ type: 'stage:log', stage: 'ileapp_bridge', level: 'debug', message: 't', index: 211, total: 540 })
+    );
+    analysis.finish({ success: false, cancelled: true });
+
+    assert.deepEqual(
+      analysis.snapshot().backups.map(({ label, status, runState, stopped }) => ({ label, status, runState, stopped })),
+      [
+        { label: 'A', status: 'finished', runState: 'complete', stopped: null },
+        {
+          label: 'B',
+          status: 'interrupted',
+          runState: null,
+          stopped: { stage: 'ileapp_bridge', title: 'iLEAPP Artifacts', progress: { index: 211, total: 540 } },
+        },
+        { label: 'C', status: 'not-started', runState: null, stopped: null },
+        { label: 'D', status: 'up-to-date', runState: null, stopped: null },
+      ]
+    );
+  });
+
+  it('calls a backup a timeout or crash stopped failed, not interrupted: interrupted is only a cancel (DESIGN.md §9)', () => {
+    for (const result of [
+      { success: false, timedOut: true },
+      { success: false, error: 'the orchestrator crashed' },
+    ]) {
+      const analysis = new AnalysisSession(() => {});
+      analysis.start('workspace', '/w', '/w', ['A'], 1000);
+      analysis.follow(created(RUN, 'A'));
+      analysis.follow(event({ type: 'stage:started', run_id: RUN, stage: 'crash' }));
+      analysis.finish(result);
+      const [backup] = analysis.snapshot().backups;
+      assert.equal(backup.status, 'failed');
+      assert.deepEqual(backup.stopped, { stage: 'crash', title: 'Crash Reports', progress: null });
+    }
+  });
+
+  it('refuses an event for a backup this Analyze did not ask for', () => {
+    const analysis = new AnalysisSession(() => {});
+    analysis.start('workspace', '/w', '/w', ['A'], 1000);
+    assert.throws(() => analysis.follow(created(RUN, 'Z')), /did not ask for/);
   });
 });
 

@@ -188,8 +188,8 @@ export const App: React.FC = () => {
             {section === 'reports' && <ReportsView selectedRun={selectedRun} />}
           </div>
 
-          {/* EPOCH-570: the Activity Log, docked below the page, never inside it. U4 adds it to Investigations. */}
-          {section === 'workspace' && <ActivityLogDock />}
+          {/* EPOCH-570: the Activity Log, docked below the page, never inside it; on Investigations too (U4b). */}
+          {(section === 'workspace' || section === 'runs') && <ActivityLogDock />}
         </div>
       </div>
     </TooltipProvider>
