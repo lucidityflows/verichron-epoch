@@ -534,7 +534,10 @@ forgot what was prepared. "We must guide clearly, or we look untrustworthy."
     as its row does (the name, the green "Prepared ·" chip on the right, when
     it was backed up beneath), each fact carries an accent icon chip, and the
     card is headed with a success icon chip as Analyze is with its own (owner's
-    review, 2026-10-19).
+    review, 2026-10-19). Several backups are a table instead, one row per
+    backup (its name, when it was backed up and its chip) and the facts as
+    columns headed with their accent icons, styled as the Backups Found list,
+    so they compare across rows.
   - **One primary button per state:** Prepare Evidence while the selection
     needs preparing, then Analyze and Create Investigation.
 - **The iPhone pull follows the board "iPhone Pull Flow"** (EPOCH-554, U3b):

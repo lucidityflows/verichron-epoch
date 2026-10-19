@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, it, vi } from 'vitest';
 
 import type { BackupProgress } from '../../../shared/prepareProgress';
@@ -13,6 +13,7 @@ import type { PreparedBackup } from '../../../shared/types/window';
 import {
   EvidenceSourcePanel,
   PreparedSummary,
+  PreparedTable,
   PreparingCard,
   backupName,
   formatElapsed,
@@ -191,5 +192,52 @@ describe('PreparedSummary', () => {
     );
     assert.ok(screen.getByText('Not run'));
     assert.ok(screen.getByText('Database repair: no sqlite3'));
+  });
+});
+
+describe('PreparedTable', () => {
+  const base: PreparedBackup = {
+    label: 'a',
+    state: 'prepared',
+    preparedAt: '2026-10-19T19:57:52Z',
+    details: {
+      filesChecked: 9870,
+      repair: { status: 'ran', scanned: 61, repaired: 4, failed: 0 },
+      modules: { total: 540, complete: 540, errors: 0 },
+    },
+  };
+
+  it('puts several backups in one table, a row each, with the facts as columns', () => {
+    render(
+      <PreparedTable
+        rows={[
+          { key: 'a', name: 'iPhone 17,5 · iOS 26.6.1', backupDate: '2026-10-19T18:05:15Z', prepared: base },
+          {
+            key: 'b',
+            name: 'iPhone 14,2 · iOS 17.6.1',
+            backupDate: null,
+            prepared: {
+              ...base,
+              label: 'b',
+              details: { ...base.details!, modules: { total: 540, complete: 539, errors: 1 } },
+            },
+          },
+          {
+            key: 'c',
+            name: 'iPad 13,1 · iOS 18.1',
+            backupDate: null,
+            prepared: { ...base, label: 'c', details: null, detailsError: 'its sidecar is missing' },
+          },
+        ]}
+      />
+    );
+    const rows = screen.getAllByRole('row');
+    assert.equal(rows.length, 4, 'a header and a row per backup');
+    assert.ok(within(rows[0]).getByText('Files checked'));
+    assert.ok(within(rows[1]).getByText('9,870'));
+    assert.ok(within(rows[1]).getByText(/Prepared · 2026-10-19 19:57:52/));
+    assert.ok(within(rows[2]).getByText('539 of 540'));
+    assert.ok(within(rows[2]).getByText('1 reported an error'));
+    assert.ok(within(rows[3]).getByText('What Prepare did is not shown: its sidecar is missing.'));
   });
 });

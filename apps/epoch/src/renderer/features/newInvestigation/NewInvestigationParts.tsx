@@ -290,3 +290,116 @@ export function PreparedSummary({
     </section>
   );
 }
+
+/** A Prepared backup as the page names it, for the table of several. */
+export interface PreparedRow {
+  key: string;
+  name: string;
+  backupDate: string | null;
+  prepared: PreparedBackup;
+}
+
+const COLUMNS: { icon: LucideIcon; label: string }[] = [
+  { icon: FileCheck2, label: 'Files checked' },
+  { icon: Wrench, label: 'Databases repaired' },
+  { icon: Puzzle, label: 'iLEAPP modules' },
+  { icon: ShieldCheck, label: 'Original' },
+];
+
+/**
+ * Prepared, for more than one backup (owner's review, 2026-10-19): a table
+ * with a row per backup and Prepare's facts as columns, styled as the
+ * Backups Found list above it, so the backups compare across rows. One backup
+ * keeps PreparedSummary's tiles.
+ */
+export function PreparedTable({ rows }: { rows: PreparedRow[] }) {
+  return (
+    <div className="rounded-xl bg-surface-raised shadow-inner overflow-x-auto">
+      <table className="w-full text-data">
+        <thead>
+          <tr className="text-label text-muted-foreground text-left">
+            <th scope="col" className="px-3 py-3 font-medium">
+              Backup
+            </th>
+            {COLUMNS.map(({ icon: Icon, label }) => (
+              <th key={label} scope="col" className="px-3 py-3 font-medium">
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon size="0.875rem" className="text-accent shrink-0" aria-hidden />
+                  {label}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border border-t border-border">
+          {rows.map(({ key, name, backupDate, prepared }) => {
+            const { details } = prepared;
+            return (
+              <tr key={key} className="align-top">
+                <th scope="row" className="px-3 py-3 text-left font-normal">
+                  <span className="block text-foreground font-medium">{name}</span>
+                  {backupDate && (
+                    <span className="block text-label text-muted-foreground">
+                      Backed up <DateTime value={backupDate} />
+                    </span>
+                  )}
+                  <span className="block mt-1.5">
+                    <PreparedState prepared={prepared} />
+                  </span>
+                </th>
+                {!details ? (
+                  // The workspace's records for this backup could not be read; never guessed.
+                  <td colSpan={COLUMNS.length} className="px-3 py-3 text-warning">
+                    What Prepare did is not shown: {prepared.detailsError}.
+                  </td>
+                ) : (
+                  <>
+                    <td className="px-3 py-3 text-foreground tabular-nums">
+                      {details.filesChecked.toLocaleString('en-US')}
+                    </td>
+                    <td className="px-3 py-3">
+                      {details.repair.status === 'ran' ? (
+                        <>
+                          <span className="block text-foreground tabular-nums whitespace-nowrap">
+                            {details.repair.repaired} of {details.repair.scanned}
+                          </span>
+                          {details.repair.failed > 0 && (
+                            <span className="block text-label text-muted-foreground">
+                              {details.repair.failed} still damaged
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <span className="block text-foreground">Not run</span>
+                          <span className="block text-label text-muted-foreground">{details.repair.reason}</span>
+                        </>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {details.modules ? (
+                        <>
+                          <span className="block text-foreground tabular-nums whitespace-nowrap">
+                            {details.modules.complete} of {details.modules.total}
+                          </span>
+                          {details.modules.errors > 0 && (
+                            <span className="block text-label text-muted-foreground">
+                              {details.modules.errors} reported an error
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="block text-muted-foreground">Not yet</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-foreground">Unchanged</td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}

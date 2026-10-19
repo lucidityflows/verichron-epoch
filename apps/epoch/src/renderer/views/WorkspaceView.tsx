@@ -35,6 +35,8 @@ import { AnalysisStageProgress } from '../features/investigations/AnalysisStageP
 import {
   EvidenceSourcePanel,
   PreparedSummary,
+  PreparedTable,
+  type PreparedRow,
   PreparingCard,
   backupName,
   preparingTarget,
@@ -669,20 +671,30 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
                   Evidence Prepared
                 </h2>
               </div>
-              {backups
-                .filter((b) => selectedLabels.has(b.label))
-                .map((b) => {
-                  const prepared = preparedByLabel.get(b.label);
-                  const description = descriptions.get(b.path);
-                  return prepared ? (
-                    <PreparedSummary
-                      key={b.label}
-                      name={backupName(b, description)}
-                      backupDate={description?.backupDate ?? null}
-                      prepared={prepared}
-                    />
-                  ) : null;
-                })}
+              {(() => {
+                const rows: PreparedRow[] = backups
+                  .filter((b) => selectedLabels.has(b.label))
+                  .flatMap((b) => {
+                    const prepared = preparedByLabel.get(b.label);
+                    const description = descriptions.get(b.path);
+                    return prepared
+                      ? [
+                          {
+                            key: b.label,
+                            name: backupName(b, description),
+                            backupDate: description?.backupDate ?? null,
+                            prepared,
+                          },
+                        ]
+                      : [];
+                  });
+                // One backup reads as tiles; several compare best as a table (owner's review, 2026-10-19).
+                return rows.length === 1 ? (
+                  <PreparedSummary name={rows[0].name} backupDate={rows[0].backupDate} prepared={rows[0].prepared} />
+                ) : (
+                  <PreparedTable rows={rows} />
+                );
+              })()}
             </section>
           )}
 
