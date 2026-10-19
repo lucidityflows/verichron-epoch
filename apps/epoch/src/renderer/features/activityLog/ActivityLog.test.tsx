@@ -8,9 +8,14 @@ import type { TaskLogEntry } from '@verichron/contracts';
 import { afterEach, beforeAll, describe, it } from 'vitest';
 
 import { ActivityLog } from './ActivityLog';
+import { useDockState } from './dockState';
 import { FailureBanner } from './FailureBanner';
 
-afterEach(cleanup);
+const dockInitial = useDockState.getState();
+afterEach(() => {
+  cleanup();
+  useDockState.setState(dockInitial, true);
+});
 beforeAll(() => {
   // jsdom has no layout: give the virtualized list a size so it renders rows.
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 220 });

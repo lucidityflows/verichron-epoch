@@ -616,6 +616,8 @@ and how it is sanitized, is `docs/event-log.md`; this is how it looks.
   errors (`danger/10`, `foreground` text, as the Failed chip), warnings
   (`warning/10`, `warning`) and notes for review (`accent/10`, `accent`). One click
   opens the drawer above it; the page above gets shorter and nothing nests.
+  The drawer stays as the examiner left it (open or closed, the view and the
+  filter) when they leave the page and come back, for the session (EPOCH-575).
 - **Two views (owner, 2026-10-18).** **Summary**, the default, shows `info`,
   warnings and errors in plain sentences; only an error, a warning or a note
   for review carries a word tag (Error, Warning, For review), and progress

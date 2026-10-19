@@ -348,7 +348,10 @@ itself (EPOCH-436).
   UDID, so the sanitizer has the UDID before any Info.plist exists (§6.3). The
   backup password is the tripwire's secret (§6.2).
 - **Outcome:** `succeeded`, `cancelled` when the examiner stopped it, or
-  `failed`. No log, no pull: a log that can't be created stops the pull before
+  `failed`. A cancel counts only when it stopped the backup: before the backup
+  process starts (checking, or turning on encryption while the iPhone waits
+  for its passcode), Cancel is refused and says so, and a later error is a
+  failure. No log, no pull: a log that can't be created stops the pull before
   its folder holds anything (§7).
 - The one-time tool setup is not a case's task, so it has no task log; its
   output stays in a disclosure in the setup card (owner, 2026-10-18).

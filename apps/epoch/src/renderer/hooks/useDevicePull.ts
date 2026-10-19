@@ -375,7 +375,17 @@ export function useDevicePull() {
     setCancelling(true);
     cancelAsked.current = true;
     try {
-      await devicesApi.cancelDeviceBackup(sourceId);
+      // Refused while no backup process runs yet: checking, or turning on
+      // encryption while the iPhone waits for its passcode. The pull goes on,
+      // and a later error stays a failure, not a stop that was asked for.
+      if (!(await devicesApi.cancelDeviceBackup(sourceId))) {
+        setCancelling(false);
+        cancelAsked.current = false;
+        toast.show(
+          "The pull can't be cancelled until the backup starts on the iPhone. If the iPhone is asking for its passcode, enter it, or wait for the request to time out.",
+          'info'
+        );
+      }
     } catch (err) {
       setCancelling(false);
       cancelAsked.current = false;
