@@ -181,6 +181,28 @@ describe('Prepare and its task log', () => {
     ]);
   });
 
+  it('stops Prepare when the examiner asks, and records it as cancelled, not crashed (EPOCH-554)', async () => {
+    const processor = childProcess();
+    spawnMock.mockReturnValueOnce(processor);
+    await invoke('epoch:startPipeline', '/source', { workspace });
+    assert.deepEqual(await invoke('epoch:cancelPrepare'), { cancelled: true });
+    assert.deepEqual(processor.kill.mock.calls, [['SIGTERM']]);
+    assert.deepEqual(await invoke('epoch:cancelPrepare'), { cancelled: false }, 'one stop at a time');
+    processor.emit('close', null, 'SIGTERM');
+    await vi.waitFor(async () =>
+      assert.equal((await invoke<{ status: string }>('epoch:getPrepareState')).status, 'finished')
+    );
+    const state = await invoke<{ result: { success: boolean; cancelled?: boolean } }>('epoch:getPrepareState');
+    assert.deepEqual([state.result.success, state.result.cancelled], [false, true]);
+    const last = readTaskLog(savedLog().text).entries.at(-1)!;
+    assert.ok(last.kind === 'task:finished' && last.result.outcome === 'cancelled');
+    assert.equal(last.level, 'warn', 'a stop is not a failure');
+  });
+
+  it('has nothing to stop when no Prepare runs', async () => {
+    assert.deepEqual(await invoke('epoch:cancelPrepare'), { cancelled: false });
+  });
+
   it('does not start Prepare when its log cannot be created: no log, no task', async () => {
     const blocked = path.join(workspace, 'blocked');
     writeFileSync(blocked, '');

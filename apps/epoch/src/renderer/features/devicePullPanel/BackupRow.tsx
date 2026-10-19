@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Smartphone, Circle, Loader2, CheckCircle2, XCircle, KeyRound } from 'lucide-react';
+import { Circle, Loader2, CheckCircle2, XCircle, KeyRound } from 'lucide-react';
 import type { Backup } from '@verichron/contracts';
 import { STAGE_ORDER, STAGE_LABELS, type BackupProgress, type StageName } from '../../../shared/prepareProgress';
 import { formatDateTime } from '../../../shared/time';
-import type { PreparedBackup } from '../../../shared/types/window';
+import type { BackupDescription, PreparedBackup } from '../../../shared/types/window';
+import { DateTime } from '../../components/ui/DateTime';
+import { backupName } from '../newInvestigation/NewInvestigationParts';
+import { formatBytes } from './BackupProgressCard';
 import type { CrashReportsRetryTarget } from '../../../shared/types/tools';
 import { Button } from '../../components/ui/Button';
 
@@ -23,6 +26,8 @@ interface BackupRowProps {
   lastResult?: 'done' | 'failed';
   /** What the workspace records for this backup (EPOCH-497); undefined when not prepared. */
   prepared?: PreparedBackup;
+  /** Its model, iOS version, backup date and size (EPOCH-554); undefined until read. */
+  description?: BackupDescription;
   crashReportsRetryTarget?: CrashReportsRetryTarget;
   onCopyCrashReportsAgain?: (target: CrashReportsRetryTarget) => Promise<void>;
 }
@@ -36,6 +41,7 @@ export function BackupRow({
   awaitingPassword,
   lastResult,
   prepared,
+  description,
   crashReportsRetryTarget,
   onCopyCrashReportsAgain,
 }: BackupRowProps) {
@@ -45,14 +51,24 @@ export function BackupRow({
   const [retryDone, setRetryDone] = useState(false);
 
   if (liveProgress) {
-    return <LiveBackupRow backup={backup} progress={liveProgress} awaitingPassword={awaitingPassword} />;
+    return (
+      <LiveBackupRow
+        backup={backup}
+        description={description}
+        progress={liveProgress}
+        awaitingPassword={awaitingPassword}
+      />
+    );
   }
 
   return (
     <div>
+      {/* The checkbox, the name and the chip share the first line; the facts,
+          and a partly prepared backup's reason, sit beneath the name (owner's
+          review, 2026-10-19). */}
       <label
-        className={`flex items-center gap-3 px-4 py-3 text-data cursor-pointer select-none transition-colors ${
-          selected ? 'bg-accent/10' : 'hover:bg-surface'
+        className={`grid grid-cols-[0.875rem_minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 items-start px-4 py-3 text-data cursor-pointer select-none transition-colors ${
+          selected ? 'bg-accent/10' : 'hover:bg-surface-hover'
         } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
       >
         <input
@@ -60,14 +76,21 @@ export function BackupRow({
           checked={selected}
           onChange={onToggle}
           disabled={disabled}
-          className="accent-accent w-4 h-4 rounded cursor-pointer shrink-0"
+          className="accent-accent w-3.5 h-3.5 mt-[0.1875rem] rounded cursor-pointer"
         />
-        <Smartphone size="1.125rem" className={`shrink-0 ${selected ? 'text-accent' : 'text-muted-foreground'}`} />
-        <span className="font-mono text-foreground truncate flex-1 font-medium" title={backup.path}>
-          {backup.label}
+        <span className="text-foreground truncate font-medium">{backupName(backup, description)}</span>
+        <span className="flex items-center gap-2 justify-self-end">
+          <PreparedState prepared={prepared} />
+          {lastResult === 'failed' && <XCircle size="1rem" className="text-danger shrink-0" />}
         </span>
-        <PreparedState prepared={prepared} />
-        {lastResult === 'failed' && <XCircle size="1.125rem" className="text-danger shrink-0" />}
+        <span className="col-start-2 col-span-2 min-w-0">
+          <BackupFacts backup={backup} description={description} />
+          {prepared?.state === 'partial' && (
+            <span className="block text-label text-muted-foreground">
+              {prepared.reason ?? `Decrypted ${formatDateTime(prepared.preparedAt)}; iLEAPP's output is missing`}
+            </span>
+          )}
+        </span>
       </label>
       {retryDone && (
         <div className="px-11 pb-3">
@@ -143,24 +166,41 @@ export function BackupRow({
   );
 }
 
-/** The backup's state in the workspace, in its role colour (DESIGN.md §9). */
+/**
+ * The row's second line (board 5): size and when the backup was made, then
+ * its folder's name, which the logs use. Never the device identifier.
+ */
+function BackupFacts({ backup, description }: { backup: Backup; description?: BackupDescription }) {
+  return (
+    <span className="block text-label text-muted-foreground truncate">
+      {description && <>{formatBytes(description.bytes)} · </>}
+      {description?.backupDate ? (
+        <>
+          backed up <DateTime value={description.backupDate} />
+        </>
+      ) : description ? (
+        'backup date not recorded'
+      ) : (
+        'reading…'
+      )}
+      <span className="font-mono"> · {backup.label}</span>
+    </span>
+  );
+}
+
+const CHIP = 'inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-label whitespace-nowrap shrink-0';
+
+/** The backup's state in the workspace, as a chip in its role colour (DESIGN.md §9, board 5). */
 function PreparedState({ prepared }: { prepared?: PreparedBackup }) {
-  if (!prepared) return <span className="text-label text-muted-foreground shrink-0">Not prepared</span>;
+  if (!prepared) return <span className={`${CHIP} bg-muted-foreground/14 text-foreground`}>Not prepared</span>;
   const when = formatDateTime(prepared.preparedAt);
   if (prepared.state === 'partial') {
-    // Why, written out, not on hover (DESIGN.md §9): the last Prepare's reason, else what is missing.
-    return (
-      <span className="flex flex-col items-end text-right shrink-0 max-w-[22rem]">
-        <span className="text-label text-warning">Partly prepared · prepare again</span>
-        <span className="text-label text-muted-foreground">
-          {prepared.reason ?? `Decrypted ${when}; iLEAPP's output is missing`}
-        </span>
-      </span>
-    );
+    // Its reason is written out beneath the backup's facts, not on hover (DESIGN.md §9).
+    return <span className={`${CHIP} bg-warning/10 text-warning`}>Partly prepared · prepare again</span>;
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-label text-success shrink-0">
-      <CheckCircle2 size="1rem" /> Prepared · {when}
+    <span className={`${CHIP} bg-success/10 text-success`}>
+      <CheckCircle2 size="0.875rem" /> Prepared · {when}
     </span>
   );
 }
@@ -210,10 +250,12 @@ function stepDetail(progress: BackupProgress, stage: StageName, now: number): st
 
 function LiveBackupRow({
   backup,
+  description,
   progress,
   awaitingPassword,
 }: {
   backup: Backup;
+  description?: BackupDescription;
   progress: BackupProgress;
   awaitingPassword?: boolean;
 }) {
@@ -265,9 +307,7 @@ function LiveBackupRow({
     >
       {awaitingPassword ? <KeyRound size="1.125rem" className="text-warning shrink-0 animate-bounce" /> : icon}
       <div className="min-w-0 flex-1">
-        <div className="font-mono text-foreground truncate font-medium" title={backup.path}>
-          {backup.label}
-        </div>
+        <div className="text-foreground truncate font-medium">{backupName(backup, description)}</div>
         <div className={`text-label truncate mt-0.5 ${statusClass}`}>
           {statusText}
           {detail && <span className="text-muted-foreground"> · {detail}</span>}

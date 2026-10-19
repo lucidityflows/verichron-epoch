@@ -498,6 +498,34 @@ forgot what was prepared. "We must guide clearly, or we look untrustworthy."
   chevron; closed, they show the status and what the stage produced; open,
   what it read, what it wrote, exact times and its output (EPOCH-431). A card
   with nothing to open has no hover lift.
+- **New Investigation follows the board "New Investigation View"** (EPOCH-554,
+  U3):
+  - **Sources are equal.** Pulling from an iPhone and using an existing
+    backup are two equal secondary buttons, never two primary cards. With
+    no evidence chosen they sit in the page's one card ("Where Is the
+    Evidence?"); with a folder chosen they move below the list as one quiet
+    line, "Evidence somewhere else?", with no card and no heading. No tip
+    bar repeats them.
+  - **A card's header row holds only its title and where it is** ("Backups
+    Found (2)" and "In ~/… · Change Folder", on one baseline). Controls
+    never share the title's row (owner's review, 2026-10-19); the list's one
+    action sits below it, beside the line that says what it will do.
+  - **A backup is named by its model and iOS version**, with its size, when
+    it was backed up and its folder's name beneath, and its state as a chip.
+    Never its device identifier. The chosen folder shows the home folder as
+    `~`. The checkbox (14 px), the name and the chip share the row's first
+    line; the facts, and a partly prepared backup's reason, sit beneath the
+    name. No icon repeats what the name says.
+  - **Only what still needs preparing starts selected**, and the line above
+    the list says what the selection will do and roughly how long.
+  - **Preparing** is a card under the step rail: the backup, what the step is
+    doing ("Decrypting · 31.2 GB of 58.4 GB"), the time elapsed, and **Stop**.
+    A stop the examiner asked for reads in the flag role, never as a failure.
+  - **Prepared** states what Prepare did, from the workspace's records: the
+    backup files checked, the damaged databases repaired, iLEAPP's modules,
+    and that the original backup was not changed.
+  - **One primary button per state:** Prepare Evidence while the selection
+    needs preparing, then Analyze and Create Investigation.
 
 ## 11. Dates and times — every time says its zone
 

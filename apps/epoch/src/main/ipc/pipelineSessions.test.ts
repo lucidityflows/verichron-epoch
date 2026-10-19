@@ -9,8 +9,8 @@ import { PipelineEvent, type PipelineEventBody, type TaskLogEntry } from '@veric
 import { describe, it } from 'vitest';
 
 import { applyPrepareEvent, initPrepareProgress } from '../../shared/prepareProgress';
-import type { PrepareState } from '../../shared/types/window';
-import { AnalysisSession, KEPT_LOG_LINES, LineSplitter, PrepareSession } from './pipelineSessions';
+import type { PrepareState, PullLogState } from '../../shared/types/window';
+import { AnalysisSession, KEPT_LOG_LINES, LineSplitter, PrepareSession, PullLogSession } from './pipelineSessions';
 
 const AT = '2026-10-18T15:30:02.123Z';
 const TASK = '1f3a9c2e-0000-4000-8000-000000000001';
@@ -210,6 +210,41 @@ describe('AnalysisSession', () => {
     analysis.finish({ success: false });
     assert.equal(analysis.snapshot().currentStage, null);
     assert.equal(analysis.snapshot().log.length, 0, 'following an event adds no entry; the task log does');
+  });
+});
+
+describe('PullLogSession (EPOCH-436)', () => {
+  it("keeps the pull's log for a page that mounts mid-pull, and says when it ended", () => {
+    const sent: PullLogState[] = [];
+    const pull = new PullLogSession((state) => sent.push(state));
+    pull.start('/home/x/verichron-workspace', 1000);
+    pull.logFile('pull-2026-10-18T142446Z-1f3a9c2e.ndjson');
+    pull.entry(entry(1, 'iPhone pull started for iPhone17,5, iOS 26.6.1'));
+    const mid = pull.snapshot();
+    assert.deepEqual(
+      [mid.status, mid.startedAt, mid.taskLog, mid.workspace],
+      ['running', 1000, 'pull-2026-10-18T142446Z-1f3a9c2e.ndjson', '/home/x/verichron-workspace']
+    );
+    assert.deepEqual(
+      mid.log.map((l) => l.message),
+      ['iPhone pull started for iPhone17,5, iOS 26.6.1']
+    );
+    pull.finish();
+    assert.equal(pull.snapshot().status, 'finished');
+    assert.ok(
+      sent.every((state) => state.log.length === 0),
+      'changes are sent without the log'
+    );
+  });
+});
+
+describe('PullLogSession.reset', () => {
+  it('leaves no trace of a pull that never started', () => {
+    const pull = new PullLogSession(() => undefined);
+    pull.start('/home/x/verichron-workspace', 1000);
+    pull.entry(entry(1, 'iPhone pull started'));
+    pull.reset();
+    assert.deepEqual(pull.snapshot(), { status: 'idle', startedAt: null, taskLog: null, workspace: null, log: [] });
   });
 });
 

@@ -8,6 +8,8 @@ import type {
   ReadTaskLog,
   TaskLogSummary,
   PrepareState,
+  BackupDescription,
+  PullLogState,
   ReportResult,
 } from '../shared/types/window';
 import type {
@@ -49,6 +51,9 @@ const dbApi = {
   selectDeviceBackupDestination: (): Promise<string | null> =>
     ipcRenderer.invoke('epoch:selectDeviceBackupDestination'),
   discoverBackups: (source: string): Promise<Backup[]> => ipcRenderer.invoke('epoch:discoverBackups', source),
+  describeBackups: (paths: string[]): Promise<BackupDescription[]> =>
+    ipcRenderer.invoke('epoch:describeBackups', paths),
+  displayPath: (folder: string): Promise<string> => ipcRenderer.invoke('epoch:displayPath', folder),
   getPreparedBackups: (workspace?: string) => ipcRenderer.invoke('epoch:getPreparedBackups', workspace),
   startPipeline: (source: string, options?: StartPipelineOptions): Promise<{ started: boolean; workspace: string }> =>
     ipcRenderer.invoke('epoch:startPipeline', source, options),
@@ -90,6 +95,8 @@ const dbApi = {
   // to cancel" isn't an error condition for a Cancel button that may be
   // clicked in a race with the run finishing on its own.
   cancelAnalysis: (): Promise<{ cancelled: boolean }> => ipcRenderer.invoke('epoch:cancelAnalysis'),
+  // EPOCH-554: Stop on Preparing.
+  cancelPrepare: (): Promise<{ cancelled: boolean }> => ipcRenderer.invoke('epoch:cancelPrepare'),
   // EPOCH-305: cross-references a workspace against both the in-memory
   // "is anything actually running right now" state and the Postgres
   // pipeline_runs table, so a remounted WorkspaceView can tell "fresh",
@@ -115,6 +122,18 @@ const dbApi = {
     const listener = (_event: Electron.IpcRendererEvent, state: AnalysisState) => callback(state);
     ipcRenderer.on('epoch:analysisState', listener);
     return () => ipcRenderer.removeListener('epoch:analysisState', listener);
+  },
+  // EPOCH-436: the iPhone pull's task log, kept in the main process like Prepare's.
+  getPullLogState: (): Promise<PullLogState> => ipcRenderer.invoke('epoch:getPullLogState'),
+  onPullLogState: (callback: (state: PullLogState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: PullLogState) => callback(state);
+    ipcRenderer.on('epoch:pullLogState', listener);
+    return () => ipcRenderer.removeListener('epoch:pullLogState', listener);
+  },
+  onPullLog: (callback: (entry: PipelineLogEntry) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, entry: PipelineLogEntry) => callback(entry);
+    ipcRenderer.on('epoch:pullLog', listener);
+    return () => ipcRenderer.removeListener('epoch:pullLog', listener);
   },
 
   // Device backup acquisition -- see apps/epoch/src/tools/device-backup.

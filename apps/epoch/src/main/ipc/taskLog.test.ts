@@ -123,6 +123,29 @@ describe('TaskLog', () => {
     await log.finish(result, 'done');
   });
 
+  it("keeps a pull's tool lines as debug under the tool, with the device's UDID replaced before its backup exists (EPOCH-436)", async () => {
+    // A pull's backup is written into a folder named by the device's UDID,
+    // so the identifier is known from the folder's name, with no Info.plist yet.
+    const pullDir = path.join(tmp, 'pulls', '2026-10-18T142446Z');
+    const { log } = await openLog({
+      kind: 'pull',
+      labels: ['2026-10-18T142446Z'],
+      options: { turn_on_encryption: false },
+      backups: [{ label: '2026-10-18T142446Z', path: path.join(pullDir, '00008140-001A2B3C4D5E6F70') }],
+      source: path.join(tmp, 'pulls'),
+      message: 'iPhone pull started for iPhone17,5, iOS 26.6.1',
+    });
+    log.addSecret('hunter22');
+    const entry = log.toolOutput('idevicebackup2', 'Backup directory is "00008140-001A2B3C4D5E6F70"', {
+      label: '2026-10-18T142446Z',
+    });
+    assert.deepEqual([entry.kind, entry.level, entry.source], ['output', 'debug', 'tool:idevicebackup2']);
+    assert.equal(entry.message, 'Backup directory is "[device 2026-10-18T142446Z]"');
+    const leaked = log.toolOutput('idevicebackup2', 'password hunter22 rejected');
+    assert.equal(leaked.message.includes('hunter22'), false, 'the tripwire removes the password');
+    await log.finish(result, 'iPhone pull finished');
+  });
+
   it('never replaces the Device Name, and replaces the serial number wherever it appears', async () => {
     const { log } = await openLog();
     const entry = log.app('info', 'iphone_backup_decrypt 0.10.0 read serial F2LZK1ABCD12');

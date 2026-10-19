@@ -1,6 +1,16 @@
 import { app, ipcMain, dialog, BrowserWindow } from 'electron';
-import { addPullDestination, pullFolderName, readPullDestinations } from '../tools/device-backup/pullDestinations';
+import {
+  addPullDestination,
+  pullFolderName,
+  readPullDestinations,
+  removePullDestination,
+} from '../tools/device-backup/pullDestinations';
 import { PullStateTracker } from '../tools/device-backup/pullState';
+import { logPullProgress } from '../tools/device-backup/pullLog';
+import { PullLogSession } from './pipelineSessions';
+import { defaultWorkspace } from './preparedBackups';
+import { TaskLog } from './taskLog';
+import { popOutWindows } from '../windows';
 import path from 'path';
 import fs from 'fs/promises';
 import { spawn } from 'child_process';
@@ -23,15 +33,23 @@ import type {
   ToolSetupStatus,
 } from '../../shared/types/tools';
 
-export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null) {
+export function registerDeviceHandlers(
+  getMainWindow: () => BrowserWindow | null,
+  repoRoot: string,
+  appVersion: string
+) {
   // The running pull, so a panel that mounts mid-pull can show it (EPOCH-467).
   const pull = new PullStateTracker();
+  // Its task log, for the Activity Log (EPOCH-436).
+  const pullLog = new PullLogSession((state) => sendToRenderer('epoch:pullLogState', state));
+  // Whether the examiner asked the running pull to stop: its log then ends cancelled, not failed.
+  let cancelRequested = false;
 
+  // To the main window and every pop-out, as Prepare and Analyze do, so a
+  // popped-out Activity Log follows a pull too (EPOCH-436).
   function sendToRenderer(channel: string, ...args: unknown[]) {
     const win = getMainWindow();
-    if (win) {
-      win.webContents.send(channel, ...args);
-    }
+    for (const target of [...(win ? [win] : []), ...popOutWindows()]) target.webContents.send(channel, ...args);
   }
 
   ipcMain.handle('epoch:selectDeviceBackupDestination', async () => {
@@ -71,6 +89,7 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
   });
 
   ipcMain.handle('epoch:getDevicePullState', async (): Promise<DevicePullState | null> => pull.current());
+  ipcMain.handle('epoch:getPullLogState', async () => pullLog.snapshot());
 
   ipcMain.handle('epoch:getBackupEncryption', async (_event, sourceId: string, device: DeviceInfo) => {
     // A device query during a backup would compete with it for the device.
@@ -83,6 +102,7 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
   ipcMain.handle('epoch:cancelDeviceBackup', async (_event, sourceId: string) => {
     const source = getDeviceBackupSource(sourceId);
     if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    if (pull.running()) cancelRequested = true;
     return source.cancelPull();
   });
 
@@ -188,12 +208,60 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
         pull.end();
         throw err;
       }
+
+      // The pull's task log (EPOCH-436), in the default workspace, never in
+      // the pull's folder, which is evidence (owner, 2026-10-18). The backup's
+      // folder is named by the device's UDID, so the sanitizer knows it from
+      // the start (docs/event-log.md §6.3).
+      const label = path.basename(pullDir);
+      const workspace = defaultWorkspace();
+      cancelRequested = false;
+      pullLog.start(workspace);
+      let log: TaskLog;
+      try {
+        log = await TaskLog.open(
+          {
+            workspace,
+            kind: 'pull',
+            labels: [label],
+            options: { turn_on_encryption: Boolean(options.enableEncryption) },
+            backups: [{ label, path: path.join(pullDir, device.id) }],
+            source: destDir,
+            appRoot: repoRoot,
+            appVersion,
+            message: `iPhone pull started${device.model ? ` for ${device.model}` : ''}${
+              device.osVersion ? `, iOS ${device.osVersion}` : ''
+            }`,
+          },
+          (entry) => {
+            pullLog.entry(entry);
+            sendToRenderer('epoch:pullLog', entry);
+          }
+        );
+      } catch (err) {
+        // No log, no task (docs/event-log.md §7): the empty folder and its
+        // registration leave no trace, and the Activity Log shows no pull.
+        await fs.rmdir(pullDir).catch(() => undefined);
+        await removePullDestination(app.getPath('userData'), pullDir).catch(() => undefined);
+        pull.end();
+        pullLog.reset();
+        throw new Error(
+          `The task log could not be created, so the pull did not start: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err }
+        );
+      }
+      pullLog.logFile(log.file);
+      log.addSecret(options.password);
+
+      let failure: string | null = null;
       try {
         return await source.pullBackup(
           device,
           pullDir,
           (progress: BackupProgress) => {
             pull.progress(progress);
+            logPullProgress(log, label, progress);
+            if (progress.phase === 'error') failure = progress.message;
             sendToRenderer('epoch:deviceBackupProgress', progress);
           },
           (stats: BackupStats) => {
@@ -203,17 +271,34 @@ export function registerDeviceHandlers(getMainWindow: () => BrowserWindow | null
           options
         );
       } catch (err) {
+        failure ??= err instanceof Error ? err.message : String(err);
         // Every pull ends with done or an error on the progress channel, so a
         // panel that mounted mid-pull (and isn't awaiting this call) sees it end.
         if (!pull.reportedEnd()) {
           sendToRenderer('epoch:deviceBackupProgress', {
             phase: 'error',
-            message: err instanceof Error ? err.message : String(err),
+            message: failure,
           } satisfies BackupProgress);
         }
         throw err;
       } finally {
-        pull.end();
+        // The pull stays reserved until its log is closed, so another pull
+        // can't start and have its session ended by this one's finish.
+        try {
+          const outcome = failure === null ? 'succeeded' : cancelRequested ? 'cancelled' : 'failed';
+          // The result reaches the Activity Log through the log's own delivery, like every entry.
+          await log.finish(
+            { outcome, exitCode: null, signal: null, reported: true, failedLabels: failure === null ? [] : [label] },
+            failure === null
+              ? 'iPhone pull finished'
+              : cancelRequested
+                ? 'iPhone pull cancelled'
+                : `iPhone pull failed: ${failure}`
+          );
+          pullLog.finish();
+        } finally {
+          pull.end();
+        }
       }
     }
   );

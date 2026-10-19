@@ -23,6 +23,7 @@ import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSession
 import { PipelineSingleFlight } from './pipelineSingleFlight';
 import { analysisTargets, orchestratorArgs } from './analysisTargets';
 import { defaultWorkspace, readPreparedBackups } from './preparedBackups';
+import { describeBackup } from './backupDescription';
 import { closeAbandonedRuns, closeRuns, type AppEndedReason } from './runCloseOut';
 import { TaskLog, lastPrepareFailures, listTaskLogs, readSavedTaskLog, type TaskLogSetup } from './taskLog';
 import { popOutWindows } from '../windows';
@@ -71,6 +72,9 @@ export function registerPipelineHandlers(
   appVersion: string
 ) {
   let runningProcessor: ChildProcessWithoutNullStreams | null = null;
+  // The examiner asked the running Prepare to stop (EPOCH-554): it ends cancelled, not crashed.
+  let prepareStopRequested = false;
+  let prepareKillEscalationHandle: NodeJS.Timeout | null = null;
   let runningOrchestratorProcess: ChildProcessWithoutNullStreams | null = null;
   const pipelineSingleFlight = new PipelineSingleFlight();
   // Which workspace the currently-tracked orchestrator invocation is for --
@@ -246,6 +250,21 @@ export function registerPipelineHandlers(
     return result.filePaths[0];
   });
 
+  // EPOCH-554: a folder as the page shows it, with the home folder as ~, so
+  // the examiner's account name isn't on screen (docs/event-log.md §2.6).
+  ipcMain.handle('epoch:displayPath', async (_event, folder: string) => {
+    const home = os.homedir();
+    return folder === home || folder.startsWith(home + path.sep) ? `~${folder.slice(home.length)}` : folder;
+  });
+
+  // EPOCH-554: each discovered backup's model, iOS version, backup date and size, for its row.
+  ipcMain.handle('epoch:describeBackups', async (_event, paths: unknown) => {
+    if (!Array.isArray(paths) || !paths.every((p) => typeof p === 'string')) {
+      throw new Error('Backup paths must be a list of strings.');
+    }
+    return Promise.all(paths.map((p) => describeBackup(p)));
+  });
+
   ipcMain.handle('epoch:discoverBackups', async (_event, source: string): Promise<Backup[]> => {
     if (!source || !source.trim()) {
       throw new Error('A source directory is required.');
@@ -360,6 +379,7 @@ export function registerPipelineHandlers(
     }
     runningProcessor = child;
     pendingPasswordResolve = null;
+    prepareStopRequested = false;
     log.app('debug', 'the processor started');
 
     // The failed labels from prepare:finished, once the processor reports its own result.
@@ -392,8 +412,26 @@ export function registerPipelineHandlers(
       const signal = closeSignal ?? null;
       releasePipeline();
       feed.end();
+      if (prepareKillEscalationHandle) clearTimeout(prepareKillEscalationHandle);
+      prepareKillEscalationHandle = null;
       void (async () => {
         const failedLabels = reported.failedLabels ?? [];
+        if (prepareStopRequested) {
+          // A stop the examiner asked for: what was prepared stays, the rest
+          // has no marker, so it reads partly prepared (DESIGN.md §9: not a failure).
+          await finish(
+            { outcome: 'cancelled', exitCode: code, signal, reported: reported.failedLabels !== null, failedLabels },
+            'Prepare Evidence was stopped',
+            {
+              success: false,
+              cancelled: true,
+              exitCode: code,
+              workspace: workspacePath,
+              error: 'Prepare Evidence was stopped.',
+            }
+          );
+          return;
+        }
         if (reported.failedLabels === null) {
           // The processor ended without its own result: the cause EPOCH-569 could not see.
           const error = `the processor ended (${howItEnded(code, signal)}) without reporting a result`;
@@ -769,6 +807,21 @@ export function registerPipelineHandlers(
       return { saved: choice.filePath };
     }
   );
+
+  // EPOCH-554: Stop on Preparing. The processor's whole process group is
+  // signalled, as for Analyze, so the decrypt and iLEAPP stop with it.
+  ipcMain.handle('epoch:cancelPrepare', async (): Promise<{ cancelled: boolean }> => {
+    if (!runningProcessor || prepareStopRequested) return { cancelled: false };
+    prepareStopRequested = true;
+    pendingPasswordResolve = null;
+    prepareSession.passwordSubmitted();
+    const child = runningProcessor;
+    signalTask(child, 'SIGTERM');
+    prepareKillEscalationHandle = setTimeout(() => {
+      if (runningProcessor === child) signalTask(child, 'SIGKILL');
+    }, KILL_GRACE_MS);
+    return { cancelled: true };
+  });
 
   ipcMain.handle('epoch:cancelAnalysis', async (): Promise<{ cancelled: boolean }> => {
     if (!runningOrchestratorProcess) {

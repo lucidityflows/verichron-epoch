@@ -50,7 +50,7 @@ registerReportHandlers(dbPool);
 // ends the runs that call created (closeCallRuns in pipelineHandlers.ts)
 // rather than leaving them running forever.
 const pipeline = registerPipelineHandlers(getMainWindow, REPO_ROOT, dbPool, app.getVersion());
-registerDeviceHandlers(getMainWindow);
+registerDeviceHandlers(getMainWindow, REPO_ROOT, app.getVersion());
 
 const webPreferences: BrowserWindowConstructorOptions['webPreferences'] = {
   preload: path.join(__dirname, 'preload.js'),

@@ -54,6 +54,10 @@ export interface BackupProgress {
   message: string;
   /** With `done`: what the crash-log copy did (EPOCH-514, 519). */
   crashReports?: CrashReportsResult;
+  /** A line the tool printed, not one of Epoch's: the task log keeps it as debug (EPOCH-436). */
+  tool?: boolean;
+  /** Which of the tool's streams it came from; stdout unless stated. */
+  stream?: 'stdout' | 'stderr';
 }
 
 /** What copying a backup's crash logs did, as the panel shows it (EPOCH-519). */

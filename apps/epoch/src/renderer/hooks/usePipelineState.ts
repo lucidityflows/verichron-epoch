@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { pipelineApi } from '../api/pipeline';
-import type { AnalysisState, PipelineLogEntry, PrepareState } from '../../shared/types/window';
+import type { AnalysisState, PipelineLogEntry, PrepareState, PullLogState } from '../../shared/types/window';
 
 /** The most log lines a page keeps; the main process keeps the same number. */
 const MAX_LINES = 2000;
@@ -124,4 +124,9 @@ export function useAnalysisState() {
     pipelineApi.onAnalysisState,
     pipelineApi.onOrchestratorLog
   );
+}
+
+/** The iPhone pull's task log (EPOCH-436), for the Activity Log. */
+export function usePullLogState() {
+  return useRunState<PullLogState>(pipelineApi.getPullLogState, pipelineApi.onPullLogState, pipelineApi.onPullLog);
 }

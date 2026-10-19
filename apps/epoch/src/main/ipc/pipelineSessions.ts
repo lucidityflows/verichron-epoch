@@ -3,7 +3,13 @@ import { StringDecoder } from 'node:string_decoder';
 import type { PipelineEvent } from '@verichron/contracts';
 
 import { applyPrepareEvent, initPrepareProgress } from '../../shared/prepareProgress';
-import type { AnalysisState, PipelineFinishedResult, PipelineLogEntry, PrepareState } from '../../shared/types/window';
+import type {
+  AnalysisState,
+  PipelineFinishedResult,
+  PipelineLogEntry,
+  PrepareState,
+  PullLogState,
+} from '../../shared/types/window';
 
 /**
  * The state of Prepare Evidence and Analyze, kept in the main process
@@ -130,6 +136,54 @@ export class PrepareSession {
   }
 
   snapshot(): PrepareState {
+    return { ...this.state, log: this.log.all() };
+  }
+}
+
+/**
+ * The iPhone pull's task log (EPOCH-436), for the Activity Log. The pull's own
+ * state (device, progress, the device-action banner) is PullStateTracker's.
+ */
+export class PullLogSession {
+  private state: Omit<PullLogState, 'log'> = { status: 'idle', startedAt: null, taskLog: null, workspace: null };
+  private readonly log = new LogBuffer();
+  private readonly notifier: Notifier<PullLogState>;
+
+  /** `send` delivers a change (without the log) to the renderer. */
+  constructor(send: (state: PullLogState) => void) {
+    this.notifier = new Notifier<PullLogState>(send, () => ({ ...this.state, log: [] }));
+  }
+
+  start(workspace: string, now = Date.now()): void {
+    this.log.clear();
+    this.state = { status: 'running', startedAt: now, taskLog: null, workspace };
+    this.notifier.now();
+  }
+
+  /** The saved log this pull writes. */
+  logFile(file: string): void {
+    this.state.taskLog = file;
+    this.notifier.soon();
+  }
+
+  entry(entry: PipelineLogEntry): void {
+    this.log.add(entry);
+    this.notifier.soon();
+  }
+
+  finish(): void {
+    this.state = { ...this.state, status: 'finished' };
+    this.notifier.now();
+  }
+
+  /** A pull that never started (its log could not be created): as if none had run. */
+  reset(): void {
+    this.log.clear();
+    this.state = { status: 'idle', startedAt: null, taskLog: null, workspace: null };
+    this.notifier.now();
+  }
+
+  snapshot(): PullLogState {
     return { ...this.state, log: this.log.all() };
   }
 }

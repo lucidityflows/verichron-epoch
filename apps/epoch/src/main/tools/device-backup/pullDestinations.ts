@@ -32,6 +32,23 @@ export async function addPullDestination(settingsDir: string, destDir: string): 
   await fs.rename(tmp, file);
 }
 
+/** Forgets a folder a pull registered but never wrote to (a pull that could not start). */
+export async function removePullDestination(settingsDir: string, destDir: string): Promise<void> {
+  const known = await readPullDestinations(settingsDir);
+  if (!known.includes(destDir)) return;
+  const file = path.join(settingsDir, PULL_DESTINATIONS_FILE);
+  const tmp = `${file}.${process.pid}.tmp`;
+  await fs.writeFile(
+    tmp,
+    JSON.stringify(
+      known.filter((d) => d !== destDir),
+      null,
+      2
+    ) + '\n'
+  );
+  await fs.rename(tmp, file);
+}
+
 /**
  * The folder one pull writes into, inside the folder the examiner chose
  * (EPOCH-504): its UTC start time, e.g. `2026-10-14T130512Z`. Every pull gets

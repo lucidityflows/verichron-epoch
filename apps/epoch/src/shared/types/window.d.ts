@@ -50,6 +50,30 @@ export interface PreparedBackup {
   preparedAt: string;
   /** For a partly prepared backup: why its last Prepare failed, from that task's log (EPOCH-570). */
   reason?: string | null;
+  /** What Prepare did, from the evidence sidecar and the markers (EPOCH-554, board 5's Prepared state);
+   * null when they could not be read for this backup, and `detailsError` says why. */
+  details: PreparedDetails | null;
+  detailsError?: string;
+}
+
+/** A discovered backup as New Investigation's rows show it (EPOCH-554). Never its device identifier. */
+export interface BackupDescription {
+  productType: string | null;
+  iosVersion: string | null;
+  /** Info.plist "Last Backup Date": when the backup began, with its offset. */
+  backupDate: string | null;
+  bytes: number;
+  /** Why Info.plist could not be read, when it could not. */
+  infoPlistError: string | null;
+}
+
+export interface PreparedDetails {
+  /** Files the backup's manifest lists, each hashed when Prepare checked it. */
+  filesChecked: number;
+  /** The SQLite repair pass, or why it did not run. */
+  repair: { status: 'ran'; scanned: number; repaired: number; failed: number } | { status: 'skipped'; reason: string };
+  /** iLEAPP's modules; null while the backup is only partly prepared. */
+  modules: { total: number; complete: number; errors: number } | null;
 }
 
 export interface StartPipelineOptions {
@@ -166,6 +190,17 @@ export interface AnalysisState {
   log: PipelineLogEntry[];
 }
 
+/** The iPhone pull's task log (EPOCH-436), as the Activity Log follows it; the pull's own state is DevicePullState. */
+export interface PullLogState {
+  status: 'idle' | 'running' | 'finished';
+  startedAt: number | null;
+  /** This pull's saved log in the default workspace's logs folder, once it has one. */
+  taskLog: string | null;
+  /** The workspace the log is in. */
+  workspace: string | null;
+  log: PipelineLogEntry[];
+}
+
 declare global {
   interface Window {
     epoch: {
@@ -173,6 +208,8 @@ declare global {
       selectBackupDirectory: () => Promise<string | null>;
       selectDeviceBackupDestination: () => Promise<string | null>;
       discoverBackups: (source: string) => Promise<Backup[]>;
+      describeBackups: (paths: string[]) => Promise<BackupDescription[]>;
+      displayPath: (folder: string) => Promise<string>;
       getPreparedBackups: (workspace?: string) => Promise<{ workspace: string; backups: PreparedBackup[] }>;
       startPipeline: (
         source: string,
@@ -201,10 +238,15 @@ declare global {
       retryRun: (runId: string) => Promise<{ started: boolean }>;
       // EPOCH-305
       cancelAnalysis: () => Promise<{ cancelled: boolean }>;
+      cancelPrepare: () => Promise<{ cancelled: boolean }>;
       getAnalysisRunStatus: (workspace: string) => Promise<AnalysisRunStatus>;
       onOrchestratorLog: (callback: (entry: PipelineLogEntry) => void) => () => void;
       getAnalysisState: () => Promise<AnalysisState>;
       onAnalysisState: (callback: (state: AnalysisState) => void) => () => void;
+      // EPOCH-436: the iPhone pull's task log.
+      getPullLogState: () => Promise<PullLogState>;
+      onPullLogState: (callback: (state: PullLogState) => void) => () => void;
+      onPullLog: (callback: (entry: PipelineLogEntry) => void) => () => void;
       // EPOCH-570: the workspace's saved task logs, read back after a restart.
       listTaskLogs: (workspace: string) => Promise<TaskLogSummary[]>;
       readTaskLog: (workspace: string, file: string) => Promise<ReadTaskLog>;
