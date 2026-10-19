@@ -238,6 +238,16 @@ describe('PullLogSession (EPOCH-436)', () => {
   });
 });
 
+describe('PullLogSession.reset', () => {
+  it('leaves no trace of a pull that never started', () => {
+    const pull = new PullLogSession(() => undefined);
+    pull.start('/home/x/verichron-workspace', 1000);
+    pull.entry(entry(1, 'iPhone pull started'));
+    pull.reset();
+    assert.deepEqual(pull.snapshot(), { status: 'idle', startedAt: null, taskLog: null, workspace: null, log: [] });
+  });
+});
+
 describe('LineSplitter', () => {
   it('keeps a character split across chunks whole, and returns what is left at the end', () => {
     const splitter = new LineSplitter();

@@ -4,6 +4,7 @@ import * as path from 'node:path';
 
 import {
   EvidenceSidecar,
+  type EvidenceSidecar as EvidenceSidecarRecord,
   readDecryptMarker,
   readIleappMarker,
   readWorkspaceManifestSync,
@@ -39,8 +40,32 @@ export function readPreparedBackups(workspace: string): PreparedBackup[] {
     const current = ileapp !== null && ileapp.content_root === decrypt.content_root;
     const repair = decrypt.params.repair;
     // Prepare hashes the backup before it decrypts it, so a decrypt always has
-    // its evidence sidecar; one without it is refused, not guessed around.
-    const sidecar = EvidenceSidecar.parse(JSON.parse(readFileSync(entry.sidecarPath, 'utf8')));
+    // its evidence sidecar. One that can't be read, or describes other
+    // evidence, is said so for that backup alone; it never blocks the others,
+    // and its counts are never shown as this decrypt's.
+    let sidecar: EvidenceSidecarRecord;
+    try {
+      sidecar = EvidenceSidecar.parse(JSON.parse(readFileSync(entry.sidecarPath, 'utf8')));
+    } catch (err) {
+      result.push({
+        label: entry.label,
+        state: current ? 'prepared' : 'partial',
+        preparedAt: current ? ileapp.completed_at : decrypt.completed_at,
+        details: null,
+        detailsError: `its evidence sidecar could not be read: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      continue;
+    }
+    if (sidecar.content_root !== decrypt.content_root) {
+      result.push({
+        label: entry.label,
+        state: current ? 'prepared' : 'partial',
+        preparedAt: current ? ileapp.completed_at : decrypt.completed_at,
+        details: null,
+        detailsError: 'its evidence sidecar describes other evidence than its decrypt',
+      });
+      continue;
+    }
     const details: PreparedDetails = {
       filesChecked: sidecar.file_count,
       repair:

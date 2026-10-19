@@ -5,7 +5,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
-import { addPullDestination, PULL_DESTINATIONS_FILE, pullFolderName, readPullDestinations } from './pullDestinations';
+import {
+  addPullDestination,
+  PULL_DESTINATIONS_FILE,
+  pullFolderName,
+  readPullDestinations,
+  removePullDestination,
+} from './pullDestinations';
 
 let tmp: string;
 
@@ -20,6 +26,14 @@ afterEach(() => {
 describe('pull destinations', () => {
   it('is empty before any pull', async () => {
     assert.deepEqual(await readPullDestinations(tmp), []);
+  });
+
+  it('forgets a folder a pull registered but could not start in, and nothing else (EPOCH-436)', async () => {
+    await addPullDestination(tmp, '/backups/a');
+    await addPullDestination(tmp, '/backups/b');
+    await removePullDestination(tmp, '/backups/b');
+    await removePullDestination(tmp, '/backups/never-registered');
+    assert.deepEqual(await readPullDestinations(tmp), ['/backups/a']);
   });
 
   it('keeps the most recent first, without repeats, at most 20', async () => {

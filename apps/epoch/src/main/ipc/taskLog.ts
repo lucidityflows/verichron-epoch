@@ -246,13 +246,13 @@ export class TaskLog {
    * A line printed by a tool the app runs itself, such as idevicebackup2 for
    * a pull (EPOCH-436): debug, by its source, like any tool output.
    */
-  toolOutput(tool: string, text: string, where: Where = {}): TaskLogEntry {
+  toolOutput(tool: string, text: string, where: Where = {}, stream: 'stdout' | 'stderr' = 'stdout'): TaskLogEntry {
     const tripped = (this.sanitizer.report(text).replaced.password ?? 0) > 0;
     const entry = this.push({
       kind: 'output',
       level: 'debug',
       source: `tool:${tool}`,
-      stream: 'stdout',
+      stream,
       message: this.sanitizer.sanitize(text),
       ...this.where(where),
     });

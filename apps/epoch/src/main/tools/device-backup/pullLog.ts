@@ -15,6 +15,6 @@ export function logPullProgress(
   progress: BackupProgress
 ): void {
   if (progress.phase === 'error') return;
-  if (progress.tool) log.toolOutput('idevicebackup2', progress.message, { label });
+  if (progress.tool) log.toolOutput('idevicebackup2', progress.message, { label }, progress.stream ?? 'stdout');
   else log.app('info', progress.message, { label });
 }

@@ -18,7 +18,7 @@ describe('logPullProgress', () => {
     const log = fakeLog();
     logPullProgress(log as never, 'L', { phase: 'transferring', message: 'Receiving files', tool: true });
     logPullProgress(log as never, 'L', { phase: 'device-action', message: 'Look at the iPhone now' });
-    assert.deepEqual(log.toolOutput.mock.calls, [['idevicebackup2', 'Receiving files', { label: 'L' }]]);
+    assert.deepEqual(log.toolOutput.mock.calls, [['idevicebackup2', 'Receiving files', { label: 'L' }, 'stdout']]);
     assert.deepEqual(log.app.mock.calls, [['info', 'Look at the iPhone now', { label: 'L' }]]);
   });
 
@@ -26,5 +26,16 @@ describe('logPullProgress', () => {
     const log = fakeLog();
     logPullProgress(log as never, 'L', { phase: 'error', message: 'The iPhone disconnected' });
     assert.equal(log.app.mock.calls.length + log.toolOutput.mock.calls.length, 0);
+  });
+
+  it("keeps the tool's stderr lines as tool output from stderr", () => {
+    const log = fakeLog();
+    logPullProgress(log as never, 'L', {
+      phase: 'preparing',
+      message: 'ERROR: lockdown',
+      tool: true,
+      stream: 'stderr',
+    });
+    assert.deepEqual(log.toolOutput.mock.calls, [['idevicebackup2', 'ERROR: lockdown', { label: 'L' }, 'stderr']]);
   });
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Play,
   AlertCircle,
@@ -37,6 +37,7 @@ import {
   PreparedSummary,
   PreparingCard,
   backupName,
+  preparingTarget,
 } from '../features/newInvestigation/NewInvestigationParts';
 import { formatBytes } from '../features/devicePullPanel/BackupProgressCard';
 
@@ -175,8 +176,17 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   }, []);
 
   // The latest prepared backups, read when discovery ends.
-  const preparedRef = useRef(preparedByLabel);
-  preparedRef.current = preparedByLabel;
+  // Only what still needs preparing starts selected (board 5). That needs both
+  // the backups and what the workspace says is prepared, which arrive
+  // separately, so the default waits for both and is never applied over a
+  // choice the examiner has already made.
+  const [awaitingDefault, setAwaitingDefault] = useState(false);
+  if (awaitingDefault && preparedInfo !== null && !discoveringBackups) {
+    setAwaitingDefault(false);
+    setSelectedLabels(
+      new Set(backups.filter((b) => preparedByLabel.get(b.label)?.state !== 'prepared').map((b) => b.label))
+    );
+  }
 
   useEffect(() => {
     if (!selectedPath) {
@@ -197,9 +207,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         if (cancelled) return;
         setBackups(found);
         // Only what still needs preparing starts selected (board 5).
-        setSelectedLabels(
-          new Set(found.filter((b) => preparedRef.current.get(b.label)?.state !== 'prepared').map((b) => b.label))
-        );
+        setSelectedLabels(new Set());
+        setAwaitingDefault(true);
         pipelineApi
           .describeBackups(found.map((b) => b.path))
           .then((described) => {
@@ -291,6 +300,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   }, [backups, retryEligibilityRefreshVersion]);
 
   const toggleBackup = (label: string) => {
+    setAwaitingDefault(false);
     setSelectedLabels((prev) => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label);
@@ -423,19 +433,9 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const analysisFailedCount = analysisResult?.analysis?.filter((result) => result.status === 'failed').length ?? 0;
 
   // The backup being prepared now, for the Preparing card (board 5).
-  const preparing = (() => {
-    if (!isRunning || !runProgress) return null;
-    const label =
-      runProgress.currentLabel ?? runProgress.order.find((l) => runProgress.byLabel[l].overall === 'running') ?? null;
-    const backup = label ? backups.find((b) => b.label === label) : undefined;
-    if (!label || !backup) return null;
-    const index = runProgress.order.indexOf(label);
-    return {
-      backup,
-      progress: runProgress.byLabel[label],
-      position: runProgress.order.length > 1 ? `${index + 1} of ${runProgress.order.length}` : null,
-    };
-  })();
+  // Shown, with Stop, from the moment Prepare runs: before the first backup
+  // reports progress it names the first one queued (EPOCH-554).
+  const preparing = isRunning && runProgress ? preparingTarget(runProgress, backups, descriptions) : null;
 
   // The page's steps (DESIGN.md §10, EPOCH-497): what is done, what is
   // current, what comes next.
@@ -490,7 +490,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         <>
           {preparing && (
             <PreparingCard
-              name={backupName(preparing.backup, descriptions.get(preparing.backup.path))}
+              name={preparing.name}
               position={preparing.position}
               progress={preparing.progress}
               startedAt={prepare?.startedAt ?? Date.now()}

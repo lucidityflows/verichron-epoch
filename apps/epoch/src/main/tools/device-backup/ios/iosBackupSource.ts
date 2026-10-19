@@ -761,7 +761,26 @@ function runBackup(
       output.take('stdout', text);
       handle(parser.push(text));
     });
-    proc.stderr.on('data', (chunk: Buffer) => output.take('stderr', chunk.toString('utf-8')));
+    // stderr is kept for the failure's tail, and each line goes to the pull's
+    // log too, as the tool's own output (EPOCH-436).
+    const errParser = new OutputParser();
+    const relayStderr = (events: OutputEvent[]) => {
+      for (const event of events) {
+        if (event.kind === 'line') {
+          onProgress({
+            phase: receiving ? 'transferring' : 'preparing',
+            message: event.text,
+            tool: true,
+            stream: 'stderr',
+          });
+        }
+      }
+    };
+    proc.stderr.on('data', (chunk: Buffer) => {
+      const text = chunk.toString('utf-8');
+      output.take('stderr', text);
+      relayStderr(errParser.push(text));
+    });
 
     // The folder's growth is the honest measure of progress: one large file
     // can take many minutes and prints nothing until it is done.
@@ -797,6 +816,7 @@ function runBackup(
       clearInterval(timer);
       control.setProcess(null);
       handle(parser.flush());
+      relayStderr(errParser.flush());
     };
     const fail = (message: string) => {
       onProgress({ phase: 'error', message });

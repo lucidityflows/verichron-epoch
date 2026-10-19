@@ -17,6 +17,7 @@ import {
   backupName,
   formatElapsed,
   preparingLine,
+  preparingTarget,
 } from './NewInvestigationParts';
 
 afterEach(cleanup);
@@ -67,6 +68,30 @@ describe('EvidenceSourcePanel, quiet', () => {
     assert.equal(screen.queryByRole('heading'), null);
     assert.ok(screen.getByText(/^Evidence somewhere else\? Pull a backup/));
     assert.equal(screen.getAllByRole('button').length, 2);
+  });
+});
+
+describe('preparingTarget', () => {
+  it('names the first queued backup before any progress, so Stop shows at once', () => {
+    const queued = (label: string) =>
+      progress({
+        label,
+        overall: 'queued',
+        stages: { hash: 'pending', decrypt: 'pending', repair: 'pending', ileapp: 'pending' },
+      });
+    const run = { order: ['A', 'B'], byLabel: { A: queued('A'), B: queued('B') }, currentLabel: null };
+    const target = preparingTarget(run, [{ label: 'A', path: '/x/A' }], new Map());
+    assert.deepEqual([target?.name, target?.position], ['A', '1 of 2']);
+    assert.equal(preparingTarget({ order: [], byLabel: {}, currentLabel: null }, [], new Map()), null);
+  });
+
+  it('follows the backup that is running', () => {
+    const run = {
+      order: ['A', 'B'],
+      byLabel: { A: progress({ label: 'A', overall: 'done' }), B: progress({ label: 'B' }) },
+      currentLabel: 'B',
+    };
+    assert.equal(preparingTarget(run, [], new Map())?.position, '2 of 2');
   });
 });
 
@@ -158,7 +183,7 @@ describe('PreparedSummary', () => {
         backupDate={null}
         prepared={{
           ...prepared,
-          details: { ...prepared.details, repair: { status: 'skipped', reason: 'no sqlite3' } },
+          details: { ...prepared.details!, repair: { status: 'skipped', reason: 'no sqlite3' } },
         }}
       />
     );

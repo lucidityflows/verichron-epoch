@@ -4,7 +4,12 @@ import type { Backup } from '@verichron/contracts';
 
 import { Button } from '../../components/ui/Button';
 import { DateTime } from '../../components/ui/DateTime';
-import { STAGE_LABELS, STAGE_ORDER, type BackupProgress } from '../../../shared/prepareProgress';
+import {
+  STAGE_LABELS,
+  STAGE_ORDER,
+  type BackupProgress,
+  type PrepareRunProgress,
+} from '../../../shared/prepareProgress';
 import type { BackupDescription, PreparedBackup } from '../../../shared/types/window';
 import { formatBytes } from '../devicePullPanel/BackupProgressCard';
 
@@ -115,6 +120,31 @@ export function preparingLine(progress: BackupProgress): string {
 }
 
 /**
+ * The backup the Preparing card names: the one running, else the first one
+ * queued, so the card and Stop show from the moment Prepare runs, before any
+ * backup reports progress (EPOCH-554). Null when nothing was selected.
+ */
+export function preparingTarget(
+  run: PrepareRunProgress,
+  backups: readonly Backup[],
+  descriptions: ReadonlyMap<string, BackupDescription>
+): { name: string; progress: BackupProgress; position: string | null } | null {
+  if (run.order.length === 0) return null;
+  const label =
+    run.currentLabel ??
+    run.order.find((l) => run.byLabel[l].overall === 'running') ??
+    run.order.find((l) => run.byLabel[l].overall === 'queued') ??
+    run.order[0];
+  const backup = backups.find((b) => b.label === label);
+  const index = run.order.indexOf(label);
+  return {
+    name: backup ? backupName(backup, descriptions.get(backup.path)) : label,
+    progress: run.byLabel[label],
+    position: run.order.length > 1 ? `${index + 1} of ${run.order.length}` : null,
+  };
+}
+
+/**
  * Preparing (board 5): the backup being prepared, what it is doing now, the
  * time elapsed, and Stop. Choices are locked while it runs; the examiner can
  * leave the page and it keeps going.
@@ -193,6 +223,15 @@ export function PreparedSummary({
   prepared: PreparedBackup;
 }) {
   const { details } = prepared;
+  if (!details) {
+    // The workspace's records for this backup could not be read; never guessed.
+    return (
+      <section aria-label={`${name} prepared`} className="flex flex-col gap-1">
+        <p className="text-data text-foreground font-semibold">{name}</p>
+        <p className="text-data text-warning">What Prepare did is not shown: {prepared.detailsError}.</p>
+      </section>
+    );
+  }
   const repair = details.repair;
   return (
     <section aria-label={`${name} prepared`} className="flex flex-col gap-3">

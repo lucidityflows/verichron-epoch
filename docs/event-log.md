@@ -336,7 +336,7 @@ itself (EPOCH-436).
   investigation; its Prepare normally uses that workspace.
 - **What it keeps:**
   - Epoch's own messages (what it is doing, what to do on the iPhone) are `info`;
-  - each line idevicebackup2 prints is `debug`, from `tool:idevicebackup2`;
+  - each line idevicebackup2 prints, on stdout or stderr, is `debug`, from `tool:idevicebackup2`, with its stream;
   - the failure is the result, `task:finished`, so one failure is one `error`.
 - **Identifiers:** the backup is written into a folder named by the device's
   UDID, so the sanitizer has the UDID before any Info.plist exists (§6.3). The

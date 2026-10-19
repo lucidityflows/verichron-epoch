@@ -176,6 +176,13 @@ export class PullLogSession {
     this.notifier.now();
   }
 
+  /** A pull that never started (its log could not be created): as if none had run. */
+  reset(): void {
+    this.log.clear();
+    this.state = { status: 'idle', startedAt: null, taskLog: null, workspace: null };
+    this.notifier.now();
+  }
+
   snapshot(): PullLogState {
     return { ...this.state, log: this.log.all() };
   }

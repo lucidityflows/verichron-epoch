@@ -50,8 +50,10 @@ export interface PreparedBackup {
   preparedAt: string;
   /** For a partly prepared backup: why its last Prepare failed, from that task's log (EPOCH-570). */
   reason?: string | null;
-  /** What Prepare did, from the evidence sidecar and the markers (EPOCH-554, board 5's Prepared state). */
-  details: PreparedDetails;
+  /** What Prepare did, from the evidence sidecar and the markers (EPOCH-554, board 5's Prepared state);
+   * null when they could not be read for this backup, and `detailsError` says why. */
+  details: PreparedDetails | null;
+  detailsError?: string;
 }
 
 /** A discovered backup as New Investigation's rows show it (EPOCH-554). Never its device identifier. */

@@ -110,7 +110,7 @@ describe('readPreparedBackups', () => {
       repair: { status: 'ran', scanned: 61, repaired: 4, failed: 1 },
       modules: { total: 540, complete: 539, errors: 1 },
     });
-    assert.equal(partial.details.modules, null, 'no iLEAPP output yet');
+    assert.equal(partial.details?.modules, null, 'no iLEAPP output yet');
   });
 
   it('is empty for a workspace that does not exist yet', () => {
@@ -121,5 +121,28 @@ describe('readPreparedBackups', () => {
     const ws = path.join(tmp, 'without-manifest');
     mkdirSync(ws);
     assert.throws(() => readPreparedBackups(ws), /could not read workspace manifest/);
+  });
+
+  it('says why for one backup whose sidecar is unreadable or describes other evidence, and reads the rest (EPOCH-554)', () => {
+    const ws = path.join(tmp, 'ws-bad-sidecar');
+    const backups: ReturnType<typeof createWorkspaceManifestBackup>[] = [];
+    backup(ws, 'GOOD', ROOT_A, ROOT_A, backups);
+    backup(ws, 'BROKEN', ROOT_A, ROOT_A, backups);
+    backup(ws, 'OTHER', ROOT_A, ROOT_A, backups);
+    writeFileSync(path.join(ws, 'workspace.json'), JSON.stringify({ ...emptyWorkspaceManifest(), backups }));
+    const sidecar = (label: string) =>
+      resolveWorkspaceBackup(
+        ws,
+        backups.find((b) => b.label === label)!
+      ).sidecarPath;
+    writeFileSync(sidecar('BROKEN'), 'not json');
+    writeSidecarFixture(sidecar('OTHER'), 'OTHER', ROOT_B);
+    const byLabel = new Map(readPreparedBackups(ws).map((b) => [b.label, b]));
+    assert.equal(byLabel.get('GOOD')?.details?.filesChecked, 9870);
+    assert.equal(byLabel.get('BROKEN')?.details, null);
+    assert.match(byLabel.get('BROKEN')?.detailsError ?? '', /evidence sidecar could not be read/);
+    assert.equal(byLabel.get('OTHER')?.details, null, "its counts are never shown as this decrypt's");
+    assert.match(byLabel.get('OTHER')?.detailsError ?? '', /describes other evidence/);
+    assert.equal(byLabel.get('BROKEN')?.state, 'prepared', 'the markers still decide the state');
   });
 });

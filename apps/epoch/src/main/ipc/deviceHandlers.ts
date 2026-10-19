@@ -1,10 +1,16 @@
 import { app, ipcMain, dialog, BrowserWindow } from 'electron';
-import { addPullDestination, pullFolderName, readPullDestinations } from '../tools/device-backup/pullDestinations';
+import {
+  addPullDestination,
+  pullFolderName,
+  readPullDestinations,
+  removePullDestination,
+} from '../tools/device-backup/pullDestinations';
 import { PullStateTracker } from '../tools/device-backup/pullState';
 import { logPullProgress } from '../tools/device-backup/pullLog';
 import { PullLogSession } from './pipelineSessions';
 import { defaultWorkspace } from './preparedBackups';
 import { TaskLog } from './taskLog';
+import { popOutWindows } from '../windows';
 import path from 'path';
 import fs from 'fs/promises';
 import { spawn } from 'child_process';
@@ -39,11 +45,11 @@ export function registerDeviceHandlers(
   // Whether the examiner asked the running pull to stop: its log then ends cancelled, not failed.
   let cancelRequested = false;
 
+  // To the main window and every pop-out, as Prepare and Analyze do, so a
+  // popped-out Activity Log follows a pull too (EPOCH-436).
   function sendToRenderer(channel: string, ...args: unknown[]) {
     const win = getMainWindow();
-    if (win) {
-      win.webContents.send(channel, ...args);
-    }
+    for (const target of [...(win ? [win] : []), ...popOutWindows()]) target.webContents.send(channel, ...args);
   }
 
   ipcMain.handle('epoch:selectDeviceBackupDestination', async () => {
@@ -233,10 +239,12 @@ export function registerDeviceHandlers(
           }
         );
       } catch (err) {
-        // No log, no task (docs/event-log.md §7): the empty folder leaves no trace.
+        // No log, no task (docs/event-log.md §7): the empty folder and its
+        // registration leave no trace, and the Activity Log shows no pull.
         await fs.rmdir(pullDir).catch(() => undefined);
+        await removePullDestination(app.getPath('userData'), pullDir).catch(() => undefined);
         pull.end();
-        pullLog.finish();
+        pullLog.reset();
         throw new Error(
           `The task log could not be created, so the pull did not start: ${err instanceof Error ? err.message : String(err)}`,
           { cause: err }
@@ -274,18 +282,23 @@ export function registerDeviceHandlers(
         }
         throw err;
       } finally {
-        pull.end();
-        const outcome = failure === null ? 'succeeded' : cancelRequested ? 'cancelled' : 'failed';
-        // The result reaches the Activity Log through the log's own delivery, like every entry.
-        await log.finish(
-          { outcome, exitCode: null, signal: null, reported: true, failedLabels: failure === null ? [] : [label] },
-          failure === null
-            ? 'iPhone pull finished'
-            : cancelRequested
-              ? 'iPhone pull cancelled'
-              : `iPhone pull failed: ${failure}`
-        );
-        pullLog.finish();
+        // The pull stays reserved until its log is closed, so another pull
+        // can't start and have its session ended by this one's finish.
+        try {
+          const outcome = failure === null ? 'succeeded' : cancelRequested ? 'cancelled' : 'failed';
+          // The result reaches the Activity Log through the log's own delivery, like every entry.
+          await log.finish(
+            { outcome, exitCode: null, signal: null, reported: true, failedLabels: failure === null ? [] : [label] },
+            failure === null
+              ? 'iPhone pull finished'
+              : cancelRequested
+                ? 'iPhone pull cancelled'
+                : `iPhone pull failed: ${failure}`
+          );
+          pullLog.finish();
+        } finally {
+          pull.end();
+        }
       }
     }
   );
