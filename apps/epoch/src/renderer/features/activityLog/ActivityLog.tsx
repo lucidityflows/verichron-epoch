@@ -43,8 +43,8 @@ interface ActivityLogProps {
 const TAG_CLASS: Record<string, string> = {
   Error: 'text-danger',
   ERROR: 'text-danger',
-  Warning: 'text-flag',
-  WARN: 'text-flag',
+  Warning: 'text-warning',
+  WARN: 'text-warning',
   'For review': 'text-accent',
   REVIEW: 'text-accent',
   INFO: 'text-foreground',
@@ -138,7 +138,7 @@ export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked'
         </span>
       )}
       {counts.warnings > 0 && (
-        <span className="rounded-full px-2 py-0.5 text-label bg-flag/10 text-flag">
+        <span className="rounded-full px-2 py-0.5 text-label bg-warning/10 text-warning">
           {plural(counts.warnings, 'warning')}
         </span>
       )}
@@ -153,7 +153,7 @@ export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked'
       aria-label="Activity Log"
       className={cn(
         'bg-inset flex flex-col',
-        docked ? 'shrink-0 shadow-[0_-4px_16px_hsl(224_40%_3%/0.45)]' : 'h-screen'
+        docked ? 'shrink-0 shadow-[0_-4px_16px_color-mix(in_oklab,var(--shadow-tint)_45%,transparent)]' : 'h-screen'
       )}
     >
       {docked && (

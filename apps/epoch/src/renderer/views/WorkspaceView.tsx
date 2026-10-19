@@ -435,7 +435,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-3 bg-surface shadow-elevation-1 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-3 card rounded-xl px-4 py-3">
             <div className="p-2 rounded-lg bg-accent/10 text-accent shrink-0">
               <HardDrive size="1.125rem" />
             </div>
@@ -453,7 +453,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
             )}
           </div>
 
-          <div className="bg-surface shadow-elevation-1 rounded-xl p-6">
+          <div className="card rounded-xl p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-display text-heading text-foreground">
                 Backups Found{backups.length > 0 ? ` (${backups.length})` : ''}
@@ -661,7 +661,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       )}
 
       {showAnalyze && (
-        <div className="bg-surface shadow-elevation-1 rounded-xl p-6">
+        <div className="card rounded-xl p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-md bg-accent/10 text-accent">
               <Microscope size="1.25rem" />
@@ -814,7 +814,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
       )}
 
       {!selectedPath && importSource === null && (
-        <div className="flex items-start gap-4 bg-surface shadow-elevation-1 rounded-xl p-4 sm:p-5">
+        <div className="flex items-start gap-4 card rounded-xl p-4 sm:p-5">
           <div className="p-2 rounded-lg bg-section/15 text-section shrink-0">
             <Lightbulb size="1.125rem" />
           </div>
@@ -827,7 +827,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
       {pendingPasswordFor && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-xs flex items-center justify-center z-50">
-          <div className="bg-surface shadow-elevation-3 rounded-xl p-6 w-full max-w-sm">
+          <div className="bg-surface border border-border shadow-elevation-3 rounded-xl p-6 w-full max-w-sm">
             <h2 className="font-display text-heading mb-1 text-foreground">Password Required</h2>
             <p className="text-data text-muted-foreground mb-4">
               The selected backup requires its password for{' '}
@@ -883,7 +883,7 @@ function ImportChoice({ icon, title, description, action, tone, onChoose }: Impo
       </div>
       <h2 className="font-display text-heading text-foreground mb-1">{title}</h2>
       <p className="text-data text-muted-foreground mb-5 max-w-md">{description}</p>
-      <span className="inline-flex items-center gap-1.5 bg-accent text-background shadow-elevation-2 group-hover:bg-accent/90 px-4 py-2 rounded-lg text-label font-semibold transition-all">
+      <span className="inline-flex items-center gap-1.5 bg-accent text-on-accent shadow-elevation-2 group-hover:bg-accent/90 px-4 py-2 rounded-lg text-label font-semibold transition-all">
         {action}
       </span>
     </button>

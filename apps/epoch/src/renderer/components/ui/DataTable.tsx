@@ -137,11 +137,11 @@ export function DataTable<TData extends Record<string, any>>({
               }}
               className={`transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${
                 isExpanded && isSelected
-                  ? 'bg-surface shadow-[inset_0.125rem_0_0_hsl(var(--accent)),var(--shadow-elevation-1)]'
+                  ? 'bg-surface shadow-[inset_0.125rem_0_0_var(--color-accent),var(--shadow-elevation-1)]'
                   : isExpanded
                     ? 'bg-surface shadow-elevation-1'
                     : isSelected
-                      ? 'bg-surface shadow-[inset_0.125rem_0_0_hsl(var(--accent))]'
+                      ? 'bg-surface shadow-[inset_0.125rem_0_0_var(--color-accent)]'
                       : 'hover:bg-surface/60'
               }`}
             >

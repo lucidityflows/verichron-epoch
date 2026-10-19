@@ -32,7 +32,7 @@ export function logLineParts(entry: PipelineLogEntry): { text: string; muted: bo
 
 const LEVEL_CLASS: Record<PipelineLogEntry['level'], string> = {
   error: 'text-danger',
-  warn: 'text-flag',
+  warn: 'text-warning',
   info: 'text-foreground/80',
   debug: 'text-muted-foreground',
 };
@@ -149,7 +149,7 @@ export function TerminalLog({ lines, live, defaultOpen = false, label = 'Technic
           {!stickToBottom && lines.length > 0 && (
             <button
               onClick={jumpToBottom}
-              className="absolute bottom-2 right-2 flex items-center gap-1 bg-accent text-background text-2xs font-medium rounded-full px-2.5 py-1 shadow-elevation-2 hover:bg-accent/90 transition-colors"
+              className="absolute bottom-2 right-2 flex items-center gap-1 bg-accent text-on-accent text-2xs font-medium rounded-full px-2.5 py-1 shadow-elevation-2 hover:bg-accent/90 transition-colors"
             >
               <ArrowDown size="0.7rem" />
               Jump to latest

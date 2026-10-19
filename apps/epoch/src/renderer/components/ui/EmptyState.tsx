@@ -16,7 +16,7 @@ interface EmptyStateProps {
  * nothing loaded yet, or nothing found (EPOCH-464, DESIGN.md §6). One look
  * everywhere: centered in the space it fills, an icon (or spinner) in a chip
  * of the view's section colour (§9), the state in one line, and an optional
- * muted detail. Errors are not empty states; they use the flag banner (§1).
+ * muted detail. Errors are not empty states; they use the warning banner (§1).
  */
 export function EmptyState({ icon: Icon, title, detail, loading = false }: EmptyStateProps) {
   return (

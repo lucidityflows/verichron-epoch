@@ -219,7 +219,7 @@ export function StageCard({
           </dl>
 
           {stopped && stage.status === 'running' && (
-            <p className="text-data text-flag mt-3">
+            <p className="text-data text-warning mt-3">
               This stage never finished: {interruptionPhrase(stage.run_ended_reason)}. What it wrote is kept, and
               Analyze Again finishes the rest.
             </p>
@@ -238,7 +238,7 @@ export function StageCard({
           {warnings.length > 0 && (
             <div className="mt-3">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-data text-flag">
+                <p className="text-data text-warning">
                   {warnings.length} warning{warnings.length === 1 ? '' : 's'}
                 </p>
                 <CopyButton text={warnings.join('\n')} title="Copy warnings" />

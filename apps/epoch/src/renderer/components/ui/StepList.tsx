@@ -12,7 +12,7 @@ const STATE_CLASSES: Record<StepState, { circle: string; label: string }> = {
   pending: { circle: 'border border-border text-muted-foreground', label: 'text-muted-foreground' },
   current: { circle: 'bg-accent/10 text-accent ring-2 ring-accent', label: 'text-foreground' },
   done: { circle: 'bg-success/10 text-success', label: 'text-foreground' },
-  blocked: { circle: 'bg-flag/10 text-flag ring-2 ring-flag', label: 'text-flag' },
+  blocked: { circle: 'bg-warning/10 text-warning ring-2 ring-warning', label: 'text-warning' },
 };
 
 /**

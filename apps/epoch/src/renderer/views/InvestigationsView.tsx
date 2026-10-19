@@ -205,7 +205,7 @@ export function InvestigationsView({
       {viewError ? (
         <div
           role="alert"
-          className="flex items-start gap-3 text-flag bg-flag/10 border border-flag/30 shadow-elevation-1 rounded-md px-4 py-3 text-data"
+          className="flex items-start gap-3 text-warning bg-warning/10 border border-warning/30 shadow-elevation-1 rounded-md px-4 py-3 text-data"
         >
           <span className="flex-1 min-w-0">{viewError}</span>
           <CopyButton title="Copy the error" text={`Investigations could not be shown: ${viewError}`} />
@@ -260,7 +260,7 @@ export function InvestigationsView({
 
           {selected && selectedRun && (
             <section aria-labelledby="investigation-title" className="flex flex-col gap-6 min-w-0">
-              <div className="bg-surface rounded-xl shadow-elevation-1 p-6 flex flex-col gap-5">
+              <div className="card rounded-xl p-6 flex flex-col gap-5">
                 <div>
                   <h2 id="investigation-title" className="font-display text-heading text-foreground">
                     {selected.title}
@@ -299,7 +299,7 @@ export function InvestigationsView({
                     role="alert"
                     className={`flex items-start gap-3 shadow-elevation-1 rounded-md px-4 py-3 text-data ${
                       againStopped
-                        ? 'text-flag bg-flag/10 border border-flag/30'
+                        ? 'text-warning bg-warning/10 border border-warning/30'
                         : 'text-danger bg-danger/10 border border-danger/30'
                     }`}
                   >

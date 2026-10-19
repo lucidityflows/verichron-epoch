@@ -7,7 +7,7 @@ import { chipLabel, type ChipState } from './statusChip';
 /**
  * The board "Investigations States and Rules": a rounded chip per state, in its
  * colour role (DESIGN.md §9). Danger is only for Failed; a stop the examiner
- * asked for is Interrupted, in the flag role; Skipped is neutral and never
+ * asked for is Interrupted, in the warning role; Skipped is neutral and never
  * reads as a clean result.
  *
  * Failed differs from the board on purpose: foreground text on the danger
@@ -19,8 +19,8 @@ const chipVariants = cva('inline-flex items-center gap-1.5 rounded-full px-2 py-
   variants: {
     state: {
       complete: 'bg-success/10 text-success',
-      warnings: 'bg-flag/10 text-flag',
-      interrupted: 'bg-flag/10 text-flag',
+      warnings: 'bg-warning/10 text-warning',
+      interrupted: 'bg-warning/10 text-warning',
       skipped: 'bg-muted-foreground/14 text-foreground',
       'not-started': 'bg-muted-foreground/8 text-muted-foreground',
       failed: 'bg-danger/10 text-foreground',

@@ -46,7 +46,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
   };
 
   return (
-    <ViewLayout section="reports" title="Reports" description={analysisName(selectedRun) ?? undefined}>
+    <ViewLayout
+      section="reports"
+      title="Reports"
+      description="The investigation report for the selected investigation."
+      context={analysisName(selectedRun)}
+    >
       {!selectedRun ? (
         <EmptyState
           icon={MousePointerClick}
@@ -55,7 +60,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
         />
       ) : reportLoadError ? (
         // §1 state-color banner rule: shadow-elevation-1 + state-color border together, never border alone.
-        <div className="text-flag bg-flag/10 shadow-elevation-1 border border-flag/30 rounded-lg p-4 text-data">
+        <div className="text-warning bg-warning/10 shadow-elevation-1 border border-warning/30 rounded-lg p-4 text-data">
           Error: {reportLoadError}
         </div>
       ) : reportLoading || !report ? (
@@ -81,7 +86,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
           </div>
           {/* §1: was bg-surface + flat border -- panel containers use elevation, not
               border, for background separation. */}
-          <pre className="bg-surface shadow-elevation-1 rounded-lg p-5 text-data font-mono whitespace-pre-wrap overflow-auto max-h-[calc(100vh-16rem)]">
+          <pre className="card rounded-lg p-5 text-data font-mono whitespace-pre-wrap overflow-auto max-h-[calc(100vh-16rem)]">
             {report.content}
           </pre>
         </div>

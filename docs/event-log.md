@@ -335,7 +335,7 @@ The drawer's appearance is a pattern in [DESIGN.md](../apps/epoch/DESIGN.md); th
   - **Full log:** every entry, debug included, each with its time and level, for diagnosis.
 
 - **Line:** `15:21:03Z  INFO   message`.
-  - The time comes from `formatLogTime`. The level is written in text and also shown in colour: `error` danger, `warn` flag, `info` foreground, `debug` muted.
+  - The time comes from `formatLogTime`. The level is written in text and also shown in colour: `error` danger, `warn` warning, `info` foreground, `debug` muted.
   - The label and step are shown as a muted prefix where present.
 - **Bar:** the latest `info`/`warn`/`error` message, and "N errors · N warnings". It opens the drawer above it; nothing on the page moves.
 - **Drawer:**

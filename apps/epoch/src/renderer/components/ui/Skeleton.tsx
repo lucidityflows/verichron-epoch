@@ -48,7 +48,7 @@ export function ListSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-3 max-w-80" aria-busy="true" aria-label="Loading">
       {Array.from({ length: rows }, (_, row) => (
-        <div key={row} className="rounded-lg bg-surface shadow-elevation-1 px-4 py-3 flex flex-col gap-2">
+        <div key={row} className="rounded-lg card px-4 py-3 flex flex-col gap-2">
           <div className="h-4 w-48 rounded bg-muted-foreground/20 animate-pulse" />
           <div className="h-3 w-32 rounded bg-muted-foreground/10 animate-pulse" />
           <div className="h-5 w-24 rounded-full bg-muted-foreground/10 animate-pulse" />

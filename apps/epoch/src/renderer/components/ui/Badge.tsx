@@ -7,7 +7,7 @@ const badgeVariants = cva('inline-flex items-center rounded-md px-2 py-0.5 text-
     variant: {
       accent: 'bg-accent/15 text-accent',
       success: 'bg-success/15 text-success',
-      flag: 'bg-flag/20 text-flag',
+      warning: 'bg-warning/20 text-warning',
       neutral: 'bg-surface text-muted-foreground border border-border',
       // pipeline_stage_status.status CHECK constraint values, coloured by
       // role (DESIGN.md §9): running is in progress (accent), succeeded is

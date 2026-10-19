@@ -69,7 +69,7 @@ describe('StatusChip', () => {
     assert.equal(chipLabel('running'), 'Running');
   });
 
-  it('uses danger only for Failed, and the flag role for a stop', () => {
+  it('uses danger only for Failed, and the warning role for a stop', () => {
     render(
       <>
         <StatusChip state="failed" />
@@ -80,7 +80,7 @@ describe('StatusChip', () => {
     assert.match(failed.className, /bg-danger/);
     assert.ok(failed.querySelector('svg'), 'Failed is marked with an icon as well as its fill');
     const interrupted = screen.getByText('Interrupted');
-    assert.match(interrupted.className, /text-flag/);
+    assert.match(interrupted.className, /text-warning/);
     assert.doesNotMatch(interrupted.className, /danger/);
   });
 
