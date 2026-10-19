@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Smartphone, Circle, Loader2, CheckCircle2, XCircle, KeyRound } from 'lucide-react';
+import { Circle, Loader2, CheckCircle2, XCircle, KeyRound } from 'lucide-react';
 import type { Backup } from '@verichron/contracts';
 import { STAGE_ORDER, STAGE_LABELS, type BackupProgress, type StageName } from '../../../shared/prepareProgress';
 import { formatDateTime } from '../../../shared/time';
@@ -63,9 +63,12 @@ export function BackupRow({
 
   return (
     <div>
+      {/* The checkbox, the name and the chip share the first line; the facts,
+          and a partly prepared backup's reason, sit beneath the name (owner's
+          review, 2026-10-19). */}
       <label
-        className={`flex items-center gap-3 px-4 py-3 text-data cursor-pointer select-none transition-colors ${
-          selected ? 'bg-accent/10' : 'hover:bg-surface'
+        className={`grid grid-cols-[0.875rem_minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 items-start px-4 py-3 text-data cursor-pointer select-none transition-colors ${
+          selected ? 'bg-accent/10' : 'hover:bg-surface-hover'
         } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
       >
         <input
@@ -73,15 +76,21 @@ export function BackupRow({
           checked={selected}
           onChange={onToggle}
           disabled={disabled}
-          className="accent-accent w-4 h-4 rounded cursor-pointer shrink-0"
+          className="accent-accent w-3.5 h-3.5 mt-[0.1875rem] rounded cursor-pointer"
         />
-        <Smartphone size="1.125rem" className={`shrink-0 ${selected ? 'text-accent' : 'text-muted-foreground'}`} />
-        <span className="min-w-0 flex-1">
-          <span className="block text-foreground truncate font-medium">{backupName(backup, description)}</span>
-          <BackupFacts backup={backup} description={description} />
+        <span className="text-foreground truncate font-medium">{backupName(backup, description)}</span>
+        <span className="flex items-center gap-2 justify-self-end">
+          <PreparedState prepared={prepared} />
+          {lastResult === 'failed' && <XCircle size="1rem" className="text-danger shrink-0" />}
         </span>
-        <PreparedState prepared={prepared} />
-        {lastResult === 'failed' && <XCircle size="1.125rem" className="text-danger shrink-0" />}
+        <span className="col-start-2 col-span-2 min-w-0">
+          <BackupFacts backup={backup} description={description} />
+          {prepared?.state === 'partial' && (
+            <span className="block text-label text-muted-foreground">
+              {prepared.reason ?? `Decrypted ${formatDateTime(prepared.preparedAt)}; iLEAPP's output is missing`}
+            </span>
+          )}
+        </span>
       </label>
       {retryDone && (
         <div className="px-11 pb-3">
@@ -186,15 +195,8 @@ function PreparedState({ prepared }: { prepared?: PreparedBackup }) {
   if (!prepared) return <span className={`${CHIP} bg-muted-foreground/14 text-foreground`}>Not prepared</span>;
   const when = formatDateTime(prepared.preparedAt);
   if (prepared.state === 'partial') {
-    // Why, written out, not on hover (DESIGN.md §9): the last Prepare's reason, else what is missing.
-    return (
-      <span className="flex flex-col items-end text-right shrink-0 max-w-[22rem] gap-1">
-        <span className={`${CHIP} bg-warning/10 text-warning`}>Partly prepared · prepare again</span>
-        <span className="text-label text-muted-foreground">
-          {prepared.reason ?? `Decrypted ${when}; iLEAPP's output is missing`}
-        </span>
-      </span>
-    );
+    // Its reason is written out beneath the backup's facts, not on hover (DESIGN.md §9).
+    return <span className={`${CHIP} bg-warning/10 text-warning`}>Partly prepared · prepare again</span>;
   }
   return (
     <span className={`${CHIP} bg-success/10 text-success`}>

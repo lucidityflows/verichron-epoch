@@ -61,6 +61,15 @@ describe('EvidenceSourcePanel', () => {
   });
 });
 
+describe('EvidenceSourcePanel, quiet', () => {
+  it('is one line and two buttons under the list, with no card and no heading', () => {
+    render(<EvidenceSourcePanel quiet title="Evidence somewhere else?" onPull={vi.fn()} onChooseFolder={vi.fn()} />);
+    assert.equal(screen.queryByRole('heading'), null);
+    assert.ok(screen.getByText(/^Evidence somewhere else\? Pull a backup/));
+    assert.equal(screen.getAllByRole('button').length, 2);
+  });
+});
+
 describe('PreparingCard', () => {
   it('says what Prepare is doing, how long it has run, and stops it', () => {
     const onStop = vi.fn();

@@ -26,34 +26,56 @@ export function backupName(backup: Backup, description: BackupDescription | unde
  * Two equal ways to bring evidence, neither of them primary (DESIGN.md §9:
  * the current step's action is the one primary button): pull from an
  * iPhone, or use an existing backup folder.
+ *
+ * With no evidence chosen it is the page's card, with a title. Below a
+ * folder's backups it is `quiet`: one line and the two buttons, with no card
+ * and no heading, so it never competes with the list (owner's review,
+ * 2026-10-19).
  */
 export function EvidenceSourcePanel({
   title,
+  quiet = false,
   onPull,
   onChooseFolder,
 }: {
   title: string;
+  quiet?: boolean;
   onPull: () => void;
   onChooseFolder: () => void;
 }) {
+  const buttons = (
+    <div className="flex flex-wrap gap-3">
+      <Button variant="outline" size={quiet ? 'sm' : 'default'} onClick={onPull}>
+        <Smartphone size="1rem" />
+        Pull from a Connected iPhone
+      </Button>
+      <Button variant="outline" size={quiet ? 'sm' : 'default'} onClick={onChooseFolder}>
+        <FolderOpen size="1rem" />
+        Use an Existing Backup
+      </Button>
+    </div>
+  );
+  if (quiet) {
+    return (
+      <section aria-label={title} className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <p className="text-data text-muted-foreground min-w-0">
+          {title} Pull a backup from a connected iPhone, or use an existing backup from another folder.
+        </p>
+        {buttons}
+      </section>
+    );
+  }
   return (
-    <section aria-labelledby="evidence-source" className="bg-surface-raised rounded-xl shadow-elevation-1 p-5">
-      <h2 id="evidence-source" className="font-display text-heading text-foreground">
-        {title}
-      </h2>
-      <p className="text-data text-muted-foreground mt-1">
-        Pull a backup from a connected iPhone, or use an existing backup from another folder.
-      </p>
-      <div className="flex flex-wrap gap-3 mt-4">
-        <Button variant="outline" onClick={onPull}>
-          <Smartphone size="1rem" />
-          Pull from a Connected iPhone
-        </Button>
-        <Button variant="outline" onClick={onChooseFolder}>
-          <FolderOpen size="1rem" />
-          Use an Existing Backup
-        </Button>
+    <section aria-labelledby="evidence-source" className="card rounded-xl p-6 flex flex-col gap-4">
+      <div>
+        <h2 id="evidence-source" className="font-display text-heading text-foreground">
+          {title}
+        </h2>
+        <p className="text-data text-muted-foreground mt-1">
+          Pull a backup from a connected iPhone, or use an existing backup from another folder.
+        </p>
       </div>
+      {buttons}
     </section>
   );
 }
@@ -117,7 +139,7 @@ export function PreparingCard({
   return (
     <section
       aria-labelledby="preparing-title"
-      className="bg-surface rounded-xl shadow-elevation-1 border-t-2 border-accent p-6 flex flex-col gap-3"
+      className="card rounded-xl border-t-2 border-t-accent p-6 flex flex-col gap-3"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">

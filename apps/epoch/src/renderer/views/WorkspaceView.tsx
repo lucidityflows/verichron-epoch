@@ -299,9 +299,6 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     });
   };
 
-  const selectAllBackups = () => setSelectedLabels(new Set(backups.map((b) => b.label)));
-  const selectNoBackups = () => setSelectedLabels(new Set());
-
   // Prepare Again redoes the selected backups from the start; Prepare
   // Evidence uses the Advanced setting.
   const handleStartPipeline = async (again = false) => {
@@ -503,74 +500,27 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
           )}
 
           <div className="card rounded-xl p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div className="min-w-0">
-                <h2 className="font-display text-heading text-foreground">
-                  Backups Found{backups.length > 0 ? ` (${backups.length})` : ''}
-                </h2>
-                <p className="text-label text-muted-foreground truncate">
-                  In <span className="font-mono">{folderShown ?? '…'}</span>
-                  {!busy && (
-                    <>
-                      {' · '}
-                      <button
-                        type="button"
-                        onClick={handleSelectDirectory}
-                        className="text-accent underline underline-offset-2 hover:text-accent/80 cursor-pointer"
-                      >
-                        Change Folder
-                      </button>
-                    </>
-                  )}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                {backups.length > 1 && !busy && (
-                  <div className="flex items-center gap-2 text-label bg-surface-raised shadow-elevation-1 rounded-lg p-1">
-                    {/* Segmented pill toggle -- a compound control, not a plain button;
-                        left on Button.tsx's deferred list rather than forced into `ghost`. */}
+            {/* One header row: the title, and where the backups are (owner's review, 2026-10-19). */}
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-4">
+              <h2 className="font-display text-heading text-foreground">
+                Backups Found{backups.length > 0 ? ` (${backups.length})` : ''}
+              </h2>
+              <p className="text-label text-muted-foreground min-w-0 truncate">
+                In <span className="font-mono">{folderShown ?? '…'}</span>
+                {!busy && (
+                  <>
+                    {' · '}
                     <button
-                      onClick={selectAllBackups}
-                      className="px-3 py-1 rounded-md text-foreground/80 hover:text-foreground hover:bg-surface transition-colors cursor-pointer font-medium"
+                      type="button"
+                      onClick={handleSelectDirectory}
+                      className="text-accent underline underline-offset-2 hover:text-accent/80 cursor-pointer"
                     >
-                      Select All
+                      Change Folder
                     </button>
-                    <span className="text-border">|</span>
-                    <button
-                      onClick={selectNoBackups}
-                      className="px-3 py-1 rounded-md text-foreground/80 hover:text-foreground hover:bg-surface transition-colors cursor-pointer font-medium"
-                    >
-                      Select None
-                    </button>
-                  </div>
+                  </>
                 )}
-                {selectedAllPrepared && !busy ? (
-                  // Done already: preparing again is a secondary choice, and
-                  // Analyze is the next step (EPOCH-497).
-                  <Button
-                    variant="outline"
-                    onClick={() => handleStartPipeline(true)}
-                    disabled={orchestratorRunning}
-                    className="shrink-0"
-                  >
-                    <RotateCcw size="1rem" />
-                    Prepare Again{selectedLabels.size > 1 ? ` (${selectedLabels.size})` : ''}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => handleStartPipeline()}
-                    disabled={discoveringBackups || selectedLabels.size === 0 || orchestratorRunning}
-                    loading={busy}
-                    loadingText={isStarting ? 'Starting…' : 'Running…'}
-                    className="shrink-0"
-                  >
-                    <Play size="1rem" fill="currentColor" />
-                    Prepare Evidence{selectedLabels.size > 0 ? ` (${selectedLabels.size})` : ''}
-                  </Button>
-                )}
-              </div>
+              </p>
             </div>
-            <p className="text-data text-muted-foreground mb-4">{selectionHint}</p>
 
             {discoveringBackups && (
               <p className="text-data text-muted-foreground">Looking for compatible iPhone backups…</p>
@@ -634,6 +584,35 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
               </p>
             )}
 
+            {/* What the selection will do, and its one action, below the list (board 5). */}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+              <p className="text-data text-muted-foreground min-w-0 flex-1">{selectionHint}</p>
+              {selectedAllPrepared && !busy ? (
+                // Done already: preparing again is a secondary choice, and
+                // Analyze is the next step (EPOCH-497).
+                <Button
+                  variant="outline"
+                  onClick={() => handleStartPipeline(true)}
+                  disabled={orchestratorRunning}
+                  className="shrink-0"
+                >
+                  <RotateCcw size="1rem" />
+                  Prepare Again{selectedLabels.size > 1 ? ` (${selectedLabels.size})` : ''}
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => handleStartPipeline()}
+                  disabled={discoveringBackups || selectedLabels.size === 0 || orchestratorRunning}
+                  loading={busy}
+                  loadingText={isStarting ? 'Starting…' : 'Running…'}
+                  className="shrink-0"
+                >
+                  <Play size="1rem" fill="currentColor" />
+                  Prepare Evidence{selectedLabels.size > 0 ? ` (${selectedLabels.size})` : ''}
+                </Button>
+              )}
+            </div>
+
             <div className="mt-6 pt-4 border-t border-border/60">
               <Button
                 variant="ghost"
@@ -679,7 +658,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
           {!busy && selectedAllPrepared && (
             <section
               aria-labelledby="prepared-title"
-              className="card rounded-xl border-t-2 border-success p-6 flex flex-col gap-5"
+              className="card rounded-xl border-t-2 border-t-success p-6 flex flex-col gap-5"
             >
               <h2 id="prepared-title" className="font-display text-heading text-foreground">
                 Evidence Prepared
@@ -703,7 +682,8 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
           {!busy && (
             <EvidenceSourcePanel
-              title="Evidence Somewhere Else?"
+              quiet
+              title="Evidence somewhere else?"
               onPull={() => {
                 setSelectedPath(null);
                 setImportSource('device');
