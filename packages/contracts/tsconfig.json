@@ -23,6 +23,7 @@
     "ts/sanitize.ts",
     "ts/deviceIdentifiers.ts",
     "ts/processorSummary.ts",
-    "ts/testDatabase.ts"
+    "ts/testDatabase.ts",
+    "ts/displayZone.ts"
   ]
 }

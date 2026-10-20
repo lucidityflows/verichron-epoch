@@ -196,6 +196,7 @@ an audit event; facts belong to evidence, not to runs (R7).**
     - `host` and `pid`: the orchestrator process that created the run.
     - Once it ends, `ended_reason`: `completed`, `cancelled`, `timeout`, `crashed` or `abandoned`. It is set exactly when `finished_at` is.
     - `ended_detail`: what was known about why.
+    - `display_zone` (EPOCH-560, migration 0020): the zone its report shows times in, UTC or the named zone chosen in Settings. The report reads it from the run. Stored times stay UTC (R11).
   - **Who closes a run the orchestrator didn't finish:**
     - The orchestrator closes its own run as `crashed`, with its error.
     - The app closes a call's runs by ID, from their `run:created` events: as `cancelled` on a cancel, `timeout` when stalled, or `crashed` when the process died.

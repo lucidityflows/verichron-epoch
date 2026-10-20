@@ -192,7 +192,7 @@ the theme a CSS-only change.
 ## 6. View layout — one gutter, one title, one left edge
 
 Every sidebar-navigated view (`WorkspaceView`, `InvestigationsView`, `RecordsView`,
-`IocsView`, `ReportsView`) renders inside `ViewLayout`
+`IocsView`, `ReportsView`, `SettingsView`) renders inside `ViewLayout`
 (`components/layout/ViewLayout.tsx`), and switching views never moves the
 content edge or the title (EPOCH-464).
 
@@ -598,6 +598,24 @@ only how they are shown.
 - **Every date and time shows its zone.** The default is UTC. The examiner
   can choose a zone in Settings (EPOCH-560), and it then applies everywhere,
   the report included. The report's header names the zone.
+- **Settings** (EPOCH-560, board "Time Display Rules") sits at the foot of the
+  sidebar, apart from the investigation's five sections, in a neutral colour
+  (`--section-settings`, the muted foreground): it is the app's, not part of
+  an investigation. Its Time Zone card holds the picker ("UTC (default)",
+  "America/Chicago (CDT, UTC−05:00)"), the board's sentence ("Evidence times
+  are stored in UTC. This changes only how times are shown, in the app and in
+  reports."), a line saying a report keeps the zone it was written in, and a
+  Preview of the time now in the chosen zone. A choice is saved at once.
+  Only UTC or a named zone can be chosen.
+- **The zone reaches every time:** each view and the Activity Log, with its
+  Copy, Save As ("times in America/Chicago") and Copy Details, and the line
+  above its entries ("Times in America/Chicago, 2026-10-14"). An indicator
+  set's age is counted between the days as they are shown.
+- **The report** states "Times shown in UTC (default)" or "Times shown in
+  America/Chicago" under its title, and labels every time as the app does.
+  Its short names come from the zone database, which has them for more places
+  than the app's runtime: the report shows `IST, UTC+05:30` where the app
+  shows `UTC+05:30`. The offset is always the same.
 - **One format:** a 24-hour clock with seconds, the value in monospace, and
   the zone beside it in muted `text-label`, after a real space rather than a
   margin, so text selected and copied from the page reads `18:17:10 UTC`
@@ -629,8 +647,10 @@ only how they are shown.
 - **Folder names stay compact UTC** (`2026-10-15T154804Z`), and durations
   are unchanged.
 - **One implementation:** `shared/time.ts` (`formatDateTime`, `formatDate`,
-  `formatLogTime`, `isoWithOffset`) and the `DateTime` component. A view never
-  calls `toLocaleString` on a time.
+  `formatLogTime`, `isoWithOffset`) and the `DateTime` component. Every
+  formatter takes the zone; a view reads it with `useDisplayZone()`, and
+  `DateTime` reads it itself. A view never calls `toLocaleString` on a time.
+  The report's twin is `ZoneTimes` in `packages/contracts/python/display_zone.py`.
 
 ## 12. Activity Log — one docked drawer, wherever a task runs
 

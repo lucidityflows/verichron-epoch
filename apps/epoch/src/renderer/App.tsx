@@ -6,6 +6,7 @@ import { InvestigationsView } from './views/InvestigationsView';
 import { RecordsView } from './views/RecordsView';
 import { IocsView } from './views/IocsView';
 import { ReportsView } from './views/ReportsView';
+import { SettingsView } from './views/SettingsView';
 import { ActivityLogDock } from './features/activityLog/ActivityLogDock';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { useEpochStore } from './store/useEpochStore';
@@ -186,6 +187,8 @@ export const App: React.FC = () => {
             {section === 'iocs' && <IocsView selectedRun={selectedRun} />}
 
             {section === 'reports' && <ReportsView selectedRun={selectedRun} stages={stages} />}
+
+            {section === 'settings' && <SettingsView />}
           </div>
 
           {/* EPOCH-570: the Activity Log, docked below the page, never inside it; on Investigations too (U4b). */}

@@ -11,7 +11,10 @@ import re
 from datetime import UTC, date, datetime
 
 import pytest
+from display_zone import ZoneTimes
 from reporting.generate_report import INDICATOR_LIMIT, NOTHING_CHECKED, render_indicator_section
+
+UTC_TIMES = ZoneTimes()
 
 RUN = "11111111-0000-0000-0000-000000000001"
 EARLIER = "22222222-0000-0000-0000-000000000002"
@@ -107,7 +110,7 @@ def skipped(run_id: str = RUN) -> dict:
 
 
 def text(checks: list[dict], run_id: str = RUN, stale_days: int = 90) -> str:
-    return "\n".join(render_indicator_section(checks, run_id, stale_days))
+    return "\n".join(render_indicator_section(checks, run_id, stale_days, UTC_TIMES))
 
 
 def test_no_set_registered_says_nothing_was_checked() -> None:
@@ -120,7 +123,7 @@ def test_no_set_registered_says_nothing_was_checked() -> None:
 def test_a_set_and_no_match_states_the_set_its_age_and_what_was_not_checked() -> None:
     out = text([check()])
     assert "Set: mvt-indicators index b22ddf05e1a3, fetched 2026-10-15 (`e3fb2081f3e1`)." in out
-    assert "Newest indicator 2026-10-09: 6 day(s) old when checked." in out
+    assert "Newest indicator 2026-10-09 UTC: 6 day(s) old when checked." in out
     assert "No match against this set." in out
     assert "| Domain | 6,692 | 7,545 | 1 source(s): Safari Browser - History: URL (host) (4,518) |" in out
     assert "- **IP address** (73): no source in any backup." in out
@@ -135,14 +138,14 @@ def test_a_set_with_matches_lists_each_with_campaign_mode_fact_and_time() -> Non
     out = text([check(matches=[MATCH])])
     assert "1 match(es) against this set." in out
     assert (
-        "| 2026-03-01 12:00:00 UTC | Domain | `evil.example` | Test Campaign | subdomain, expired 2026-06-01 "
+        "| 2026-03-01 12:00:00 UTC | Domain | `evil.example` | Test Campaign | subdomain, expired 2026-06-01 UTC "
         "| Safari Browser - History: URL (host) (record 42) | `a.stix2` |"
     ) in out
 
 
 def test_a_stale_set_says_so() -> None:
     out = text([check(newest=datetime(2026, 5, 1, tzinfo=UTC))])
-    assert "Newest indicator 2026-05-01: 167 day(s) old when checked." in out
+    assert "Newest indicator 2026-05-01 UTC: 167 day(s) old when checked." in out
     assert "Older than 90 days when checked: indicators published since are not in it." in out
 
 
@@ -151,7 +154,18 @@ def test_two_runs_are_shown_separately_never_merged() -> None:
     out = text([check(matches=[MATCH]), earlier])
     this_run, _, rest = out.partition("### Earlier checks of this evidence")
     assert "1 match(es) against this set." in this_run
-    assert "- 2026-10-14 · mvt-indicators index b22ddf05e1a3 (`e3fb2081f3e1`) · no match" in rest
+    assert "- 2026-10-14 UTC · mvt-indicators index b22ddf05e1a3 (`e3fb2081f3e1`) · no match" in rest
+
+
+def test_in_a_chosen_zone_every_time_and_day_is_shown_there_and_the_age_counts_the_days_shown() -> None:
+    chicago = ZoneTimes("America/Chicago")
+    out = "\n".join(render_indicator_section([check(matches=[MATCH])], RUN, 90, chicago))
+    assert "### This run's check (2026-10-15 09:30:00 CDT, UTC−05:00)" in out
+    # 2026-10-09 00:00 UTC is the evening of the 8th in Chicago: 7 days before the 15th there.
+    assert "Newest indicator 2026-10-08 CDT, UTC−05:00: 7 day(s) old when checked." in out
+    assert "| 2026-03-01 06:00:00 CST, UTC−06:00 | Domain |" in out, "March is standard time"
+    assert "subdomain, expired 2026-05-31 CDT, UTC−05:00 " in out
+    assert "fetched 2026-10-15 (" in out, "a recorded calendar date is shown as recorded, with no zone"
 
 
 def test_a_file_with_an_unknown_licence_is_marked_not_redistributable() -> None:

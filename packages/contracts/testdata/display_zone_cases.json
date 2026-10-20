@@ -1,0 +1,18 @@
+{
+  "accepted": ["UTC", "America/Chicago", "Asia/Kolkata", "Australia/Adelaide", "America/Argentina/Salta", "Europe/London"],
+  "refused": [
+    "",
+    "utc",
+    "GMT",
+    "CST",
+    "EST5EDT",
+    "CST6CDT",
+    "+05:30",
+    "UTC+05:30",
+    "Etc/GMT+5",
+    "Etc/UTC",
+    "America/Nowhere",
+    "../etc/passwd",
+    "America/Chicago "
+  ]
+}

@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
-import { Activity, Database, FileText, PlusCircle, Target, type LucideIcon } from 'lucide-react';
+import { Activity, Database, FileText, PlusCircle, Settings, Target, type LucideIcon } from 'lucide-react';
 
-export type Section = 'workspace' | 'runs' | 'records' | 'iocs' | 'reports';
+export type Section = 'workspace' | 'runs' | 'records' | 'iocs' | 'reports' | 'settings';
 
 interface SectionInfo {
   label: string;
@@ -21,8 +21,12 @@ export const SECTIONS: Record<Section, SectionInfo> = {
   records: { label: 'Forensic Records', icon: Database, colorVar: '--section-records' },
   iocs: { label: 'Indicator Matches', icon: Target, colorVar: '--section-iocs' },
   reports: { label: 'Reports', icon: FileText, colorVar: '--section-reports' },
+  // The app's own settings, not part of an investigation: at the foot of the
+  // sidebar, in a neutral colour (EPOCH-560).
+  settings: { label: 'Settings', icon: Settings, colorVar: '--section-settings' },
 };
 
+/** The investigation's sections, in order; Settings sits apart, below them. */
 export const SECTION_ORDER: Section[] = ['workspace', 'runs', 'records', 'iocs', 'reports'];
 
 /** Sets `--section` on an element, so `text-section` and `bg-section/NN` inside it use this section's colour. */

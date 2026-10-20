@@ -7,7 +7,7 @@
  */
 
 import type { IndicatorCheckRow, IndicatorSetSourceRow } from '@verichron/etl-db-reader';
-import { formatDate } from '../../../shared/time';
+import { formatDate, formatDateParts, type DisplayZone } from '../../../shared/time';
 
 export const TYPE_LABELS: Record<string, string> = {
   domain: 'Domain',
@@ -37,8 +37,8 @@ const NOT_LOADED: Record<string, string> = {
 };
 
 const count = (n: number | string) => Number(n).toLocaleString('en-US');
-/** The UTC day, for counting days between two times. */
-const day = (iso: string) => new Date(iso).toISOString().slice(0, 10);
+/** The day a time falls on in the zone it is shown in, for counting days between two times. */
+const day = (iso: string, zone: DisplayZone) => formatDateParts(iso, zone)!.value;
 
 /** Types in one fixed order (the database doesn't keep a JSON object's key order). */
 export function inOrder<T>(types: Record<string, T>): [string, T][] {
@@ -49,27 +49,30 @@ export function inOrder<T>(types: Record<string, T>): [string, T][] {
 
 export const typeLabel = (t: string) => TYPE_LABELS[t] ?? t;
 
-/** Whole days from the set's newest indicator to the check, by UTC date. */
-export function ageWhenChecked(check: IndicatorCheckRow): number | null {
+/**
+ * Whole days from the set's newest indicator to the check, between the days
+ * as they are shown in the examiner's zone, as the report counts them (EPOCH-560).
+ */
+export function ageWhenChecked(check: IndicatorCheckRow, zone: DisplayZone): number | null {
   if (!check.newest_indicator || !check.finished_at) return null;
-  const toDay = (iso: string) => Date.parse(day(iso));
+  const toDay = (iso: string) => Date.parse(`${day(iso, zone)}T00:00:00Z`);
   return Math.round((toDay(check.finished_at) - toDay(check.newest_indicator)) / 86_400_000);
 }
 
 /** The set, when it was fetched (or registered), and its newest indicator's age when checked. */
-export function setLine(check: IndicatorCheckRow): string {
+export function setLine(check: IndicatorCheckRow, zone: DisplayZone): string {
   const downloaded = check.sources.map((s) => s.downloaded_on).filter((d): d is string => !!d);
   const when = downloaded.length
-    ? `fetched ${formatDate(downloaded.sort().at(-1)!)}`
-    : `registered ${check.set_registered_at ? formatDate(check.set_registered_at) : 'on an unknown date'}`;
+    ? `fetched ${formatDate(downloaded.sort().at(-1)!, zone)}`
+    : `registered ${check.set_registered_at ? formatDate(check.set_registered_at, zone) : 'on an unknown date'}`;
   const line = `Set: ${check.set_name}, ${when} (${(check.set_hash ?? '').slice(0, 12)}).`;
-  const age = ageWhenChecked(check);
+  const age = ageWhenChecked(check, zone);
   if (age === null || !check.newest_indicator) return `${line} It holds no indicator this check could load.`;
-  return `${line} Newest indicator ${formatDate(check.newest_indicator)}: ${age} day(s) old when checked.`;
+  return `${line} Newest indicator ${formatDate(check.newest_indicator, zone)}: ${age} day(s) old when checked.`;
 }
 
-export function staleLine(check: IndicatorCheckRow, staleAfterDays: number): string | null {
-  const age = ageWhenChecked(check);
+export function staleLine(check: IndicatorCheckRow, staleAfterDays: number, zone: DisplayZone): string | null {
+  const age = ageWhenChecked(check, zone);
   return age !== null && age > staleAfterDays
     ? `Older than ${staleAfterDays} days when checked: indicators published since are not in it.`
     : null;

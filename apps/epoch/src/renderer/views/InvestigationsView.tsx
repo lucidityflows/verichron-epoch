@@ -23,7 +23,8 @@ import {
   warningLines,
   type Investigation,
 } from '../features/investigations/investigations';
-import { isoWithOffset } from '../../shared/time';
+import { isoWithOffset, type DisplayZone } from '../../shared/time';
+import { useDisplayZone } from '../store/useSettings';
 import type { BackupAnalysisOutcome } from '../../shared/types/window';
 
 interface InvestigationsViewProps {
@@ -44,12 +45,17 @@ interface InvestigationsViewProps {
  * analysis and each stage's state. No device identifier, device name, path
  * or password, since it may be pasted anywhere.
  */
-function analysisDetails(investigation: Investigation, run: PipelineRunRow, stages: StageStatusRow[]): string {
+function analysisDetails(
+  investigation: Investigation,
+  run: PipelineRunRow,
+  stages: StageStatusRow[],
+  zone: DisplayZone
+): string {
   return [
     `Investigation: ${investigation.title} (${shortId(investigation.evidenceId)})`,
     // Copied times are ISO 8601 with their offset (DESIGN.md §11).
-    `Backup began: ${isoWithOffset(investigation.backupDate)}`,
-    `Analysis ${shortId(run.run_id)}: started ${isoWithOffset(run.started_at)}, ${chipLabel(analysisChip(run))}`,
+    `Backup began: ${isoWithOffset(investigation.backupDate, zone)}`,
+    `Analysis ${shortId(run.run_id)}: started ${isoWithOffset(run.started_at, zone)}, ${chipLabel(analysisChip(run))}`,
     '',
     ...stages.map((stage) => {
       const chip = stageChip({
@@ -100,6 +106,7 @@ export function InvestigationsView({
   onRefreshStages,
   onRefreshRun,
 }: InvestigationsViewProps) {
+  const zone = useDisplayZone();
   const [startError, setStartError] = useState<string | null>(null);
 
   const grouped = useMemo((): { investigations: Investigation[]; error: string | null } => {
@@ -309,7 +316,7 @@ export function InvestigationsView({
                   <CopyButton
                     label="Copy Details"
                     title="Copy the investigation, the analysis and each stage, with no device identifier"
-                    text={() => analysisDetails(selected, selectedRun, stagesShown)}
+                    text={() => analysisDetails(selected, selectedRun, stagesShown, zone)}
                   />
                 </div>
 
@@ -326,7 +333,7 @@ export function InvestigationsView({
                     <CopyButton
                       title="Copy the error, the investigation and each stage, with no device identifier"
                       text={() =>
-                        `Analyze Again: ${againError}\n\n${analysisDetails(selected, selectedRun, stagesShown)}`
+                        `Analyze Again: ${againError}\n\n${analysisDetails(selected, selectedRun, stagesShown, zone)}`
                       }
                     />
                   </div>

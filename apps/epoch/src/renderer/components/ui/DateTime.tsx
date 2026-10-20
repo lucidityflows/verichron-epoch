@@ -1,5 +1,4 @@
 import {
-  DEFAULT_ZONE,
   formatDateParts,
   formatParts,
   isoWithOffset,
@@ -8,10 +7,11 @@ import {
   type TimeValue,
 } from '../../../shared/time';
 import { cn } from '../../libs/utils';
+import { useDisplayZone } from '../../store/useSettings';
 
 interface DateTimeProps {
   value: TimeValue | null | undefined;
-  /** UTC unless the examiner chose a zone (EPOCH-560). */
+  /** The examiner's zone (EPOCH-560) unless one is given. */
   zone?: DisplayZone;
   /** Show the date only. */
   dateOnly?: boolean;
@@ -24,7 +24,9 @@ interface DateTimeProps {
  * with its offset on hover (EPOCH-559). A recorded calendar date has no zone
  * to show. A missing time says so; it is never guessed (R11).
  */
-export function DateTime({ value, zone = DEFAULT_ZONE, dateOnly = false, className }: DateTimeProps) {
+export function DateTime({ value, zone: given, dateOnly = false, className }: DateTimeProps) {
+  const setting = useDisplayZone();
+  const zone = given ?? setting;
   const parts = dateOnly ? formatDateParts(value, zone) : formatParts(value, zone);
   if (!parts) return <span className={cn('text-muted-foreground', className)}>{NO_TIME}</span>;
   return (

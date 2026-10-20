@@ -3,7 +3,10 @@ them. No database is involved, so this runs the same on every tier; the stage
 query itself is tested on real PostgreSQL in test_evidence_reads.py (R33: a
 double never certifies SQL)."""
 
+from display_zone import ZoneTimes
 from reporting.generate_report import render_not_examined_section
+
+UTC_TIMES = ZoneTimes()
 
 CRASH_REASON = (
     "Crash logs were not acquired for this evidence. An iOS backup does not contain the device's "
@@ -49,7 +52,7 @@ def test_the_report_opens_with_the_responsibility_statement_it_travels_with():
     """EPOCH-552: the statement is in the report itself, under its title, so it goes wherever the report goes."""
     from reporting.generate_report import RESPONSIBILITY, render_title_block
 
-    lines = render_title_block("e1", "r1", "2026-10-19 22:00:00 UTC")
+    lines = render_title_block("e1", "r1", "2026-10-19 22:00:00 UTC", UTC_TIMES)
     assert lines[0] == "# Investigation Report"
     assert f"*{RESPONSIBILITY}*" in lines
     assert lines.index(f"*{RESPONSIBILITY}*") < lines.index("---"), "before any section"

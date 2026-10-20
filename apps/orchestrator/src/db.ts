@@ -83,6 +83,8 @@ export interface RunProvenance {
   contractVersion: string;
   /** e.g. { orchestrator: "0.1.0", node: "v24.21.0", python: "3.12.3" } */
   toolVersions: Record<string, string>;
+  /** The zone the report shows times in: UTC or a named zone (EPOCH-560). The report reads it from the run. */
+  displayZone: string;
 }
 
 /**
@@ -104,13 +106,14 @@ export async function createRun(
   // found and closed as abandoned (EPOCH-435).
   await client.query(
     `INSERT INTO pipeline_runs
-       (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+       (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
     [
       runId,
       backupPath,
       provenance.contractVersion,
       provenance.toolVersions,
+      provenance.displayZone,
       registration.evidenceId,
       registration.decryptedDerivativeId,
       hostname(),

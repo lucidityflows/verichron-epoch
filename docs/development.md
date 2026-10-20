@@ -160,6 +160,11 @@ against another one, give the orchestrator its set hash:
 newer set makes the next Analyze of already-analyzed evidence run again; the
 extractors find their facts already ingested and write nothing new.
 
+The report shows times in UTC unless the orchestrator is given a zone:
+`--display-zone America/Chicago` (the app passes the one chosen in Settings).
+The app keeps its settings in `settings.json` in its settings folder
+(Electron's userData; `~/.config/Epoch` on Linux).
+
 Useful tools:
 
 | Command | What it does |

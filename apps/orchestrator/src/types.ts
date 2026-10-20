@@ -43,4 +43,6 @@ export interface CliConfig {
   summaryPath?: string;
   /** The indicator set to check, by its set hash; the newest registered set when omitted (EPOCH-491). */
   indicatorSetHash?: string;
+  /** The zone the report shows times in, UTC or a named zone; UTC when omitted (EPOCH-560). */
+  displayZone: string;
 }

@@ -3,6 +3,7 @@ import { Circle, Loader2, CheckCircle2, XCircle, KeyRound } from 'lucide-react';
 import type { Backup } from '@verichron/contracts';
 import { STAGE_ORDER, STAGE_LABELS, type BackupProgress, type StageName } from '../../../shared/prepareProgress';
 import { formatDateTime } from '../../../shared/time';
+import { useDisplayZone } from '../../store/useSettings';
 import type { BackupDescription, PreparedBackup } from '../../../shared/types/window';
 import { DateTime } from '../../components/ui/DateTime';
 import { backupName } from '../newInvestigation/NewInvestigationParts';
@@ -46,6 +47,7 @@ export function BackupRow({
   crashReportsRetryTarget,
   onCopyCrashReportsAgain,
 }: BackupRowProps) {
+  const zone = useDisplayZone();
   const [retryConfirming, setRetryConfirming] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export function BackupRow({
           <BackupFacts backup={backup} description={description} />
           {prepared?.state === 'partial' && (
             <span className="block text-label text-muted-foreground">
-              {prepared.reason ?? `Decrypted ${formatDateTime(prepared.preparedAt)}; iLEAPP's output is missing`}
+              {prepared.reason ?? `Decrypted ${formatDateTime(prepared.preparedAt, zone)}; iLEAPP's output is missing`}
             </span>
           )}
         </span>

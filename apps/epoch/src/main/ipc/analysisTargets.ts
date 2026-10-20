@@ -30,8 +30,12 @@ export function analysisTargets(workspace: string, labels: unknown[]): string[] 
   return unique;
 }
 
-/** The orchestrator receives the workspace and selected manifest labels (EPOCH-427, EPOCH-530). */
-export function orchestratorArgs(workspace: string, labels: string[], summaryPath: string): string[] {
+/**
+ * The orchestrator receives the workspace and selected manifest labels
+ * (EPOCH-427, EPOCH-530), and the zone the report shows times in, which the
+ * run records (EPOCH-560).
+ */
+export function orchestratorArgs(workspace: string, labels: string[], summaryPath: string, zone: string): string[] {
   return [
     '--filter',
     '@verichron/orchestrator',
@@ -42,6 +46,8 @@ export function orchestratorArgs(workspace: string, labels: string[], summaryPat
     ...labels.flatMap((label) => ['--label', label]),
     '--summary-path',
     summaryPath,
+    '--display-zone',
+    zone,
     // Typed events only (EPOCH-570): the app reads them, never the text.
     '--output',
     'events',

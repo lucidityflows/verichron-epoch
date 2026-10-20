@@ -242,6 +242,37 @@ def test_the_report_takes_its_evidence_from_the_run_when_not_given(db, tmp_path)
     assert "INCIDENT-FROM-RUN" in _crash_section(report)
 
 
+def test_the_report_shows_its_times_in_the_zone_its_run_records(db, tmp_path):
+    """EPOCH-560: the report reads its zone from the run (R35), names it in its
+    header and labels every time with it; UTC by default."""
+    if not isinstance(db, PgReal):
+        pytest.skip("the report reads through psycopg2 RealDictCursor on real Postgres")
+    from reporting.generate_report import generate_report
+
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    # 2024-01-15 10:30:00 -0600 is 16:30:00 UTC, and 22:00:00 in India (UTC+05:30).
+    (backup / "crash.ips").write_text(_valid_ips("INCIDENT-ZONED"))
+    assert crash_main.run(db, ctx(RUN_A), str(backup)).failed == 0
+    db.commit()
+
+    out = tmp_path / "report.md"
+    generate_report(db._conn, RUN_A, EVIDENCE, str(out))
+    report = out.read_text()
+    assert "**Times shown in UTC (default).** Every time is labelled with its zone" in report
+    assert "| 2024-01-15 16:30:00 UTC | 309 ·" in _crash_section(report)
+
+    with db.cursor() as cur:
+        cur.execute("UPDATE pipeline_runs SET display_zone = 'Asia/Kolkata' WHERE run_id = %s", (RUN_A,))
+    db.commit()
+    generate_report(db._conn, RUN_A, EVIDENCE, str(out))
+    report = out.read_text()
+    assert "**Times shown in Asia/Kolkata.** Every time is labelled with its zone" in report
+    assert "| 2024-01-15 22:00:00 IST, UTC+05:30 | 309 ·" in _crash_section(report)
+    assert re.search(r"\*\*Report created:\*\* \d{4}-\d\d-\d\d \d\d:\d\d:\d\d IST, UTC\+05:30", report)
+    assert " UTC |" not in _crash_section(report), "no time is left in UTC"
+
+
 def test_the_report_says_what_produced_each_derivative_the_run_read(db, tmp_path):
     """EPOCH-406: "produced by iphone_backup_decrypt X.Y; N files repaired",
     and iLEAPP output by its commit, including output from an earlier pass."""

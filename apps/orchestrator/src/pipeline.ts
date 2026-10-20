@@ -9,7 +9,9 @@ import { createRun, findCompleteRunFor, finishRun, markStage, markRunFailed, typ
 import { inputsFor, registerEvidence, RegistrationError, type Registration } from './registration.js';
 import { IndicatorSetError, selectIndicatorSet, type IndicatorSetChoice } from './indicatorSets.js';
 import {
+  DEFAULT_DISPLAY_ZONE,
   contractVersion,
+  displayZone,
   resolveRunSummaryPath,
   type ResolvedWorkspaceBackup,
   type DerivativeKind,
@@ -262,7 +264,7 @@ const ORCHESTRATOR_VERSION: string = JSON.parse(
  * run-level ones; per-derivative tool versions (the decrypt, iLEAPP) belong to
  * EPOCH-406.
  */
-export function collectProvenance(pythonBin: string): RunProvenance {
+export function collectProvenance(pythonBin: string, displayZone: string): RunProvenance {
   let python = 'unavailable';
   try {
     // "Python 3.12.3" -> "3.12.3"
@@ -276,6 +278,7 @@ export function collectProvenance(pythonBin: string): RunProvenance {
   return {
     contractVersion: contractVersion(),
     toolVersions: { orchestrator: ORCHESTRATOR_VERSION, node: process.version, python },
+    displayZone,
   };
 }
 
@@ -294,6 +297,12 @@ export interface RunPipelineOptions {
   secretPath?: string;
   /** The indicator set to check, by set hash; the newest registered one when omitted (EPOCH-491). */
   indicatorSetHash?: string;
+  /**
+   * The zone the report shows times in (EPOCH-560), recorded on the run.
+   * It changes only how times are shown, so it is not part of the "already
+   * done" check: an analysis that is complete stays complete in any zone.
+   */
+  displayZone?: string;
 }
 
 /**
@@ -392,7 +401,14 @@ export async function runPipelineForBackup(
     return { success: true, skipped: true, evidenceId: registration.evidenceId };
   }
 
-  const runId = await createRun(client, backupPath, stages, collectProvenance(pythonBin), registration, indicatorSet);
+  const runId = await createRun(
+    client,
+    backupPath,
+    stages,
+    collectProvenance(pythonBin, displayZone(options.displayZone ?? DEFAULT_DISPLAY_ZONE)),
+    registration,
+    indicatorSet
+  );
   emitEvent({
     type: 'run:created',
     run_id: runId,

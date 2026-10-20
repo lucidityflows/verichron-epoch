@@ -51,13 +51,16 @@ const base: IndicatorCheckRow = {
 describe('indicator wording', () => {
   it('states the set, when it was fetched, and its newest indicator age when checked', () => {
     assert.equal(
-      setLine(base),
+      setLine(base, 'UTC'),
       'Set: mvt-indicators index b22ddf05e1a3, fetched 2026-10-15 (e3fb2081f3e1). ' +
         'Newest indicator 2026-10-09 UTC: 6 day(s) old when checked.'
     );
-    assert.equal(staleLine(base, 90), null);
+    assert.equal(staleLine(base, 90, 'UTC'), null);
     const old = { ...base, newest_indicator: '2026-05-01T00:00:00.000Z' };
-    assert.equal(staleLine(old, 90), 'Older than 90 days when checked: indicators published since are not in it.');
+    assert.equal(
+      staleLine(old, 90, 'UTC'),
+      'Older than 90 days when checked: indicators published since are not in it.'
+    );
   });
 
   it('says no match, or how many, and that nothing was checked when it was skipped or failed', () => {
@@ -106,10 +109,19 @@ describe('indicator wording', () => {
     );
   });
 
+  it("dates the set in the examiner's zone and counts the days shown there, as the report does (EPOCH-560)", () => {
+    // 2026-10-09 00:00 UTC is the evening of the 8th in Chicago, 7 days before the check on the 15th there.
+    assert.equal(
+      setLine(base, 'America/Chicago'),
+      'Set: mvt-indicators index b22ddf05e1a3, fetched 2026-10-15 (e3fb2081f3e1). ' +
+        'Newest indicator 2026-10-08 CDT, UTC−05:00: 7 day(s) old when checked.'
+    );
+  });
+
   it('uses no verdict word', () => {
     const texts = [
-      setLine(base),
-      staleLine({ ...base, newest_indicator: '2025-01-01T00:00:00.000Z' }, 90) ?? '',
+      setLine(base, 'UTC'),
+      staleLine({ ...base, newest_indicator: '2025-01-01T00:00:00.000Z' }, 90, 'UTC') ?? '',
       resultLine(base, NOTHING),
       resultLine({ ...base, matches: 2 }, NOTHING),
       ...notCheckedLines(base),

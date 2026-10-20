@@ -70,7 +70,13 @@ describe('pipeline IPC single-flight', () => {
       JSON.stringify({ ...emptyWorkspaceManifest(), backups: [entry] })
     );
     pool = { query: async () => ({ rows: [{ path: decryptPath }] }) };
-    registerPipelineHandlers(() => null, '/repo', pool as unknown as Pool, '0.1.0');
+    registerPipelineHandlers(
+      () => null,
+      '/repo',
+      pool as unknown as Pool,
+      '0.1.0',
+      async () => 'America/Chicago'
+    );
   });
 
   afterEach(() => rmSync(workspace, { recursive: true, force: true }));
@@ -95,6 +101,11 @@ describe('pipeline IPC single-flight', () => {
     assert.ok(args.includes(workspace));
     assert.ok(args.includes('--label'));
     assert.ok(args.includes('BK'));
+    assert.deepEqual(
+      args.slice(args.indexOf('--display-zone'), args.indexOf('--display-zone') + 2),
+      ['--display-zone', 'America/Chicago'],
+      "the examiner's zone, read when Analyze starts (EPOCH-560)"
+    );
 
     await assert.rejects(
       invoke('epoch:startPipeline', '/source', { workspace }),
@@ -115,7 +126,13 @@ describe('Prepare and its task log', () => {
     spawnMock.mockReset();
     workspace = mkdtempSync(path.join(os.tmpdir(), 'pipeline-prepare-'));
     writeFileSync(path.join(workspace, 'workspace.json'), JSON.stringify(emptyWorkspaceManifest()));
-    registerPipelineHandlers(() => null, '/repo', { query: async () => ({ rows: [] }) } as unknown as Pool, '0.1.0');
+    registerPipelineHandlers(
+      () => null,
+      '/repo',
+      { query: async () => ({ rows: [] }) } as unknown as Pool,
+      '0.1.0',
+      async () => 'UTC'
+    );
   });
   afterEach(() => rmSync(workspace, { recursive: true, force: true }));
 
@@ -274,15 +291,15 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     // (this test's own), so only an id can close one.
     await db.query(
       `INSERT INTO pipeline_runs
-         (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid,
+         (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid,
           started_at, finished_at, ended_reason)
-       VALUES ($1, $2, 'test', '{}', $3, $3, $4, $5, now() - interval '1 hour', now() - interval '50 minutes', 'crashed'),
-              ($6, $2, 'test', '{}', $3, $3, $4, $5, now(), NULL, NULL)`,
+       VALUES ($1, $2, 'test', '{}', 'UTC', $3, $3, $4, $5, now() - interval '1 hour', now() - interval '50 minutes', 'crashed'),
+              ($6, $2, 'test', '{}', 'UTC', $3, $3, $4, $5, now(), NULL, NULL)`,
       [RETRIED, decryptPath, EVIDENCE, os.hostname(), process.pid, CREATED]
     );
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid)
-       VALUES ($1, '/other/decrypted/X', 'test', '{}', $2, $3)`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, host, pid)
+       VALUES ($1, '/other/decrypted/X', 'test', '{}', 'UTC', $2, $3)`,
       [OTHER, os.hostname(), process.pid]
     );
     await db.query(
@@ -296,7 +313,13 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
 
     handlers.clear();
     spawnMock.mockReset();
-    registerPipelineHandlers(() => null, '/repo', db as unknown as Pool, '0.1.0');
+    registerPipelineHandlers(
+      () => null,
+      '/repo',
+      db as unknown as Pool,
+      '0.1.0',
+      async () => 'UTC'
+    );
   });
 
   afterAll(async () => {
@@ -363,8 +386,8 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
   it('ends the run as crashed, with the exit code, when the orchestrator exits unexpectedly', async () => {
     const CRASHED = '88888888-8888-8888-8888-888888888888';
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, evidence_id, derivative_id, host, pid)
-       VALUES ($1, $2, 'test', '{}', $3, $3, $4, $5)`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid)
+       VALUES ($1, $2, 'test', '{}', 'UTC', $3, $3, $4, $5)`,
       [CRASHED, decryptPath, EVIDENCE, os.hostname(), process.pid]
     );
     // The stage it was running when it died.
@@ -420,9 +443,9 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     const ABANDONED = '66666666-6666-6666-6666-666666666666';
     const ELSEWHERE = '77777777-7777-7777-7777-777777777777';
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, host, pid) VALUES
-         ($1, '/x', 'test', '{}', $3, $4),
-         ($2, '/y', 'test', '{}', 'another-host', $4)`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, host, pid) VALUES
+         ($1, '/x', 'test', '{}', 'UTC', $3, $4),
+         ($2, '/y', 'test', '{}', 'UTC', 'another-host', $4)`,
       [ABANDONED, ELSEWHERE, os.hostname(), deadPid]
     );
 

@@ -15,6 +15,8 @@ import {
 import { CopyButton } from '../../components/ui/CopyButton';
 import { cn } from '../../libs/utils';
 import { useDockState } from './dockState';
+import { useDisplayZone } from '../../store/useSettings';
+import { formatDateParts } from '../../../shared/time';
 
 /**
  * The Activity Log (EPOCH-570, the board "New Investigation View" and
@@ -97,6 +99,7 @@ function IconButton({
 
 export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked', error = null }: ActivityLogProps) {
   const docked = mode === 'docked';
+  const zone = useDisplayZone();
   // The dock keeps its drawer as the examiner left it across pages (EPOCH-575);
   // the pop-out window is always open and keeps its own.
   const dock = useDockState();
@@ -113,7 +116,8 @@ export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked'
   const shown = useMemo(() => visibleEntries(entries, { view, filter, search }), [entries, view, filter, search]);
   const counts = useMemo(() => logCounts(entries), [entries]);
   const latest = latestLine(entries);
-  const day = entries[0]?.at.slice(0, 10);
+  // The day the log starts on, in the zone its times are shown in (EPOCH-560).
+  const day = entries[0] ? formatDateParts(entries[0].at, zone)?.value : undefined;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -183,7 +187,7 @@ export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked'
               error ? 'text-danger' : 'text-muted-foreground'
             )}
           >
-            {error ?? (latest ? `${lineParts(latest, 'summary').time}  ${latest.message}` : 'No activity yet')}
+            {error ?? (latest ? `${lineParts(latest, 'summary', zone).time}  ${latest.message}` : 'No activity yet')}
           </span>
           {countChips}
         </button>
@@ -227,8 +231,12 @@ export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked'
             />
             {!docked && countChips}
             <span className="flex-1" />
-            {day && <span className="text-label text-muted-foreground">Times in UTC, {day}</span>}
-            <CopyButton text={() => logText(shown, view)} title="Copy log" />
+            {day && (
+              <span className="text-label text-muted-foreground">
+                Times in {zone}, {day}
+              </span>
+            )}
+            <CopyButton text={() => logText(shown, view, zone)} title="Copy log" />
             <IconButton label="Save As…" onClick={onSaveAs} disabled={!onSaveAs}>
               <Download size="1rem" aria-hidden />
             </IconButton>
@@ -270,7 +278,7 @@ export function ActivityLog({ entries, live, onSaveAs, onPopOut, mode = 'docked'
                 <div aria-hidden style={{ height: virtualizer.getVirtualItems()[0]?.start ?? 0 }} />
                 {virtualizer.getVirtualItems().map((item) => {
                   const entry = shown[item.index];
-                  const { time, tag, label, message } = lineParts(entry, view);
+                  const { time, tag, label, message } = lineParts(entry, view, zone);
                   return (
                     <div
                       key={item.key}

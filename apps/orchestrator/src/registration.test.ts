@@ -674,13 +674,47 @@ describe('stages and the completeness predicate', live, () => {
     assert.equal(await count('pipeline_runs'), runs, 'no run was created');
   });
 
+  it('records the zone the report shows times in, and a new zone is not a reason to analyze again (EPOCH-560)', async () => {
+    const ws = makeWorkspace('display-zone');
+    const stage = recordingStage('zoned', 10);
+    const stages = { enabled: [stage], disabled: [] };
+    const zoned = await runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', stages, {
+      secretPath,
+      displayZone: 'Asia/Kolkata',
+    });
+    assert.equal(zoned.success, true, JSON.stringify(zoned));
+    const { rows } = await db.query(`SELECT display_zone FROM pipeline_runs WHERE run_id = $1`, [zoned.runId]);
+    assert.deepEqual(rows, [{ display_zone: 'Asia/Kolkata' }]);
+
+    const again = await runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', stages, {
+      secretPath,
+      displayZone: 'America/Chicago',
+    });
+    assert.equal(again.skipped, true, 'the analysis is complete in any zone');
+
+    const fresh = makeWorkspace('display-zone-default', { manifest: 'b'.repeat(64) + '  Manifest.db\n' });
+    const utc = await runPipelineForBackup(db, fresh.target, DSN ?? '', 'python3', stages, { secretPath });
+    const recorded = await db.query(`SELECT display_zone FROM pipeline_runs WHERE run_id = $1`, [utc.runId]);
+    assert.deepEqual(recorded.rows, [{ display_zone: 'UTC' }], 'UTC when none is given');
+  });
+
+  it('refuses a zone that is not UTC or a named zone before any run is created (EPOCH-560)', async () => {
+    const ws = makeWorkspace('display-zone-refused');
+    const runs = await count('pipeline_runs');
+    await assert.rejects(
+      runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', NO_STAGES, { secretPath, displayZone: 'CST' }),
+      /"CST" is not a time zone Epoch can show times in/
+    );
+    assert.equal(await count('pipeline_runs'), runs, 'no run was created');
+  });
+
   it("records each stage's declared order, so a run's stages read back in stage.json order, disabled ones in place (EPOCH-414)", async () => {
     const ws = makeWorkspace('stage-order');
     const registration = await registerEvidence(db, {
       target: ws.target,
       secretPath,
     });
-    const provenance = { contractVersion: 'test', toolVersions: {} };
+    const provenance = { contractVersion: 'test', toolVersions: {}, displayZone: 'UTC' };
 
     // The real stages, as discovery finds them.
     const discovered = await discoverStages();

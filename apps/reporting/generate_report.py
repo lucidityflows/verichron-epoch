@@ -33,6 +33,7 @@ from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
+from display_zone import ZoneTimes
 from indicator_set import results_config, stale_after_days
 from runtime_env import redact_password, require_database_url
 from stage_report import report
@@ -255,7 +256,7 @@ def copied_after_backup(params: dict) -> str:
     return f"{days} d {hours} h after the backup finished"
 
 
-def describe_derivative(d: dict) -> list[str]:
+def describe_derivative(d: dict, times: ZoneTimes) -> list[str]:
     """One line of what produced a derivative, plus any repair failures."""
     tool = d["tool"]
     params = d["params"]
@@ -271,7 +272,7 @@ def describe_derivative(d: dict) -> list[str]:
     if d["kind"] == "crash_reports":
         return [
             f"- **Crash logs** (`{d['path']}`): copied from the device by {tool['name']} {tool['version']} "
-            f"on {_recorded_utc(params['acquired_at'])}, {copied_after_backup(params)}, and left on the device; "
+            f"on {times.recorded(params['acquired_at'])}, {copied_after_backup(params)}, and left on the device; "
             f"{params['files']} file(s)"
         ]
     repair = params["repair"]
@@ -292,7 +293,7 @@ def describe_derivative(d: dict) -> list[str]:
     return lines
 
 
-def render_provenance_section(inputs: list[dict], fact_sources: list[dict] | None) -> list[str]:
+def render_provenance_section(inputs: list[dict], fact_sources: list[dict] | None, times: ZoneTimes) -> list[str]:
     """What this run read, and, separately, what produced the facts shown.
 
     The two differ whenever a fact was filed by an earlier pass: e.g. after an
@@ -304,7 +305,7 @@ def render_provenance_section(inputs: list[dict], fact_sources: list[dict] | Non
     if not inputs:
         lines.append("No registered derivative was read by this run.")
     for d in inputs:
-        lines += describe_derivative(d)
+        lines += describe_derivative(d, times)
     lines.append("")
     if fact_sources is None:
         return lines
@@ -315,7 +316,7 @@ def render_provenance_section(inputs: list[dict], fact_sources: list[dict] | Non
         return lines
     read_now = {d["derivative_id"] for d in inputs}
     for d in fact_sources:
-        described = describe_derivative(d)
+        described = describe_derivative(d, times)
         note = f" — {d['records']} record(s)"
         if d["derivative_id"] not in read_now:
             note += "; **from an earlier pass, not an input of this run**"
@@ -405,15 +406,15 @@ def _bug_type(code) -> str:
     return f"{code} · {label}" if label else f"{code} · no label known"
 
 
-def render_crash_section(records: list[dict]) -> list[str]:
-    """The crash logs' table, then each log's details. Every time is UTC,
-    labelled; a missing value reads "not recorded" (EPOCH-553)."""
+def render_crash_section(records: list[dict], times: ZoneTimes) -> list[str]:
+    """The crash logs' table, then each log's details. Every time is in the
+    report's zone, labelled; a missing value reads "not recorded" (EPOCH-553)."""
     lines = [
         "| Time | Bug Type | Process | PID | Bundle ID | Incident |",
         "| :--- | :--- | :--- | ---: | :--- | :--- |",
     ]
     for r in records:
-        time = _utc(r["event_time"]) if r["event_time"] else NOT_RECORDED
+        time = times.at(r["event_time"]) if r["event_time"] else NOT_RECORDED
         lines.append(
             f"| {time} | {_bug_type(r['bug_type'])} | {_value(r['process_name'])} | {_value(r['pid'])} "
             f"| {_value(r['bundle_id'])} | {_code(r['incident_id'])} |"
@@ -525,17 +526,7 @@ def _table_cell(text: str) -> str:
     return text.replace("\\", "\\\\").replace("|", "\\|").replace("\r", " ").replace("\n", " ")
 
 
-def _utc(value) -> str:
-    return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
-
-
-def _recorded_utc(text: str) -> str:
-    """A time a derivative recorded as ISO 8601 text, in the report's one
-    format: "2026-10-15 01:00:00 UTC" (EPOCH-553)."""
-    return _utc(datetime.fromisoformat(text))
-
-
-def render_ileapp_section(rows: list[dict]) -> list[str]:
+def render_ileapp_section(rows: list[dict], times: ZoneTimes) -> list[str]:
     """Each artifact's facts beside the count iLEAPP itself reported
     (EPOCH-500): a difference means records were lost or duplicated between
     iLEAPP's output and the database, so it is flagged, never assumed away."""
@@ -574,7 +565,7 @@ def render_ileapp_section(rows: list[dict]) -> list[str]:
         if r["timed"] == 0:
             span = "no timeline position | "
         else:
-            span = f"{_utc(r['earliest'])} | {_utc(r['latest'])}"
+            span = f"{times.at(r['earliest'])} | {times.at(r['latest'])}"
         lines.append(f"| {artifact} | {r['records']} | {reported} | {r['timed']} | {span} |")
     lines.append("")
     return lines
@@ -641,11 +632,7 @@ TIME_CHECKS = {
 }
 
 
-def _date_span(first, last) -> str:
-    return _utc(first) if first == last else f"{_utc(first)} to {_utc(last)}"
-
-
-def render_tool_checks_section(corrections: list[dict]) -> list[str]:
+def render_tool_checks_section(corrections: list[dict], times: ZoneTimes) -> list[str]:
     """Every registered tool defect corrected in this evidence (R36,
     EPOCH-511), each as one entry, so no column is squeezed in a narrow
     window or on a page (board "Exported Report", EPOCH-553)."""
@@ -663,7 +650,7 @@ def render_tool_checks_section(corrections: list[dict]) -> list[str]:
     for c in corrections:
         entry = registered_defect(c["tool"], c["defect"])
         # A correction can have no event time; it says so rather than "times no time" (R11).
-        span = f"times {_date_span(c['earliest'], c['latest'])}" if c["earliest"] else "their times were not recorded"
+        span = f"times {times.span(c['earliest'], c['latest'])}" if c["earliest"] else "their times were not recorded"
         upstream = entry.upstream.status + (f" ({entry.upstream.reference})" if entry.upstream.reference else "")
         lines += [
             f"### {c['defect']} ({entry.ticket}): {_table_cell(c['artifact'])}, {_table_cell(c['column_name'])}",
@@ -678,7 +665,7 @@ def render_tool_checks_section(corrections: list[dict]) -> list[str]:
     return lines + ["---", ""]
 
 
-def render_time_review_section(review: list[dict]) -> list[str]:
+def render_time_review_section(review: list[dict], times: ZoneTimes) -> list[str]:
     """Every event time outside the device era, kept as the tool gave it and
     listed for review (R36, EPOCH-511)."""
     lines = [
@@ -699,7 +686,7 @@ def render_time_review_section(review: list[dict]) -> list[str]:
         lines.append(
             f"| {_table_cell(r['artifact'] or '(no artifact name)')} | {_table_cell(r['column_name'])} "
             f"| {TIME_CHECKS.get(r['check_name'], _table_cell(r['check_name']))} | {r['records']:,} "
-            f"| {_date_span(r['earliest'], r['latest'])} |"
+            f"| {times.span(r['earliest'], r['latest'])} |"
         )
     return lines + ["", "---", ""]
 
@@ -797,20 +784,17 @@ def fetch_indicator_checks(conn, evidence_id: str) -> list[dict]:
     return checks
 
 
-def _day(value) -> str:
-    return value.astimezone(UTC).strftime("%Y-%m-%d")
-
-
-def _set_line(check: dict, stale_days: int) -> str:
+def _set_line(check: dict, stale_days: int, times: ZoneTimes) -> str:
     """The set, when it was fetched or registered, and how old its newest indicator was when checked."""
     downloaded = [s["downloaded_on"] for s in check["sources"] if s["downloaded_on"] is not None]
-    when = f"fetched {max(downloaded).isoformat()}" if downloaded else f"registered {_day(check['registered_at'])}"
+    when = f"fetched {max(downloaded).isoformat()}" if downloaded else f"registered {times.day(check['registered_at'])}"
     line = f"Set: {_table_cell(check['set_name'])}, {when} (`{check['set_hash'][:12]}`)."
     newest = check.get("newest_indicator")
     if newest is None:
         return line + " It holds no indicator this check could load."
-    age = (check["finished_at"].astimezone(UTC).date() - newest.astimezone(UTC).date()).days
-    line += f" Newest indicator {_day(newest)}: {age} day(s) old when checked."
+    # Counted between the days as shown, in the report's zone, as the app counts it.
+    age = (times.local_date(check["finished_at"]) - times.local_date(newest)).days
+    line += f" Newest indicator {times.day(newest)}: {age} day(s) old when checked."
     if age > stale_days:
         line += f" Older than {stale_days} days when checked: indicators published since are not in it."
     return line
@@ -839,7 +823,7 @@ def _in_order(types: dict) -> list[tuple[str, dict]]:
     return sorted(types.items(), key=lambda item: (order.index(item[0]) if item[0] in order else len(order), item[0]))
 
 
-def _check_body(check: dict, stale_days: int) -> list[str]:
+def _check_body(check: dict, stale_days: int, times: ZoneTimes) -> list[str]:
     status = check["status"]
     if status == "skipped":
         reason = check["error_message"] or "the orchestrator recorded no reason."
@@ -852,7 +836,7 @@ def _check_body(check: dict, stale_days: int) -> list[str]:
         return [f"The check finished but its result is not recorded. {NOTHING_CHECKED}", ""]
     payload = unit["raw_payload"]
     found = unit["record_count"]
-    lines = [_set_line(check, stale_days), ""]
+    lines = [_set_line(check, stale_days, times), ""]
     lines += [f"{found} match(es) against this set." if found else "No match against this set.", ""]
 
     checked = {t: e for t, e in _in_order(payload["types"]) if e["status"] == "checked"}
@@ -893,16 +877,17 @@ def _check_body(check: dict, stale_days: int) -> list[str]:
 
     if check["matches"]:
         lines += [
-            "| Time (UTC) | Type | Value | Campaign | Match | Fact | File |",
+            "| Time | Type | Value | Campaign | Match | Fact | File |",
             "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
         ]
         for m in check["matches"]:
             i, f = m["fields"]["indicator"], m["fields"]["fact"]
             mode = m["fields"]["match_mode"]
             if i["expired"]:
-                mode += f", expired {(i['valid_until'] or '')[:10]}"
+                expiry = i["valid_until"]
+                mode += f", expired {times.day(datetime.fromisoformat(expiry))}" if expiry else ", expired"
             lines.append(
-                f"| {_utc(m['event_time']) if m['event_time'] else 'no time recorded'} "
+                f"| {times.at(m['event_time']) if m['event_time'] else 'no time recorded'} "
                 f"| {TYPE_LABELS.get(i['type'], i['type'])} | `{_table_cell(i['value'])}` "
                 f"| {_table_cell(', '.join(i['campaigns']) or 'not named')} | {mode} "
                 f"| {_table_cell(f['source'])} (record {f['record_id']}) | `{_table_cell(i['source_file'])}` |"
@@ -911,7 +896,7 @@ def _check_body(check: dict, stale_days: int) -> list[str]:
     return lines + _sources_lines(check)
 
 
-def render_indicator_section(checks: list[dict], run_id: str, stale_days: int) -> list[str]:
+def render_indicator_section(checks: list[dict], run_id: str, stale_days: int, times: ZoneTimes) -> list[str]:
     """This run's indicator check, then every earlier check of the same
     evidence, each with its own set and date and never merged (EPOCH-493).
     Each states what wasn't checked, so "no match" never reads as a clean
@@ -921,15 +906,15 @@ def render_indicator_section(checks: list[dict], run_id: str, stale_days: int) -
     earlier = [c for c in checks if str(c["run_id"]) != str(run_id)]
     if this_run:
         check = this_run[0]
-        when = f" ({_utc(check['finished_at'])})" if check["finished_at"] else ""
+        when = f" ({times.at(check['finished_at'])})" if check["finished_at"] else ""
         lines += [f"### This run's check{when}", ""]
-        lines += _check_body(check, stale_days)
+        lines += _check_body(check, stale_days, times)
     else:
         lines += ["### This run's check", "", f"This run did not check indicators. {NOTHING_CHECKED}", ""]
     if earlier:
         lines += ["### Earlier checks of this evidence", ""]
         for check in earlier:
-            when = _day(check["finished_at"]) if check["finished_at"] else "not finished"
+            when = times.day(check["finished_at"]) if check["finished_at"] else "not finished"
             if check["status"] == "succeeded" and check["unit"] is not None:
                 found = check["unit"]["record_count"]
                 result = f"{found} match(es)" if found else "no match"
@@ -961,7 +946,7 @@ def fetch_fact_counts(conn, evidence_id: str) -> list[dict]:
 
 
 def render_coverage_section(
-    counts: list[dict], ileapp_outputs: list[dict], crash_reports: list[dict] | None = None
+    counts: list[dict], ileapp_outputs: list[dict], crash_reports: list[dict] | None, times: ZoneTimes
 ) -> list[str]:
     """What the report shows of the evidence's facts, and what it doesn't, so
     "not shown" can never read as "not found". Also what iLEAPP's modules did
@@ -994,7 +979,7 @@ def render_coverage_section(
         )
     for d in crash_reports or []:
         p = d["params"]
-        when = _recorded_utc(p["acquired_at"])
+        when = times.recorded(p["acquired_at"])
         lines.append(
             f"Crash logs (`{d['path']}`): {p['files']} file(s) copied from the device on {when}, "
             f"{copied_after_backup(p)}."
@@ -1016,6 +1001,17 @@ def fetch_run_evidence(conn, run_id: str) -> str | None:
     return str(row[0]) if row and row[0] is not None else None
 
 
+def fetch_run_display_zone(conn, run_id: str) -> str:
+    """The zone the run records for its report's times (EPOCH-560, R35): the
+    report reads it from the run, so the two can't disagree."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT display_zone FROM pipeline_runs WHERE run_id = %s", (run_id,))
+        row = cur.fetchone()
+    if row is None:
+        raise ReportInputError(f"run {run_id} is not recorded, so the zone for its report's times is unknown")
+    return row[0]
+
+
 #: What the report is, and who draws conclusions from it (EPOCH-552). Approved
 #: by the project owner on 2026-10-19, within docs/claims.md: no result is
 #: proof of absence. It travels with the report, the document handed over.
@@ -1026,8 +1022,9 @@ RESPONSIBILITY = (
 )
 
 
-def render_title_block(evidence_id: str | None, run_id: str, created: str) -> list[str]:
-    """The report's title, what it is about and when it was made, and the
+def render_title_block(evidence_id: str | None, run_id: str, created: str, times: ZoneTimes) -> list[str]:
+    """The report's title, what it is about and when it was made, the zone
+    its times are shown in (board "Time Display Rules"), and the
     responsibility statement, before anything else."""
     return [
         "# Investigation Report",
@@ -1035,7 +1032,8 @@ def render_title_block(evidence_id: str | None, run_id: str, created: str) -> li
         f"**Evidence:** `{evidence_id or 'not registered'}`  ",
         f"**Run:** `{run_id}`  ",
         f"**Report created:** {created}  ",
-        "**Times in this report:** UTC, labelled on every time.",
+        f"**Times shown in {times.heading()}.** Every time is labelled with its zone; "
+        "evidence times are stored in UTC.",
         "",
         f"*{RESPONSIBILITY}*",
         "",
@@ -1054,10 +1052,11 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     """
     if evidence_id is None:
         evidence_id = fetch_run_evidence(conn, run_id)
-    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+    times = ZoneTimes(fetch_run_display_zone(conn, run_id))
+    timestamp = times.at(datetime.now(UTC))
     stages = fetch_stage_status(conn, run_id)
 
-    lines = render_title_block(evidence_id, run_id, timestamp)
+    lines = render_title_block(evidence_id, run_id, timestamp, times)
     inputs = fetch_run_derivatives(conn, run_id)
     ileapp_outputs = [d for d in inputs if d["kind"] == "ileapp_output"]
     # What was not examined comes first (board "Reports View", EPOCH-552): it
@@ -1068,6 +1067,7 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     lines += render_provenance_section(
         inputs,
         fetch_fact_derivatives(conn, evidence_id) if evidence_id else None,
+        times,
     )
     lines.append("---")
     lines.append("")
@@ -1090,17 +1090,18 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
         fetch_fact_counts(conn, evidence_id),
         ileapp_outputs,
         [d for d in inputs if d["kind"] == "crash_reports"],
+        times,
     )
-    lines += render_tool_checks_section(fetch_corrections(conn, evidence_id))
-    lines += render_time_review_section(fetch_time_review(conn, evidence_id))
-    lines += render_indicator_section(fetch_indicator_checks(conn, evidence_id), run_id, stale_after_days())
+    lines += render_tool_checks_section(fetch_corrections(conn, evidence_id), times)
+    lines += render_time_review_section(fetch_time_review(conn, evidence_id), times)
+    lines += render_indicator_section(fetch_indicator_checks(conn, evidence_id), run_id, stale_after_days(), times)
 
     for title, fetch, render in RENDERERS.values():
         rows = fetch(conn, evidence_id)
         if not rows:
             continue
         lines += [f"## {title}", ""]
-        lines += render(rows)
+        lines += render(rows, times)
         lines.append("---")
         lines.append("")
 
