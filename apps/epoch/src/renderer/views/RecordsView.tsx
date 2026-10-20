@@ -1,101 +1,99 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Database, FileQuestion, Filter, MousePointerClick } from 'lucide-react';
 import type { ForensicRecordRow } from '@verichron/etl-db-reader';
-import { Badge } from '../components/ui/Badge';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { DateTime } from '../components/ui/DateTime';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
+import { TableSkeleton } from '../components/ui/Skeleton';
 import { InterruptedStagesPanel } from '../features/records/InterruptedStagesPanel';
 import { StillFailingPanel } from '../features/records/StillFailingPanel';
+import { CompletenessPanel } from '../features/records/CompletenessPanel';
+import { RecordFiltersBar } from '../features/records/RecordFiltersBar';
+import { RecordSheet } from '../features/records/RecordSheet';
+import { useRecords, type RecordFilters } from '../features/records/useRecords';
+import { originOf, summaryOf, tierLabel } from '../features/records/recordText';
+import { useDisplayZone } from '../store/useSettings';
 
 interface RecordsViewProps {
   selectedRun: boolean;
-  /** The selected run, whose evidence's still-failing items show above its records (EPOCH-432). */
+  /** The selected analysis; its evidence's records are shown (R7). */
   runId: string | null;
-  /** The selected analysis's name (EPOCH-555), now that no strip above the page names it. */
+  /** The selected analysis's name (EPOCH-555). */
   analysisName: string | null;
-  /** A rerun started from the still-failing panel has finished: read the records again. */
-  onRerunFinished?: () => void;
-  records: ForensicRecordRow[];
-  /** Records loaded so far for the run's evidence (all source types). */
-  loadedCount: number;
-  /** Every record for the run's evidence, from the reader (R25). */
-  totalCount: number;
   /** False when the run has no registered evidence, so nothing was read. */
   evidenceRegistered: boolean;
-  availableSourceTypes: string[];
-  sourceTypeFilter: string | null;
-  onFilterChange: (sourceType: string | null) => void;
+  /** A rerun started from a panel above the records has finished. */
+  onRerunFinished?: () => void;
+  onOpenInvestigations: () => void;
+  onOpenIndicatorMatches: () => void;
 }
 
-const cellMono = 'font-mono text-data';
+const COLUMNS: DataTableColumn<ForensicRecordRow>[] = [
+  {
+    id: 'event_time',
+    header: 'Time',
+    cell: ({ row }) => <DateTime value={row.original.event_time} className="font-mono text-data" />,
+    meta: { width: 'minmax(12rem, 1fr)' },
+  },
+  {
+    id: 'origin',
+    header: 'Artifact',
+    cell: ({ row }) => <span className="truncate">{originOf(row.original)}</span>,
+    meta: { width: 'minmax(8rem, 1fr)' },
+  },
+  {
+    id: 'summary',
+    header: 'Summary',
+    cell: ({ row }) => <span className="truncate font-mono text-foreground/90">{summaryOf(row.original)}</span>,
+    meta: { width: 'minmax(10rem, 2.4fr)' },
+  },
+  {
+    id: 'tier',
+    header: 'Tier',
+    cell: ({ row }) => (
+      <span
+        className={`text-label rounded-full px-2 py-0.5 whitespace-nowrap ${
+          row.original.tier === 'tool_judgement' ? 'bg-surface-hover text-foreground' : 'text-muted-foreground'
+        }`}
+      >
+        {tierLabel(row.original.tier)}
+      </span>
+    ),
+    meta: { width: '8rem' },
+  },
+];
 
-function buildColumns(): DataTableColumn<ForensicRecordRow>[] {
-  return [
-    {
-      id: 'event_time',
-      header: 'Event Time',
-      accessorFn: (row) => row.event_time,
-      cell: ({ row }) => <DateTime value={row.original.event_time} className={cellMono} />,
-      meta: { width: 'minmax(11rem, 1.2fr)' },
-    },
-    {
-      id: 'source_type',
-      header: 'Source Type',
-      accessorFn: (row) => row.source_type,
-      cell: ({ row }) => <Badge variant="neutral">{row.original.source_type}</Badge>,
-      meta: { width: 'minmax(9rem, 1fr)' },
-    },
-    {
-      id: 'bug_type',
-      header: 'Bug Type',
-      accessorFn: (row) => row.bug_type,
-      cell: ({ row }) => <span className={cellMono}>{row.original.bug_type ?? '—'}</span>,
-    },
-    {
-      id: 'process_name',
-      header: 'Process',
-      accessorFn: (row) => row.process_name,
-      cell: ({ row }) => <span className={cellMono}>{row.original.process_name ?? '—'}</span>,
-    },
-    {
-      id: 'pid',
-      header: 'PID',
-      accessorFn: (row) => row.pid,
-      cell: ({ row }) => <span className={cellMono}>{row.original.pid ?? '—'}</span>,
-      meta: { width: 'minmax(5rem, 0.5fr)' },
-    },
-    {
-      id: 'bundle_id',
-      header: 'Bundle ID',
-      accessorFn: (row) => row.bundle_id,
-      cell: ({ row }) => <span className={cellMono}>{row.original.bundle_id ?? '—'}</span>,
-    },
-    {
-      id: 'incident_id',
-      header: 'Incident',
-      accessorFn: (row) => row.incident_id,
-      cell: ({ row }) => <span className={cellMono}>{row.original.incident_id ?? '—'}</span>,
-    },
-  ];
-}
-
+/**
+ * Forensic Records (EPOCH-411, EPOCH-556; board 14): every fact of the
+ * selected investigation's evidence, with what was examined above it. Rows,
+ * filters and counts are read from the database a page at a time; nothing
+ * is filtered or counted from the rows on screen (R25).
+ */
 export function RecordsView({
   selectedRun,
   runId,
   analysisName,
-  onRerunFinished,
-  records,
-  loadedCount,
-  totalCount,
   evidenceRegistered,
-  availableSourceTypes,
-  sourceTypeFilter,
-  onFilterChange,
+  onRerunFinished,
+  onOpenInvestigations,
+  onOpenIndicatorMatches,
 }: RecordsViewProps) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const columns = useMemo(buildColumns, []);
+  const zone = useDisplayZone();
+  const [filters, setFilters] = useState<RecordFilters>({});
+  const [opened, setOpened] = useState<ForensicRecordRow | null>(null);
+  const readable = selectedRun && evidenceRegistered ? runId : null;
+  const records = useRecords(readable, filters);
+  // A new investigation starts with no filters and nothing open.
+  const [shownRun, setShownRun] = useState(runId);
+  if (shownRun !== runId) {
+    setShownRun(runId);
+    setFilters({});
+    setOpened(null);
+  }
+  const columns = useMemo(() => COLUMNS, []);
+  const closeRecord = useCallback(() => setOpened(null), []);
+  const nothingAtAll = records.facets !== null && records.facets.total === 0 && Object.keys(filters).length === 0;
 
   return (
     <ViewLayout
@@ -103,86 +101,80 @@ export function RecordsView({
       title="Forensic Records"
       description="Every fact extracted from this evidence, with where it came from. Records show what was found, not what was not examined."
       context={analysisName}
-      scroll="contained"
-      className="overflow-hidden"
     >
-      {selectedRun && loadedCount < totalCount && (
-        // A capped list must say so (R25). Filters below apply only to the
-        // loaded rows until the server-side grid lands (EPOCH-411).
-        <p className="text-data text-muted-foreground mb-4 shrink-0">
-          Showing the first {loadedCount.toLocaleString()} of {totalCount.toLocaleString()} records for this evidence.
-          Filters apply to the loaded records only.
-        </p>
-      )}
-
-      {selectedRun && evidenceRegistered && runId && (
-        <>
-          <InterruptedStagesPanel key={`interrupted-${runId}`} runId={runId} onRerunFinished={onRerunFinished} />
-          <StillFailingPanel key={runId} runId={runId} onRerunFinished={onRerunFinished} />
-        </>
-      )}
-
       {!selectedRun ? (
         <EmptyState
           icon={MousePointerClick}
           title="No investigation selected"
           detail="Select an investigation in Investigations to see its forensic records."
         />
-      ) : !evidenceRegistered ? (
+      ) : !evidenceRegistered || !runId ? (
         <EmptyState
           icon={FileQuestion}
           title="Evidence not registered"
           detail="This investigation's evidence isn't registered yet, so its facts haven't been read. This is not the same as finding nothing."
         />
-      ) : records.length === 0 && !sourceTypeFilter ? (
-        <EmptyState
-          icon={Database}
-          title="No records"
-          detail="No forensic records were found for this investigation."
-        />
       ) : (
         <>
-          <div className="flex gap-2 mb-5 shrink-0">
-            <button
-              onClick={() => onFilterChange(null)}
-              className={`px-4 py-2 rounded-md text-label font-mono transition-all ${
-                sourceTypeFilter === null
-                  ? 'bg-accent/15 text-accent shadow-elevation-1'
-                  : 'bg-surface-raised text-muted-foreground shadow-elevation-1 hover:shadow-elevation-2 hover:text-foreground'
-              }`}
+          <InterruptedStagesPanel key={`interrupted-${runId}`} runId={runId} onRerunFinished={onRerunFinished} />
+          <StillFailingPanel key={runId} runId={runId} onRerunFinished={onRerunFinished} />
+          <CompletenessPanel key={runId} runId={runId} onOpenInvestigations={onOpenInvestigations} />
+          {records.error && (
+            <div
+              role="alert"
+              className="text-warning bg-warning/10 shadow-elevation-1 border border-warning/30 rounded-lg p-4 text-data mb-4 shrink-0"
             >
-              all
-            </button>
-            {availableSourceTypes.map((st) => (
-              <button
-                key={st}
-                onClick={() => onFilterChange(st)}
-                className={`px-4 py-2 rounded-md text-label font-mono transition-all ${
-                  sourceTypeFilter === st
-                    ? 'bg-accent/15 text-accent shadow-elevation-1'
-                    : 'bg-surface-raised text-muted-foreground shadow-elevation-1 hover:shadow-elevation-2 hover:text-foreground'
-                }`}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
-
-          <DataTable<ForensicRecordRow>
-            data={records}
-            columns={columns}
-            getRowId={(row) => String(row.id)}
-            expandedId={expandedId}
-            onRowClick={(row) => setExpandedId(expandedId === String(row.id) ? null : String(row.id))}
-            estimateRowHeight={44}
-            className="flex-1 min-h-0 rounded-lg shadow-elevation-1"
-            emptyState={<EmptyState icon={Filter} title="No records match this filter" />}
-            renderExpanded={(row) => (
-              <pre className="text-data font-mono text-muted-foreground whitespace-pre-wrap break-all">
-                {JSON.stringify(row.fields, null, 2)}
-              </pre>
-            )}
-          />
+              The records could not be read: {records.error}
+            </div>
+          )}
+          {nothingAtAll ? (
+            <EmptyState
+              icon={Database}
+              title="Nothing was extracted from this evidence"
+              detail="There are no records, which is not a finding about the device. Evidence Completeness above says what ran and what did not."
+            />
+          ) : (
+            <>
+              <RecordFiltersBar
+                filters={filters}
+                facets={records.facets}
+                zone={zone}
+                onChange={(next) => {
+                  setFilters(next);
+                  setOpened(null);
+                }}
+              />
+              {records.loading && records.rows.length === 0 ? (
+                <TableSkeleton />
+              ) : (
+                <DataTable<ForensicRecordRow>
+                  data={records.rows}
+                  columns={columns}
+                  getRowId={(row) => row.id}
+                  selectedId={opened?.id ?? null}
+                  onRowClick={(row) => setOpened(opened?.id === row.id ? null : row)}
+                  onNearEnd={records.hasMore ? records.loadMore : undefined}
+                  estimateRowHeight={44}
+                  className="flex-1 min-h-[24rem] rounded-lg border border-border bg-surface-raised shadow-elevation-1"
+                  emptyState={
+                    <EmptyState
+                      icon={Filter}
+                      title="No records match these filters"
+                      detail="None of this evidence's records match every filter in use. Clear a filter to see more."
+                    />
+                  }
+                />
+              )}
+            </>
+          )}
+          {opened && (
+            <RecordSheet
+              runId={runId}
+              row={opened}
+              onClose={closeRecord}
+              onOpenIndicatorMatches={onOpenIndicatorMatches}
+            />
+          )}
         </>
       )}
     </ViewLayout>

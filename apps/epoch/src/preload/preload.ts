@@ -80,6 +80,10 @@ const dbApi = {
   getInterruptedStages: (runId: string) => ipcRenderer.invoke('epoch:getInterruptedStages', runId),
   getForensicRecords: (runId: string, query?: ForensicRecordQuery) =>
     ipcRenderer.invoke('epoch:getForensicRecords', runId, query),
+  getRecordFacets: (runId: string, query?: ForensicRecordQuery) =>
+    ipcRenderer.invoke('epoch:getRecordFacets', runId, query),
+  getEvidenceCompleteness: (runId: string) => ipcRenderer.invoke('epoch:getEvidenceCompleteness', runId),
+  getRecordDetail: (runId: string, recordId: string) => ipcRenderer.invoke('epoch:getRecordDetail', runId, recordId),
   getIndicatorResults: (runId: string) => ipcRenderer.invoke('epoch:getIndicatorResults', runId),
   getReport: (runId: string): Promise<ReportResult> => ipcRenderer.invoke('epoch:getReport', runId),
   openReport: (runId: string): Promise<boolean> => ipcRenderer.invoke('epoch:openReport', runId),

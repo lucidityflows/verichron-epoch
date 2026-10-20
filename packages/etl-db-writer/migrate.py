@@ -160,6 +160,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _column("pipeline_runs", "display_zone"),
         _constraint("pipeline_runs_display_zone_present"),
     ),
+    "0021_record_reads.sql": (
+        _relation("source_type_tiers"),
+        _relation("idx_forensic_match_cites"),
+    ),
 }
 
 

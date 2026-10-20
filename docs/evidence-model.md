@@ -252,6 +252,19 @@ Every fact enters through one door, `ingest()` in `db_writer.py` (R13).
   isn't UTF-8 text). The stage's notes count the values it
   encoded.
 
+- **Every source type is registered with its tier (R10).** `source_type_tiers`
+  (migration 0021) names each one Observed, Tool judgement or Lead, and
+  `forensic_records` refers to it, so a record of an unregistered type can't be
+  written. A Lead (an AI-assisted lead) is never read among the facts.
+- **Where an iLEAPP record came from is also a column.** `source_artifact`,
+  `module` and `category` are generated from `fields` when a record is written
+  (0021), so they are indexed and counted like `source_type`. Their one source
+  stays `fields`. Each iLEAPP unit's payload names its artifact's columns with
+  the type iLEAPP declared (`columns`: column, header, type; parser version 6),
+  so a reader shows a time as a time without guessing.
+- **Search reads values, never names.** `record_values_text(fields)` joins a
+  record's values, indexed by trigram (`pg_trgm`).
+
 Reads go through two views (R27):
 
 | View | Shows |

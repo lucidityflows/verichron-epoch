@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { PipelineRunRow } from '@verichron/etl-db-reader';
 import { Sidebar, type Section } from './components/layout/Sidebar';
 import { WorkspaceView } from './views/WorkspaceView';
@@ -19,10 +19,6 @@ export const App: React.FC = () => {
     runs,
     selectedRun,
     stages,
-    records,
-    recordsTotal,
-    recordsLoaded,
-    sourceTypeFilter,
     loading,
     error,
     dbStatus,
@@ -30,9 +26,6 @@ export const App: React.FC = () => {
     setRuns,
     setSelectedRun,
     setStages,
-    setRecords,
-    setRecordsLoaded,
-    setSourceTypeFilter,
     setLoading,
     setError,
     setDbStatus,
@@ -102,36 +95,10 @@ export const App: React.FC = () => {
     [setDbStatus, setRuns, setSelectedRun]
   );
 
-  const loadRecords = async (run: PipelineRunRow) => {
-    if (!run.evidence_id) {
-      // Nothing to read; RecordsView says the evidence isn't registered.
-      setRecords([], 0);
-      setRecordsLoaded(true);
-      return;
-    }
-    try {
-      // First page only, with the true total (R25). RecordsView says when it
-      // is showing less than everything; the paged, server-filtered grid is
-      // EPOCH-411.
-      const page = await runsApi.getForensicRecords(run.run_id);
-      setRecords(page.rows, page.total);
-      setRecordsLoaded(true);
-      setDbStatus('connected');
-    } catch (err) {
-      console.error('Failed to load records:', err);
-      setDbStatus('error');
-    }
-  };
+  // Forensic Records reads its own pages and counts; a finished rerun reads them again.
+  const [recordsVersion, setRecordsVersion] = useState(0);
 
-  const handleSectionSelect = (next: Section) => {
-    setSection(next);
-    if (next === 'records' && selectedRun && !recordsLoaded) {
-      loadRecords(selectedRun);
-    }
-  };
-
-  const availableSourceTypes = Array.from(new Set(records.map((r) => r.source_type))).sort();
-  const visibleRecords = sourceTypeFilter ? records.filter((r) => r.source_type === sourceTypeFilter) : records;
+  const handleSectionSelect = (next: Section) => setSection(next);
 
   return (
     <TooltipProvider>
@@ -166,21 +133,18 @@ export const App: React.FC = () => {
 
             {section === 'records' && (
               <RecordsView
+                key={recordsVersion}
                 selectedRun={!!selectedRun}
                 runId={selectedRun?.run_id ?? null}
                 analysisName={analysisName(selectedRun)}
+                evidenceRegistered={!!selectedRun?.evidence_id}
                 onRerunFinished={() => {
                   if (!selectedRun) return;
                   refreshRun(selectedRun.run_id);
-                  loadRecords(selectedRun);
+                  setRecordsVersion((v) => v + 1);
                 }}
-                records={visibleRecords}
-                loadedCount={records.length}
-                totalCount={recordsTotal}
-                evidenceRegistered={!!selectedRun?.evidence_id}
-                availableSourceTypes={availableSourceTypes}
-                sourceTypeFilter={sourceTypeFilter}
-                onFilterChange={setSourceTypeFilter}
+                onOpenInvestigations={() => setSection('runs')}
+                onOpenIndicatorMatches={() => setSection('iocs')}
               />
             )}
 

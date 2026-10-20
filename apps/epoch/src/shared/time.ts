@@ -172,3 +172,35 @@ export function isoWithOffset(time: TimeValue, zone: DisplayZone): string {
   const minutes = isUtc(zone) ? 0 : offsetMinutes(date, zone);
   return `${f.date}T${f.time}${fraction}${isUtc(zone) ? 'Z' : offsetText(minutes)}`;
 }
+
+/** A wall-clock time without a zone, as a time input gives it: "2026-11-01T01:30" (seconds optional). */
+const WALL_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
+
+/**
+ * The instant a wall-clock time names in `zone`, as ISO 8601 UTC, for a
+ * filter the examiner types in their own zone (EPOCH-411). On the night the
+ * clocks go back, a time that occurs twice names its first occurrence
+ * (`later: false`, a range's start) or its second (`later: true`, a range's
+ * end), so the range covers both. A time the clocks skip doesn't exist, and
+ * is refused rather than moved.
+ */
+export function wallTimeToInstant(wall: string, zone: DisplayZone, later = false): string {
+  const m = WALL_TIME.exec(wall);
+  if (!m) throw new Error(`not a date and time: ${wall}`);
+  const [year, month, day, hour, minute] = m.slice(1, 6);
+  const second = m[6] ?? '00';
+  const asUtc = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+  const named = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+  if (isUtc(zone)) return new Date(asUtc).toISOString();
+  // The offsets in force a day either side cover every candidate instant.
+  const offsets = [...new Set([-86_400_000, 0, 86_400_000].map((d) => offsetMinutes(new Date(asUtc + d), zone)))];
+  const candidates = offsets
+    .map((offset) => asUtc - offset * 60_000)
+    .filter((instant) => {
+      const f = fields(new Date(instant), zone);
+      return `${f.date}T${f.time}` === named;
+    })
+    .sort((a, b) => a - b);
+  if (candidates.length === 0) throw new Error(`${wall} does not exist in ${zone}: the clocks skip it`);
+  return new Date(later ? candidates.at(-1)! : candidates[0]).toISOString();
+}

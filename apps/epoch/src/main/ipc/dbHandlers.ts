@@ -5,6 +5,9 @@ import {
   getRunEvidence,
   getStageStatus,
   getForensicRecords,
+  getRecordFacets,
+  getEvidenceCompleteness,
+  getRecordDetail,
   getIndicatorChecks,
   getStageFailures,
   getStillFailing,
@@ -86,6 +89,23 @@ export function registerDbHandlers(dbPool: Pool) {
       console.error('DB error:', err);
       throw err;
     }
+  });
+
+  // Forensic Records' counts, what was examined, and one opened record (EPOCH-411, EPOCH-556),
+  // for the selected run's evidence. A run with no registered evidence has none.
+  ipcMain.handle('epoch:getRecordFacets', async (_event, runId: string, query?: ForensicRecordQuery) => {
+    const evidenceId = await getRunEvidence(dbPool, runId);
+    return evidenceId ? getRecordFacets(dbPool, evidenceId, query ?? {}) : null;
+  });
+
+  ipcMain.handle('epoch:getEvidenceCompleteness', async (_event, runId: string) => {
+    const evidenceId = await getRunEvidence(dbPool, runId);
+    return evidenceId ? getEvidenceCompleteness(dbPool, evidenceId) : null;
+  });
+
+  ipcMain.handle('epoch:getRecordDetail', async (_event, runId: string, recordId: string) => {
+    const evidenceId = await getRunEvidence(dbPool, runId);
+    return evidenceId ? getRecordDetail(dbPool, evidenceId, recordId) : null;
   });
 
   // Every check of the selected run's evidence (EPOCH-493), with the stale
