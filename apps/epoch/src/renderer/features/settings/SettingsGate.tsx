@@ -15,10 +15,16 @@ export function SettingsGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    const stop = settingsApi.onSettingsChanged(setSettings);
+    // A change from another window can arrive before the first read answers;
+    // the read is then older than the change and is not applied (CodeRabbit, PR #138).
+    let changed = false;
+    const stop = settingsApi.onSettingsChanged((settings) => {
+      changed = true;
+      setSettings(settings);
+    });
     settingsApi.getSettings().then(
-      (settings) => active && setSettings(settings),
-      (err: unknown) => active && setError(err instanceof Error ? err.message : String(err))
+      (settings) => active && !changed && setSettings(settings),
+      (err: unknown) => active && !changed && setError(err instanceof Error ? err.message : String(err))
     );
     return () => {
       active = false;

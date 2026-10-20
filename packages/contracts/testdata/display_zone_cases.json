@@ -1,5 +1,12 @@
 {
-  "accepted": ["UTC", "America/Chicago", "Asia/Kolkata", "Australia/Adelaide", "America/Argentina/Salta", "Europe/London"],
+  "accepted": [
+    "UTC",
+    "America/Chicago",
+    "Asia/Calcutta",
+    "Australia/Adelaide",
+    "America/Argentina/Salta",
+    "Europe/London"
+  ],
   "refused": [
     "",
     "utc",
@@ -13,6 +20,10 @@
     "Etc/UTC",
     "America/Nowhere",
     "../etc/passwd",
-    "America/Chicago "
+    "America/Chicago ",
+    "america/chicago",
+    "America/CHICAGO",
+    "etc/gmt+5",
+    "etc/utc"
   ]
 }

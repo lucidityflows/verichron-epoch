@@ -4,6 +4,8 @@ the TypeScript copy gives them (ts/displayZone.test.ts reads the same file)."""
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -64,3 +66,30 @@ def test_a_day_is_the_day_in_the_zone_and_a_calendar_date_is_shown_as_recorded()
 def test_a_time_without_an_offset_is_refused_not_read_in_the_hosts_zone():
     with pytest.raises(ValueError, match="without a UTC offset"):
         ZoneTimes().at(datetime(2026, 10, 8, 0, 36, 36))
+
+
+def test_every_zone_the_app_can_offer_loads_in_the_report():
+    """The app offers the zones its JavaScript runtime knows (displayZones in
+    displayZone.ts); the report reads the pinned tzdata package. Every one the
+    app can offer must load here, or a report in that zone would fail
+    (found 2026-10-20: Debian 13's own files lack 18 of them)."""
+    node = shutil.which("node")
+    assert node, "Node is needed to list the app's zones (mise install provides it)"
+    listed = json.loads(
+        subprocess.run(
+            [node, "-e", 'console.log(JSON.stringify(Intl.supportedValuesOf("timeZone")))'],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )
+    offered = [zone for zone in listed if "/" in zone and not zone.startswith("Etc/")]
+    assert len(offered) > 400
+    missing = [zone for zone in offered if not is_display_zone(zone)]
+    assert missing == []
+    assert display_zone("Asia/Calcutta").utcoffset(datetime(2026, 10, 8, tzinfo=UTC)) is not None
+
+
+def test_zones_come_from_the_pinned_package_not_the_host():
+    assert str(display_zone("Europe/Kiev")) == "Europe/Kiev"
+    assert not is_display_zone("america/chicago"), "the database is case-sensitive, so one spelling is kept"

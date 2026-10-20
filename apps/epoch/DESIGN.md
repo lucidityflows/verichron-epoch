@@ -606,7 +606,8 @@ only how they are shown.
   are stored in UTC. This changes only how times are shown, in the app and in
   reports."), a line saying a report keeps the zone it was written in, and a
   Preview of the time now in the chosen zone. A choice is saved at once.
-  Only UTC or a named zone can be chosen.
+  Only UTC or a named zone can be chosen, listed as the app's runtime spells
+  it: some under their older names ("Asia/Calcutta" for Kolkata, "Europe/Kiev").
 - **The zone reaches every time:** each view and the Activity Log, with its
   Copy, Save As ("times in America/Chicago") and Copy Details, and the line
   above its entries ("Times in America/Chicago, 2026-10-14"). An indicator

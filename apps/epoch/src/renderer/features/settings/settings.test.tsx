@@ -17,11 +17,15 @@ import { SettingsGate } from './SettingsGate';
 let stored: AppSettings;
 let changed: ((settings: AppSettings) => void) | null;
 let readError: Error | null;
+let readGate: Promise<void> | null;
 const setDisplayZone = vi.fn(async (zone: string) => (stored = { ...stored, displayZone: zone }));
 
 vi.stubGlobal('epoch', {
   getSettings: async () => {
+    const answer = stored;
+    if (readGate) await readGate;
     if (readError) throw readError;
+    if (readGate) return answer;
     return stored;
   },
   getDisplayZones: async () => ['UTC', 'America/Chicago', 'Asia/Kolkata'],
@@ -39,6 +43,7 @@ beforeEach(() => {
   stored = { displayZone: 'UTC', backupsFolder: null };
   changed = null;
   readError = null;
+  readGate = null;
   setDisplayZone.mockClear();
   // As at start-up: nothing loaded until SettingsGate loads it.
   useSettingsStore.setState({ settings: null });
@@ -97,6 +102,16 @@ describe('the time zone setting', () => {
     app();
     await screen.findByTestId('elsewhere');
     await act(async () => changed!({ displayZone: 'Asia/Kolkata', backupsFolder: null }));
+    assert.equal(screen.getByTestId('elsewhere').textContent, '2026-11-01 12:00:00 UTC+05:30');
+  });
+
+  it('keeps a change from another window that arrives before its first read answers (CodeRabbit, PR #138)', async () => {
+    let answer!: () => void;
+    readGate = new Promise((resolve) => (answer = resolve));
+    app();
+    // The read has taken the file as UTC; then another window chooses Kolkata's zone.
+    await act(async () => changed!({ displayZone: 'Asia/Calcutta', backupsFolder: null }));
+    await act(async () => answer());
     assert.equal(screen.getByTestId('elsewhere').textContent, '2026-11-01 12:00:00 UTC+05:30');
   });
 

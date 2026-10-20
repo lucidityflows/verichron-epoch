@@ -65,13 +65,17 @@ const buttonVariants = cva(
     variants: {
       variant: {
         // The primary action: the one filled accent button of a step (DESIGN.md §9).
-        accent: 'bg-accent text-on-accent shadow-elevation-2 hover:bg-accent/90 active:scale-[0.99]',
+        // The filled buttons carry a transparent border, so they are the same
+        // height as an outline button beside them (owner's review of PR #138).
+        accent:
+          'bg-accent text-on-accent border border-transparent shadow-elevation-2 hover:bg-accent/90 active:scale-[0.99]',
         // A secondary action is neutral, with a border, so the primary action is
         // the only coloured button on a screen (EPOCH-574, DESIGN.md §9).
         outline:
           'bg-surface-raised text-foreground border border-border-strong shadow-elevation-1 hover:bg-surface-hover active:scale-[0.99]',
         ghost: 'text-muted-foreground hover:text-foreground',
-        danger: 'bg-danger text-background shadow-elevation-2 hover:bg-danger/90 active:scale-[0.99]',
+        danger:
+          'bg-danger text-background border border-transparent shadow-elevation-2 hover:bg-danger/90 active:scale-[0.99]',
       },
       size: {
         default: '',

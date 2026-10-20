@@ -107,7 +107,7 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className={head}>Time (UTC)</th>
+                <th className={head}>Time</th>
                 <th className={head}>Type</th>
                 <th className={head}>Value</th>
                 <th className={head}>Campaign</th>
@@ -130,7 +130,16 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
                     <td className={cell}>
                       {match_mode}
                       {indicator.expired && (
-                        <span className="text-warning">, expired {(indicator.valid_until ?? '').slice(0, 10)}</span>
+                        // The day it expired in the examiner's zone, as the report says it (EPOCH-560).
+                        <span className="text-warning">
+                          , expired
+                          {indicator.valid_until && (
+                            <>
+                              {' '}
+                              <DateTime value={indicator.valid_until} dateOnly />
+                            </>
+                          )}
+                        </span>
                       )}
                     </td>
                     <td className={cell}>

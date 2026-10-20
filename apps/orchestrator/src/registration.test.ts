@@ -680,11 +680,11 @@ describe('stages and the completeness predicate', live, () => {
     const stages = { enabled: [stage], disabled: [] };
     const zoned = await runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', stages, {
       secretPath,
-      displayZone: 'Asia/Kolkata',
+      displayZone: 'Asia/Calcutta',
     });
     assert.equal(zoned.success, true, JSON.stringify(zoned));
     const { rows } = await db.query(`SELECT display_zone FROM pipeline_runs WHERE run_id = $1`, [zoned.runId]);
-    assert.deepEqual(rows, [{ display_zone: 'Asia/Kolkata' }]);
+    assert.deepEqual(rows, [{ display_zone: 'Asia/Calcutta' }]);
 
     const again = await runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', stages, {
       secretPath,

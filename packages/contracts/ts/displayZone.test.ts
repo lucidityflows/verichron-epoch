@@ -23,6 +23,9 @@ describe('the display zone', () => {
   it('says why a zone is refused', () => {
     assert.throws(() => displayZone('CST'), /"CST" is not a time zone Epoch can show times in/);
     assert.equal(displayZone('America/Chicago'), 'America/Chicago');
+    // The runtime reads other spellings as one of its own; Epoch keeps its spelling, and says it.
+    assert.throws(() => displayZone('america/chicago'), /Epoch spells this zone "America\/Chicago"/);
+    assert.throws(() => displayZone('Asia/Kolkata'), /Epoch spells this zone "Asia\/Calcutta"/);
   });
 
   it('offers UTC first, then only zones it accepts', () => {

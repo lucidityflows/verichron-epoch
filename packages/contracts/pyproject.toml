@@ -10,6 +10,10 @@ description = "Shared NormalizedRecord schema (Python + TypeScript twins) for fo
 requires-python = "==3.14.*"
 dependencies = [
     "pydantic>=2.0",
+    # The report's time zones (EPOCH-560): the IANA database pinned by uv.lock,
+    # never the host's, which may lack zones the app offers (Debian 13 drops
+    # the older names Chromium still uses) or have none at all (Windows).
+    "tzdata>=2026.5",
 ]
  
 # Same flat-layout ambiguity as packages/etl-dbwriter: four top-level .py files here

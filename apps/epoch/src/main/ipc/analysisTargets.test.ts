@@ -75,7 +75,7 @@ describe('analysisTargets', () => {
   it('with three prepared backups and one selected, the orchestrator is given only that one', () => {
     const labels = analysisTargets(ws, ['NEW']);
     assert.deepEqual(labels, ['NEW']);
-    const args = orchestratorArgs(ws, labels, '/tmp/summary.json', 'Asia/Kolkata');
+    const args = orchestratorArgs(ws, labels, '/tmp/summary.json', 'Asia/Calcutta');
     assert.deepEqual(args.slice(args.indexOf('--workspace'), args.indexOf('--workspace') + 2), ['--workspace', ws]);
     assert.deepEqual(args.slice(args.indexOf('--label'), args.indexOf('--label') + 2), ['--label', 'NEW']);
     assert.ok(!args.some((arg) => arg.includes('custom/decrypt')), 'does not infer or pass layout-derived paths');
@@ -85,7 +85,7 @@ describe('analysisTargets', () => {
     ]);
     assert.deepEqual(args.slice(args.indexOf('--display-zone'), args.indexOf('--display-zone') + 2), [
       '--display-zone',
-      'Asia/Kolkata',
+      'Asia/Calcutta',
     ]);
   });
 

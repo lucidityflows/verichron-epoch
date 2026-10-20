@@ -4,42 +4,52 @@ zone the examiner chose, such as "America/Chicago". Times are stored in UTC
 (R11); the zone changes only how they are shown.
 
 Only named zones are accepted: an abbreviation ("CST"), a fixed offset
-("+05:30", "Etc/GMT+5") or a POSIX rule ("CST6CDT") is refused. The
+("+05:30", "Etc/GMT+5") or a POSIX rule ("CST6CDT") is refused, and so is a
+name spelled other than the database spells it ("america/chicago"). The
 TypeScript copy is `packages/contracts/ts/displayZone.ts`; both read the cases
 in `testdata/display_zone_cases.json`.
+
+Zones come from the `tzdata` package that uv.lock pins, never from the host:
+Debian 13's zone files drop older names that Chromium still offers
+("Asia/Calcutta", "Europe/Kiev"), and Windows has none, so a report written
+from the host's files could fail on a zone the examiner chose.
 """
 
 from __future__ import annotations
 
 import re
 from datetime import UTC, date, datetime
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from importlib.resources import files
+from importlib.resources.abc import Traversable
+from zoneinfo import ZoneInfo
 
 DEFAULT_DISPLAY_ZONE = "UTC"
 
 _NAMED_ZONE = re.compile(r"[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)+")
 
 
+def _zone_file(zone: str) -> Traversable:
+    """The zone's file in the pinned tzdata package; its names are case-sensitive."""
+    return files("tzdata").joinpath("zoneinfo", *zone.split("/"))
+
+
 def is_display_zone(zone: str) -> bool:
-    """True for UTC or a named zone this host's zone database knows."""
+    """True for UTC or a named zone the pinned zone database holds, spelled as it spells it."""
     if zone == DEFAULT_DISPLAY_ZONE:
         return True
     if not _NAMED_ZONE.fullmatch(zone) or zone.startswith("Etc/"):
         return False
-    try:
-        ZoneInfo(zone)
-    except ZoneInfoNotFoundError, ValueError:
-        return False
-    return True
+    return _zone_file(zone).is_file()
 
 
 def display_zone(zone: str) -> ZoneInfo:
-    """The zone, or an error saying why it can't be used."""
+    """The zone, read from the pinned zone database, or an error saying why it can't be used."""
     if not is_display_zone(zone):
         raise ValueError(
             f'"{zone}" is not a time zone Epoch can show times in: use UTC or a named zone such as America/Chicago'
         )
-    return ZoneInfo(zone)
+    with _zone_file(zone).open("rb") as data:
+        return ZoneInfo.from_file(data, key=zone)
 
 
 #: A real short name ("CDT", "IST"); the zone database writes "+0530" or "-03" where a place has none.

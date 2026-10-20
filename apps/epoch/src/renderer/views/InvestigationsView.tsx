@@ -3,6 +3,7 @@ import { FileText, Inbox, Layers, RefreshCw } from 'lucide-react';
 import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 import { Button } from '../components/ui/Button';
 import { CopyButton } from '../components/ui/CopyButton';
+import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
 import { DateTime } from '../components/ui/DateTime';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ListSkeleton } from '../components/ui/Skeleton';
@@ -45,6 +46,47 @@ interface InvestigationsViewProps {
  * analysis and each stage's state. No device identifier, device name, path
  * or password, since it may be pasted anywhere.
  */
+/** Each analysis of the investigation, newest first, in the app's one table (owner's review of PR #138). */
+const ANALYSIS_COLUMNS: DataTableColumn<PipelineRunRow>[] = [
+  {
+    id: 'started',
+    header: 'Started',
+    meta: { width: 'minmax(13rem, 1.4fr)' },
+    cell: ({ row }) => <DateTime value={row.original.started_at} className="text-foreground" />,
+  },
+  {
+    id: 'analysis',
+    header: 'Analysis',
+    meta: { width: '7rem' },
+    cell: ({ row }) => <span className="font-mono text-foreground/90">{shortId(row.original.run_id)}</span>,
+  },
+  {
+    id: 'stages',
+    header: 'Stages complete',
+    meta: { width: '8.5rem' },
+    cell: ({ row }) => {
+      const counts = Object.values(row.original.stage_counts).reduce((sum, n) => sum + n, 0);
+      return (
+        <span className="tabular-nums">
+          {row.original.stage_counts.succeeded} of {counts}
+        </span>
+      );
+    },
+  },
+  {
+    id: 'records',
+    header: 'Records',
+    meta: { width: '6.5rem' },
+    cell: ({ row }) => <span className="tabular-nums">{row.original.records.toLocaleString('en-US')}</span>,
+  },
+  {
+    id: 'state',
+    header: 'State',
+    meta: { width: 'minmax(9rem, 1fr)' },
+    cell: ({ row }) => <StatusChip state={analysisChip(row.original)} />,
+  },
+];
+
 function analysisDetails(
   investigation: Investigation,
   run: PipelineRunRow,
@@ -314,6 +356,7 @@ export function InvestigationsView({
                     Analyze Again
                   </Button>
                   <CopyButton
+                    variant="button"
                     label="Copy Details"
                     title="Copy the investigation, the analysis and each stage, with no device identifier"
                     text={() => analysisDetails(selected, selectedRun, stagesShown, zone)}
@@ -361,29 +404,14 @@ export function InvestigationsView({
                   <h3 id="analyses-title" className="font-display text-heading text-foreground mb-3">
                     Analyses ({selected.analyses.length})
                   </h3>
-                  <ul className="flex flex-col gap-2">
-                    {selected.analyses.map((run) => {
-                      const current = run.run_id === selectedRun.run_id;
-                      return (
-                        <li key={run.run_id}>
-                          <button
-                            type="button"
-                            aria-current={current ? 'true' : undefined}
-                            onClick={() => onSelectRun(run)}
-                            className={`w-full flex flex-wrap items-center gap-3 rounded-lg px-4 py-2 text-left text-data cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                              current ? 'bg-surface-raised shadow-elevation-1' : 'hover:bg-surface-raised'
-                            }`}
-                          >
-                            <DateTime value={run.started_at} className="text-foreground" />
-                            <span className="text-label text-muted-foreground">
-                              Analysis <span className="font-mono">{shortId(run.run_id)}</span>
-                            </span>
-                            <StatusChip state={analysisChip(run)} className="ml-auto" />
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <DataTable<PipelineRunRow>
+                    data={selected.analyses}
+                    columns={ANALYSIS_COLUMNS}
+                    getRowId={(run) => run.run_id}
+                    selectedId={selectedRun.run_id}
+                    onRowClick={onSelectRun}
+                    className="max-h-80 rounded-lg border border-border bg-surface-raised shadow-elevation-1"
+                  />
                 </section>
               )}
 

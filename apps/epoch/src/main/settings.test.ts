@@ -37,11 +37,11 @@ describe('settings', () => {
   });
 
   it('refuse a zone that is not UTC or a named zone, and leave the file as it was', async () => {
-    await updateSettings(tmp, { displayZone: 'Asia/Kolkata' });
-    for (const zone of ['CST', '+05:30', 'Etc/GMT+5', 'America/Nowhere']) {
+    await updateSettings(tmp, { displayZone: 'Asia/Calcutta' });
+    for (const zone of ['CST', '+05:30', 'Etc/GMT+5', 'America/Nowhere', 'america/chicago', 'Asia/Kolkata']) {
       await assert.rejects(updateSettings(tmp, { displayZone: zone }), /displayZone must be UTC or a named time zone/);
     }
-    assert.equal((await readSettings(tmp)).displayZone, 'Asia/Kolkata');
+    assert.equal((await readSettings(tmp)).displayZone, 'Asia/Calcutta');
   });
 
   it('refuse a file that cannot be read as settings, naming it, rather than replacing it with the defaults', async () => {
