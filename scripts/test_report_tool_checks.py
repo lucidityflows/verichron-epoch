@@ -38,6 +38,21 @@ def test_a_correction_is_one_entry_with_the_defect_behind_it():
     assert "- **Reported to the tool:** not reported" in lines
 
 
+def test_a_correction_with_no_recorded_time_says_so():
+    """CodeRabbit on PR #137: never "times no time" (R11)."""
+    correction = {
+        "tool": "iLEAPP",
+        "defect": "ILEAPP-0001",
+        "artifact": "Uber - Place Search Hits",
+        "column_name": "Timestamp",
+        "records": 3,
+        "earliest": None,
+        "latest": None,
+    }
+    lines = render_tool_checks_section([correction])
+    assert "- **Records corrected:** 3, their times were not recorded" in lines
+
+
 def test_times_for_review_are_their_own_section_per_artifact_column_and_check():
     review = [
         {

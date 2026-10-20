@@ -48,3 +48,30 @@ export function splitReport(markdown: string): ReportSection[] {
   if (current.title !== null || current.chunks.some((chunk) => chunk.trim() !== '')) sections.push(current);
   return sections;
 }
+
+/**
+ * How many things the report says it did not examine: the top-level items of
+ * its Not Examined list, where each item is one such thing. The contents entry
+ * and the tile both show this number, so they can't disagree (R2); null when
+ * the report has no Not Examined section.
+ */
+export function notExaminedCount(sections: ReportSection[]): number | null {
+  const section = sections.find((s) => s.title === NOT_EXAMINED);
+  if (!section) return null;
+  return section.chunks
+    .join('\n')
+    .split('\n')
+    .filter((line) => line.startsWith('- ')).length;
+}
+
+/**
+ * Scrolls to a section, then again once the chunks around it have rendered
+ * at their real height, so a jump lands on the section, not where its
+ * estimate put it (CodeRabbit, PR #137). Kept here, not in ReportDocument, so
+ * the Reports view can use it without loading the Markdown renderer.
+ */
+export function jumpToSection(id: string): void {
+  const go = () => document.getElementById(id)?.scrollIntoView({ block: 'start' });
+  go();
+  for (const ms of [150, 400]) setTimeout(go, ms);
+}

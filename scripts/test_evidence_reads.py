@@ -338,7 +338,7 @@ def test_the_report_says_when_indicators_were_not_checked_and_ai_analysis_was_no
     generate_report(db._conn, RUN_A, EVIDENCE, str(out))
     report = out.read_text()
     not_examined = report.split("## Not Examined", 1)[1].split("---", 1)[0]
-    assert "**Indicators of compromise:** what was checked, against which set, and what wasn't" in not_examined
+    assert "What indicators were checked, against which set, and what wasn't, is in Indicator Matches." in not_examined
     assert "**AI-assisted analysis:** not run" in not_examined
     indicators = report.split("## Indicator Matches", 1)[1].split("---", 1)[0]
     assert INDICATOR_LIMIT in indicators

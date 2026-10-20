@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-import { NOT_EXAMINED, splitReport, type ReportSection } from './reportSections';
+import { NOT_EXAMINED, jumpToSection, notExaminedCount, splitReport } from './reportSections';
 
 /**
  * The report rendered as a document (EPOCH-552, board "Reports View"): the
@@ -70,6 +70,18 @@ const COMPONENTS: Components = {
 };
 
 /**
+ * The element a chunk scrolls inside: the app's content area, not the
+ * window. An observer must use it as its root, or its margin is ignored and
+ * a chunk renders only once it is already on screen (CodeRabbit, PR #137).
+ */
+function scrollingAncestor(element: HTMLElement): HTMLElement | null {
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY)) return parent;
+  }
+  return null;
+}
+
+/**
  * One chunk of the report, rendered once it comes within a screen or two of
  * view, and memoized, so opening a long report renders only what is near.
  * Without IntersectionObserver (a test), it renders at once.
@@ -87,7 +99,7 @@ function ReportChunk({ markdown }: { markdown: string }) {
           observer.disconnect();
         }
       },
-      { rootMargin: '1200px 0px' }
+      { root: scrollingAncestor(element), rootMargin: '1200px 0px' }
     );
     observer.observe(element);
     return () => observer.disconnect();
@@ -110,18 +122,9 @@ function ReportChunk({ markdown }: { markdown: string }) {
   );
 }
 
-/** How many items the Not Examined section lists, for its entry in the contents. */
-function itemCount(section: ReportSection): number {
-  return section.chunks
-    .join('\n')
-    .split('\n')
-    .filter((line) => line.startsWith('- ')).length;
-}
-
 export function ReportDocument({ markdown }: { markdown: string }) {
   const sections = useMemo(() => splitReport(markdown), [markdown]);
   const contents = sections.filter((section) => section.title !== null);
-  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
     <div className="grid gap-6 xl:grid-cols-[13rem_minmax(0,1fr)] items-start">
@@ -134,12 +137,12 @@ export function ReportDocument({ markdown }: { markdown: string }) {
               <li key={section.id}>
                 <button
                   type="button"
-                  onClick={() => jump(section.id)}
+                  onClick={() => jumpToSection(section.id)}
                   className={`text-data text-left hover:underline ${lead ? 'text-warning font-medium' : 'text-foreground/80'}`}
                 >
                   {section.title}
                   {/* A real space, so the entry copies as it reads. */}
-                  {lead && <span className="tabular-nums"> · {itemCount(section)}</span>}
+                  {lead && <span className="tabular-nums"> · {notExaminedCount(sections)}</span>}
                 </button>
               </li>
             );

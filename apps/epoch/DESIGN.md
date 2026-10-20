@@ -692,7 +692,10 @@ boards "Reports View" and "Exported Report").
 - **A contents list** ("In this report") jumps to each section. It sits
   beside the document from 1280 px, and above it, wrapping, below that.
 - **Tiles** above the document: stages complete, records found, not examined
-  (it jumps to the list) and warnings, counted as Investigations counts them.
+  and warnings. Not examined is the count of the report's own Not Examined
+  items, the same number as its contents entry, and jumps to the list (R2;
+  CodeRabbit, PR #137). Each item in that list is one thing not examined; a
+  stage that never started is one.
 - **The responsibility statement** is part of the report itself, under its
   title, so it travels with the document handed over: the report is an aid;
   the examiner is responsible for any conclusion; no result, including the

@@ -54,3 +54,23 @@ def test_the_report_opens_with_the_responsibility_statement_it_travels_with():
     assert f"*{RESPONSIBILITY}*" in lines
     assert lines.index(f"*{RESPONSIBILITY}*") < lines.index("---"), "before any section"
     assert "including the absence of a match, is proof that something is absent" in RESPONSIBILITY
+
+
+def test_a_stage_that_never_started_is_listed_too():
+    """CodeRabbit on PR #137: a stage left pending is not examined, whatever stopped the run."""
+    lines = render_not_examined_section([], [stage("indicator_match", "pending")])
+    assert "- **Indicator Matching did not run:** the run ended before it started." in lines
+
+
+def test_each_bullet_is_one_thing_not_examined_so_the_list_counts_true():
+    """R2, EPOCH-552: the app shows the count of this list's items, so plugins that all ran
+    and the pointer to Indicator Matches are sentences, not items."""
+    ran = {"path": "/ws/ileapp/BK1", "params": {"modules": {"errors": []}}}
+    lines = render_not_examined_section([ran], [stage("crash", "skipped", CRASH_REASON)])
+    items = [line for line in lines if line.startswith("- ")]
+    assert items == [
+        f"- **Crash Reports did not run:** {CRASH_REASON}",
+        "- **AI-assisted analysis:** not run. It returns as a separate, labelled section of leads "
+        "for the examiner to confirm or dismiss.",
+    ]
+    assert "No iLEAPP plugin errored on `/ws/ileapp/BK1`.  " in lines

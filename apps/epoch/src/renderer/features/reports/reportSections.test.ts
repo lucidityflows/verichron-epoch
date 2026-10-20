@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { splitReport } from './reportSections';
+import { notExaminedCount, splitReport } from './reportSections';
 
 const REPORT = [
   '# Investigation Report',
@@ -46,5 +46,13 @@ describe('splitReport (EPOCH-552)', () => {
   it('does not cut at a heading inside a code block', () => {
     const sections = splitReport('## A\n```\n## not a heading\n```\n');
     expect(sections.map((s) => s.title)).toEqual(['A']);
+  });
+
+  it('counts the Not Examined items, not their nested details, and nothing when there is no such section', () => {
+    expect(notExaminedCount(splitReport(REPORT))).toBe(1);
+    const nested =
+      '## Not Examined\n- **iLEAPP plugins that errored**: 1.\n  - `Zalo Messages`\n- **AI-assisted analysis:** not run.';
+    expect(notExaminedCount(splitReport(nested))).toBe(2);
+    expect(notExaminedCount(splitReport('## Coverage\n- one'))).toBeNull();
   });
 });

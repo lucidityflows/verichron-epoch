@@ -332,17 +332,27 @@ def render_not_examined_section(ileapp_outputs: list[dict], stages: list[dict]) 
     """Checks this report cannot speak to, stated so their absence is never
     read as a clean result: every stage this run skipped, with the reason the
     orchestrator recorded (a disabled stage, or crash logs that were never
-    acquired, EPOCH-447), and every iLEAPP plugin that errored on the output
-    this run read (EPOCH-457), whose artifact is therefore missing."""
+    acquired, EPOCH-447), every stage that never started, every iLEAPP plugin
+    that errored on the output this run read (EPOCH-457), whose artifact is
+    therefore missing, and AI-assisted analysis.
+
+    Each bullet is one thing not examined, so the list's count is the count
+    the app shows for it (R2, EPOCH-552); what is not an item, such as plugins
+    that all ran or where indicator checks are described, is a sentence after
+    the list."""
     lines = ["## Not Examined", "", "What this report did not look at. None of these is a clean result.", ""]
     for s in stages:
+        title = stage_title(s["stage_name"])
         if s["status"] == "skipped":
             reason = s["error_message"] or "the orchestrator recorded no reason"
-            lines.append(f"- **{stage_title(s['stage_name'])} did not run:** {_table_cell(reason)}")
+            lines.append(f"- **{title} did not run:** {_table_cell(reason)}")
+        elif s["status"] == "pending":
+            lines.append(f"- **{title} did not run:** the run ended before it started.")
+    notes: list[str] = []
     for d in ileapp_outputs:
         errors = d["params"]["modules"]["errors"]
         if not errors:
-            lines.append(f"- **iLEAPP plugins** (`{d['path']}`): none errored.")
+            notes.append(f"No iLEAPP plugin errored on `{d['path']}`.")
             continue
         lines.append(
             f"- **iLEAPP plugins that errored** (`{d['path']}`): {len(errors)}. "
@@ -354,15 +364,12 @@ def render_not_examined_section(ileapp_outputs: list[dict], stages: list[dict]) 
                 f"  - `{_table_cell(e['artifact'])}` ({_table_cell(e['module'])}, "
                 f"{e['file_count']} file(s)): {_table_cell(reason)}"
             )
-    return lines + [
-        "- **Indicators of compromise:** what was checked, against which set, and what wasn't, is "
-        "in Indicator Matches.",
+    lines.append(
         "- **AI-assisted analysis:** not run. It returns as a separate, labelled section of leads "
-        "for the examiner to confirm or dismiss.",
-        "",
-        "---",
-        "",
-    ]
+        "for the examiner to confirm or dismiss."
+    )
+    notes.append("What indicators were checked, against which set, and what wasn't, is in Indicator Matches.")
+    return lines + ["", *[f"{note}  " for note in notes], "", "---", ""]
 
 
 # TODO: one render_<source_type>_section() per domain as extractors land.
@@ -655,12 +662,13 @@ def render_tool_checks_section(corrections: list[dict]) -> list[str]:
         return lines + ["No registered tool defect applied to this evidence, so nothing was corrected.", "", "---", ""]
     for c in corrections:
         entry = registered_defect(c["tool"], c["defect"])
-        span = _date_span(c["earliest"], c["latest"]) if c["earliest"] else "no time"
+        # A correction can have no event time; it says so rather than "times no time" (R11).
+        span = f"times {_date_span(c['earliest'], c['latest'])}" if c["earliest"] else "their times were not recorded"
         upstream = entry.upstream.status + (f" ({entry.upstream.reference})" if entry.upstream.reference else "")
         lines += [
             f"### {c['defect']} ({entry.ticket}): {_table_cell(c['artifact'])}, {_table_cell(c['column_name'])}",
             f"- **Tool:** {_table_cell(c['tool'])} {_table_cell(', '.join(entry.versions))}",
-            f"- **Records corrected:** {c['records']:,}, times {span}",
+            f"- **Records corrected:** {c['records']:,}, {span}",
             f"- **What the tool got wrong:** {_table_cell(entry.defect)}",
             f"- **Correction:** corrected to within {entry.correction.factor:,} of the column's unit "
             "(seconds, for a time).",

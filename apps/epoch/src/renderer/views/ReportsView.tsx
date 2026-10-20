@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useEffect } from 'react';
+import React, { Suspense, lazy, useMemo, useState, useEffect } from 'react';
 import { FileQuestion, FileText, MousePointerClick } from 'lucide-react';
 import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 import type { ReportResult } from '../../shared/types/window';
@@ -6,8 +6,8 @@ import { Button } from '../components/ui/Button';
 import { reportsApi } from '../api/reports';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
-import { analysisName, notExamined, warningLines } from '../features/investigations/investigations';
-import { NOT_EXAMINED } from '../features/reports/reportSections';
+import { analysisName, warningLines } from '../features/investigations/investigations';
+import { NOT_EXAMINED, jumpToSection, notExaminedCount, splitReport } from '../features/reports/reportSections';
 
 // The Markdown renderer adds 157 KB minified (measured 2026-10-19), so it
 // loads the first time a report is shown, not at start-up.
@@ -79,8 +79,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun, stages })
     (sum, stage) => sum + (stage.status === 'succeeded' ? warningLines(stage.warnings).length : 0),
     0
   );
-  const jumpToNotExamined = () =>
-    document.querySelector(`[aria-label="${NOT_EXAMINED}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // The tile counts the report's own Not Examined list, as its contents entry does (R2).
+  const sections = useMemo(() => (report?.status === 'ok' ? splitReport(report.content) : []), [report]);
+  const notExaminedItems = notExaminedCount(sections);
+  const notExaminedId = sections.find((section) => section.title === NOT_EXAMINED)?.id;
 
   return (
     <ViewLayout
@@ -128,9 +130,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun, stages })
               />
               <Tile value={selectedRun.records.toLocaleString('en-US')} label="Records found" />
               <Tile
-                value={shown.filter(notExamined).length}
+                value={notExaminedItems ?? '—'}
                 label="Not examined · jump to list"
-                onClick={jumpToNotExamined}
+                onClick={notExaminedId ? () => jumpToSection(notExaminedId) : undefined}
               />
               <Tile value={warningCount} label="Warnings" />
             </div>
