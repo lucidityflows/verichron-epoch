@@ -5,9 +5,10 @@
  */
 
 import assert from 'node:assert/strict';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, it } from 'vitest';
 
+import { useSettingsStore } from '../../store/useSettings';
 import { DateTime } from './DateTime';
 import { StatusChip } from './StatusChip';
 import { chipLabel, stageChip } from './statusChip';
@@ -122,5 +123,18 @@ describe('DateTime', () => {
     render(<DateTime value="2026-10-08T00:36:36Z" zone="America/Chicago" />);
     assert.ok(screen.getByText('2026-10-07 19:36:36'));
     assert.ok(screen.getByText('CDT, UTC−05:00'));
+  });
+
+  it('follows the zone chosen in Settings, and still says which zone it is in (EPOCH-560)', () => {
+    const { container } = render(<DateTime value="2026-11-01T07:30:00Z" />);
+    assert.equal(container.textContent, '2026-11-01 07:30:00 UTC');
+    act(() => useSettingsStore.setState({ settings: { displayZone: 'America/Chicago', backupsFolder: null } }));
+    assert.equal(container.textContent, '2026-11-01 01:30:00 CST, UTC−06:00');
+    act(() => useSettingsStore.setState({ settings: { displayZone: 'Asia/Kolkata', backupsFolder: null } }));
+    assert.equal(container.textContent, '2026-11-01 13:00:00 UTC+05:30');
+    assert.equal(
+      screen.getByText('2026-11-01 13:00:00').parentElement!.getAttribute('title'),
+      '2026-11-01T13:00:00+05:30'
+    );
   });
 });

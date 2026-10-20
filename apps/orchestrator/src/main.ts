@@ -69,6 +69,7 @@ async function run(cfg: CliConfig) {
       // any run is created (EPOCH-404).
       const result = await runPipelineForBackup(client, target, cfg.dbUrl, pythonBin, stages, {
         indicatorSetHash: cfg.indicatorSetHash,
+        displayZone: cfg.displayZone,
       });
       if (result.skipped) {
         analysisResults.push({ backupPath, status: 'skipped' });

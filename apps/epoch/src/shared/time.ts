@@ -3,10 +3,12 @@
  * Rules"). Times are stored in UTC (R11); this decides only how they are
  * shown, and every time shown says which zone it is in.
  *
- * The zone is an input, UTC by default. The examiner's own zone comes from the
- * setting EPOCH-560 adds; when it is set, it applies everywhere.
+ * The zone is the examiner's setting (EPOCH-560): UTC by default, or a named
+ * zone chosen in Settings, and it applies everywhere. Every function takes it,
+ * so nothing can show a time without saying which zone it is in; a view reads
+ * it with `useDisplayZone()`.
  *
- *   formatParts('2026-10-08T00:36:36Z')                    → 2026-10-08 00:36:36 · UTC
+ *   formatParts('2026-10-08T00:36:36Z', 'UTC')             → 2026-10-08 00:36:36 · UTC
  *   formatParts('2026-10-08T00:36:36Z', 'America/Chicago') → 2026-10-07 19:36:36 · CDT, UTC−05:00
  *
  * The offset is part of a chosen zone's label because the zone's name alone
@@ -109,7 +111,7 @@ function abbreviation(date: Date, zone: DisplayZone): string | null {
 }
 
 /** The label beside a time: "UTC", or the zone's short name and offset ("CDT, UTC−05:00"). */
-export function zoneLabel(time: TimeValue, zone: DisplayZone = DEFAULT_ZONE): string {
+export function zoneLabel(time: TimeValue, zone: DisplayZone): string {
   if (isUtc(zone)) return 'UTC';
   const date = toDate(time);
   const offset = `UTC${offsetText(offsetMinutes(date, zone), '−')}`;
@@ -118,7 +120,7 @@ export function zoneLabel(time: TimeValue, zone: DisplayZone = DEFAULT_ZONE): st
 }
 
 /** A date and time to show, or null when there is none (show `NO_TIME`). */
-export function formatParts(time: TimeValue | null | undefined, zone: DisplayZone = DEFAULT_ZONE): TimeParts | null {
+export function formatParts(time: TimeValue | null | undefined, zone: DisplayZone): TimeParts | null {
   if (time === null || time === undefined) return null;
   const date = toDate(time);
   const f = fields(date, zone);
@@ -126,10 +128,7 @@ export function formatParts(time: TimeValue | null | undefined, zone: DisplayZon
 }
 
 /** A date only, in the zone that decides which day it is; a recorded calendar date as recorded. */
-export function formatDateParts(
-  time: TimeValue | null | undefined,
-  zone: DisplayZone = DEFAULT_ZONE
-): TimeParts | null {
+export function formatDateParts(time: TimeValue | null | undefined, zone: DisplayZone): TimeParts | null {
   if (time === null || time === undefined) return null;
   if (isCalendarDate(time)) return { value: time, label: null };
   const date = toDate(time);
@@ -137,7 +136,7 @@ export function formatDateParts(
 }
 
 /** A date and time as one line of text, for sentences, titles and tooltips. */
-export function formatDateTime(time: TimeValue | null | undefined, zone: DisplayZone = DEFAULT_ZONE): string {
+export function formatDateTime(time: TimeValue | null | undefined, zone: DisplayZone): string {
   const parts = formatParts(time, zone);
   return parts ? `${parts.value} ${parts.label}` : NO_TIME;
 }
@@ -145,13 +144,13 @@ export function formatDateTime(time: TimeValue | null | undefined, zone: Display
 const joined = (parts: TimeParts) => (parts.label ? `${parts.value} ${parts.label}` : parts.value);
 
 /** A date as one line of text. */
-export function formatDate(time: TimeValue | null | undefined, zone: DisplayZone = DEFAULT_ZONE): string {
+export function formatDate(time: TimeValue | null | undefined, zone: DisplayZone): string {
   const parts = formatDateParts(time, zone);
   return parts ? joined(parts) : NO_TIME;
 }
 
 /** A log line's time: "15:21:03Z" in UTC, "10:21:03 CDT" in a chosen zone. */
-export function formatLogTime(time: TimeValue, zone: DisplayZone = DEFAULT_ZONE): string {
+export function formatLogTime(time: TimeValue, zone: DisplayZone): string {
   const date = toDate(time);
   const { time: clock } = fields(date, zone);
   if (isUtc(zone)) return `${clock}Z`;
@@ -164,7 +163,7 @@ export function formatLogTime(time: TimeValue, zone: DisplayZone = DEFAULT_ZONE)
  * keeps the milliseconds when there are any ("2026-10-08T00:36:36.400Z"); a
  * Date holds no finer precision. A calendar date is copied as recorded.
  */
-export function isoWithOffset(time: TimeValue, zone: DisplayZone = DEFAULT_ZONE): string {
+export function isoWithOffset(time: TimeValue, zone: DisplayZone): string {
   if (isCalendarDate(time)) return time;
   const date = toDate(time);
   const f = fields(date, zone);

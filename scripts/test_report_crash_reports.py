@@ -5,12 +5,15 @@ the queries themselves are tested on real PostgreSQL in test_evidence_reads.py."
 import re
 from datetime import UTC, datetime
 
+from display_zone import ZoneTimes
 from reporting.generate_report import (
     copied_after_backup,
     describe_derivative,
     render_coverage_section,
     render_crash_section,
 )
+
+UTC_TIMES = ZoneTimes()
 
 
 def crash_reports(files: int, backup_finished_at: str = "2026-10-15T00:59:57.000Z") -> dict:
@@ -29,14 +32,14 @@ def crash_reports(files: int, backup_finished_at: str = "2026-10-15T00:59:57.000
 
 
 def test_the_provenance_names_the_tool_and_says_the_logs_stayed_on_the_device():
-    assert describe_derivative(crash_reports(244)) == [
+    assert describe_derivative(crash_reports(244), UTC_TIMES) == [
         "- **Crash logs** (`/ws/crash_reports/BK1`): copied from the device by idevicecrashreport 1.4.0 "
         "on 2026-10-15 01:00:00 UTC, 3 s after the backup finished, and left on the device; 244 file(s)"
     ]
 
 
 def test_coverage_counts_the_crash_logs_copied():
-    lines = render_coverage_section([], [], [crash_reports(244)])
+    lines = render_coverage_section([], [], [crash_reports(244)], UTC_TIMES)
     assert (
         "Crash logs (`/ws/crash_reports/BK1`): 244 file(s) copied from the device on 2026-10-15 01:00:00 UTC, "
         "3 s after the backup finished." in lines
@@ -44,7 +47,7 @@ def test_coverage_counts_the_crash_logs_copied():
 
 
 def test_a_device_with_no_crash_logs_reads_as_none_held_not_none_looked_for():
-    lines = render_coverage_section([], [], [crash_reports(0)])
+    lines = render_coverage_section([], [], [crash_reports(0)], UTC_TIMES)
     assert (
         "Crash logs (`/ws/crash_reports/BK1`): the device held none when they were copied on 2026-10-15 01:00:00 UTC, "
         "3 s after the backup finished." in lines
@@ -52,7 +55,7 @@ def test_a_device_with_no_crash_logs_reads_as_none_held_not_none_looked_for():
 
 
 def test_without_crash_logs_coverage_says_nothing_about_them():
-    assert not any("Crash logs" in line for line in render_coverage_section([], [], []))
+    assert not any("Crash logs" in line for line in render_coverage_section([], [], [], UTC_TIMES))
 
 
 def test_a_later_copy_says_how_much_later_it_was_made():
@@ -111,7 +114,9 @@ def crash_record(**overrides) -> dict:
 
 def test_the_crash_table_prints_values_never_python_reprs():
     """EPOCH-553: no 'None', no quoted numbers or backticked times; a missing value reads "not recorded"."""
-    lines = render_crash_section([crash_record(), crash_record(pid=812, process_name="SpringBoard", bug_type="309")])
+    lines = render_crash_section(
+        [crash_record(), crash_record(pid=812, process_name="SpringBoard", bug_type="309")], UTC_TIMES
+    )
     table = [line for line in lines if line.startswith("| ") and not line.startswith(("| Time", "| :"))]
     assert table == [
         "| 2026-10-08 00:36:36 UTC | 145 · no label known | not recorded | not recorded | not recorded "
@@ -127,7 +132,7 @@ def test_the_crash_table_prints_values_never_python_reprs():
 def test_a_crash_with_no_time_or_bug_type_says_so():
     [row] = [
         line
-        for line in render_crash_section([crash_record(event_time=None, bug_type=None)])
+        for line in render_crash_section([crash_record(event_time=None, bug_type=None)], UTC_TIMES)
         if line.startswith("| ") and not line.startswith(("| Time", "| :"))
     ]
     assert row.startswith("| not recorded | not recorded |")

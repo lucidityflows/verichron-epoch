@@ -11,11 +11,11 @@ import * as path from 'node:path';
 import { CliConfig } from './types.js';
 import { REPO_ROOT } from './discovery.js';
 import { log, setOutputMode } from './events.js';
-import { loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
+import { DEFAULT_DISPLAY_ZONE, displayZone, loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
 
 export function printUsage() {
   console.error(
-    `Usage:\n  pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace-dir> [--label <label> ...] [--summary-path <file>] [--indicator-set <set hash>]`
+    `Usage:\n  pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace-dir> [--label <label> ...] [--summary-path <file>] [--indicator-set <set hash>] [--display-zone <UTC or a named zone, e.g. America/Chicago>]`
   );
 }
 
@@ -85,6 +85,8 @@ export async function parseCliConfig(): Promise<CliConfig> {
       'summary-path': { type: 'string' },
       // The indicator set to check, by set hash; the newest registered set when omitted (EPOCH-491).
       'indicator-set': { type: 'string' },
+      // The zone the report shows times in (EPOCH-560): the app passes the examiner's setting.
+      'display-zone': { type: 'string', default: DEFAULT_DISPLAY_ZONE },
       // Typed events, as the app runs it, or human text on the command line (EPOCH-570).
       output: { type: 'string', default: 'text' },
     },
@@ -97,6 +99,8 @@ export async function parseCliConfig(): Promise<CliConfig> {
   const dbUrl = resolveDatabaseUrl();
   const summaryPath = values['summary-path'];
   const indicatorSetHash = values['indicator-set'];
+  // Refused before anything starts, rather than when the report stage runs.
+  const zone = displayZone(values['display-zone']);
 
   if (!values.workspace) {
     if (positionals.length > 0) {
@@ -111,7 +115,7 @@ export async function parseCliConfig(): Promise<CliConfig> {
   }
   const workspace = path.resolve(values.workspace);
   const targets = await workspaceTargets(workspace, values.label);
-  return { targets, workspacePaths: [workspace], dbUrl, summaryPath, indicatorSetHash };
+  return { targets, workspacePaths: [workspace], dbUrl, summaryPath, indicatorSetHash, displayZone: zone };
 }
 
 export async function workspaceTargets(

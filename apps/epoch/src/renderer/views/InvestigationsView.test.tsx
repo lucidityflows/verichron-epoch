@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, it, vi } from 'vitest';
 
 const hook = vi.hoisted(() => ({ analysis: null as unknown }));
 vi.mock('../hooks/usePipelineState', () => ({
@@ -22,6 +22,12 @@ import {
   groupInvestigations,
   warningLines,
 } from '../features/investigations/investigations';
+
+beforeAll(() => {
+  // jsdom has no layout: give the virtualized analyses table a size so it renders rows.
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 220 });
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 800 });
+});
 
 afterEach(() => {
   cleanup();
@@ -185,10 +191,16 @@ describe('InvestigationsView', () => {
   it('lists the analyses of an investigation newest first, and switches to the one chosen', () => {
     const { onSelectRun } = show(NEWER, [stage({})]);
     const analyses = screen.getByRole('heading', { name: 'Analyses (2)' }).nextElementSibling as HTMLElement;
-    const buttons = within(analyses).getAllByRole('button');
-    assert.equal(buttons[0].getAttribute('aria-current'), 'true');
-    assert.ok(within(buttons[1]).getByText('22222222'));
-    fireEvent.click(buttons[1]);
+    // The app's one table (owner's review of PR #138), its rows selectable by click and keyboard.
+    assert.ok(within(analyses).getByRole('columnheader', { name: 'Started' }));
+    const rows = within(analyses).getAllByRole('row').slice(1);
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].getAttribute('aria-selected'), 'true');
+    assert.ok(within(rows[1]).getByText('22222222'));
+    fireEvent.click(rows[1]);
+    assert.deepEqual(onSelectRun.mock.calls.at(-1), [OLDER]);
+    onSelectRun.mockClear();
+    fireEvent.keyDown(rows[1], { key: 'Enter' });
     assert.deepEqual(onSelectRun.mock.calls.at(-1), [OLDER]);
   });
 
@@ -202,8 +214,9 @@ describe('InvestigationsView', () => {
         error_message: 'No indicator set is registered',
       }),
     ]);
-    assert.ok(screen.getByText('1 of 2'));
-    assert.ok(screen.getByText('46,434'));
+    // The tiles; the analyses table repeats the records for each analysis.
+    assert.equal(screen.getByText('Stages complete', { selector: 'p' }).previousElementSibling?.textContent, '1 of 2');
+    assert.equal(screen.getByText('Records found', { selector: 'p' }).previousElementSibling?.textContent, '46,434');
     const notExamined = screen.getByText('Not examined').previousElementSibling;
     assert.equal(notExamined?.textContent, '1');
     const warnings = screen.getByText('Warnings').previousElementSibling;

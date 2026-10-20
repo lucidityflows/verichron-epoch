@@ -128,6 +128,20 @@ export function DataTable<TData extends Record<string, any>>({
               data-index={virtualRow.index}
               role="row"
               onClick={() => onRowClick?.(row.original)}
+              // A row that does something is reached and used from the keyboard too.
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onRowClick(row.original);
+                      }
+                    }
+                  : undefined
+              }
+              aria-selected={selectedId != null ? isSelected : undefined}
               style={{
                 position: 'absolute',
                 top: 0,
@@ -135,7 +149,7 @@ export function DataTable<TData extends Record<string, any>>({
                 width: '100%',
                 transform: `translateY(${virtualRow.start}px)`,
               }}
-              className={`transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${
+              className={`transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${onRowClick ? 'cursor-pointer' : ''} ${
                 isExpanded && isSelected
                   ? 'bg-surface shadow-[inset_0.125rem_0_0_var(--color-accent),var(--shadow-elevation-1)]'
                   : isExpanded

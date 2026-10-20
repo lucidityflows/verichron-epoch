@@ -11,7 +11,7 @@
 
 import type { TaskLogEntry } from '@verichron/contracts';
 
-import { formatLogTime } from './time';
+import { formatLogTime, isoWithOffset, type DisplayZone } from './time';
 
 export type LogView = 'summary' | 'full';
 export type LogFilter = 'all' | 'warnings' | 'errors';
@@ -89,12 +89,18 @@ export function latestLine(entries: readonly TaskLogEntry[]): TaskLogEntry | nul
   return null;
 }
 
-/** One entry as its parts, for the screen and for text: time, tag, label, message. */
+/** One entry as its parts, for the screen and for text: time (in the examiner's zone, EPOCH-560), tag, label, message. */
 export function lineParts(
   entry: TaskLogEntry,
-  view: LogView
+  view: LogView,
+  zone: DisplayZone
 ): { time: string; tag: string | null; label: string | null; message: string } {
-  return { time: formatLogTime(entry.at), tag: entryTag(entry, view), label: entry.label, message: entry.message };
+  return {
+    time: formatLogTime(entry.at, zone),
+    tag: entryTag(entry, view),
+    label: entry.label,
+    message: entry.message,
+  };
 }
 
 /**
@@ -102,31 +108,31 @@ export function lineParts(
  * (Summary): the order the drawer shows, with real spaces, so copied text
  * keeps its columns.
  */
-export function lineText(entry: TaskLogEntry, view: LogView): string {
-  const { time, tag, label, message } = lineParts(entry, view);
+export function lineText(entry: TaskLogEntry, view: LogView, zone: DisplayZone): string {
+  const { time, tag, label, message } = lineParts(entry, view, zone);
   const tagText = tag === null ? '' : view === 'full' ? `${tag.padEnd(6)} ` : `${tag}: `;
   return `${time}  ${tagText}${label ? `[${label}] ` : ''}${message}`;
 }
 
 /** The entries as text, one per line: what Copy puts on the clipboard. */
-export function logText(entries: readonly TaskLogEntry[], view: LogView): string {
-  return entries.map((entry) => lineText(entry, view)).join('\n');
+export function logText(entries: readonly TaskLogEntry[], view: LogView, zone: DisplayZone): string {
+  return entries.map((entry) => lineText(entry, view, zone)).join('\n');
 }
 
 /** A saved log as text, with what the header says: what Save As writes (the Full log). */
-export function logFileText(entries: readonly TaskLogEntry[]): string {
+export function logFileText(entries: readonly TaskLogEntry[], zone: DisplayZone): string {
   const header = entries[0]?.kind === 'task:started' ? entries[0] : null;
   const finished = entries.find((e) => e.kind === 'task:finished');
   const lines = [
     header
       ? `${header.task.kind === 'prepare' ? 'Prepare Evidence' : header.task.kind === 'analyze' ? 'Analyze' : 'Device pull'}: ${header.task.labels.join(', ') || 'no backup selected'}`
       : 'Task log',
-    `Started ${header ? header.at : 'unknown'}; times in UTC`,
+    `Started ${header ? isoWithOffset(header.at, zone) : 'unknown'}; times in ${zone}`,
     finished && finished.kind === 'task:finished'
-      ? `Ended ${finished.at}: ${finished.result.outcome}`
+      ? `Ended ${isoWithOffset(finished.at, zone)}: ${finished.result.outcome}`
       : 'Ended: never recorded (the app was closed while it ran)',
     '',
-    logText(entries, 'full'),
+    logText(entries, 'full', zone),
     '',
   ];
   return lines.join('\n');
@@ -140,7 +146,8 @@ export function logFileText(entries: readonly TaskLogEntry[]): string {
  */
 export function failureDetails(
   entries: readonly TaskLogEntry[],
-  failure: { label: string; step: string; reason: string }
+  failure: { label: string; step: string; reason: string },
+  zone: DisplayZone
 ): string {
   const meaningful = entries.filter((e) => e.level !== 'debug');
   const firstError = meaningful.findIndex((e) => e.level === 'error' && e.label === failure.label);
@@ -154,7 +161,7 @@ export function failureDetails(
     `Step: ${failure.step}`,
     `Reason: ${failure.reason}`,
     '',
-    logText(chosen, 'full'),
+    logText(chosen, 'full', zone),
     '',
   ].join('\n');
 }

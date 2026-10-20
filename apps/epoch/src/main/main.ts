@@ -9,6 +9,8 @@ import { registerDbHandlers } from './ipc/dbHandlers';
 import { registerReportHandlers } from './ipc/reportHandlers';
 import { closeAbandonedRunsOnStartup, registerPipelineHandlers } from './ipc/pipelineHandlers';
 import { registerDeviceHandlers } from './ipc/deviceHandlers';
+import { registerSettingsHandlers } from './ipc/settingsHandlers';
+import { readSettings } from './settings';
 import { addPopOut } from './windows';
 
 const { app, BrowserWindow, ipcMain } = electron;
@@ -49,8 +51,15 @@ registerReportHandlers(dbPool);
 // orchestrator subprocess it spawns crashes, times out, or is cancelled, it
 // ends the runs that call created (closeCallRuns in pipelineHandlers.ts)
 // rather than leaving them running forever.
-const pipeline = registerPipelineHandlers(getMainWindow, REPO_ROOT, dbPool, app.getVersion());
+const pipeline = registerPipelineHandlers(
+  getMainWindow,
+  REPO_ROOT,
+  dbPool,
+  app.getVersion(),
+  async () => (await readSettings(app.getPath('userData'))).displayZone
+);
 registerDeviceHandlers(getMainWindow, REPO_ROOT, app.getVersion());
+registerSettingsHandlers(getMainWindow);
 
 const webPreferences: BrowserWindowConstructorOptions['webPreferences'] = {
   preload: path.join(__dirname, 'preload.js'),

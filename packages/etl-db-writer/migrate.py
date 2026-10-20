@@ -156,6 +156,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _column("evidence_items", "product_type"),
         _column("evidence_items", "backup_date"),
     ),
+    "0020_run_display_zone.sql": (
+        _column("pipeline_runs", "display_zone"),
+        _constraint("pipeline_runs_display_zone_present"),
+    ),
 }
 
 

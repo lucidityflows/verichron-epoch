@@ -10,6 +10,10 @@ description = "Shared NormalizedRecord schema (Python + TypeScript twins) for fo
 requires-python = "==3.14.*"
 dependencies = [
     "pydantic>=2.0",
+    # The report's time zones (EPOCH-560): the IANA database pinned by uv.lock,
+    # never the host's, which may lack zones the app offers (Debian 13 drops
+    # the older names Chromium still uses) or have none at all (Windows).
+    "tzdata>=2026.5",
 ]
  
 # Same flat-layout ambiguity as packages/etl-dbwriter: four top-level .py files here
@@ -21,7 +25,7 @@ dependencies = [
 # same reason. conftest.py and test_contract_sync.py are pytest's concern,
 # not something other packages import, so they're left out.
 [tool.setuptools]
-py-modules = ["normalized_record", "adapter", "source_type", "tool_defects", "stored_value", "indicator_field_map", "indicator_set", "workspace_manifest", "stage_report", "stage_titles"]
+py-modules = ["normalized_record", "adapter", "source_type", "tool_defects", "stored_value", "indicator_field_map", "indicator_set", "workspace_manifest", "stage_report", "stage_titles", "display_zone"]
 
 [tool.setuptools.package-dir]
 "" = "python"

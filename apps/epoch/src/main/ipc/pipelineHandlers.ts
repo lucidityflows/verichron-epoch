@@ -69,7 +69,9 @@ export function registerPipelineHandlers(
   repoRoot: string,
   dbPool: Pool,
   /** Recorded in each task log's header (EPOCH-570). */
-  appVersion: string
+  appVersion: string,
+  /** The examiner's time zone setting, read when each Analyze starts; its report shows times in it (EPOCH-560). */
+  displayZoneSetting: () => Promise<string>
 ) {
   let runningProcessor: ChildProcessWithoutNullStreams | null = null;
   // The examiner asked the running Prepare to stop (EPOCH-554): it ends cancelled, not crashed.
@@ -562,7 +564,8 @@ export function registerPipelineHandlers(
     try {
       // pnpm --silent: its script banners would print the repository's path (docs/event-log.md §6.6).
       // Its own process group, so Cancel reaches the orchestrator, not only pnpm.
-      child = spawn('pnpm', ['--silent', ...orchestratorArgs(call.workspace, call.labels, summaryPath)], {
+      const zone = await displayZoneSetting();
+      child = spawn('pnpm', ['--silent', ...orchestratorArgs(call.workspace, call.labels, summaryPath, zone)], {
         cwd: repoRoot,
         stdio: ['pipe', 'pipe', 'pipe'],
         detached: true,
@@ -811,7 +814,7 @@ export function registerPipelineHandlers(
       if (choice.canceled || !choice.filePath) return { saved: null };
       const content = choice.filePath.endsWith('.ndjson')
         ? read.entries.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
-        : logFileText(read.entries);
+        : logFileText(read.entries, await displayZoneSetting());
       await writeFile(choice.filePath, content, { mode: 0o600 });
       // The mode applies only to a file writeFile creates; an existing one chosen in the dialog keeps its own.
       await chmod(choice.filePath, 0o600);

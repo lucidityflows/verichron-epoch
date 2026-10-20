@@ -112,5 +112,6 @@ export { deviceIdentifierSources, readPlistValues } from './ts/deviceIdentifiers
 export { ProcessorSummary } from './ts/processorSummary.js';
 export { SourceType, isSourceType } from './ts/sourceType';
 export type { SourceType as SourceTypeValue } from './ts/sourceType';
+export { DEFAULT_DISPLAY_ZONE, displayZone, displayZones, isDisplayZone } from './ts/displayZone.js';
 export { loadRootEnv, resolveDatabaseUrl } from './ts/env.js';
 export { safeTestDatabaseUrl, unsafeTestDatabase } from './ts/testDatabase.js';

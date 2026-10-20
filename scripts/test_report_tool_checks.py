@@ -5,7 +5,10 @@ test_evidence_reads.py (R33: a double never certifies SQL)."""
 
 from datetime import UTC, datetime
 
+from display_zone import ZoneTimes
 from reporting.generate_report import render_time_review_section, render_tool_checks_section
+
+UTC_TIMES = ZoneTimes()
 
 
 def at(seconds: int) -> datetime:
@@ -29,7 +32,7 @@ def test_a_correction_is_one_entry_with_the_defect_behind_it():
             "latest": at(1791016000),
         }
     ]
-    lines = render_tool_checks_section(corrections)
+    lines = render_tool_checks_section(corrections, UTC_TIMES)
     assert table_rows(lines) == [], "no wide table"
     assert "### ILEAPP-0001 (EPOCH-510): Uber - Place Search Hits, Timestamp" in lines
     assert "- **Tool:** iLEAPP 2026.3.0" in lines
@@ -49,7 +52,7 @@ def test_a_correction_with_no_recorded_time_says_so():
         "earliest": None,
         "latest": None,
     }
-    lines = render_tool_checks_section([correction])
+    lines = render_tool_checks_section([correction], UTC_TIMES)
     assert "- **Records corrected:** 3, their times were not recorded" in lines
 
 
@@ -72,7 +75,7 @@ def test_times_for_review_are_their_own_section_per_artifact_column_and_check():
             "latest": at(1826409600),
         },
     ]
-    lines = render_time_review_section(review)
+    lines = render_time_review_section(review, UTC_TIMES)
     assert lines[0] == "## Times for Review"
     assert table_rows(lines) == [
         "| Calendar Events | Last Modification Time | before 2007-06-29, the first iPhone | "
@@ -83,10 +86,10 @@ def test_times_for_review_are_their_own_section_per_artifact_column_and_check():
 
 
 def test_with_nothing_to_list_each_section_still_says_what_was_checked():
-    lines = render_tool_checks_section([])
+    lines = render_tool_checks_section([], UTC_TIMES)
     assert lines[0] == "## Tool Checks and Corrections"
     assert "No registered tool defect applied to this evidence, so nothing was corrected." in lines
-    review = render_time_review_section([])
+    review = render_time_review_section([], UTC_TIMES)
     assert "No checked time falls outside that range." in review
     assert table_rows(review) == []
 
@@ -102,5 +105,5 @@ def test_tool_text_cannot_break_the_table():
             "latest": at(0),
         }
     ]
-    [row] = table_rows(render_time_review_section(review))
+    [row] = table_rows(render_time_review_section(review, UTC_TIMES))
     assert row.startswith("| A \\| B C | X\\|Y |")

@@ -124,17 +124,24 @@ describe('the Activity Log views (EPOCH-570)', () => {
 
   it('writes lines with real spaces, as they show', () => {
     const [started, , written, review] = log();
-    expect(lineText(started, 'full')).toBe('15:21:03Z  INFO   Analyze started for 1 backup');
-    expect(lineText(review, 'summary')).toBe(
+    expect(lineText(started, 'full', 'UTC')).toBe('15:21:03Z  INFO   Analyze started for 1 backup');
+    expect(lineText(review, 'summary', 'UTC')).toBe(
       '15:21:03Z  For review: Reading device activity: Calendar Events: 57 times before 2007'
     );
-    expect(logText([started, written], 'summary')).toBe(
+    expect(logText([started, written], 'summary', 'UTC')).toBe(
       '15:21:03Z  Analyze started for 1 backup\n15:21:03Z  Reading device activity: 44,619 record(s) written'
     );
   });
 
+  it("shows and copies each line's time in the examiner's zone (EPOCH-560)", () => {
+    const [started] = log();
+    expect(lineText(started, 'full', 'America/Chicago')).toBe('10:21:03 CDT  INFO   Analyze started for 1 backup');
+    expect(lineText(started, 'full', 'Asia/Kolkata')).toBe('20:51:03 UTC+05:30  INFO   Analyze started for 1 backup');
+    expect(logFileText(log(), 'America/Chicago').split('\n')[1]).toBe('Started unknown; times in America/Chicago');
+  });
+
   it('saves the Full log under a header that says what the task was and how it ended', () => {
-    const text = logFileText(log());
+    const text = logFileText(log(), 'UTC');
     expect(text.split('\n').slice(0, 3)).toEqual([
       'Task log',
       'Started unknown; times in UTC',
@@ -144,7 +151,7 @@ describe('the Activity Log views (EPOCH-570)', () => {
   });
 
   it("copies a failure's details without debug: the step, the evidence, the reason and its entries", () => {
-    const details = failureDetails(log(), { label: 'BK', step: 'ileapp', reason: 'iLEAPP exited with code 1' });
+    const details = failureDetails(log(), { label: 'BK', step: 'ileapp', reason: 'iLEAPP exited with code 1' }, 'UTC');
     expect(details.split('\n').slice(0, 3)).toEqual([
       'Backup: BK',
       'Step: ileapp',

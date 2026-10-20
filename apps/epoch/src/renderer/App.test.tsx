@@ -71,6 +71,7 @@ const answers: Record<string, unknown> = {
 };
 
 // Every IPC call answers as the main process does mid-pull; a subscription returns its unsubscribe.
+const calls: unknown[][] = [];
 vi.stubGlobal(
   'epoch',
   new Proxy(
@@ -79,7 +80,10 @@ vi.stubGlobal(
       get: (_target, name: string) => {
         if (name === 'platform') return 'linux';
         if (name.startsWith('on')) return () => () => undefined;
-        return async () => (name in answers ? answers[name] : []);
+        return async (...args: unknown[]) => {
+          calls.push([name, ...args]);
+          return name in answers ? answers[name] : [];
+        };
       },
     }
   )
@@ -95,6 +99,7 @@ vi.stubGlobal('matchMedia', (query: string) => ({
 
 import { App } from './App';
 import { ToastProvider } from './components/ui/Toast';
+import { useSettingsStore } from './store/useSettings';
 
 afterEach(cleanup);
 
@@ -198,5 +203,47 @@ describe('App (EPOCH-575)', () => {
     expect(outcomes.textContent).toContain(
       'iPhone 14,2 · iOS 17.6.1 interrupted. iLEAPP Artifacts stopped after reaching 211 of 540 artifact tables.'
     );
+  });
+
+  it('opens New Investigation on the folder last looked in, and remembers a folder chosen there (EPOCH-560)', async () => {
+    Object.assign(answers, {
+      getDevicePullState: null,
+      getPullLogState: idle,
+      getPrepareState: { ...idle, source: null, labels: [], progress: null, passwordFor: null, result: null },
+      getAnalysisState: { ...idle, kind: null, target: null, currentStage: null, result: null },
+      discoverBackups: [],
+      describeBackups: [],
+      getPreparedBackups: { workspace: '/w', backups: [] },
+      findCrashReportsRetryTargets: { targets: [], errors: [] },
+      displayPath: '~/cases/backups',
+      selectBackupDirectory: '/cases/other',
+    });
+    useSettingsStore.setState({ settings: { displayZone: 'UTC', backupsFolder: '/cases/backups' } });
+    calls.length = 0;
+    render(
+      <ToastProvider>
+        <App />
+      </ToastProvider>
+    );
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /New Investigation/ })));
+    await screen.findByRole('heading', { name: /Backups Found/ });
+    expect(calls).toContainEqual(['discoverBackups', '/cases/backups']);
+    expect(calls.some(([name]) => name === 'rememberBackupsFolder')).toBe(false);
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Change Folder' })));
+    await waitFor(() => expect(calls).toContainEqual(['rememberBackupsFolder', '/cases/other']));
+  });
+
+  it('shows a pull still running in place of the remembered folder (EPOCH-560)', async () => {
+    Object.assign(answers, { getDevicePullState: running, getPullLogState: pullLog });
+    useSettingsStore.setState({ settings: { displayZone: 'UTC', backupsFolder: '/cases/backups' } });
+    render(
+      <ToastProvider>
+        <App />
+      </ToastProvider>
+    );
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /New Investigation/ })));
+    await screen.findByRole('heading', { name: /Pulling iPhone 17,5/ });
+    expect(screen.queryByRole('heading', { name: /Backups Found/ })).toBeNull();
   });
 });

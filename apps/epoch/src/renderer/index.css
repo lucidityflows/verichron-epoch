@@ -37,6 +37,8 @@
   --section-records: hsl(212 85% 66%);
   --section-iocs: hsl(326 75% 70%);
   --section-reports: hsl(244 80% 76%);
+  /* Settings is not a part of an investigation, so it has no hue of its own (EPOCH-560). */
+  --section-settings: var(--muted-foreground);
   /* The current view's section colour; ViewLayout sets it per view. */
   --section: var(--accent);
 
@@ -88,6 +90,7 @@
   --color-section-records: var(--section-records);
   --color-section-iocs: var(--section-iocs);
   --color-section-reports: var(--section-reports);
+  --color-section-settings: var(--section-settings);
 
   --font-sans: 'Inter', sans-serif;
   --font-display: 'Space Grotesk', sans-serif;

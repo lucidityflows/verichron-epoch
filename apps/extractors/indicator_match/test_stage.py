@@ -12,11 +12,14 @@ from pathlib import Path
 import psycopg2
 import pytest
 from db_writer import IngestContext, ingest
+from display_zone import ZoneTimes
 from indicator_loader import load_set
 from indicator_sets import register_set
 from match_stage import run
 from normalized_record import NormalizedRecord, SourceType
 from testing.pg_real import TEST_DATABASE_URL_ENV, open_db
+
+UTC_TIMES = ZoneTimes()
 
 RUN = "aaaaaaaa-0000-0000-0000-00000000000a"
 RUN_2 = "bbbbbbbb-0000-0000-0000-00000000000b"
@@ -229,7 +232,7 @@ def test_the_report_reads_each_runs_check_from_the_database(db, tmp_path: Path) 
     assert [(str(c["run_id"]), c["status"]) for c in checks] == [(RUN, "succeeded"), (RUN_2, "skipped")]
     assert checks[0]["unit"]["record_count"] == 1
     assert checks[0]["newest_indicator"] == datetime(2026, 1, 1, tzinfo=UTC)
-    out = "\n".join(render_indicator_section(checks, RUN, 90))
+    out = "\n".join(render_indicator_section(checks, RUN, 90, UTC_TIMES))
     assert "1 match(es) against this set." in out
     assert "| Domain | `evil.example` | not named | subdomain |" in out.replace(" | 2026-03-01 12:00:00 UTC", "")
-    assert "- 2026-10-14 · not checked: No indicator set is registered" in out
+    assert "- 2026-10-14 UTC · not checked: No indicator set is registered" in out

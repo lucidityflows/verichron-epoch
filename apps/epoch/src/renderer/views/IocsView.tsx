@@ -7,7 +7,8 @@ import { ViewLayout } from '../components/layout/ViewLayout';
 import { Badge } from '../components/ui/Badge';
 import { DateTime } from '../components/ui/DateTime';
 import { Disclosure } from '../components/ui/Disclosure';
-import { formatDateTime } from '../../shared/time';
+import { formatDateTime, type DisplayZone } from '../../shared/time';
+import { useDisplayZone } from '../store/useSettings';
 import { EmptyState } from '../components/ui/EmptyState';
 import { analysisName } from '../features/investigations/investigations';
 import {
@@ -39,15 +40,16 @@ function ResultBadge({ check }: { check: IndicatorCheckRow }) {
 
 /** One run's check, in the report's approved order (EPOCH-493). */
 function CheckBody({ check, results }: { check: IndicatorCheckRow; results: IndicatorResults }) {
+  const zone = useDisplayZone();
   const summary = check.summary;
-  const stale = check.set_name ? staleLine(check, results.staleAfterDays) : null;
+  const stale = check.set_name ? staleLine(check, results.staleAfterDays, zone) : null;
   const checked = summary ? inOrder(summary.types).filter(([, e]) => e.status === 'checked') : [];
   const notChecked = notCheckedLines(check);
   return (
     <div className="space-y-4">
       {check.set_name && (
         <p className="text-data text-foreground/90">
-          {setLine(check)}
+          {setLine(check, zone)}
           {stale && <span className="block text-warning mt-1">{stale}</span>}
         </p>
       )}
@@ -105,7 +107,7 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className={head}>Time (UTC)</th>
+                <th className={head}>Time</th>
                 <th className={head}>Type</th>
                 <th className={head}>Value</th>
                 <th className={head}>Campaign</th>
@@ -128,7 +130,16 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
                     <td className={cell}>
                       {match_mode}
                       {indicator.expired && (
-                        <span className="text-warning">, expired {(indicator.valid_until ?? '').slice(0, 10)}</span>
+                        // The day it expired in the examiner's zone, as the report says it (EPOCH-560).
+                        <span className="text-warning">
+                          , expired
+                          {indicator.valid_until && (
+                            <>
+                              {' '}
+                              <DateTime value={indicator.valid_until} dateOnly />
+                            </>
+                          )}
+                        </span>
                       )}
                     </td>
                     <td className={cell}>
@@ -157,8 +168,8 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
   );
 }
 
-const checkedOn = (check: IndicatorCheckRow) =>
-  check.finished_at ? formatDateTime(check.finished_at) : 'not finished';
+const checkedOn = (check: IndicatorCheckRow, zone: DisplayZone) =>
+  check.finished_at ? formatDateTime(check.finished_at, zone) : 'not finished';
 
 /**
  * Indicator Matches (EPOCH-493): every check of the selected investigation's
@@ -169,6 +180,7 @@ const checkedOn = (check: IndicatorCheckRow) =>
  * read as a verdict.
  */
 export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
+  const zone = useDisplayZone();
   const [results, setResults] = useState<IndicatorResults | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -230,10 +242,10 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
           <div className="flex items-center gap-3 mb-4">
             <h2 className="font-display text-heading text-foreground">This run's check</h2>
             {thisRun && <ResultBadge check={thisRun} />}
-            {thisRun?.set_name && staleLine(thisRun, results.staleAfterDays) && (
+            {thisRun?.set_name && staleLine(thisRun, results.staleAfterDays, zone) && (
               <Badge variant="warning">Older than {results.staleAfterDays} days</Badge>
             )}
-            {thisRun && <span className="text-data text-muted-foreground">{checkedOn(thisRun)}</span>}
+            {thisRun && <span className="text-data text-muted-foreground">{checkedOn(thisRun, zone)}</span>}
           </div>
           {thisRun ? (
             <CheckBody check={thisRun} results={results} />
@@ -247,7 +259,7 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
             {others.map((check) => (
               <div key={check.run_id} className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <span className="text-data text-muted-foreground">{checkedOn(check)}</span>
+                  <span className="text-data text-muted-foreground">{checkedOn(check, zone)}</span>
                   <ResultBadge check={check} />
                   {check.set_name && <span className="text-data">{check.set_name}</span>}
                 </div>

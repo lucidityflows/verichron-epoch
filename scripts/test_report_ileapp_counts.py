@@ -14,8 +14,11 @@ from pathlib import Path
 
 import pytest
 from db_writer import IngestContext, ingest
+from display_zone import ZoneTimes
 from normalized_record import NormalizedRecord, SourceType
 from testing.pg_real import open_db
+
+UTC_TIMES = ZoneTimes()
 
 RUN = "aaaaaaaa-0000-0000-0000-00000000000a"
 EVIDENCE = "aaaa0000-0000-0000-0000-00000000000a"
@@ -71,7 +74,7 @@ def test_each_artifact_is_checked_against_ileapps_own_count(db) -> None:
     assert rows["Unrecorded"]["reported"] is None, "no count recorded is never assumed to match"
     assert rows["Unrecorded and empty"]["records"] == 0, "no facts and no count: still listed, so it can't vanish"
 
-    text = "\n".join(render_ileapp_section(list(rows.values())))
+    text = "\n".join(render_ileapp_section(list(rows.values()), UTC_TIMES))
     assert "**2 artifact(s) differ from iLEAPP's own count**" in text
     assert "2 artifact(s) have no count from iLEAPP recorded, so they could not be checked." in text
     assert "| Matches | 3 | 3 |" in text
@@ -85,7 +88,7 @@ def test_when_every_artifact_matches_the_report_says_so(db) -> None:
 
     artifact(db, "A", 2, {"artifact": "A", "record_count": 2})
     artifact(db, "B", 1, {"artifact": "B", "record_count": 1})
-    text = "\n".join(render_ileapp_section(summary(db)))
+    text = "\n".join(render_ileapp_section(summary(db), UTC_TIMES))
     assert "Every artifact's records match the count iLEAPP reported for it." in text
     assert "differs" not in text
 
@@ -119,7 +122,7 @@ def test_unchecked_artifacts_are_never_counted_as_matching(db) -> None:
 
     artifact(db, "A", 2, {"artifact": "A", "record_count": 2})
     artifact(db, "B", 1, {"artifact": "B"})
-    text = "\n".join(render_ileapp_section(summary(db)))
+    text = "\n".join(render_ileapp_section(summary(db), UTC_TIMES))
     assert "Every artifact's records match" not in text
     assert "The 1 checked artifact(s) match the count iLEAPP reported for each." in text
     assert "1 artifact(s) have no count from iLEAPP recorded, so they could not be checked." in text

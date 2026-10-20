@@ -11,6 +11,7 @@ import type {
   BackupDescription,
   PullLogState,
   ReportResult,
+  AppSettings,
 } from '../shared/types/window';
 import type {
   BackupProgress,
@@ -118,6 +119,17 @@ const dbApi = {
   saveTaskLogAs: (workspace: string, file: string): Promise<{ saved: string | null }> =>
     ipcRenderer.invoke('epoch:saveTaskLogAs', workspace, file),
   popOutActivityLog: (): Promise<void> => ipcRenderer.invoke('epoch:popOutActivityLog'),
+  // EPOCH-560: the examiner's settings, kept by the main process.
+  getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('epoch:getSettings'),
+  getDisplayZones: (): Promise<string[]> => ipcRenderer.invoke('epoch:getDisplayZones'),
+  setDisplayZone: (zone: string): Promise<AppSettings> => ipcRenderer.invoke('epoch:setDisplayZone', zone),
+  rememberBackupsFolder: (folder: string): Promise<AppSettings> =>
+    ipcRenderer.invoke('epoch:rememberBackupsFolder', folder),
+  onSettingsChanged: (callback: (settings: AppSettings) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, settings: AppSettings) => callback(settings);
+    ipcRenderer.on('epoch:settingsChanged', listener);
+    return () => ipcRenderer.removeListener('epoch:settingsChanged', listener);
+  },
   onAnalysisState: (callback: (state: AnalysisState) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: AnalysisState) => callback(state);
     ipcRenderer.on('epoch:analysisState', listener);

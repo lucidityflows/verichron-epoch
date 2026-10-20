@@ -264,6 +264,10 @@ to the orchestrator with `--indicator-set <set hash>`. With no set registered it
 is recorded as skipped, with that reason, and the report and the app say that
 nothing was checked.
 
+The report shows its times in the zone the examiner chose in Settings, UTC by
+default: the app passes it to the orchestrator with `--display-zone <zone>`,
+the run records it, and the report reads it from the run (EPOCH-560).
+
 The AI stage (`apps/analysis`, `llm_flagged_anomaly` leads) has no `stage.json`
 until EPOCH-442 gives it the project's own facts to read.
 

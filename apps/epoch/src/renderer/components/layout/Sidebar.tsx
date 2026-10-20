@@ -52,31 +52,45 @@ export function Sidebar({ active, onSelect, dbStatus }: SidebarProps) {
         </div>
       </div>
 
-      <nav className="flex-1 px-3 pb-3 flex flex-col gap-1 overflow-y-auto">
-        {SECTION_ORDER.map((id) => {
-          const { label, icon: Icon } = SECTIONS[id];
-          const current = active === id;
-          return (
-            <button
-              key={id}
-              onClick={() => onSelect(id)}
-              style={sectionStyle(id)}
-              aria-current={current ? 'page' : undefined}
-              className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-data font-medium transition-colors cursor-pointer select-none ${
-                // The current section: a neutral fill, its colour on the marker
-                // and the icon only (DESIGN.md §9, EPOCH-574).
-                current
-                  ? 'bg-surface-raised text-foreground font-semibold'
-                  : 'text-foreground/75 hover:bg-surface hover:text-foreground'
-              }`}
-            >
-              {current && <span aria-hidden className="absolute left-0 top-2 bottom-2 w-1 rounded-r bg-section" />}
-              <Icon size="1.125rem" className="shrink-0 text-section" />
-              <span>{label}</span>
-            </button>
-          );
-        })}
+      <nav aria-label="Investigation" className="flex-1 px-3 pb-3 flex flex-col gap-1 overflow-y-auto">
+        {SECTION_ORDER.map((id) => (
+          <SectionButton key={id} id={id} current={active === id} onSelect={onSelect} />
+        ))}
+      </nav>
+      {/* The app's own settings sit apart from the investigation's sections (EPOCH-560). */}
+      <nav aria-label="App" className="px-3 pb-4 pt-3 border-t border-border/60">
+        <SectionButton id="settings" current={active === 'settings'} onSelect={onSelect} />
       </nav>
     </div>
+  );
+}
+
+function SectionButton({
+  id,
+  current,
+  onSelect,
+}: {
+  id: Section;
+  current: boolean;
+  onSelect: (section: Section) => void;
+}) {
+  const { label, icon: Icon } = SECTIONS[id];
+  return (
+    <button
+      onClick={() => onSelect(id)}
+      style={sectionStyle(id)}
+      aria-current={current ? 'page' : undefined}
+      className={`relative flex w-full items-center gap-3 px-3 py-2 rounded-lg text-data font-medium transition-colors cursor-pointer select-none ${
+        // The current section: a neutral fill, its colour on the marker
+        // and the icon only (DESIGN.md §9, EPOCH-574).
+        current
+          ? 'bg-surface-raised text-foreground font-semibold'
+          : 'text-foreground/75 hover:bg-surface hover:text-foreground'
+      }`}
+    >
+      {current && <span aria-hidden className="absolute left-0 top-2 bottom-2 w-1 rounded-r bg-section" />}
+      <Icon size="1.125rem" className="shrink-0 text-section" />
+      <span>{label}</span>
+    </button>
   );
 }

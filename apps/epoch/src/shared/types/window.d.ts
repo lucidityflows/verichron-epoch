@@ -28,6 +28,14 @@ import type {
 import type { PrepareRunProgress } from '../prepareProgress';
 import type { PrepareStep, ReadTaskLog, TaskKind, TaskLogEntry, TaskOutcome } from '@verichron/contracts';
 
+/** The examiner's settings (EPOCH-560), kept by the main process in the app's settings folder. */
+export interface AppSettings {
+  /** UTC (the default) or a named zone such as "America/Chicago": every time is shown in it, reports included. */
+  displayZone: string;
+  /** The folder New Investigation last looked in for backups; null when none, or when it is gone. */
+  backupsFolder: string | null;
+}
+
 export type ReportResult =
   | { status: 'ok'; content: string; path: string }
   | { status: 'not-found'; path: string }
@@ -294,6 +302,12 @@ declare global {
       readTaskLog: (workspace: string, file: string) => Promise<ReadTaskLog>;
       saveTaskLogAs: (workspace: string, file: string) => Promise<{ saved: string | null }>;
       popOutActivityLog: () => Promise<void>;
+      // EPOCH-560: the examiner's settings, the same in every window.
+      getSettings: () => Promise<AppSettings>;
+      getDisplayZones: () => Promise<string[]>;
+      setDisplayZone: (zone: string) => Promise<AppSettings>;
+      rememberBackupsFolder: (folder: string) => Promise<AppSettings>;
+      onSettingsChanged: (callback: (settings: AppSettings) => void) => () => void;
       listDeviceBackupSources: () => Promise<Array<{ id: string; label: string }>>;
       checkDeviceBackupToolAvailable: (sourceId: string) => Promise<ToolAvailabilityStatus>;
       listConnectedDevices: (sourceId: string) => Promise<DeviceInfo[]>;

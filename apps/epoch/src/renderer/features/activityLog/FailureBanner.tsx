@@ -3,6 +3,7 @@ import type { TaskLogEntry } from '@verichron/contracts';
 
 import { failureDetails } from '../../../shared/activityLog';
 import { CopyButton } from '../../components/ui/CopyButton';
+import { useDisplayZone } from '../../store/useSettings';
 
 export interface PrepareFailure {
   label: string;
@@ -28,6 +29,7 @@ export function FailureBanner({
   prepared: number;
   total: number;
 }) {
+  const zone = useDisplayZone();
   const sentence = (f: PrepareFailure) =>
     [...entries]
       .reverse()
@@ -57,7 +59,7 @@ export function FailureBanner({
                 <span className="text-foreground">: {sentence(f)}</span>
               </div>
               <CopyButton
-                text={() => failureDetails(entries, f)}
+                text={() => failureDetails(entries, f, zone)}
                 label="Copy Details"
                 title="Copy the step, the evidence and the log around it"
               />

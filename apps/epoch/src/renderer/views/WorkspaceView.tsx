@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Play,
   AlertCircle,
@@ -25,6 +25,9 @@ import type {
 import { StepList, type Step } from '../components/ui/StepList';
 import type { Backup } from '@verichron/contracts';
 import { pipelineApi } from '../api/pipeline';
+import { settingsApi } from '../api/settings';
+import { useSettings } from '../store/useSettings';
+import { useToast } from '../components/ui/Toast';
 import { useAnalysisState, usePrepareState } from '../hooks/usePipelineState';
 import { analysisShown } from './analysisShown';
 import { analysisSelection, listLabels } from '../../shared/analysisSelection';
@@ -57,7 +60,21 @@ export interface WorkspaceViewProps {
 }
 
 export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const { show } = useToast();
+  // The page opens on the folder the examiner last looked in (EPOCH-560),
+  // or on the choice of where the evidence is when there is none.
+  const { backupsFolder } = useSettings();
+  const [selectedPath, setSelectedPath] = useState<string | null>(backupsFolder);
+  // True once the examiner picks a folder here: a run or pull found running is
+  // then not put in its place. The state is for render, the ref for the
+  // pull check that answers after it.
+  const [pathChosen, setPathChosen] = useState(false);
+  const chosen = useRef(false);
+  const choosePath = useCallback((dir: string) => {
+    chosen.current = true;
+    setPathChosen(true);
+    setSelectedPath(dir);
+  }, []);
   // How the evidence is imported (EPOCH-467): null until the user chooses, so
   // only the chosen path is on screen.
   const [importSource, setImportSource] = useState<'device' | null>(null);
@@ -67,7 +84,10 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   useEffect(() => {
     let active = true;
     devicesApi.getDevicePullState().then((running) => {
-      if (active && running) setImportSource('device');
+      if (!active || !running) return;
+      setImportSource('device');
+      // The pull is shown in place of the remembered folder.
+      if (!chosen.current) setSelectedPath(null);
     });
     return () => {
       active = false;
@@ -161,7 +181,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   const [restoredRun, setRestoredRun] = useState(false);
   if (!restoredRun && prepare) {
     setRestoredRun(true);
-    if (prepare.status !== 'idle' && prepare.source && selectedPath === null) setSelectedPath(prepare.source);
+    if (prepare.status !== 'idle' && prepare.source && !pathChosen) setSelectedPath(prepare.source);
   }
 
   // A new password request starts with an empty field.
@@ -173,8 +193,21 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
 
   const handleSelectDirectory = async () => {
     const dir = await pipelineApi.selectBackupDirectory();
-    if (dir) setSelectedPath(dir);
+    if (dir) choosePath(dir);
   };
+
+  // A folder the examiner chose, or pulled into, is the one the page opens on next time.
+  useEffect(() => {
+    if (!selectedPath || !pathChosen) return;
+    settingsApi
+      .rememberBackupsFolder(selectedPath)
+      .catch((err: unknown) =>
+        show(
+          `Epoch could not remember this folder for next time: ${err instanceof Error ? err.message : String(err)}`,
+          'danger'
+        )
+      );
+  }, [selectedPath, pathChosen, show]);
 
   // EPOCH-302: stable identity so it never forces useDevicePull's internal
   // listener effect to tear down/re-register mid-pull. useDevicePull now
@@ -182,9 +215,7 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
   // the stuck-'pulling' bug -- but passing a fresh arrow here was the
   // trigger for it, so it's fixed at the source too rather than relying on
   // the hook's defense alone.
-  const handleBackupPulled = useCallback((dir: string) => {
-    setSelectedPath(dir);
-  }, []);
+  const handleBackupPulled = useCallback((dir: string) => choosePath(dir), [choosePath]);
 
   // The latest prepared backups, read when discovery ends.
   // Only what still needs preparing starts selected (board 5). That needs both

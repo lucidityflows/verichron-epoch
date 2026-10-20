@@ -11,5 +11,7 @@ export default defineConfig({
     environment: 'node',
     environmentMatchGlobs: [['src/renderer/**', 'jsdom']],
     pool: 'forks',
+    // The settings a renderer view reads, loaded as SettingsGate loads them in the app (EPOCH-560).
+    setupFiles: ['src/renderer/test/settings.ts'],
   },
 });
