@@ -5,9 +5,9 @@
  * them and says where each stands, in one place the views share.
  */
 
-import type { PipelineRunRow } from '@verichron/etl-db-reader';
+import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 
-import type { ChipState } from '../../components/ui/statusChip';
+import { stageChip, type ChipState } from '../../components/ui/statusChip';
 import { shownModel } from '../../../shared/deviceModel';
 
 export interface Investigation {
@@ -103,4 +103,14 @@ export function warningLines(warnings: string | null): string[] {
 export function analysisName(run: PipelineRunRow | null): string | null {
   if (!run?.evidence_id || !run.product_type || !run.ios_version) return null;
   return `${investigationTitle(run)} · Investigation ${shortId(run.evidence_id)} · Analysis ${shortId(run.run_id)}`;
+}
+
+/** A stage the analysis did not examine: skipped, or never run to the end. */
+export function notExamined(stage: StageStatusRow): boolean {
+  const { state } = stageChip({
+    status: stage.status,
+    warnings: stage.warnings,
+    runEndedReason: stage.run_ended_reason,
+  });
+  return state === 'skipped' || state === 'not-started' || state === 'interrupted';
 }

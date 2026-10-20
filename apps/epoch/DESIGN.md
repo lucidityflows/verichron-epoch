@@ -674,3 +674,41 @@ and how it is sanitized, is `docs/event-log.md`; this is how it looks.
   the running task's log, else the last one; after a restart, the
   workspace's newest saved log.
 
+## 13. Reports — the report as a document
+
+Decided 2026-10-19 by the project owner (EPOCH-552, EPOCH-553, U5; the
+boards "Reports View" and "Exported Report").
+
+- **One source.** The report stage's Markdown is the report. The app renders
+  it as a document (`react-markdown` with `remark-gfm`), never as source, so
+  what the examiner reads is the file they hand over. A PDF export renders
+  the same document (EPOCH-577).
+- **Nothing in a report acts.** Raw HTML is skipped, a link is shown as text
+  with its address on hover and never followed, and an image is shown as its
+  description and never loaded.
+- **Not Examined leads.** It is the report's first section, in a `warning`
+  panel, and first in the contents list with its count of items: "What this
+  report did not look at. None of these is a clean result."
+- **A contents list** ("In this report") jumps to each section. It sits
+  beside the document from 1280 px, and above it, wrapping, below that.
+- **Tiles** above the document: stages complete, records found, not examined
+  and warnings. Not examined is the count of the report's own Not Examined
+  items, the same number as its contents entry, and jumps to the list (R2;
+  CodeRabbit, PR #137). Each item in that list is one thing not examined; a
+  stage that never started is one.
+- **The responsibility statement** is part of the report itself, under its
+  title, so it travels with the document handed over: the report is an aid;
+  the examiner is responsible for any conclusion; no result, including the
+  absence of a match, is proof of absence. Wording approved by the project
+  owner, 2026-10-19, within `docs/claims.md` (`RESPONSIBILITY` in
+  `generate_report.py`).
+- **Wide tables** scroll inside their own box with their first column kept
+  in view; the page never scrolls sideways. The widest, Tool Checks and
+  Corrections, is one entry per correction instead of an 8-column table.
+- **The report renders as it is read.** It is cut at its headings into
+  chunks, and each renders when it comes near the screen (measured on a
+  141 KB real report: about 30 ms to open, against about 1 s whole).
+- **Values print as values** (EPOCH-553): a missing one reads "not recorded",
+  never `None`; every time is UTC in one format, labelled; a bug type reads
+  "145 · no label known" until a verified source labels it.
+

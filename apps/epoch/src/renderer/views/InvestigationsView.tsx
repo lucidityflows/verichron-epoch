@@ -18,6 +18,7 @@ import { formatBytes } from '../features/devicePullPanel/BackupProgressCard';
 import {
   analysisChip,
   groupInvestigations,
+  notExamined,
   shortId,
   warningLines,
   type Investigation,
@@ -36,16 +37,6 @@ interface InvestigationsViewProps {
   onViewReport: () => void;
   onRefreshStages?: (runId: string) => void;
   onRefreshRun?: (runId: string) => void | Promise<void>;
-}
-
-/** A stage the analysis did not examine: skipped, or never run to the end. */
-function notExamined(stage: StageStatusRow): boolean {
-  const { state } = stageChip({
-    status: stage.status,
-    warnings: stage.warnings,
-    runEndedReason: stage.run_ended_reason,
-  });
-  return state === 'skipped' || state === 'not-started' || state === 'interrupted';
 }
 
 /**
