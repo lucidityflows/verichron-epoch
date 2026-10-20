@@ -8,14 +8,16 @@ deep_ips_report.py — that file's PARSING logic moves to /extractors/crash,
 its RENDERING logic (and rendering for every other domain) lives here.
 
 Three things this file must always do, per the "fix, don't punish" principle:
-  1. Query pipeline_stage_status FIRST and render an honest preface —
-     which domains are present, which failed, which were never run.
+  1. Say first what was NOT examined (board "Reports View", EPOCH-552):
+     every skipped stage and errored iLEAPP plugin, and AI-assisted
+     analysis, which has had no producer since EPOCH-489 and returns with
+     EPOCH-442. Then query pipeline_stage_status and render an honest
+     preface: which stages ran, failed or never ran, and how long each took.
   2. Before any findings, say what the report shows of the evidence's facts
-     and what it leaves out (the Coverage section, EPOCH-448), then what was
-     NOT examined: every skipped stage and errored iLEAPP plugin, and
-     AI-assisted analysis, which has had no producer since EPOCH-489 and
-     returns with EPOCH-442. Indicator checks have their own section, which
-     says which set was checked and what it couldn't check (EPOCH-493).
+     and what it leaves out (the Coverage section, EPOCH-448). Indicator
+     checks have their own section, which says which set was checked and
+     what it couldn't check (EPOCH-493). Every value prints as a value: a
+     missing one reads "not recorded", never Python's repr (EPOCH-553).
   3. Never let a missing/failed domain silently disappear from the report.
      A failed stage gets a visible "not available" note, not omission.
   4. State what was checked and corrected in the tools' output (R36,
@@ -24,6 +26,7 @@ Three things this file must always do, per the "fix, don't punish" principle:
 """
 
 import argparse
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +36,7 @@ import psycopg2.extras
 from indicator_set import results_config, stale_after_days
 from runtime_env import redact_password, require_database_url
 from stage_report import report
+from stage_titles import stage_title
 from tool_defects import defect as registered_defect
 
 
@@ -81,34 +85,73 @@ def fetch_crash_records(conn, evidence_id: str) -> list[dict]:
 REPORT_STAGE = Path(__file__).resolve().parent.name
 
 
+OUTCOMES = {
+    "succeeded": "Complete",
+    "failed": "Failed",
+    "skipped": "Skipped",
+    "pending": "Not started",
+    "running": "Running",
+}
+
+
+def _took(started, finished) -> str:
+    """How long a stage ran: "0.6 s", "1 m 17 s"; empty when it never finished."""
+    if started is None or finished is None:
+        return ""
+    seconds = (finished - started).total_seconds()
+    if seconds < 60:
+        return f"{seconds:.1f} s"
+    minutes, rest = divmod(round(seconds), 60)
+    return f"{minutes} m {rest} s"
+
+
+def _warning_lines(text: str) -> list[str]:
+    """A stage's notes, one per line, without the "[stage]" tag the stage
+    prefixed them with: the report names the stage itself."""
+    lines = (re.sub(r"^\[[^\]]+\]\s*", "", line.strip()) for line in text.splitlines())
+    return [line for line in lines if line]
+
+
 def render_stage_preface(stages: list[dict], run_id: str, generated: str) -> list[str]:
     """The honesty section — what's actually in this report, up front.
+
+    Each stage by its title, its outcome, why it failed or was skipped, and
+    how long it took (EPOCH-553). A succeeded stage's warnings are listed
+    after the table, each as its own item, never joined into one cell.
 
     The report's own stage is left out (EPOCH-499): it is still running while
     the report is written, so its status would always read "running" in the
     finished document. A line below the table says which run wrote it, and
     when, instead."""
     lines = ["## Run Completeness", ""]
-    lines.append("| Stage | Status | Note |")
-    lines.append("| :--- | :--- | :--- |")
+    lines.append("| Stage | Outcome | Note | Took |")
+    lines.append("| :--- | :--- | :--- | ---: |")
+    warnings: list[tuple[str, str]] = []
     for s in stages:
         if s["stage_name"] == REPORT_STAGE:
             continue
         status = s["status"]
+        title = stage_title(s["stage_name"])
         note = s["error_message"] or ""
         if status == "failed":
             note = (
-                f"FAILED — {note}. Fix and re-run the pipeline against the same backup; "
+                f"{note}. Fix and re-run the pipeline against the same backup; "
                 "already-succeeded stages will not be redone."
             )
         elif status == "pending":
-            note = "never ran"
+            note = "Never ran."
         elif status == "succeeded" and s.get("warnings"):
             # The stage's own notes, kept since EPOCH-420; it still succeeded.
-            lines_out = [line.strip() for line in s["warnings"].splitlines() if line.strip()]
-            note = "warnings: " + "; ".join(lines_out)
-        lines.append(f"| {s['stage_name']} | {status} | {_table_cell(note)} |")
+            warnings += [(title, line) for line in _warning_lines(s["warnings"])]
+        took = _took(s.get("started_at"), s.get("finished_at"))
+        lines.append(
+            f"| {_table_cell(title)} | {OUTCOMES.get(status, _table_cell(status))} | {_table_cell(note)} | {took} |"
+        )
     lines.append("")
+    if warnings:
+        lines += [f"**Warnings ({len(warnings)})**", ""]
+        lines += [f"- **{title}.** {line}" for title, line in warnings]
+        lines.append("")
     lines.append(
         f"This report was generated by run `{run_id}` at {generated}, as the run's last stage; "
         "the table shows the run's other stages as they stood then."
@@ -228,7 +271,7 @@ def describe_derivative(d: dict) -> list[str]:
     if d["kind"] == "crash_reports":
         return [
             f"- **Crash logs** (`{d['path']}`): copied from the device by {tool['name']} {tool['version']} "
-            f"on {params['acquired_at']}, {copied_after_backup(params)}, and left on the device; "
+            f"on {_recorded_utc(params['acquired_at'])}, {copied_after_backup(params)}, and left on the device; "
             f"{params['files']} file(s)"
         ]
     repair = params["repair"]
@@ -291,11 +334,11 @@ def render_not_examined_section(ileapp_outputs: list[dict], stages: list[dict]) 
     orchestrator recorded (a disabled stage, or crash logs that were never
     acquired, EPOCH-447), and every iLEAPP plugin that errored on the output
     this run read (EPOCH-457), whose artifact is therefore missing."""
-    lines = ["## Not Examined", ""]
+    lines = ["## Not Examined", "", "What this report did not look at. None of these is a clean result.", ""]
     for s in stages:
         if s["status"] == "skipped":
             reason = s["error_message"] or "the orchestrator recorded no reason"
-            lines.append(f"- **The `{s['stage_name']}` stage did not run:** {_table_cell(reason)}")
+            lines.append(f"- **{stage_title(s['stage_name'])} did not run:** {_table_cell(reason)}")
     for d in ileapp_outputs:
         errors = d["params"]["modules"]["errors"]
         if not errors:
@@ -327,39 +370,73 @@ def render_not_examined_section(ileapp_outputs: list[dict], stages: list[dict]) 
 # should never need to know the internal shape of, say, safari_history's
 # fields to render crash_report's section, matching the extractor contract's
 # ownership boundaries.
+#: A crash report's bug_type, labelled only from a verified source (R11 in
+#: spirit: never guess). None is verified yet, so every code reads as
+#: unlabelled (EPOCH-553).
+BUG_TYPE_LABELS: dict[str, str] = {}
+
+NOT_RECORDED = "not recorded"
+
+
+def _value(value) -> str:
+    """A field as a reader reads it: the value itself, or "not recorded" for
+    one the source didn't give. Never Python's repr (`'None'`) (EPOCH-553)."""
+    if value is None or value == "":
+        return NOT_RECORDED
+    return _table_cell(str(value))
+
+
+def _code(value) -> str:
+    """An identifier in code type, or "not recorded" in plain text."""
+    return NOT_RECORDED if value is None or value == "" else f"`{_table_cell(str(value))}`"
+
+
+def _bug_type(code) -> str:
+    if code is None or code == "":
+        return NOT_RECORDED
+    label = BUG_TYPE_LABELS.get(str(code))
+    return f"{code} · {label}" if label else f"{code} · no label known"
+
+
 def render_crash_section(records: list[dict]) -> list[str]:
-    lines = ["| Incident | Process | PID | Bug Type | Event Time |", "| :--- | :--- | :--- | :--- | :--- |"]
+    """The crash logs' table, then each log's details. Every time is UTC,
+    labelled; a missing value reads "not recorded" (EPOCH-553)."""
+    lines = [
+        "| Time | Bug Type | Process | PID | Bundle ID | Incident |",
+        "| :--- | :--- | :--- | ---: | :--- | :--- |",
+    ]
     for r in records:
+        time = _utc(r["event_time"]) if r["event_time"] else NOT_RECORDED
         lines.append(
-            f"| `{r['incident_id'] or 'N/A'}` | {r['process_name'] or 'Unknown'} "
-            f"| `{r['pid']}` | `{r['bug_type']}` | `{r['event_time'] or 'unknown'}` |"
+            f"| {time} | {_bug_type(r['bug_type'])} | {_value(r['process_name'])} | {_value(r['pid'])} "
+            f"| {_value(r['bundle_id'])} | {_code(r['incident_id'])} |"
         )
     lines.append("")
 
     for r in records:
         fields = r["fields"] or {}
-        lines.append(f"### `{r['incident_id'] or fields.get('filename', 'unknown')}`")
-        lines.append(f"- **Source file:** `{fields.get('filename')}`")
+        lines.append(f"### {_code(r['incident_id'] or fields.get('filename'))}")
+        lines.append(f"- **Source file:** {_code(fields.get('filename'))}")
         lines.append(
-            f"- **OS:** `{fields.get('os_version')}` | **Hardware:** `{fields.get('hardware_model')}` "
-            f"| **Arch:** `{fields.get('cpu_type')}`"
+            f"- **OS:** {_value(fields.get('os_version'))} · **Hardware:** {_value(fields.get('hardware_model'))} "
+            f"· **Architecture:** {_value(fields.get('cpu_type'))}"
         )
-        lines.append(f"- **Bundle:** `{r['bundle_id']}` (`{fields.get('bundle_version')}`)")
+        lines.append(f"- **Bundle:** {_code(r['bundle_id'])}, version {_value(fields.get('bundle_version'))}")
         lines.append(
-            f"- **Process:** `{r['process_name']}` (PID `{r['pid']}`), spawned by "
-            f"`{fields.get('parent_proc')}` (PID `{fields.get('parent_pid')}`)"
+            f"- **Process:** {_value(r['process_name'])} (PID {_value(r['pid'])}), spawned by "
+            f"{_value(fields.get('parent_proc'))} (PID {_value(fields.get('parent_pid'))})"
         )
         exc = fields.get("exception") or {}
         if exc:
             lines.append(
-                f"- **Exception:** `{exc.get('type')}` / signal `{exc.get('signal')}` "
-                f"(code `{exc.get('code')}`, subcode `{exc.get('subcode')}`)"
+                f"- **Exception:** {_value(exc.get('type'))}, signal {_value(exc.get('signal'))} "
+                f"(code {_value(exc.get('code'))}, subcode {_value(exc.get('subcode'))})"
             )
         term = fields.get("termination") or {}
         if term:
             lines.append(
-                f"- **Termination:** namespace `{term.get('namespace')}`, code `{term.get('code')}`, "
-                f"by `{term.get('by')}`"
+                f"- **Termination:** namespace {_value(term.get('namespace'))}, code {_value(term.get('code'))}, "
+                f"by {_value(term.get('by'))}"
             )
         asi = fields.get("asi") or []
         if asi:
@@ -443,6 +520,12 @@ def _table_cell(text: str) -> str:
 
 def _utc(value) -> str:
     return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _recorded_utc(text: str) -> str:
+    """A time a derivative recorded as ISO 8601 text, in the report's one
+    format: "2026-10-15 01:00:00 UTC" (EPOCH-553)."""
+    return _utc(datetime.fromisoformat(text))
 
 
 def render_ileapp_section(rows: list[dict]) -> list[str]:
@@ -555,7 +638,10 @@ def _date_span(first, last) -> str:
     return _utc(first) if first == last else f"{_utc(first)} to {_utc(last)}"
 
 
-def render_tool_checks_section(corrections: list[dict], review: list[dict]) -> list[str]:
+def render_tool_checks_section(corrections: list[dict]) -> list[str]:
+    """Every registered tool defect corrected in this evidence (R36,
+    EPOCH-511), each as one entry, so no column is squeezed in a narrow
+    window or on a page (board "Exported Report", EPOCH-553)."""
     lines = [
         "## Tool Checks and Corrections",
         "",
@@ -565,48 +651,49 @@ def render_tool_checks_section(corrections: list[dict], review: list[dict]) -> l
         "otherwise have reached this report.",
         "",
     ]
-    if corrections:
+    if not corrections:
+        return lines + ["No registered tool defect applied to this evidence, so nothing was corrected.", "", "---", ""]
+    for c in corrections:
+        entry = registered_defect(c["tool"], c["defect"])
+        span = _date_span(c["earliest"], c["latest"]) if c["earliest"] else "no time"
+        upstream = entry.upstream.status + (f" ({entry.upstream.reference})" if entry.upstream.reference else "")
         lines += [
-            "| Defect | Tool | Artifact | Column | Records | Corrected time | "
-            "What the tool got wrong | Reported to the tool |",
-            "| :--- | :--- | :--- | :--- | ---: | :--- | :--- | :--- |",
+            f"### {c['defect']} ({entry.ticket}): {_table_cell(c['artifact'])}, {_table_cell(c['column_name'])}",
+            f"- **Tool:** {_table_cell(c['tool'])} {_table_cell(', '.join(entry.versions))}",
+            f"- **Records corrected:** {c['records']:,}, times {span}",
+            f"- **What the tool got wrong:** {_table_cell(entry.defect)}",
+            f"- **Correction:** corrected to within {entry.correction.factor:,} of the column's unit "
+            "(seconds, for a time).",
+            f"- **Reported to the tool:** {upstream}",
+            "",
         ]
-        for c in corrections:
-            entry = registered_defect(c["tool"], c["defect"])
-            span = _date_span(c["earliest"], c["latest"]) if c["earliest"] else "no time"
-            upstream = entry.upstream.status + (f" ({entry.upstream.reference})" if entry.upstream.reference else "")
-            lines.append(
-                f"| {c['defect']} ({entry.ticket}) | {_table_cell(c['tool'])} {_table_cell(', '.join(entry.versions))} "
-                f"| {_table_cell(c['artifact'])} | {_table_cell(c['column_name'])} | {c['records']} | {span} "
-                f"| {_table_cell(entry.defect)} Corrected to within {entry.correction.factor:,} of the column's unit "
-                f"(seconds, for a time). | {upstream} |"
-            )
-        lines.append("")
-    else:
-        lines += ["No registered tool defect applied to this evidence, so nothing was corrected.", ""]
+    return lines + ["---", ""]
 
-    lines += [
-        f"**Times for review.** A time before {DEVICE_ERA.date()} (the first iPhone) is not one a device can "
-        "have recorded; one after the run that read it can be genuine, such as a scheduled event. Every declared "
-        "time column is checked, and these times are kept as the tool gives them.",
+
+def render_time_review_section(review: list[dict]) -> list[str]:
+    """Every event time outside the device era, kept as the tool gave it and
+    listed for review (R36, EPOCH-511)."""
+    lines = [
+        "## Times for Review",
+        "",
+        f"A time before {DEVICE_ERA.date()} (the first iPhone) is not one a device can have recorded; "
+        "one after the run that read it can be genuine, such as a scheduled event. Every declared time "
+        "column is checked, and these times are kept as the tool gives them.",
         "",
     ]
-    if review:
-        lines += [
-            "| Artifact | Column | Check | Records | Times |",
-            "| :--- | :--- | :--- | ---: | :--- |",
-        ]
-        for r in review:
-            lines.append(
-                f"| {_table_cell(r['artifact'] or '(no artifact name)')} | {_table_cell(r['column_name'])} "
-                f"| {TIME_CHECKS.get(r['check_name'], _table_cell(r['check_name']))} | {r['records']} "
-                f"| {_date_span(r['earliest'], r['latest'])} |"
-            )
-        lines.append("")
-    else:
-        lines += ["No checked time falls outside that range.", ""]
-    lines += ["---", ""]
-    return lines
+    if not review:
+        return lines + ["No checked time falls outside that range.", "", "---", ""]
+    lines += [
+        "| Artifact | Column | Check | Records | Times |",
+        "| :--- | :--- | :--- | ---: | :--- |",
+    ]
+    for r in review:
+        lines.append(
+            f"| {_table_cell(r['artifact'] or '(no artifact name)')} | {_table_cell(r['column_name'])} "
+            f"| {TIME_CHECKS.get(r['check_name'], _table_cell(r['check_name']))} | {r['records']:,} "
+            f"| {_date_span(r['earliest'], r['latest'])} |"
+        )
+    return lines + ["", "---", ""]
 
 
 # Each fact type the report shows: its section's heading, how to read its
@@ -899,11 +986,12 @@ def render_coverage_section(
         )
     for d in crash_reports or []:
         p = d["params"]
+        when = _recorded_utc(p["acquired_at"])
         lines.append(
-            f"Crash logs (`{d['path']}`): {p['files']} file(s) copied from the device on {p['acquired_at']}, "
+            f"Crash logs (`{d['path']}`): {p['files']} file(s) copied from the device on {when}, "
             f"{copied_after_backup(p)}."
             if p["files"]
-            else f"Crash logs (`{d['path']}`): the device held none when they were copied on {p['acquired_at']}, "
+            else f"Crash logs (`{d['path']}`): the device held none when they were copied on {when}, "
             f"{copied_after_backup(p)}."
         )
     if ileapp_outputs or crash_reports:
@@ -920,6 +1008,34 @@ def fetch_run_evidence(conn, run_id: str) -> str | None:
     return str(row[0]) if row and row[0] is not None else None
 
 
+#: What the report is, and who draws conclusions from it (EPOCH-552). Approved
+#: by the project owner on 2026-10-19, within docs/claims.md: no result is
+#: proof of absence. It travels with the report, the document handed over.
+RESPONSIBILITY = (
+    "This report records what Epoch did with this evidence and what it found. It is an aid to the examiner, "
+    "not a conclusion: the examiner is responsible for any conclusion drawn from it, and no result in it, "
+    "including the absence of a match, is proof that something is absent."
+)
+
+
+def render_title_block(evidence_id: str | None, run_id: str, created: str) -> list[str]:
+    """The report's title, what it is about and when it was made, and the
+    responsibility statement, before anything else."""
+    return [
+        "# Investigation Report",
+        "",
+        f"**Evidence:** `{evidence_id or 'not registered'}`  ",
+        f"**Run:** `{run_id}`  ",
+        f"**Report created:** {created}  ",
+        "**Times in this report:** UTC, labelled on every time.",
+        "",
+        f"*{RESPONSIBILITY}*",
+        "",
+        "---",
+        "",
+    ]
+
+
 def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str) -> None:
     """Stage status is this run's own (a run's outcome is about the run);
     every fact is the evidence's, whichever run produced it (R7).
@@ -933,18 +1049,14 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     stages = fetch_stage_status(conn, run_id)
 
-    lines = [
-        "# Forensic Investigation Report",
-        f"**Evidence ID:** `{evidence_id or 'not registered'}`  ",
-        f"**Run ID:** `{run_id}`  ",
-        f"**Generated:** {timestamp}  ",
-        "",
-        "---",
-        "",
-    ]
-    lines += render_stage_preface(stages, run_id, timestamp)
+    lines = render_title_block(evidence_id, run_id, timestamp)
     inputs = fetch_run_derivatives(conn, run_id)
     ileapp_outputs = [d for d in inputs if d["kind"] == "ileapp_output"]
+    # What was not examined comes first (board "Reports View", EPOCH-552): it
+    # is the report's central statement, so it can't be missed.
+    if evidence_id is not None:
+        lines += render_not_examined_section(ileapp_outputs, stages)
+    lines += render_stage_preface(stages, run_id, timestamp)
     lines += render_provenance_section(
         inputs,
         fetch_fact_derivatives(conn, evidence_id) if evidence_id else None,
@@ -971,9 +1083,9 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
         ileapp_outputs,
         [d for d in inputs if d["kind"] == "crash_reports"],
     )
-    lines += render_not_examined_section(ileapp_outputs, stages)
+    lines += render_tool_checks_section(fetch_corrections(conn, evidence_id))
+    lines += render_time_review_section(fetch_time_review(conn, evidence_id))
     lines += render_indicator_section(fetch_indicator_checks(conn, evidence_id), run_id, stale_after_days())
-    lines += render_tool_checks_section(fetch_corrections(conn, evidence_id), fetch_time_review(conn, evidence_id))
 
     for title, fetch, render in RENDERERS.values():
         rows = fetch(conn, evidence_id)

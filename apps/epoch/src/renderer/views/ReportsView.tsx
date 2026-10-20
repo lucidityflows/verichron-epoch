@@ -1,18 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { FileQuestion, FileText, MousePointerClick } from 'lucide-react';
-import type { PipelineRunRow } from '@verichron/etl-db-reader';
+import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 import type { ReportResult } from '../../shared/types/window';
 import { Button } from '../components/ui/Button';
 import { reportsApi } from '../api/reports';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
-import { analysisName } from '../features/investigations/investigations';
+import { analysisName, notExamined, warningLines } from '../features/investigations/investigations';
+import { NOT_EXAMINED } from '../features/reports/reportSections';
+
+// The Markdown renderer adds 157 KB minified (measured 2026-10-19), so it
+// loads the first time a report is shown, not at start-up.
+const ReportDocument = lazy(() =>
+  import('../features/reports/ReportDocument').then((module) => ({ default: module.ReportDocument }))
+);
 
 interface ReportsViewProps {
   selectedRun: PipelineRunRow | null;
+  /** The selected analysis's stages, as Investigations reads them, for the summary tiles. */
+  stages: StageStatusRow[];
 }
 
-export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
+function Tile({ value, label, onClick }: { value: React.ReactNode; label: string; onClick?: () => void }) {
+  const body = (
+    <>
+      <p className="font-display text-heading text-foreground tabular-nums">{value}</p>
+      <p className="text-label text-muted-foreground">{label}</p>
+    </>
+  );
+  return onClick ? (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-left bg-surface-raised rounded-lg px-4 py-3 shadow-elevation-1 hover:bg-surface-hover"
+    >
+      {body}
+    </button>
+  ) : (
+    <div className="bg-surface-raised rounded-lg px-4 py-3 shadow-elevation-1">{body}</div>
+  );
+}
+
+export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun, stages }) => {
   const [report, setReport] = useState<ReportResult | null>(null);
   const [reportLoadError, setReportLoadError] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
@@ -45,6 +74,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
     if (!opened) console.error('Failed to open report in default app');
   };
 
+  const shown = selectedRun ? stages.filter((stage) => stage.run_id === selectedRun.run_id) : [];
+  const warningCount = shown.reduce(
+    (sum, stage) => sum + (stage.status === 'succeeded' ? warningLines(stage.warnings).length : 0),
+    0
+  );
+  const jumpToNotExamined = () =>
+    document.querySelector(`[aria-label="${NOT_EXAMINED}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
   return (
     <ViewLayout
       section="reports"
@@ -74,21 +111,33 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun }) => {
       ) : report.status === 'not-found' ? (
         <EmptyState icon={FileText} title="No report generated yet" detail={<>Expected at {report.path}</>} />
       ) : (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <span className="font-mono text-data text-muted-foreground">{report.path}</span>
-            {/* §1: a bordered <button> here was the wrong tool for a panel-adjacent
-                control -- routed through the shared elevation-based Button primitive
-                instead, which also brings text-label for free (§2). */}
-            <Button variant="outline" size="sm" onClick={openReportFile}>
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="font-mono text-label text-muted-foreground truncate min-w-0" title={report.path}>
+              {report.path}
+            </span>
+            <Button variant="outline" size="sm" onClick={openReportFile} className="shrink-0">
               Open in Default App
             </Button>
           </div>
-          {/* §1: was bg-surface + flat border -- panel containers use elevation, not
-              border, for background separation. */}
-          <pre className="card rounded-lg p-5 text-data font-mono whitespace-pre-wrap overflow-auto max-h-[calc(100vh-16rem)]">
-            {report.content}
-          </pre>
+          {shown.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Tile
+                value={`${shown.filter((stage) => stage.status === 'succeeded').length} of ${shown.length}`}
+                label="Stages complete"
+              />
+              <Tile value={selectedRun.records.toLocaleString('en-US')} label="Records found" />
+              <Tile
+                value={shown.filter(notExamined).length}
+                label="Not examined · jump to list"
+                onClick={jumpToNotExamined}
+              />
+              <Tile value={warningCount} label="Warnings" />
+            </div>
+          )}
+          <Suspense fallback={<EmptyState loading title="Loading the report…" />}>
+            <ReportDocument markdown={report.content} />
+          </Suspense>
         </div>
       )}
     </ViewLayout>

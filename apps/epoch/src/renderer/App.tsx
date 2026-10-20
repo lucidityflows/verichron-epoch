@@ -185,7 +185,7 @@ export const App: React.FC = () => {
 
             {section === 'iocs' && <IocsView selectedRun={selectedRun} />}
 
-            {section === 'reports' && <ReportsView selectedRun={selectedRun} />}
+            {section === 'reports' && <ReportsView selectedRun={selectedRun} stages={stages} />}
           </div>
 
           {/* EPOCH-570: the Activity Log, docked below the page, never inside it; on Investigations too (U4b). */}

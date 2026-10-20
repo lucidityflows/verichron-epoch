@@ -2,7 +2,15 @@
 rows as the report's queries return them, so it runs the same on every tier;
 the queries themselves are tested on real PostgreSQL in test_evidence_reads.py."""
 
-from reporting.generate_report import copied_after_backup, describe_derivative, render_coverage_section
+import re
+from datetime import UTC, datetime
+
+from reporting.generate_report import (
+    copied_after_backup,
+    describe_derivative,
+    render_coverage_section,
+    render_crash_section,
+)
 
 
 def crash_reports(files: int, backup_finished_at: str = "2026-10-15T00:59:57.000Z") -> dict:
@@ -23,14 +31,14 @@ def crash_reports(files: int, backup_finished_at: str = "2026-10-15T00:59:57.000
 def test_the_provenance_names_the_tool_and_says_the_logs_stayed_on_the_device():
     assert describe_derivative(crash_reports(244)) == [
         "- **Crash logs** (`/ws/crash_reports/BK1`): copied from the device by idevicecrashreport 1.4.0 "
-        "on 2026-10-15T01:00:00.000Z, 3 s after the backup finished, and left on the device; 244 file(s)"
+        "on 2026-10-15 01:00:00 UTC, 3 s after the backup finished, and left on the device; 244 file(s)"
     ]
 
 
 def test_coverage_counts_the_crash_logs_copied():
     lines = render_coverage_section([], [], [crash_reports(244)])
     assert (
-        "Crash logs (`/ws/crash_reports/BK1`): 244 file(s) copied from the device on 2026-10-15T01:00:00.000Z, "
+        "Crash logs (`/ws/crash_reports/BK1`): 244 file(s) copied from the device on 2026-10-15 01:00:00 UTC, "
         "3 s after the backup finished." in lines
     )
 
@@ -38,7 +46,7 @@ def test_coverage_counts_the_crash_logs_copied():
 def test_a_device_with_no_crash_logs_reads_as_none_held_not_none_looked_for():
     lines = render_coverage_section([], [], [crash_reports(0)])
     assert (
-        "Crash logs (`/ws/crash_reports/BK1`): the device held none when they were copied on 2026-10-15T01:00:00.000Z, "
+        "Crash logs (`/ws/crash_reports/BK1`): the device held none when they were copied on 2026-10-15 01:00:00 UTC, "
         "3 s after the backup finished." in lines
     )
 
@@ -85,3 +93,41 @@ def test_a_complete_derivative_passes_unchanged():
     current = {**crash_reports(3), "derivative_id": "d"}
     assert check_params([current]) == [current]
     assert check_params([{"kind": "some_future_kind", "params": {}, "derivative_id": "x", "path": "/x"}]) != []
+
+
+def crash_record(**overrides) -> dict:
+    """A crash fact as current_forensic_records returns it: most logs seen record no PID or bundle."""
+    record = {
+        "incident_id": "4F2A9C3E-0000-0000-0000-000000000000",
+        "process_name": None,
+        "pid": None,
+        "bug_type": "145",
+        "bundle_id": None,
+        "event_time": datetime(2026, 10, 8, 0, 36, 36, tzinfo=UTC),
+        "fields": {"filename": "JetsamEvent-2026-10-08-003636.ips", "os_version": None},
+    }
+    return {**record, **overrides}
+
+
+def test_the_crash_table_prints_values_never_python_reprs():
+    """EPOCH-553: no 'None', no quoted numbers or backticked times; a missing value reads "not recorded"."""
+    lines = render_crash_section([crash_record(), crash_record(pid=812, process_name="SpringBoard", bug_type="309")])
+    table = [line for line in lines if line.startswith("| ") and not line.startswith(("| Time", "| :"))]
+    assert table == [
+        "| 2026-10-08 00:36:36 UTC | 145 · no label known | not recorded | not recorded | not recorded "
+        "| `4F2A9C3E-0000-0000-0000-000000000000` |",
+        "| 2026-10-08 00:36:36 UTC | 309 · no label known | SpringBoard | 812 | not recorded "
+        "| `4F2A9C3E-0000-0000-0000-000000000000` |",
+    ]
+    text = "\n".join(lines)
+    assert "None" not in text
+    assert not re.search(r"`'|'`|`\d+`|\+00:00", text), "no repr quotes, backticked numbers or Python offsets"
+
+
+def test_a_crash_with_no_time_or_bug_type_says_so():
+    [row] = [
+        line
+        for line in render_crash_section([crash_record(event_time=None, bug_type=None)])
+        if line.startswith("| ") and not line.startswith(("| Time", "| :"))
+    ]
+    assert row.startswith("| not recorded | not recorded |")
