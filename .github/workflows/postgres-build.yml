@@ -4,8 +4,9 @@ name: Lab PostgreSQL and Python build
 # pinned Debian 13 container, then checked moved, socket-only, and with every
 # migration applied. Then the bundle's Python environment, with psycopg2 built
 # against that PostgreSQL's libpq (EPOCH-439), checked moved and connected. It
-# compiles PostgreSQL, so it runs only when the builds, the migrations or the
-# Python dependencies change.
+# compiles PostgreSQL, so it runs only when the builds, the migrations, the
+# Python dependencies, or the uv and Python versions (mise.toml,
+# .python-version) change.
 
 on:
   push:
@@ -13,6 +14,8 @@ on:
     paths:
       - "tools/postgres/**"
       - "tools/runtime/**"
+      - "mise.toml"
+      - ".python-version"
       - "pyproject.toml"
       - "uv.lock"
       - "**/pyproject.toml"
@@ -22,6 +25,8 @@ on:
     paths:
       - "tools/postgres/**"
       - "tools/runtime/**"
+      - "mise.toml"
+      - ".python-version"
       - "pyproject.toml"
       - "uv.lock"
       - "**/pyproject.toml"

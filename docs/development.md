@@ -312,7 +312,7 @@ New device behaviour seen during these checks is added to the verified list in
 | Workflow | Runs |
 |---|---|
 | `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 17, pytest on both tiers, the runtime environment and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
-| `.github/workflows/postgres-build.yml` | Only when `tools/postgres/`, `tools/runtime/`, the migrations or the Python dependencies change: the Lab bundle's PostgreSQL built from source and its Python environment built against it, each then checked as below |
+| `.github/workflows/postgres-build.yml` | Only when `tools/postgres/`, `tools/runtime/`, the migrations, the Python dependencies, `mise.toml` (uv's version) or `.python-version` change: the Lab bundle's PostgreSQL built from source and its Python environment built against it, each then checked as below |
 | `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, lint (`pnpm --filter @verichron/epoch lint`: errors fail the job, EPOCH-571), Vite build and tests |
 
 The Python and TypeScript workflows install the toolchain from `mise.toml` and Python from
