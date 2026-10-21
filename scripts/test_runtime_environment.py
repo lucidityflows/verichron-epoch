@@ -25,7 +25,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNTIME_PYTHON = REPO_ROOT / "build" / "runtime-venv" / "bin" / "python"
 
 # Never in the shipped environment: test and development tooling, the feed
-# fetch's packages (a connected machine's job), and the binary driver wheel,
+# fetch's packages (a connected machine's job), the AI stage, which is out of
+# the pipeline until EPOCH-442, and the binary driver wheel,
 # which bundles its own libpq, OpenSSL and eight other native libraries.
 EXCLUDED = {
     "pytest",
@@ -35,6 +36,8 @@ EXCLUDED = {
     "ruff",
     "nodeenv",
     "pyyaml",
+    "requests",
+    "verichron-analysis",
     "psycopg2-binary",
 }
 
@@ -97,6 +100,7 @@ def test_the_runtime_environment_is_the_runtime_closure():
     ).stdout.split()
     third_party = {canonicalize_name(n) for n in installed if not n.startswith("verichron")}
     assert third_party == _runtime_closure()
+    assert not {canonicalize_name(n) for n in installed} & EXCLUDED
 
 
 @pytest.mark.parametrize("entry_point", _stage_entry_points() + ENTRY_POINTS)

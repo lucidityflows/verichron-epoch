@@ -15,7 +15,6 @@ dependencies = [
     "verichron-etl-run",
     "verichron-crash",
     "verichron-ileapp-bridge",
-    "verichron-analysis",
     "verichron-indicator-match",
     "verichron-entities",
     "verichron-indicator-registry",
@@ -38,7 +37,7 @@ python-preference = "only-managed"
 required-version = ">=0.12.23,<0.13"
 # Development installs every group; the shipped environment installs none
 # (`uv sync --no-default-groups`), so it holds only what runs (EPOCH-439 B5).
-default-groups = ["dev", "test", "feeds"]
+default-groups = ["dev", "test", "feeds", "analysis"]
 
 [tool.uv.workspace]
 members = [
@@ -103,4 +102,9 @@ test = [
 feeds = [
     "requests>=2.31",
     "pyyaml>=6",
+]
+# The AI stage, out of the pipeline (no stage.json) until EPOCH-442 re-points
+# it at the project's own facts; it returns to `dependencies` then.
+analysis = [
+    "verichron-analysis",
 ]
