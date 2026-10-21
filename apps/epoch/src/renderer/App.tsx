@@ -161,6 +161,7 @@ export const App: React.FC = () => {
                   setRecordToOpen(recordId);
                   setSection('records');
                 }}
+                onCheckFinished={loadRuns}
               />
             )}
 

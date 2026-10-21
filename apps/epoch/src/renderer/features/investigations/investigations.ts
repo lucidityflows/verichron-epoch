@@ -19,8 +19,14 @@ export interface Investigation {
   /** The Info.plist Device Name: a detail in the investigation's card only. */
   deviceName: string | null;
   totalBytes: number;
-  /** Newest first. The first is the one shown unless another is chosen. */
+  /** Newest first, with each Check Again's run among them (EPOCH-557). */
   analyses: PipelineRunRow[];
+  /**
+   * The newest analysis: the one shown unless another is chosen. Never a
+   * Check Again, whose run holds the indicator check alone, so the other
+   * views and the report keep showing what an analysis found.
+   */
+  latest: PipelineRunRow;
 }
 
 /** The first eight characters of an ID, as a small detail beside a name. */
@@ -52,7 +58,9 @@ export function groupInvestigations(runs: readonly PipelineRunRow[]): Investigat
   return [...byEvidence.entries()]
     .map(([evidenceId, analyses]) => {
       analyses.sort((a, b) => started(b) - started(a));
-      const latest = analyses[0];
+      const latest = analyses.find((run) => run.kind === 'analysis');
+      // Check Again starts from an analysis, so an investigation always has one.
+      if (!latest) throw new Error(`Investigation ${shortId(evidenceId)} has indicator checks but no analysis.`);
       return {
         evidenceId,
         title: investigationTitle(latest),
@@ -60,6 +68,7 @@ export function groupInvestigations(runs: readonly PipelineRunRow[]): Investigat
         deviceName: latest.device_label,
         totalBytes: Number(latest.total_bytes),
         analyses,
+        latest,
       };
     })
     .sort((a, b) => started(b.analyses[0]) - started(a.analyses[0]));

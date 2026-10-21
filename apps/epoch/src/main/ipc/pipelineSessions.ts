@@ -212,7 +212,13 @@ export class AnalysisSession {
     this.notifier = new Notifier<AnalysisState>(send, () => ({ ...this.state, log: [] }));
   }
 
-  start(kind: 'workspace' | 'retry', target: string, workspace: string, labels: string[], now = Date.now()): void {
+  start(
+    kind: NonNullable<AnalysisState['kind']>,
+    target: string,
+    workspace: string,
+    labels: string[],
+    now = Date.now()
+  ): void {
     this.log.clear();
     this.createdRuns = [];
     this.runPlans = new Map();

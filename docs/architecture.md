@@ -263,7 +263,10 @@ or cleanup, and the backup and connected device are checked again before copying
 `indicator_match` checks the newest registered indicator set, or the one given
 to the orchestrator with `--indicator-set <set hash>`. With no set registered it
 is recorded as skipped, with that reason, and the report and the app say that
-nothing was checked.
+nothing was checked. Check Again on Indicator Matches runs the orchestrator
+with `--check-indicators`: a run of its own (`pipeline_runs.kind =
+'indicator_check'`) of that stage alone, against the entities an analysis
+already read, never resumed, so each check is kept on its own (EPOCH-557).
 
 The report shows its times in the zone the examiner chose in Settings, UTC by
 default: the app passes it to the orchestrator with `--display-zone <zone>`,

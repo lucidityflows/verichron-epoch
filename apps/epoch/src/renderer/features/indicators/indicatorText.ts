@@ -150,6 +150,28 @@ export function comparedTypes(check: IndicatorCheckRow): [string, number][] {
 }
 
 /**
+ * The check Indicator Matches shows first for the selected analysis: its own,
+ * unless Check Again has checked the evidence since (EPOCH-557), and then the
+ * newest of those, up to the next analysis of the evidence. The selected run
+ * stays the analysis, so the other views keep showing it.
+ */
+export function shownCheck(
+  checks: IndicatorCheckRow[],
+  run: { run_id: string; started_at: string }
+): IndicatorCheckRow | undefined {
+  const started = (c: IndicatorCheckRow) => Date.parse(c.run_started_at);
+  const after = Date.parse(run.started_at);
+  const nextAnalysis = Math.min(
+    ...checks.filter((c) => c.run_kind === 'analysis' && started(c) > after).map(started),
+    Infinity
+  );
+  const rechecks = checks
+    .filter((c) => c.run_kind === 'indicator_check' && started(c) > after && started(c) < nextAnalysis)
+    .sort((a, b) => started(b) - started(a));
+  return rechecks[0] ?? checks.find((c) => c.run_id === run.run_id);
+}
+
+/**
  * Checks listed together because they are the same check (board 8): runs
  * whose checks share one unit compared the same set, rules and entities; runs
  * that checked nothing for the same recorded reason are one outcome. Each

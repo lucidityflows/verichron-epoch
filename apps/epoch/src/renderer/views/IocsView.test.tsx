@@ -10,6 +10,12 @@ import type { IndicatorCheckRow, PipelineRunRow } from '@verichron/etl-db-reader
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, it, vi } from 'vitest';
 
+const hook = vi.hoisted(() => ({ analysis: null as unknown }));
+vi.mock('../hooks/usePipelineState', () => ({
+  useAnalysisState: () => ({ state: hook.analysis, log: [] }),
+  usePrepareState: () => ({ state: null, log: [] }),
+}));
+
 import { useSettingsStore } from '../store/useSettings';
 import { IocsView } from './IocsView';
 
@@ -17,6 +23,8 @@ const RUN = '11111111-0000-0000-0000-000000000001';
 
 const check: IndicatorCheckRow = {
   run_id: RUN,
+  run_kind: 'analysis',
+  run_started_at: '2026-10-15T14:00:00.000Z',
   status: 'succeeded',
   error_message: null,
   finished_at: '2026-10-15T14:30:00.000Z',
@@ -70,7 +78,9 @@ const skipped = (run: string, finished: string): IndicatorCheckRow => ({
 });
 
 let checks: IndicatorCheckRow[] = [check];
+const checkIndicators = vi.fn(async () => ({ started: true }));
 vi.stubGlobal('epoch', {
+  checkIndicators,
   getIndicatorResults: async () => ({
     evidenceRegistered: true,
     checks,
@@ -83,6 +93,8 @@ vi.stubGlobal('epoch', {
 afterEach(() => {
   cleanup();
   checks = [check];
+  hook.analysis = null;
+  checkIndicators.mockClear();
 });
 
 async function show(onOpenRecord: (recordId: string) => void = () => {}) {
@@ -121,5 +133,30 @@ describe('Indicator Matches', () => {
     assert.equal(screen.getAllByText('Not checked').length, 1, 'one chip for the group');
     assert.equal(screen.getAllByRole('button', { name: /^Show the check of / }).length, 2);
     assert.ok(screen.getByText('1 match'), "this investigation's check, in words");
+  });
+
+  it("Check Again checks this analysis's evidence, and is held while another task runs (EPOCH-557)", async () => {
+    await show();
+    fireEvent.click(screen.getByRole('button', { name: /Check Again/ }));
+    assert.deepEqual(checkIndicators.mock.calls, [[RUN]]);
+    cleanup();
+
+    hook.analysis = { status: 'running', kind: 'workspace', target: '/w' };
+    await show();
+    assert.equal((screen.getByRole('button', { name: /Check Again/ }) as HTMLButtonElement).disabled, true);
+  });
+
+  it('says a Check Again stopped short, in the caution role, and labels a re-check (EPOCH-557)', async () => {
+    hook.analysis = { status: 'finished', kind: 'check', target: RUN, result: { success: false, cancelled: true } };
+    checks = [
+      { ...check, run_id: 'recheck', run_kind: 'indicator_check', run_started_at: '2026-10-16T00:00:00.000Z' },
+      check,
+    ];
+    await show();
+    assert.match(screen.getByRole('alert').textContent ?? '', /Check Again was cancelled/);
+    assert.ok(
+      screen.getAllByText('Check Again').some((el) => el.tagName === 'SPAN'),
+      'the re-check is labelled'
+    );
   });
 });

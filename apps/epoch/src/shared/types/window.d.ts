@@ -191,8 +191,12 @@ export interface PrepareState {
 /** Analyze (the orchestrator) as the main process sees it (EPOCH-487). */
 export interface AnalysisState {
   status: 'idle' | 'running' | 'finished';
-  /** A whole workspace from New Investigation, or one backup retried from Investigations. */
-  kind: 'workspace' | 'retry' | null;
+  /**
+   * A whole workspace from New Investigation, one backup retried from
+   * Investigations, or one investigation's evidence checked against the
+   * indicator set again from Indicator Matches (EPOCH-557).
+   */
+  kind: 'workspace' | 'retry' | 'check' | null;
   /** The workspace, or the retried backup's source. */
   target: string | null;
   startedAt: number | null;
@@ -308,6 +312,7 @@ declare global {
       startAnalysis: (workspace: string, labels: string[]) => Promise<{ started: boolean }>;
       // EPOCH-308
       retryRun: (runId: string) => Promise<{ started: boolean }>;
+      checkIndicators: (runId: string) => Promise<{ started: boolean }>;
       // EPOCH-305
       cancelAnalysis: () => Promise<{ cancelled: boolean }>;
       cancelPrepare: () => Promise<{ cancelled: boolean }>;

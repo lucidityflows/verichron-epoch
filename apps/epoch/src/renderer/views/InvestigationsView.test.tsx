@@ -46,6 +46,7 @@ function run(overrides: Partial<PipelineRunRow>): PipelineRunRow {
     finished_at: '2026-10-15T18:32:00.000Z',
     evidence_id: EVIDENCE_A,
     derivative_id: null,
+    kind: 'analysis',
     contract_version: 'x',
     tool_versions: {},
     state: 'complete',
@@ -112,6 +113,22 @@ describe('groupInvestigations', () => {
         ['iPhone 14,2 · iOS 17.6.1', [OTHER.run_id]],
       ]
     );
+  });
+
+  it('shows the newest analysis first, never a Check Again, which is kept among the runs (EPOCH-557)', () => {
+    const recheck = run({
+      ...NEWER,
+      run_id: '99999999-0000-0000-0000-000000000009',
+      kind: 'indicator_check',
+      started_at: '2026-10-17T00:00:00.000Z',
+    });
+    const [inv] = groupInvestigations([OLDER, NEWER, recheck]);
+    assert.equal(inv.latest, NEWER);
+    assert.deepEqual(
+      inv.analyses.map((a) => a.run_id),
+      [recheck.run_id, NEWER.run_id, OLDER.run_id]
+    );
+    assert.throws(() => groupInvestigations([recheck]), /has indicator checks but no analysis/);
   });
 
   it('refuses an analysis without registered evidence rather than hide it', () => {
@@ -181,6 +198,21 @@ describe('InvestigationsView', () => {
     assert.ok(within(list).getByText('iPhone 17,5 · iOS 26.6.1'));
     assert.ok(within(list).getByText('Interrupted'), 'a cancelled analysis is a stop, not a failure');
     assert.deepEqual(onSelectRun.mock.calls, [[NEWER]]);
+  });
+
+  it('selects the newest analysis, not a newer Check Again, and labels the re-check among the runs (EPOCH-557)', () => {
+    const recheck = run({
+      ...NEWER,
+      run_id: '99999999-0000-0000-0000-000000000009',
+      kind: 'indicator_check',
+      started_at: '2026-10-17T00:00:00.000Z',
+    });
+    const { onSelectRun } = show(null, [], [OLDER, OTHER, NEWER, recheck]);
+    assert.deepEqual(onSelectRun.mock.calls, [[NEWER]]);
+    cleanup();
+    show(NEWER, [stage({})], [OLDER, OTHER, NEWER, recheck]);
+    const analyses = screen.getByRole('heading', { name: 'Analyses (3)' }).nextElementSibling as HTMLElement;
+    assert.ok(within(analyses).getByText('Check Again'));
   });
 
   it('never shows the device identifier or the backup’s path, and keeps the device name to the card', () => {

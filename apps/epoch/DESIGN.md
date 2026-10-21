@@ -788,7 +788,8 @@ Decided 2026-10-20 by the project owner (EPOCH-411, EPOCH-556, U6a; board 14
 ## 15. Indicator Matches — each check on its own, with what it couldn't compare
 
 Built 2026-10-21 for EPOCH-557 (U6b), with board 8 "Indicator Matches View"
-as guidance. The owner's decisions on the board's open questions are pending.
+as guidance. The owner chose Check Again as re-checking alone (2026-10-21);
+the board's questions on the Not checked colour and on grouping await review.
 
 - **The limit sentence comes first,** in the view's body: indicators find only
   what is already known, and no match is not a finding about the device.
@@ -812,4 +813,11 @@ as guidance. The owner's decisions on the board's open questions are pending.
   recorded reason, are listed together under one chip with their count and time
   span, so a repeat doesn't read as new information. Each stays openable on its
   own.
+- **Check Again** (an outline button above the check) checks the evidence
+  against the newest registered set, as a check of its own; the line beside
+  it says earlier checks stay and the report keeps the check it was written
+  with. While it runs the button says "Checking…", and every other task is
+  held. When it ends, the page shows the new check, labelled "Check Again",
+  as this investigation's check; Investigations lists its run, labelled, and
+  still shows the analysis.
 - No verdict word is used anywhere on the page.

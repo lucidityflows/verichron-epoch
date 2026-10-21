@@ -312,9 +312,9 @@ def test_the_runtime_ingests_reclaims_records_failures_and_closes_runs(runtime, 
     with runtime.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone,
+            INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind,
                                        evidence_id, derivative_id, host, pid)
-            VALUES (%s, 'b', 'c', '{}', 'UTC', %s, %s, 'h', 1)
+            VALUES (%s, 'b', 'c', '{}', 'UTC', 'analysis', %s, %s, 'h', 1)
             """,
             (run, EVIDENCE, DERIVATIVE),
         )

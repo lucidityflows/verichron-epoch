@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Check, FileQuestion, MousePointerClick, ShieldQuestion } from 'lucide-react';
+import { Check, FileQuestion, MousePointerClick, RefreshCw, ShieldQuestion } from 'lucide-react';
 import type { IndicatorCheckRow, PipelineRunRow } from '@verichron/etl-db-reader';
 import type { IndicatorResults } from '../../shared/types/window';
 import { runsApi } from '../api/runs';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
 import { DateTime } from '../components/ui/DateTime';
 import { Disclosure } from '../components/ui/Disclosure';
 import { StatTile } from '../components/ui/StatTile';
@@ -12,6 +13,7 @@ import { formatDateTime, type DisplayZone } from '../../shared/time';
 import { useDisplayZone } from '../store/useSettings';
 import { EmptyState } from '../components/ui/EmptyState';
 import { analysisName } from '../features/investigations/investigations';
+import { useCheckAgain } from '../features/indicators/useCheckAgain';
 import {
   checkState,
   checkTiles,
@@ -20,6 +22,7 @@ import {
   notCheckedLines,
   resultLine,
   setLine,
+  shownCheck,
   sourceLine,
   staleLine,
   stateLabel,
@@ -30,6 +33,8 @@ interface IocsViewProps {
   selectedRun: PipelineRunRow | null;
   /** Open a matched fact's record in Forensic Records. */
   onOpenRecord: (recordId: string) => void;
+  /** A Check Again has ended: its run is new, so the runs are read again. */
+  onCheckFinished?: () => void;
 }
 
 const cell = 'py-1.5 pr-4 text-data align-top';
@@ -46,10 +51,49 @@ const STATE_VARIANT = {
 function StateChip({ check }: { check: IndicatorCheckRow }) {
   const state = checkState(check);
   return (
-    <Badge variant={STATE_VARIANT[state]} className="gap-1">
-      {state === 'no-match' && <Check size="0.75rem" aria-hidden />}
-      {stateLabel(check)}
-    </Badge>
+    <>
+      <Badge variant={STATE_VARIANT[state]} className="gap-1">
+        {state === 'no-match' && <Check size="0.75rem" aria-hidden />}
+        {stateLabel(check)}
+      </Badge>
+      {check.run_kind === 'indicator_check' && <Badge variant="neutral">Check Again</Badge>}
+    </>
+  );
+}
+
+/** Check Again (EPOCH-557), with what it does and doesn't change. */
+function CheckAgainBar({ check }: { check: ReturnType<typeof useCheckAgain> }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          variant="outline"
+          onClick={check.start}
+          disabled={check.busy}
+          loading={check.checking}
+          loadingText="Checking…"
+        >
+          <RefreshCw size="0.875rem" />
+          Check Again
+        </Button>
+        <p className="text-label text-muted-foreground flex-1 min-w-[16rem]">
+          Compares this evidence with the newest registered indicator set, as a check of its own. Earlier checks stay,
+          and the report keeps the check it was written with.
+        </p>
+      </div>
+      {check.error && (
+        <div
+          role="alert"
+          className={`shadow-elevation-1 rounded-md px-4 py-3 text-data ${
+            check.cancelled
+              ? 'text-warning bg-warning/10 border border-warning/30'
+              : 'text-danger bg-danger/10 border border-danger/30'
+          }`}
+        >
+          {check.error}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -234,10 +278,16 @@ function groupTimes(group: IndicatorCheckRow[], zone: DisplayZone): string {
  * was and wasn't compared and why, and that indicators find only what is
  * already known, so an empty result is never read as a verdict.
  */
-export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord }) => {
+export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord, onCheckFinished }) => {
   const zone = useDisplayZone();
   const [results, setResults] = useState<IndicatorResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Read again when a Check Again ends, so its check is shown.
+  const [version, setVersion] = useState(0);
+  const checkAgain = useCheckAgain(selectedRun?.run_id ?? null, () => {
+    setVersion((v) => v + 1);
+    onCheckFinished?.();
+  });
 
   useEffect(() => {
     let active = true;
@@ -251,7 +301,7 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord })
     return () => {
       active = false;
     };
-  }, [selectedRun]);
+  }, [selectedRun, version]);
 
   let body: React.ReactNode;
   if (!selectedRun) {
@@ -281,18 +331,22 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord })
     );
   } else if (results.checks.length === 0) {
     body = (
-      <EmptyState
-        icon={ShieldQuestion}
-        title="Indicators were not checked for this investigation"
-        detail={`${results.limit} ${results.nothingChecked}`}
-      />
+      <div className="space-y-6">
+        <CheckAgainBar check={checkAgain} />
+        <EmptyState
+          icon={ShieldQuestion}
+          title="Indicators were not checked for this investigation"
+          detail={`${results.limit} ${results.nothingChecked}`}
+        />
+      </div>
     );
   } else {
-    const thisRun = results.checks.find((c) => c.run_id === selectedRun.run_id);
+    const thisRun = shownCheck(results.checks, selectedRun);
     const groups = groupChecks(results.checks.filter((c) => c !== thisRun));
     body = (
       <div className="space-y-6">
         <p className="text-data text-muted-foreground">{results.limit}</p>
+        <CheckAgainBar check={checkAgain} />
         <section className="card rounded-lg p-5">
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <h2 className="font-display text-heading text-foreground">This Investigation's Check</h2>

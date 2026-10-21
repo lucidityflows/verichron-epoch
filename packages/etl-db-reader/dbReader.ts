@@ -56,6 +56,8 @@ export interface PipelineRunRow {
   /** NULL until EPOCH-404's pre-flight registration sets it. */
   evidence_id: string | null;
   derivative_id: string | null;
+  /** What the run was started to do (migration 0023, EPOCH-557): an analysis, or Check Again's indicator check. */
+  kind: RunKind;
   contract_version: string;
   tool_versions: Record<string, string>;
   /** From the run_completeness view: the ONE completeness predicate (R23,
@@ -86,6 +88,8 @@ export interface PipelineRunRow {
 }
 
 export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
+
+export type RunKind = 'analysis' | 'indicator_check';
 
 /** How a run ended (migration 0017). The last four mean it didn't finish. */
 export type EndedReason = 'completed' | 'cancelled' | 'timeout' | 'crashed' | 'abandoned';
@@ -170,7 +174,7 @@ const RECORD_COLUMNS = `records.id, records.ingest_id, records.evidence_id, reco
  */
 export async function getPipelineRuns(client: Db, limit = 100): Promise<PipelineRunRow[]> {
   const result = await client.query<Omit<PipelineRunRow, 'records'>>(
-    `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id,
+    `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id, r.kind,
             r.contract_version, r.tool_versions, c.state, r.ended_reason, r.ended_detail, d.label AS device_label,
             e.product_type, e.ios_version, e.backup_date, e.total_bytes, s.stage_counts, s.stages_with_warnings
        FROM pipeline_runs r
@@ -1170,6 +1174,9 @@ export interface IndicatorMatchRow {
 /** One run's indicator check of the evidence, from the indicator_checks view (R27). */
 export interface IndicatorCheckRow {
   run_id: string;
+  /** The run's kind: an analysis's check, or a Check Again (EPOCH-557). */
+  run_kind: RunKind;
+  run_started_at: string;
   status: StageStatus;
   error_message: string | null;
   finished_at: string | null;
@@ -1201,11 +1208,13 @@ export const MATCH_LIMIT = 500;
  */
 export async function getIndicatorChecks(client: Db, evidenceId: string): Promise<IndicatorCheckRow[]> {
   const checks = await client.query<Omit<IndicatorCheckRow, 'sources' | 'match_rows'>>(
-    `SELECT run_id, status, error_message, finished_at, indicator_set_id, set_name, set_hash,
-            set_registered_at, newest_indicator, ingest_id, matches, summary
-       FROM indicator_checks
-      WHERE evidence_id = $1
-      ORDER BY finished_at DESC NULLS FIRST, run_id`,
+    `SELECT c.run_id, r.kind AS run_kind, r.started_at AS run_started_at, c.status, c.error_message,
+            c.finished_at, c.indicator_set_id, c.set_name, c.set_hash, c.set_registered_at, c.newest_indicator,
+            c.ingest_id, c.matches, c.summary
+       FROM indicator_checks c
+       JOIN pipeline_runs r USING (run_id)
+      WHERE c.evidence_id = $1
+      ORDER BY c.finished_at DESC NULLS FIRST, c.run_id`,
     [evidenceId]
   );
   const out: IndicatorCheckRow[] = [];

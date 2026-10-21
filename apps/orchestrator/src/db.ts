@@ -40,7 +40,8 @@ export async function findCompleteRunFor(
   const inputs = enabled.map((stage) => inputsFor(stage, registration, indicatorSet));
   const { rows } = await client.query<{ run_id: string }>(
     `SELECT c.run_id FROM run_completeness c
-      WHERE c.evidence_id = $1 AND c.derivative_id = $2 AND c.state = 'complete'
+       JOIN pipeline_runs r ON r.run_id = c.run_id
+      WHERE c.evidence_id = $1 AND c.derivative_id = $2 AND c.state = 'complete' AND r.kind = 'analysis'
         AND NOT EXISTS (
           SELECT 1 FROM unnest($3::text[], $4::int[], $5::uuid[], $6::uuid[], $7::text[])
                      AS want(stage_name, parser_version, derivative_id, indicator_set_id, absent_reason)
@@ -87,6 +88,9 @@ export interface RunProvenance {
   displayZone: string;
 }
 
+/** What a run was started to do (EPOCH-557): every enabled stage, or the indicator check alone. */
+export type RunKind = 'analysis' | 'indicator_check';
+
 /**
  * Create a run for registered evidence. Only called after registration
  * succeeds (EPOCH-404), so every run row carries its evidence and derivative.
@@ -99,21 +103,23 @@ export async function createRun(
   stages: StageSet,
   provenance: RunProvenance,
   registration: Pick<Registration, 'evidenceId'> & RegisteredDerivatives,
-  indicatorSet: { setId: string } | null = null
+  indicatorSet: { setId: string } | null = null,
+  kind: RunKind = 'analysis'
 ): Promise<string> {
   const runId = randomUUID();
   // The process running it, so a run left by a process that is gone can be
   // found and closed as abandoned (EPOCH-435).
   await client.query(
     `INSERT INTO pipeline_runs
-       (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       (run_id, backup_source, contract_version, tool_versions, display_zone, kind, evidence_id, derivative_id, host, pid)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
       runId,
       backupPath,
       provenance.contractVersion,
       provenance.toolVersions,
       provenance.displayZone,
+      kind,
       registration.evidenceId,
       registration.decryptedDerivativeId,
       hostname(),

@@ -135,8 +135,8 @@ before(async () => {
     );
   }
   await db.query(
-    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid)
-     VALUES ($1, 'test', 'test', '{}', 'UTC', $2, $2, 'test-host', 1)`,
+    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, evidence_id, derivative_id, host, pid)
+     VALUES ($1, 'test', 'test', '{}', 'UTC', 'analysis', $2, $2, 'test-host', 1)`,
     [RUN, EVIDENCE]
   );
 
@@ -417,8 +417,8 @@ describe('Forensic Records reads (EPOCH-411, EPOCH-556)', live, () => {
       ['{"name": "mvt-test"}']
     );
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid, started_at)
-       VALUES ($1, 'test', 'test', '{}', 'UTC', $2, $2, 'test-host', 1, now())`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, evidence_id, derivative_id, host, pid, started_at)
+       VALUES ($1, 'test', 'test', '{}', 'UTC', 'analysis', $2, $2, 'test-host', 1, now())`,
       [RECORDS_RUN, ITEM]
     );
     await db.query(
@@ -729,14 +729,14 @@ describe('getRunReportLocation', live, () => {
       [DECRYPT, EVIDENCE, oldTarget.decryptedPath]
     );
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid)
-       VALUES ($1, $4, 'test', '{}', 'UTC', $2, $3, 'test-host', 1)`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, evidence_id, derivative_id, host, pid)
+       VALUES ($1, $4, 'test', '{}', 'UTC', 'analysis', $2, $3, 'test-host', 1)`,
       [REPORT_RUN, EVIDENCE, DECRYPT, oldTarget.decryptedPath]
     );
     // A run from before evidence registration (EPOCH-404).
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, host, pid)
-       VALUES ($1, '/legacy/decrypted/a', 'test', '{}', 'UTC', 'test-host', 1)`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, host, pid)
+       VALUES ($1, '/legacy/decrypted/a', 'test', '{}', 'UTC', 'analysis', 'test-host', 1)`,
       [UNREGISTERED_RUN]
     );
   });
@@ -810,6 +810,7 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
   it("gives each run its device's name and its stage counts", async () => {
     const run = (await getPipelineRuns(db)).find((r) => r.run_id === RUN)!;
     assert.equal(run.device_label, 'test device');
+    assert.equal(run.kind, 'analysis');
     // What names the investigation (EPOCH-555).
     assert.deepEqual([run.product_type, run.ios_version, run.total_bytes], ['iPhone17,5', '26.6.1', '0']);
     assert.equal(new Date(run.backup_date as unknown as string).toISOString(), '2026-10-15T18:05:25.000Z');
@@ -868,8 +869,8 @@ describe('what each kind of stage produced (EPOCH-491, EPOCH-581)', live, () => 
     );
     const setId = set.rows[0].set_id;
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid, started_at)
-       VALUES ($1, 'test', 'test', '{}', 'UTC', $2, $2, 'test-host', 1, now())`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, evidence_id, derivative_id, host, pid, started_at)
+       VALUES ($1, 'test', 'test', '{}', 'UTC', 'analysis', $2, $2, 'test-host', 1, now())`,
       [STAGES_RUN, ITEM]
     );
     await db.query(
@@ -960,8 +961,8 @@ describe('getIndicatorChecks', live, () => {
       [SKIPPED_RUN, 'skipped', null, '2026-10-14T10:00:00Z', 'No indicator set is registered.'],
     ]) {
       await db.query(
-        `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid)
-         VALUES ($1, 'test', 'test', '{}', 'UTC', $2, $2, 'test-host', 1)`,
+        `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, evidence_id, derivative_id, host, pid)
+         VALUES ($1, 'test', 'test', '{}', 'UTC', 'analysis', $2, $2, 'test-host', 1)`,
         [run, OTHER]
       );
       await db.query(
@@ -1001,6 +1002,7 @@ describe('getIndicatorChecks', live, () => {
     );
     const [check, skipped] = checks;
     assert.equal(check.set_name, 'test set');
+    assert.equal(check.run_kind, 'analysis');
     assert.equal(new Date(check.newest_indicator!).toISOString(), '2026-10-09T00:00:00.000Z');
     assert.equal(check.matches, 1);
     assert.deepEqual(check.summary, summary);
@@ -1113,9 +1115,9 @@ describe('interrupted runs and stages (EPOCH-435, EPOCH-561)', live, () => {
   async function runOf(runId: string, startedIn: string, end: { at: string; reason: string } | null) {
     await db.query(
       `INSERT INTO pipeline_runs
-         (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid,
+         (run_id, backup_source, contract_version, tool_versions, display_zone, kind, evidence_id, derivative_id, host, pid,
           started_at, finished_at, ended_reason)
-       VALUES ($1, 'test', 'test', '{}', 'UTC', $2, $2, 'test-host', 1, now() + $3::interval,
+       VALUES ($1, 'test', 'test', '{}', 'UTC', 'analysis', $2, $2, 'test-host', 1, now() + $3::interval,
                now() + $4::interval, $5)`,
       [runId, OTHER, startedIn, end?.at ?? null, end?.reason ?? null]
     );

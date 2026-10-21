@@ -14,6 +14,7 @@ export const pipelineApi = {
   getPreparedBackups: (workspace?: string) => window.epoch.getPreparedBackups(workspace),
   startPipeline: (source: string, options?: StartPipelineOptions) => window.epoch.startPipeline(source, options),
   retryRun: (runId: string) => window.epoch.retryRun(runId),
+  checkIndicators: (runId: string) => window.epoch.checkIndicators(runId),
   submitBackupPassword: (password: string) => window.epoch.submitBackupPassword(password),
   onPrepareLog: (callback: (entry: PipelineLogEntry) => void) => window.epoch.onPrepareLog(callback),
   getPrepareState: () => window.epoch.getPrepareState(),

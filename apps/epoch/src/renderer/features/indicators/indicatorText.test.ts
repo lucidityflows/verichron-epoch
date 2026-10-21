@@ -15,6 +15,7 @@ import {
   notCheckedLines,
   resultLine,
   setLine,
+  shownCheck,
   sourceLine,
   staleLine,
   stateLabel,
@@ -25,6 +26,8 @@ const VERDICTS = /\b(compromised|infected|clean)\b/i;
 
 const base: IndicatorCheckRow = {
   run_id: 'run-1',
+  run_kind: 'analysis',
+  run_started_at: '2026-10-15T14:00:00.000Z',
   status: 'succeeded',
   error_message: null,
   finished_at: '2026-10-15T14:30:00.000Z',
@@ -180,6 +183,30 @@ describe('indicator wording', () => {
     assert.deepEqual(
       groups.map((g) => g.map((c) => c.run_id)),
       [['a', 'c'], ['b', 'e'], ['d'], ['f']]
+    );
+  });
+
+  it("shows the newest Check Again since the selected analysis, up to the next analysis, or else the analysis's own check (EPOCH-557)", () => {
+    const at = (run_id: string, run_kind: 'analysis' | 'indicator_check', run_started_at: string) => ({
+      ...base,
+      run_id,
+      run_kind,
+      run_started_at,
+    });
+    const checks = [
+      at('analysis-2', 'analysis', '2026-10-17T00:00:00.000Z'),
+      at('recheck-3', 'indicator_check', '2026-10-17T06:00:00.000Z'),
+      at('recheck-2', 'indicator_check', '2026-10-16T12:00:00.000Z'),
+      at('recheck-1', 'indicator_check', '2026-10-16T06:00:00.000Z'),
+      at('analysis-1', 'analysis', '2026-10-16T00:00:00.000Z'),
+    ];
+    const shown = (run_id: string, started_at: string) => shownCheck(checks, { run_id, started_at })?.run_id;
+    assert.equal(shown('analysis-1', '2026-10-16T00:00:00.000Z'), 'recheck-2', 'not the one after the next analysis');
+    assert.equal(shown('analysis-2', '2026-10-17T00:00:00.000Z'), 'recheck-3');
+    assert.equal(shown('recheck-1', '2026-10-16T06:00:00.000Z'), 'recheck-2');
+    assert.equal(
+      shownCheck(checks.slice(0, 1), { run_id: 'analysis-2', started_at: '2026-10-17T00:00:00.000Z' })?.run_id,
+      'analysis-2'
     );
   });
 
