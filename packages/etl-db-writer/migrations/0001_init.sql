@@ -8,7 +8,7 @@
 -- Extractors NEVER get their own tables. Adding a new source_type is a code change
 -- (new extractor + new contract validation), not a schema change.
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto; -- for gen_random_uuid()
+-- gen_random_uuid() is built in (PostgreSQL 13 and later); no extension is needed.
 
 -- ---------------------------------------------------------------------------
 -- Run tracking: one row per invocation of the orchestrator against a backup.

@@ -1,0 +1,32 @@
+name: Lab PostgreSQL build
+
+# The Lab bundle's PostgreSQL (EPOCH-477): built from the pinned source in the
+# pinned Debian 13 container, then checked moved, socket-only, and with every
+# migration applied. It compiles PostgreSQL, so it runs only when the build or
+# the migrations change.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/postgres/**"
+      - "packages/etl-db-writer/migrations/**"
+      - ".github/workflows/postgres-build.yml"
+  pull_request:
+    paths:
+      - "tools/postgres/**"
+      - "packages/etl-db-writer/migrations/**"
+      - ".github/workflows/postgres-build.yml"
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Build PostgreSQL from source
+        run: tools/postgres/build.sh "$RUNNER_TEMP/pg"
+
+      - name: Check it moved, socket-only, with every migration
+        run: tools/postgres/check.sh "$RUNNER_TEMP/pg"
