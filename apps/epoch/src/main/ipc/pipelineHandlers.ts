@@ -540,8 +540,8 @@ export function registerPipelineHandlers(
           message: `${task} started for ${call.labels.length} backup${call.labels.length === 1 ? '' : 's'}`,
         },
         (entry) => {
-          analysisSession.entry(token, entry);
-          sendToRenderer('epoch:orchestratorLog', entry);
+          // An earlier call's late entries (its task:finished) stay in its saved log, off the screen.
+          if (analysisSession.entry(token, entry)) sendToRenderer('epoch:orchestratorLog', entry);
         }
       );
     } catch (err) {

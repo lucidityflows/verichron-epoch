@@ -295,7 +295,7 @@ describe('AnalysisSession', () => {
     const second = analysis.start('check', 'run-2', '/w', ['B'], 2000);
     // The first call's close work runs on after the second started.
     analysis.follow(first, created('55555555-5555-5555-5555-555555555555', 'A'));
-    analysis.entry(first, entry(9, 'from the first call'));
+    assert.equal(analysis.entry(first, entry(9, 'from the first call')), false, 'not kept, so not shown');
     analysis.logFile(first, 'first.ndjson');
     assert.deepEqual(analysis.runIds(first), [RUN, '55555555-5555-5555-5555-555555555555'], 'its own runs to close');
     assert.deepEqual(analysis.runIds(second), []);
@@ -305,6 +305,7 @@ describe('AnalysisSession', () => {
       [now.status, now.kind, now.target, now.taskLog, now.log.length],
       ['running', 'check', 'run-2', null, 0]
     );
+    assert.equal(analysis.entry(second, entry(1, 'from the second call')), true);
     analysis.finish(second, { success: true, analysis: [] });
     assert.deepEqual(analysis.snapshot().result, { success: true, analysis: [] });
   });

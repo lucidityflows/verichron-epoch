@@ -259,10 +259,15 @@ export class AnalysisSession {
     this.notifier.soon();
   }
 
-  /** Keeps one entry of the task's log, as the writer saved it (EPOCH-570). */
-  entry(call: number, entry: PipelineLogEntry): void {
-    if (call !== this.call) return;
+  /**
+   * Keeps one entry of the task's log, as the writer saved it (EPOCH-570).
+   * False for an earlier call's entry, which is then not shown either: the
+   * renderer would read its task id as a new task and replace the current log.
+   */
+  entry(call: number, entry: PipelineLogEntry): boolean {
+    if (call !== this.call) return false;
     this.log.add(entry);
+    return true;
   }
 
   /**
