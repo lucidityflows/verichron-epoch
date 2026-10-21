@@ -27,7 +27,7 @@ jobs:
       TEST_DATABASE_URL: postgresql://verichron_ci:verichron_ci@localhost:5432/verichron_ci
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_DB: verichron_ci
           POSTGRES_USER: verichron_ci

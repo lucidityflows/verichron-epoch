@@ -12,8 +12,8 @@ setup:
 |---|---|
 | [mise](https://mise.jdx.dev/getting-started.html) | Provides Node, pnpm and uv at the versions in `mise.toml` |
 | A C compiler (`build-essential` on Debian/Ubuntu, Xcode Command Line Tools on macOS) | Two of iLEAPP's dependencies, `pyliblzfse` and `astc-decomp-faster`, publish no Linux wheels and are compiled |
-| libpq's headers and `pg_config` (`libpq-dev` on Debian/Ubuntu, `libpq-devel` on Fedora, `brew install libpq` on macOS) | `psycopg2` is built from source against libpq, not installed as the `psycopg2-binary` wheel, which bundles its own libpq, OpenSSL and eight other native libraries (EPOCH-439). A development machine and CI build against the system's libpq. Building against the Lab bundle's own PostgreSQL 16 libpq is planned with the bundle (EPOCH-477) and not yet done |
-| Docker with the compose plugin | Local PostgreSQL 16 |
+| libpq's headers and `pg_config` (`libpq-dev` on Debian/Ubuntu, `libpq-devel` on Fedora, `brew install libpq` on macOS) | `psycopg2` is built from source against libpq, not installed as the `psycopg2-binary` wheel, which bundles its own libpq, OpenSSL and eight other native libraries (EPOCH-439). A development machine and CI build against the system's libpq. Building against the Lab bundle's own PostgreSQL 17 libpq is planned with the bundle (EPOCH-477) and not yet done |
+| Docker with the compose plugin | Local PostgreSQL 17 |
 | `sqlite3` (optional) | The processor's repair pass; recorded as skipped if missing |
 
 ## Pinned versions
@@ -274,7 +274,7 @@ New device behaviour seen during these checks is added to the verified list in
 
 | Workflow | Runs |
 |---|---|
-| `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, the runtime environment and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
+| `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 17, pytest on both tiers, the runtime environment and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
 | `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, lint (`pnpm --filter @verichron/epoch lint`: errors fail the job, EPOCH-571), Vite build and tests |
 
 Both workflows install the toolchain from `mise.toml` and Python from
