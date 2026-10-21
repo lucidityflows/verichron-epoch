@@ -8,14 +8,13 @@
  * when unset; fails in CI.
  */
 
-import { safeTestDatabaseUrl } from '@verichron/contracts';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
 import pg from 'pg';
-import { createWorkspaceManifestBackup, emptyWorkspaceManifest } from '@verichron/contracts';
+import { createWorkspaceManifestBackup, emptyWorkspaceManifest, safeTestDatabaseUrl } from '@verichron/contracts';
 import { afterAll, beforeAll, describe, it, vi } from 'vitest';
 
 const { handlers, openPath } = vi.hoisted(() => ({

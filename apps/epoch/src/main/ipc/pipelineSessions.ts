@@ -81,13 +81,22 @@ export class PrepareSession {
   };
   private readonly log = new LogBuffer();
   private readonly notifier: Notifier<PrepareState>;
+  /**
+   * The current Prepare. Its log, events, password request and end carry the
+   * token start() gave it, and only the current Prepare's change the state: a
+   * Prepare that ends after another has started (its close work runs on after
+   * the pipeline is released) can't overwrite the newer one (EPOCH-592, as
+   * AnalysisSession, EPOCH-580).
+   */
+  private call = 0;
 
   /** `send` delivers a change (without the log) to the renderer. */
   constructor(send: (state: PrepareState) => void) {
     this.notifier = new Notifier<PrepareState>(send, () => ({ ...this.state, log: [] }));
   }
 
-  start(source: string, workspace: string, labels: string[], now = Date.now()): void {
+  start(source: string, workspace: string, labels: string[], now = Date.now()): number {
+    this.call += 1;
     this.log.clear();
     this.state = {
       status: 'running',
@@ -101,27 +110,37 @@ export class PrepareSession {
       taskLog: null,
     };
     this.notifier.now();
+    return this.call;
   }
 
   /** The saved log this task writes (EPOCH-570). */
-  logFile(file: string): void {
+  logFile(call: number, file: string): void {
+    if (call !== this.call) return;
     this.state.taskLog = file;
     this.notifier.soon();
   }
 
-  /** Keeps one entry of the task's log, as the writer saved it (EPOCH-570). */
-  entry(entry: PipelineLogEntry): void {
+  /**
+   * Keeps one entry of the task's log, as the writer saved it (EPOCH-570).
+   * False for an earlier Prepare's entry, which is then not shown either: the
+   * renderer would read its task id as a new task and replace the current log.
+   */
+  entry(call: number, entry: PipelineLogEntry): boolean {
+    if (call !== this.call) return false;
     this.log.add(entry);
     this.notifier.soon();
+    return true;
   }
 
   /** Follows one of the processor's events: its progress (EPOCH-445). Nothing is taken from text. */
-  follow(event: PipelineEvent, now = Date.now()): void {
+  follow(call: number, event: PipelineEvent, now = Date.now()): void {
+    if (call !== this.call) return;
     if (this.state.progress) this.state.progress = applyPrepareEvent(this.state.progress, event, now);
     this.notifier.soon();
   }
 
-  passwordRequested(backup: string): void {
+  passwordRequested(call: number, backup: string): void {
+    if (call !== this.call) return;
     this.state.passwordFor = backup;
     this.notifier.now();
   }
@@ -131,7 +150,8 @@ export class PrepareSession {
     this.notifier.now();
   }
 
-  finish(result: PipelineFinishedResult): void {
+  finish(call: number, result: PipelineFinishedResult): void {
+    if (call !== this.call) return;
     this.state = { ...this.state, status: 'finished', passwordFor: null, result };
     this.notifier.now();
   }

@@ -230,18 +230,26 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
     );
   }
 
-  useEffect(() => {
+  // A new folder (or none) resets what is shown while rendering; the effect
+  // below only reads, setting state when its answers arrive (EPOCH-571). A
+  // folder's previous list stays until the new one is read, as before.
+  const [shownPath, setShownPath] = useState<string | null | undefined>(undefined);
+  if (shownPath !== selectedPath) {
+    setShownPath(selectedPath);
+    setDiscoverError(null);
     if (!selectedPath) {
       setBackups([]);
       setSelectedLabels(new Set());
-      setDiscoverError(null);
       setDescriptions(new Map());
       setFolderShown(null);
-      return;
+    } else {
+      setDiscoveringBackups(true);
     }
+  }
+
+  useEffect(() => {
+    if (!selectedPath) return;
     let cancelled = false;
-    setDiscoveringBackups(true);
-    setDiscoverError(null);
     pipelineApi.displayPath(selectedPath).then((shown) => !cancelled && setFolderShown(shown));
     pipelineApi
       .discoverBackups(selectedPath)
@@ -537,12 +545,13 @@ export function WorkspaceView({ onAnalysisComplete }: WorkspaceViewProps) {
         />
       ) : (
         <>
-          {preparing && (
+          {/* A running Prepare always has its start time (PrepareSession.start sets it); none is made up here. */}
+          {preparing && prepare?.startedAt != null && (
             <PreparingCard
               name={preparing.name}
               position={preparing.position}
               progress={preparing.progress}
-              startedAt={prepare?.startedAt ?? Date.now()}
+              startedAt={prepare.startedAt}
               stopping={stoppingPrepare}
               onStop={handleStopPrepare}
             />
