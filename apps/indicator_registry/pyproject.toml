@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Registers an indicator set: loads STIX 2.1 files and stores them in the append-only registry (EPOCH-490)."
 requires-python = "==3.14.*"
 dependencies = [
-    "psycopg2-binary>=2.9",
+    "psycopg2>=2.9",
     "verichron-contracts",
     "verichron-etl-db-writer",
     "verichron-indicators",

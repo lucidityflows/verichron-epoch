@@ -77,6 +77,10 @@ jobs:
       # before it runs anything (EPOCH-456), and the processor reads a real
       # interpreter's environment (EPOCH-439); uv builds it at the version
       # .python-version pins.
+      # psycopg2 is built from source against libpq (EPOCH-439, B4).
+      - name: Install libpq headers
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev
+
       - name: Install Python environment
         run: uv sync --locked
 

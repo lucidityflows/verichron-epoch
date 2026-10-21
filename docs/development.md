@@ -12,6 +12,7 @@ setup:
 |---|---|
 | [mise](https://mise.jdx.dev/getting-started.html) | Provides Node, pnpm and uv at the versions in `mise.toml` |
 | A C compiler (`build-essential` on Debian/Ubuntu, Xcode Command Line Tools on macOS) | Two of iLEAPP's dependencies, `pyliblzfse` and `astc-decomp-faster`, publish no Linux wheels and are compiled |
+| libpq's headers and `pg_config` (`libpq-dev` on Debian/Ubuntu, `libpq-devel` on Fedora, `brew install libpq` on macOS) | `psycopg2` is built from source against libpq, not installed as the `psycopg2-binary` wheel, which bundles its own libpq, OpenSSL and eight other native libraries (EPOCH-439). A development machine and CI build against the system's libpq; the Lab bundle builds against its own PostgreSQL 16 libpq |
 | Docker with the compose plugin | Local PostgreSQL 16 |
 | `sqlite3` (optional) | The processor's repair pass; recorded as skipped if missing |
 
@@ -39,10 +40,17 @@ the iLEAPP submodule. `mise.toml` and `.python-version` are updated by hand.
 
 | Environment | Holds | Used by |
 |---|---|---|
-| `.venv/` | The uv workspace: our Python stages, writer, report and tests | the orchestrator's stages, `uv run` |
+| `.venv/` | The uv workspace: our Python stages, writer, report and tests, with every dependency group (`dev`, `test`, `feeds`) | the orchestrator's stages, `uv run` |
+| `build/runtime-venv/` | The shipped environment: the same lockfile with no dependency groups, so only what runs (`mise run runtime-env`, EPOCH-439) | `scripts/test_runtime_environment.py`, which checks it holds no test or development tooling and that every stage, the migrations, the runtime login and the indicator registry import in it |
 | `tools/decrypt/.venv/` | The backup decrypt's library, pinned | The processor runs `tools/decrypt/decrypt_backup.py` with this interpreter (or `--decrypt-python`) |
 | `tools/ileapp/.venv/` | iLEAPP's runtime dependencies, pinned | the processor runs the submodule, `tools/ileapp/iLEAPP/ileapp.py`, with this interpreter |
 | `node_modules/` | The pnpm workspace | the app, the processor, the orchestrator |
+
+A package that only tests, linting or the indicator-feed fetch use goes in a
+dependency group in the root `pyproject.toml` (`test`, `dev`, `feeds`), never in
+`dependencies`, which is what ships. Our packages install editable in both
+environments: the stages run from the source tree, and read the shared
+contract files beside their source.
 
 The backup decrypt and iLEAPP each have their own uv project and lockfile, so
 each tool's exact pins stay its own. No workspace code imports either tool;
@@ -265,7 +273,7 @@ New device behaviour seen during these checks is added to the verified list in
 
 | Workflow | Runs |
 |---|---|
-| `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
+| `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 16, pytest on both tiers, the runtime environment and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
 | `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, lint (`pnpm --filter @verichron/epoch lint`: errors fail the job, EPOCH-571), Vite build and tests |
 
 Both workflows install the toolchain from `mise.toml` and Python from

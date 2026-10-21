@@ -16,6 +16,8 @@
 #   .venv/           the uv workspace (our Python code), Python from .python-version
 #   tools/decrypt/.venv the backup decrypt, pinned; run by the processor
 #   tools/ileapp/.venv  iLEAPP's runtime, pinned; run by the processor
+#   build/runtime-venv  the shipped environment: the workspace with no
+#                       dependency groups (EPOCH-439); its tests run against it
 #   node_modules/    the pnpm workspace
 
 set -euo pipefail
@@ -84,6 +86,18 @@ else
   problem "no working C compiler (needed to build iLEAPP's environment)" "$COMPILER_FIX"
 fi
 
+# psycopg2 is built from source against libpq (EPOCH-439, B4), so libpq's
+# headers and pg_config are needed, as the compiler is.
+case "$(uname -s)" in
+  Darwin) LIBPQ_FIX="brew install libpq, then put \$(brew --prefix libpq)/bin on PATH" ;;
+  *)      LIBPQ_FIX="sudo apt install libpq-dev   (Fedora: sudo dnf install libpq-devel)" ;;
+esac
+if command -v pg_config >/dev/null 2>&1 && [ -f "$(pg_config --includedir 2>/dev/null)/libpq-fe.h" ]; then
+  ok "libpq headers ($(pg_config --version 2>/dev/null))"
+else
+  problem "libpq's headers or pg_config are missing (needed to build psycopg2)" "$LIBPQ_FIX"
+fi
+
 if ! docker compose version >/dev/null 2>&1; then
   problem "docker with the compose plugin is not available (local PostgreSQL)" \
     "install Docker Engine or Docker Desktop (https://docs.docker.com/engine/install/)"
@@ -138,6 +152,9 @@ echo "  done  submodules (iLEAPP)"
 
 uv sync --locked
 echo "  done  workspace .venv (Python $PYTHON_WANT)"
+
+UV_PROJECT_ENVIRONMENT=build/runtime-venv uv sync --locked --no-default-groups
+echo "  done  build/runtime-venv (the shipped environment)"
 
 uv sync --locked --project tools/decrypt
 echo "  done  tools/decrypt/.venv ($(tools/decrypt/.venv/bin/python -I tools/decrypt/decrypt_backup.py --version 2>/dev/null))"
