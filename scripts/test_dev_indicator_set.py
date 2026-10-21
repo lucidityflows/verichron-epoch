@@ -73,3 +73,21 @@ def test_a_failed_fetch_or_registration_stops_with_its_exit_code(monkeypatch: py
     with pytest.raises(SystemExit) as stopped:
         dev.run(dev.FETCH, "x")
     assert stopped.value.code == 3
+
+
+def test_a_set_json_that_cant_be_read_stops_the_run_and_names_it(tmp_path: Path) -> None:
+    fetched(tmp_path, "mvt-2026-10-15", "2026-10-15")
+    broken = tmp_path / "mvt-2026-10-20"
+    broken.mkdir()
+    (broken / "set.json").write_text("{not json", encoding="utf-8")
+    with pytest.raises(SystemExit, match="mvt-2026-10-20/set.json can't be read"):
+        dev.newest_fetched(tmp_path)
+    (broken / "set.json").write_text('{"files": []}', encoding="utf-8")
+    with pytest.raises(SystemExit, match="lists no files"):
+        dev.newest_fetched(tmp_path)
+
+
+def test_a_relative_sets_directory_is_made_absolute(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(dev.SETS_ENV, "sets")
+    assert dev.sets_root() == tmp_path / "sets"

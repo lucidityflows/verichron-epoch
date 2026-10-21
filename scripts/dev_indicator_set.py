@@ -40,15 +40,28 @@ SETS_ENV = "EPOCH_INDICATOR_SETS"
 
 
 def sets_root() -> Path:
-    return Path(os.environ.get(SETS_ENV) or Path.home() / "indicator-sets").expanduser()
+    """Absolute, so this script and the ones it runs from the repository root agree on it."""
+    return Path(os.environ.get(SETS_ENV) or Path.home() / "indicator-sets").expanduser().resolve()
 
 
 def fetched_on(set_dir: Path) -> str:
-    """The day a fetched set's newest file was downloaded, from its set.json."""
-    files = json.loads((set_dir / "set.json").read_text(encoding="utf-8"))["files"]
-    days = [f["downloaded_on"] for f in files]
+    """The day a fetched set's newest file was downloaded, from its set.json.
+
+    A set.json that can't be read stops the run rather than being skipped:
+    skipping it could register an older set without saying so.
+    """
+    path = set_dir / "set.json"
+    try:
+        days = [f["downloaded_on"] for f in json.loads(path.read_text(encoding="utf-8"))["files"]]
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        days, problem = [], f"can't be read ({type(e).__name__}: {e})"
+    else:
+        problem = "lists no files"
     if not days:
-        raise SystemExit(f"{set_dir / 'set.json'} lists no files")
+        raise SystemExit(
+            f"{path} {problem}, so the sets fetched there can't be compared. "
+            f"Remove {set_dir} or fetch again with `mise run indicators:update`."
+        )
     return max(days)
 
 
