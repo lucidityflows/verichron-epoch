@@ -141,6 +141,7 @@ _TABLES = (
     "indicator_file_contents",
     "stage_item_failures",
     "ingest_run_links",
+    "record_entities",
     "forensic_records",
     "ingested_files",
     "pipeline_stage_status",

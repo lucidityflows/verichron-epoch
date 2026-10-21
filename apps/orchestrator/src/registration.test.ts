@@ -731,7 +731,7 @@ describe('stages and the completeness predicate', live, () => {
     );
     assert.deepEqual(
       real.rows.map((r) => r.stage_name),
-      ['crash', 'ileapp_bridge', 'indicator_match', 'reporting']
+      ['crash', 'ileapp_bridge', 'entities', 'indicator_match', 'reporting']
     );
 
     // A disabled stage keeps its declared place, recorded as skipped.

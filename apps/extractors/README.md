@@ -8,6 +8,8 @@ the [stage contract](../../packages/contracts/EXTRACTOR_CONTRACT.md).
 |---|---|---|
 | [`crash`](crash/) | decrypted backup | `crash_report` |
 | [`ileapp_bridge`](ileapp_bridge/) | iLEAPP output | `ileapp_record` |
+| [`entities`](entities/) | the evidence's current facts | `entity` units, with their `record_entities` |
+| [`indicator_match`](indicator_match/) | a registered indicator set, and the evidence's facts | `indicator_match` |
 
 To add an extractor:
 

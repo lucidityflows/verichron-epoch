@@ -4,6 +4,8 @@ import { Button } from '../../components/ui/Button';
 import { wallTimeEnd, wallTimeToInstant, type DisplayZone } from '../../../shared/time';
 import type { RecordFilters } from './useRecords';
 import { sourceTitle, tierLabel } from './recordText';
+import { MentionsFilter } from './MentionsFilter';
+import type { EntityOverview } from '../../../shared/types/window';
 
 const count = (n: number) => n.toLocaleString('en-US');
 
@@ -41,6 +43,9 @@ function choices(facet: RecordFacet, values: FacetCount[], filters: RecordFilter
 }
 
 interface RecordFiltersBarProps {
+  runId: string;
+  /** What the records mention (EPOCH-581), for the Mentions filter. */
+  entities: EntityOverview | null;
   filters: RecordFilters;
   facets: RecordFacets | null;
   zone: DisplayZone;
@@ -54,7 +59,7 @@ interface RecordFiltersBarProps {
  * chosen, and a chosen value is always listed. Times are typed in the
  * examiner's zone; the end of a range is exclusive (`wallTimeEnd`).
  */
-export function RecordFiltersBar({ filters, facets, zone, onChange }: RecordFiltersBarProps) {
+export function RecordFiltersBar({ runId, entities, filters, facets, zone, onChange }: RecordFiltersBarProps) {
   const [search, setSearch] = useState(filters.search ?? '');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -131,6 +136,13 @@ export function RecordFiltersBar({ filters, facets, zone, onChange }: RecordFilt
         })}
       </div>
       <div className="flex flex-wrap items-end gap-2">
+        <MentionsFilter
+          runId={runId}
+          overview={entities}
+          kind={filters.mentionKind}
+          value={filters.mentionValue}
+          onChange={(mentionKind, mentionValue) => onChange({ ...filters, mentionKind, mentionValue })}
+        />
         <label className="flex flex-col gap-1">
           <span className="text-label text-muted-foreground">From ({zone})</span>
           <input

@@ -113,8 +113,9 @@ function formatTimeout(timeoutMs: number): string {
 
 /**
  * Runs one stage against the input its stage.json says it reads: a derivative,
- * whose id and path it passes, or the indicator set the run checks, whose id it
- * passes (EPOCH-491). A stage whose derivative wasn't registered (the processor
+ * whose id and path it passes, the indicator set the run checks, whose id it
+ * passes (EPOCH-491), or the evidence's facts, which need only the evidence id
+ * every stage is given (EPOCH-581). A stage whose derivative wasn't registered (the processor
  * hasn't completed it) fails before it is spawned, unless that input is one
  * whose absence is a fact (crash logs never acquired, no indicator set
  * registered); the stage is then skipped with the reason.
@@ -135,7 +136,9 @@ export function runStage(
   }
   let inputArgs: string[];
   const reads = stage.manifest.reads;
-  if (reads === 'indicator_set') {
+  if (reads === 'facts') {
+    inputArgs = [];
+  } else if (reads === 'indicator_set') {
     if (!input.indicatorSetId) throw new Error(`stage "${stage.name}" has no indicator set and no reason`);
     inputArgs = ['--indicator-set-id', input.indicatorSetId];
   } else {

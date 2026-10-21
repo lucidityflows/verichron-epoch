@@ -1,4 +1,4 @@
-import type { ForensicRecordQuery } from '@verichron/etl-db-reader';
+import type { EntityValueQuery, ForensicRecordQuery } from '@verichron/etl-db-reader';
 export const runsApi = {
   getPipelineRuns: () => window.epoch.getPipelineRuns(),
   getStageStatus: (runId: string) => window.epoch.getStageStatus(runId),
@@ -9,5 +9,8 @@ export const runsApi = {
   getRecordFacets: (runId: string, query?: ForensicRecordQuery) => window.epoch.getRecordFacets(runId, query),
   getEvidenceCompleteness: (runId: string) => window.epoch.getEvidenceCompleteness(runId),
   getRecordDetail: (runId: string, recordId: string) => window.epoch.getRecordDetail(runId, recordId),
+  getEntityOverview: (runId: string) => window.epoch.getEntityOverview(runId),
+  getEntityValues: (runId: string, kind: string, query?: EntityValueQuery) =>
+    window.epoch.getEntityValues(runId, kind, query),
   getIndicatorResults: (runId: string) => window.epoch.getIndicatorResults(runId),
 };

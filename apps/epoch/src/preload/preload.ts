@@ -1,4 +1,4 @@
-import type { ForensicRecordQuery } from '@verichron/etl-db-reader';
+import type { EntityValueQuery, ForensicRecordQuery } from '@verichron/etl-db-reader';
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Backup } from '@verichron/contracts';
 import type {
@@ -84,6 +84,9 @@ const dbApi = {
     ipcRenderer.invoke('epoch:getRecordFacets', runId, query),
   getEvidenceCompleteness: (runId: string) => ipcRenderer.invoke('epoch:getEvidenceCompleteness', runId),
   getRecordDetail: (runId: string, recordId: string) => ipcRenderer.invoke('epoch:getRecordDetail', runId, recordId),
+  getEntityOverview: (runId: string) => ipcRenderer.invoke('epoch:getEntityOverview', runId),
+  getEntityValues: (runId: string, kind: string, query?: EntityValueQuery) =>
+    ipcRenderer.invoke('epoch:getEntityValues', runId, kind, query),
   getIndicatorResults: (runId: string) => ipcRenderer.invoke('epoch:getIndicatorResults', runId),
   getReport: (runId: string): Promise<ReportResult> => ipcRenderer.invoke('epoch:getReport', runId),
   openReport: (runId: string): Promise<boolean> => ipcRenderer.invoke('epoch:openReport', runId),

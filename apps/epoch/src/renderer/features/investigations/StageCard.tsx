@@ -36,6 +36,8 @@ export function formatDuration(ms: number): string {
 
 /** What a stage read, in examiner terms. */
 function describeRead(stage: StageStatusRow): string | null {
+  if (stage.reads === 'facts') return "The evidence's records";
+  if (stage.reads === 'indicator_set') return 'An indicator set';
   const tool = stage.derivative_tool;
   if (stage.derivative_kind === 'decrypted') {
     return `Decrypted copy${tool ? ` (${tool.name} ${tool.version})` : ''}`;
@@ -46,8 +48,10 @@ function describeRead(stage: StageStatusRow): string | null {
   return stage.derivative_kind;
 }
 
-/** The ingest units' name for the derivative a stage read. */
+/** The ingest units' name for what a stage read. */
 function unitNoun(stage: StageStatusRow, count: number): string {
+  if (stage.reads === 'facts') return count === 1 ? 'fact unit' : 'fact units';
+  if (stage.reads === 'indicator_set') return count === 1 ? 'check' : 'checks';
   if (stage.derivative_kind === 'ileapp_output') return count === 1 ? 'artifact table' : 'artifact tables';
   return count === 1 ? 'file' : 'files';
 }
@@ -62,9 +66,27 @@ function summary(stage: StageStatusRow): string {
   if (stage.status === 'running') return 'Running…';
   if (stage.status === 'pending') return 'Not started';
   if (stage.stage_name === REPORT_STAGE) return 'Report written';
-  return stage.records > 0
-    ? `${stage.records.toLocaleString()} record${stage.records === 1 ? '' : 's'}`
-    : 'No facts written';
+  return produced(stage) ?? 'No facts written';
+}
+
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+/**
+ * What a succeeded stage wrote, by what it reads (EPOCH-581): mentions for a
+ * stage that reads facts, which are entities, not records; matches for an
+ * indicator check, where "no match" is a result; records otherwise. Null
+ * when it wrote nothing at all.
+ */
+function produced(stage: StageStatusRow): string | null {
+  if (stage.reads === 'facts') {
+    if (stage.mentions > 0) return plural(stage.mentions, 'mention', 'mentions');
+    return stage.units > 0 ? 'No mentions found' : null;
+  }
+  if (stage.reads === 'indicator_set') {
+    if (stage.records > 0) return plural(stage.records, 'match', 'matches');
+    return stage.units > 0 ? 'No match' : null;
+  }
+  return stage.records > 0 ? plural(stage.records, 'record', 'records') : null;
 }
 
 /** A stage's output: the first lines, the rest behind a toggle, and a copy button. */
@@ -201,10 +223,16 @@ export function StageCard({
             )}
             {stage.stage_name !== REPORT_STAGE && stage.status === 'succeeded' && (
               <>
-                <dt className="text-muted-foreground">Facts</dt>
+                <dt className="text-muted-foreground">
+                  {stage.reads === 'facts' ? 'Mentions' : stage.reads === 'indicator_set' ? 'Matches' : 'Facts'}
+                </dt>
                 <dd className="text-foreground">
-                  {stage.records.toLocaleString()} record{stage.records === 1 ? '' : 's'} from{' '}
-                  {stage.units.toLocaleString()} {unitNoun(stage, stage.units)}
+                  {stage.reads === 'facts'
+                    ? plural(stage.mentions, 'mention', 'mentions')
+                    : stage.reads === 'indicator_set'
+                      ? plural(stage.records, 'match', 'matches')
+                      : plural(stage.records, 'record', 'records')}{' '}
+                  from {stage.units.toLocaleString()} {unitNoun(stage, stage.units)}
                 </dd>
               </>
             )}

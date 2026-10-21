@@ -164,6 +164,10 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _relation("source_type_tiers"),
         _relation("idx_forensic_match_cites"),
     ),
+    "0022_record_entities.sql": (
+        _column("ingested_files", "source_ingest_id"),
+        _relation("idx_record_entities_kind"),
+    ),
 }
 
 

@@ -60,8 +60,9 @@ CREATE TABLE ingested_files (
     ingest_id        INTEGER PRIMARY KEY AUTOINCREMENT,
     evidence_id      TEXT NOT NULL,
     derivative_id    TEXT,
-    -- 0013: a unit's input is a derivative or an indicator set, never both.
+    -- 0013, 0022: a unit's input is a derivative, an indicator set or a fact unit; exactly one.
     indicator_set_id TEXT,
+    source_ingest_id INTEGER,
     file_hash        TEXT NOT NULL,
     source_type      TEXT NOT NULL,
     parser_version   INTEGER NOT NULL CHECK (parser_version >= 1),
@@ -75,7 +76,7 @@ CREATE TABLE ingested_files (
     completed_at     TEXT,
     UNIQUE (evidence_id, file_hash, source_type, parser_version),
     UNIQUE (ingest_id, evidence_id),
-    CHECK ((derivative_id IS NULL) <> (indicator_set_id IS NULL)),
+    CHECK ((derivative_id IS NOT NULL) + (indicator_set_id IS NOT NULL) + (source_ingest_id IS NOT NULL) = 1),
     CHECK (
         (ingest_complete = 1 AND record_count IS NOT NULL AND completed_at IS NOT NULL)
         OR
@@ -103,6 +104,19 @@ CREATE TABLE forensic_records (
     fields          TEXT NOT NULL DEFAULT '{}',
     -- Same composite key as 0003: a record's evidence must be its unit's.
     FOREIGN KEY (ingest_id, evidence_id) REFERENCES ingested_files(ingest_id, evidence_id)
+);
+
+-- 0022: what records mention. The triggers are certified on the real-Postgres leg.
+CREATE TABLE record_entities (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingest_id        INTEGER NOT NULL,
+    evidence_id      TEXT NOT NULL,
+    record_id        INTEGER NOT NULL REFERENCES forensic_records (id),
+    kind             TEXT NOT NULL,
+    role             TEXT NOT NULL,
+    normalized_value TEXT NOT NULL,
+    FOREIGN KEY (ingest_id, evidence_id) REFERENCES ingested_files(ingest_id, evidence_id),
+    UNIQUE (ingest_id, record_id, kind, role, normalized_value)
 );
 
 -- 0016: the items a stage could not ingest. Append-only on Postgres; the

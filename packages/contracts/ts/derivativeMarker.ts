@@ -36,10 +36,11 @@ export type DerivativeKind = z.infer<typeof DerivativeKind>;
 
 /**
  * What a stage reads (its stage.json `reads`): one of the evidence's
- * derivatives, or a registered indicator set, which the indicator-match stage
- * checks the evidence's facts against (EPOCH-491).
+ * derivatives; a registered indicator set, which the indicator-match stage
+ * checks the evidence's facts against (EPOCH-491); or the evidence's facts
+ * themselves, which the entities stage reads unit by unit (EPOCH-581).
  */
-export const StageInput = z.enum([...DerivativeKind.options, 'indicator_set']);
+export const StageInput = z.enum([...DerivativeKind.options, 'indicator_set', 'facts']);
 export type StageInput = z.infer<typeof StageInput>;
 
 const ContentRoot = z.string().regex(/^[0-9a-f]{64}$/);

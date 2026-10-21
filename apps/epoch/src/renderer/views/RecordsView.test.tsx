@@ -132,6 +132,34 @@ const answers: Record<string, unknown> = {
   },
   getEvidenceCompleteness: async () => completeness,
   getRecordDetail: async () => detail,
+  getEntityOverview: async () => ({
+    kinds: [{ kind: 'domain', title: 'Domain', values: 2, records: 3 }],
+    coverage: {
+      units: 4,
+      unreadable: 1,
+      unread: [
+        {
+          source_type: 'ileapp_record',
+          artifact: 'InteractionC - Contacts',
+          field: 'Display Name',
+          records: 7,
+          shaped: { phone: 3 },
+        },
+        {
+          source_type: 'ileapp_record',
+          artifact: 'Safari Browser - History',
+          field: 'Visit Count',
+          records: 2,
+          shaped: {},
+        },
+      ],
+    },
+    shapeHints: { phone: 'phone number' },
+  }),
+  getEntityValues: async () => ({
+    rows: [{ value: 'update-check.example.invalid', records: 2, first_seen: null, last_seen: null }],
+    total: 1,
+  }),
   getStillFailing: async () => ({ rows: [], total: 0 }),
   getInterruptedStages: async () => [],
   getAnalysisState: async () => ({
@@ -265,5 +293,37 @@ describe('Forensic Records', () => {
       /Matched domain update-check.example.invalid \(url_host\) in set mvt-2026-10-15/
     );
     assert.ok(screen.getByRole('button', { name: 'Copy Raw Data' }));
+  });
+
+  it('says what the records mention and every field no entity rule reads (EPOCH-581)', async () => {
+    show();
+    const panel = await screen.findByRole('region', { name: 'Entities' });
+    assert.match(panel.textContent ?? '', /2 Domain values in 3 records/);
+    assert.match(panel.textContent ?? '', /1 values in ruled fields didn't fit their kind/);
+    assert.match(panel.textContent ?? '', /1 field that no entity rule reads hold values shaped like an entity/);
+    assert.match(
+      panel.textContent ?? '',
+      /InteractionC - Contacts · Display Name: 7 records; 3 shaped like a phone number/
+    );
+    assert.match(panel.textContent ?? '', /2 fields in 2 sources hold values that no entity rule reads/);
+    assert.match(panel.textContent ?? '', /Safari Browser - History · Visit Count: 2 records/);
+  });
+
+  it('narrows the records to those that mention a value chosen from the values found', async () => {
+    show();
+    const mentions = await screen.findByRole('combobox', { name: 'Mentions' });
+    await waitFor(() => assert.ok(within(mentions).getByRole('option', { name: 'Domain (2)' })));
+    await act(async () => fireEvent.change(mentions, { target: { value: 'domain' } }));
+    const value = await screen.findByPlaceholderText('Type to find a value');
+    await screen.findByText('1 matching value');
+    await act(async () => fireEvent.change(value, { target: { value: 'update-check' } }));
+    assert.equal(queries.at(-1)?.mentionValue, undefined, 'a partial value narrows nothing');
+    await act(async () => fireEvent.change(value, { target: { value: 'update-check.example.invalid' } }));
+    await waitFor(() =>
+      assert.deepEqual(
+        [queries.at(-1)?.mentionKind, queries.at(-1)?.mentionValue],
+        ['domain', 'update-check.example.invalid']
+      )
+    );
   });
 });

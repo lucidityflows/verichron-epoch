@@ -245,6 +245,7 @@ The contract is in
 |---|---|---|---|
 | `crash` | 10 | the device's crash logs (`crash_reports`) | `crash_report` |
 | `ileapp_bridge` | 20 | iLEAPP output | `ileapp_record` |
+| `entities` | 30 | the evidence's current facts | `entity` units, whose entities are in `record_entities` ([entities](evidence-model.md#entities)) |
 | `indicator_match` | 500 | a registered indicator set, and the evidence's current facts | `indicator_match` |
 | `reporting` | 1000 | the database | the investigation report |
 

@@ -42,6 +42,12 @@ export type {
   RecordColumn,
   RecordCitation,
   RecordDetail,
+  EntityKindCount,
+  EntityValueRow,
+  EntityValueQuery,
+  EntityValuePage,
+  EntityUnreadField,
+  EntityCoverage,
 } from './dbReader.js';
 export {
   getPipelineRuns,
@@ -53,6 +59,9 @@ export {
   getRecordFacets,
   getEvidenceCompleteness,
   getRecordDetail,
+  getEntityKinds,
+  getEntityValues,
+  getEntityCoverage,
   getIndicatorChecks,
   getStageFailures,
   getStillFailing,

@@ -7,6 +7,7 @@ members = [
     "verichron-analysis",
     "verichron-contracts",
     "verichron-crash",
+    "verichron-entities",
     "verichron-epoch",
     "verichron-etl-db-writer",
     "verichron-etl-run",
@@ -539,6 +540,29 @@ requires-dist = [
 ]
 
 [[package]]
+name = "verichron-entities"
+version = "0.1.0"
+source = { editable = "apps/extractors/entities" }
+dependencies = [
+    { name = "psycopg2-binary" },
+    { name = "verichron-contracts" },
+    { name = "verichron-etl-db-writer" },
+    { name = "verichron-etl-run" },
+    { name = "verichron-indicators" },
+    { name = "verichron-runtime-env" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "psycopg2-binary", specifier = ">=2.9" },
+    { name = "verichron-contracts", editable = "packages/contracts" },
+    { name = "verichron-etl-db-writer", editable = "packages/etl-db-writer" },
+    { name = "verichron-etl-run", editable = "libs/etl-run" },
+    { name = "verichron-indicators", editable = "packages/indicators" },
+    { name = "verichron-runtime-env", editable = "libs/verichron-runtime-env" },
+]
+
+[[package]]
 name = "verichron-epoch"
 version = "0.1.0"
 source = { editable = "." }
@@ -550,6 +574,7 @@ dependencies = [
     { name = "verichron-analysis" },
     { name = "verichron-contracts" },
     { name = "verichron-crash" },
+    { name = "verichron-entities" },
     { name = "verichron-etl-db-writer" },
     { name = "verichron-etl-run" },
     { name = "verichron-ileapp-bridge" },
@@ -576,6 +601,7 @@ requires-dist = [
     { name = "verichron-analysis", editable = "apps/analysis" },
     { name = "verichron-contracts", editable = "packages/contracts" },
     { name = "verichron-crash", editable = "apps/extractors/crash" },
+    { name = "verichron-entities", editable = "apps/extractors/entities" },
     { name = "verichron-etl-db-writer", editable = "packages/etl-db-writer" },
     { name = "verichron-etl-run", editable = "libs/etl-run" },
     { name = "verichron-ileapp-bridge", editable = "apps/extractors/ileapp_bridge" },

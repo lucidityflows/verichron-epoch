@@ -39,6 +39,7 @@ export { crashReportsAcquisitionPaths, CrashReportsAcquisition } from './ts/cras
 export { EvidenceSidecar } from './ts/evidenceSidecar.js';
 export { contractVersion, CONTRACT_SCHEMAS } from './ts/contractVersion.js';
 export { indicatorResultsConfig, type IndicatorResultsConfig } from './ts/indicatorResults.js';
+export { entityKinds, entityShapeHints, type EntityKind } from './ts/entityRules.js';
 export {
   DECRYPT_MARKER,
   ILEAPP_MARKER,

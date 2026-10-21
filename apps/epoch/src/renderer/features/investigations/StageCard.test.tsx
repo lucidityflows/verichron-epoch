@@ -27,8 +27,11 @@ function stage(overrides: Partial<StageStatusRow>): StageStatusRow {
     derivative_id: '55555555-5555-5555-5555-555555555555',
     derivative_kind: 'decrypted',
     derivative_tool: { name: 'iphone_backup_decrypt', version: '0.10.0' },
+    indicator_set_id: null,
+    reads: 'derivative',
     units: 3,
     records: 12,
+    mentions: 0,
     run_ended_reason: null,
     run_finished_at: null,
     ...overrides,
@@ -49,6 +52,44 @@ describe('StageCard', () => {
     fireEvent.click(card());
     assert.ok(screen.getByText('Decrypted copy (iphone_backup_decrypt 0.10.0), version 1'));
     assert.ok(screen.getByText('12 records from 3 files'));
+  });
+
+  it('says how many mentions a stage that reads facts found; they are entities, not records (EPOCH-581)', () => {
+    render(
+      <StageCard
+        stage={stage({
+          stage_title: 'Crash Reports',
+          reads: 'facts',
+          derivative_id: null,
+          derivative_kind: null,
+          derivative_tool: null,
+          units: 109,
+          records: 0,
+          mentions: 78311,
+        })}
+      />
+    );
+    assert.ok(screen.getByText(/78,311 mentions/));
+    assert.equal(screen.queryByText(/No facts written/), null);
+    fireEvent.click(card());
+    assert.ok(screen.getByText("The evidence's records, version 1"));
+    assert.ok(screen.getByText('78,311 mentions from 109 fact units'));
+  });
+
+  it('says an indicator check found no match, rather than that it wrote nothing', () => {
+    const check = {
+      reads: 'indicator_set' as const,
+      derivative_id: null,
+      derivative_kind: null,
+      derivative_tool: null,
+    };
+    const { unmount } = render(<StageCard stage={stage({ ...check, units: 1, records: 0 })} />);
+    assert.ok(screen.getByText(/No match/));
+    unmount();
+    render(<StageCard stage={stage({ ...check, units: 1, records: 2 })} />);
+    assert.ok(screen.getByText(/2 matches/));
+    fireEvent.click(card());
+    assert.ok(screen.getByText('2 matches from 1 check'));
   });
 
   it('labels a skipped stage’s message as its reason, never as an error', () => {

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "verichron-entities"
+version = "0.1.0"
+description = "Stage: what one evidence's records mention, by kind, read by the entity rules (EPOCH-581)."
+requires-python = "==3.14.*"
+dependencies = [
+    "psycopg2-binary>=2.9",
+    "verichron-contracts",
+    "verichron-etl-db-writer",
+    "verichron-etl-run",
+    "verichron-indicators",
+    "verichron-runtime-env",
+]
+
+[tool.uv.sources]
+verichron-contracts = { workspace = true }
+verichron-etl-db-writer = { workspace = true }
+verichron-etl-run = { workspace = true }
+verichron-indicators = { workspace = true }
+verichron-runtime-env = { workspace = true }
+
+[tool.setuptools]
+py-modules = []

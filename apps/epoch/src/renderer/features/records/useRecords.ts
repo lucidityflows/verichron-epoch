@@ -13,6 +13,8 @@ export type RecordFilters = Pick<
   | 'eventTimeFrom'
   | 'eventTimeBefore'
   | 'search'
+  | 'mentionKind'
+  | 'mentionValue'
   | 'direction'
 >;
 

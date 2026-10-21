@@ -92,12 +92,12 @@ export function absentInputReason(stage: StageDefinition): string | null {
 
 /**
  * The derivative a stage reads, as its stage.json declares; null when that one
- * isn't registered, and for a stage that checks an indicator set, which reads
- * no derivative (EPOCH-491).
+ * isn't registered, and for a stage that checks an indicator set (EPOCH-491)
+ * or reads the evidence's facts (EPOCH-581), which read no derivative.
  */
 export function derivativeFor(stage: StageDefinition, registration: RegisteredDerivatives): string | null {
   const reads = stage.manifest.reads;
-  if (reads === 'indicator_set') return null;
+  if (reads === 'indicator_set' || reads === 'facts') return null;
   const byKind: Record<DerivativeKind, string | null> = {
     decrypted: registration.decryptedDerivativeId,
     ileapp_output: registration.ileappDerivativeId,
@@ -124,6 +124,9 @@ export function inputsFor(
   registration: RegisteredDerivatives,
   indicatorSet: { setId: string } | null
 ): StageInputs {
+  // The evidence's facts are always there to read, though there may be none:
+  // the stage then reads none and says so (EPOCH-581).
+  if (stage.manifest.reads === 'facts') return { derivativeId: null, indicatorSetId: null, absentReason: null };
   if (stage.manifest.reads === 'indicator_set') {
     const indicatorSetId = indicatorSet?.setId ?? null;
     return { derivativeId: null, indicatorSetId, absentReason: indicatorSetId ? null : absentInputReason(stage) };
