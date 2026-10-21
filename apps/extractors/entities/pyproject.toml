@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Stage: what one evidence's records mention, by kind, read by the entity rules (EPOCH-581)."
 requires-python = "==3.14.*"
 dependencies = [
-    "psycopg2-binary>=2.9",
+    "psycopg2>=2.9",
     "verichron-contracts",
     "verichron-etl-db-writer",
     "verichron-etl-run",

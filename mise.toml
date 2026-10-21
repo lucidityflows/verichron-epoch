@@ -27,6 +27,10 @@ run = "scripts/bootstrap-dev.sh --check"
 description = "Check prerequisites, then install every environment from the lockfiles"
 run = "scripts/bootstrap-dev.sh"
 
+[tasks.runtime-env]
+description = "Build the shipped Python environment: the lockfile with no dependency groups, only what runs (EPOCH-439)"
+run = "UV_PROJECT_ENVIRONMENT=build/runtime-venv uv sync --locked --no-default-groups"
+
 [tasks.db]
 description = "Apply migrations, create or update the runtime login (EPOCH-562), then register an indicator set (EPOCH-579)"
 run = [

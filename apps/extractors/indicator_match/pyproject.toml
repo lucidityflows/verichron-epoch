@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Stage: matches one evidence's facts against one registered indicator set (EPOCH-491)."
 requires-python = "==3.14.*"
 dependencies = [
-    "psycopg2-binary>=2.9",
+    "psycopg2>=2.9",
     "verichron-contracts",
     "verichron-etl-db-writer",
     "verichron-etl-run",

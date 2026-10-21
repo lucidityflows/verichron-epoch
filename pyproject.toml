@@ -13,7 +13,6 @@ dependencies = [
     "verichron-indicators",
     "verichron-runtime-env",
     "verichron-etl-run",
-    "verichron-testing",
     "verichron-crash",
     "verichron-ileapp-bridge",
     "verichron-analysis",
@@ -21,12 +20,11 @@ dependencies = [
     "verichron-entities",
     "verichron-indicator-registry",
     "verichron-reporting",
-    "pytest>=8.0",
-    "jsonschema>=4.0",
-    "requests>=2.31",
     # The backup decrypt and iLEAPP are not workspace dependencies: each runs
     # from its own pinned environment under tools/ (EPOCH-458, EPOCH-489).
-    "pyyaml>=6",
+    # Only what runs is listed here; the shipped environment is this list
+    # alone (`mise run runtime-env`, EPOCH-439 B5), and everything else is a
+    # dependency group below.
 ]
 
 [tool.setuptools]
@@ -38,6 +36,9 @@ py-modules = []
 # never used, so every machine and CI run the same interpreter (EPOCH-458).
 python-preference = "only-managed"
 required-version = ">=0.12.23,<0.13"
+# Development installs every group; the shipped environment installs none
+# (`uv sync --no-default-groups`), so it holds only what runs (EPOCH-439 B5).
+default-groups = ["dev", "test", "feeds"]
 
 [tool.uv.workspace]
 members = [
@@ -90,4 +91,16 @@ select = ["E", "F", "W", "I", "B", "UP"]
 dev = [
     "pyright==1.1.414",
     "ruff==0.17.0",
+]
+# The test suites, and the schema check only tests use (contracts' adapter.py).
+test = [
+    "pytest>=8.0",
+    "verichron-testing",
+    "jsonschema>=4.0",
+]
+# Fetching the public indicator feeds, on a connected machine; never in the
+# Lab build (scripts/fetch_indicator_feeds.py).
+feeds = [
+    "requests>=2.31",
+    "pyyaml>=6",
 ]

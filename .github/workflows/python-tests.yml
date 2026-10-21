@@ -53,9 +53,18 @@ jobs:
         with:
           version: 2026.10.4
 
+      # psycopg2 is built from source against libpq (EPOCH-439, B4).
+      - name: Install libpq headers
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev
+
       # uv takes the interpreter from .python-version (a uv-managed CPython).
       - name: Sync workspace
         run: uv sync --locked --all-extras
+
+      # The shipped environment: the lockfile with no dependency groups
+      # (EPOCH-439, B5); scripts/test_runtime_environment.py runs against it.
+      - name: Build the runtime environment
+        run: mise run runtime-env
 
       - name: Refuse forensic output in tracked files
         run: uv run python scripts/check_no_forensic_output.py --tracked
