@@ -37,7 +37,7 @@ Read [docs/architecture.md](docs/architecture.md) for the full picture.
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | The components, how data flows, and where each piece lives |
 | [docs/evidence-model.md](docs/evidence-model.md) | How evidence, derivatives, runs and facts are identified and related |
-| [docs/indicator-field-map.md](docs/indicator-field-map.md) | Which facts can supply which indicator types, and which types no backup supplies |
+| [docs/indicator-types.md](docs/indicator-types.md) | Which indicator types a check compares, with which kind of entity, and which types no backup supplies |
 | [docs/rules.md](docs/rules.md) | The architecture rules (R1–R36) every change must respect |
 | [docs/decisions.md](docs/decisions.md) | Settled decisions and why they were made |
 | [docs/claims.md](docs/claims.md) | Every public claim, its evidence and whether it may be made |

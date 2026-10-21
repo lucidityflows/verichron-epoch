@@ -1,0 +1,34 @@
+{
+  "description": "Which indicator types a check can compare, and with which kind of entity (EPOCH-581, replacing the indicator field map of EPOCH-521). Indicators are compared with the entities the entities stage read from the evidence's records by the declared rules in entity_rules.json, never with raw columns, so facts and indicators meet in one normalized form (R2). Each STIX object path names an indicator type; each type is compared with one entity kind, or is listed under no_source with the reason no kind covers it, so a check says what it couldn't compare rather than report no match.",
+  "stix_paths": {
+    "domain-name:value": "domain",
+    "url:value": "url",
+    "process:name": "process_name",
+    "app:id": "bundle_id",
+    "email-addr:value": "email",
+    "ipv4-addr:value": "ip",
+    "file:hashes.sha256": "file_hash",
+    "file:path": "file_path",
+    "file:name": "file_name",
+    "app:cert.sha1": "app_certificate",
+    "app:cert.sha256": "app_certificate",
+    "android-property:name": "android_property",
+    "configuration-profile:id": "configuration_profile"
+  },
+  "kinds": {
+    "domain": "domain",
+    "url": "url",
+    "process_name": "process",
+    "bundle_id": "app",
+    "email": "email",
+    "ip": "ip"
+  },
+  "no_source": {
+    "file_hash": "File hashes are in the evidence manifest, which is not a fact (EPOCH-523).",
+    "file_path": "File paths are in the decrypt's Manifest.db, which is not a fact (EPOCH-523).",
+    "file_name": "File names are in the decrypt's Manifest.db, which is not a fact (EPOCH-523).",
+    "app_certificate": "App signing certificates are Android indicators; an iOS backup holds none.",
+    "android_property": "Android system properties; an iOS backup holds none.",
+    "configuration_profile": "The pinned iLEAPP has no plugin that lists installed configuration profiles."
+  }
+}

@@ -1,50 +1,53 @@
-"""Matching facts against one indicator set (EPOCH-491). No database here:
-main.py reads the set and the facts, this module decides what matches, and
-what couldn't be checked and why.
+"""Matching indicators against one evidence's entities (EPOCH-491, EPOCH-581).
+No database here: match_stage.py reads the set and the entities, this module
+decides what matches, and what couldn't be compared and why.
 
-Facts are read only through the declared field map (EPOCH-521), and every
-value goes through the same normalization as the indicators
-(`indicator_normalize`, EPOCH-490), so matching is equality on normalized
-values:
+Indicators are compared with the entities the entities stage read from the
+records by the declared rules (`record_entities`), never with raw columns.
+Both sides are normalized alike (`indicator_normalize`, EPOCH-490), so
+matching is equality on normalized values:
 
 - domain: exact, or a subdomain on a label boundary (`a.evil.example` matches
-  `evil.example`; `notevil.example` doesn't), with the mode recorded (D3);
-- URL: exact on the normalized URL. Each URL's host is also checked as a
-  domain, because the field map makes every URL source a domain source;
-- process name, bundle ID, email address: exact on the normalized value.
+  `evil.example`; `notevil.example` doesn't), with the mode recorded (D3).
+  The domain entities include every URL's host, as the rules read them;
+- URL, process name, bundle ID, email address, IP address: exact.
 
 There is no fuzzy or substring matching, and no heuristic is ever recorded as
-a match.
+a match. Which indicator type is compared with which entity kind is declared
+in `indicator_types.json`.
 """
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
-from urllib.parse import urlsplit
 
-from indicator_field_map import FieldMap, Source
-from indicator_normalize import normalize
-from stored_value import decode_value, is_encoded
-
-#: Matched as equality on normalized values (domains also by label boundary).
-MATCHED_TYPES = ("domain", "url", "process_name", "bundle_id", "email")
+from indicator_types import IndicatorTypes
 
 
 @dataclass(frozen=True)
-class Fact:
-    """One fact as read from current_forensic_records."""
+class Mention:
+    """One entity of the evidence, with the record it names."""
 
     record_id: int
+    #: The record's own unit, and the derivative it was read from.
     ingest_id: int
     derivative_id: str | None
     source_type: str
+    artifact: str | None
     event_time: datetime | None
-    process_name: str | None
-    bundle_id: str | None
-    fields: Mapping[str, Any]
+    kind: str
+    #: The field the entity was read from.
+    role: str
+    normalized_value: str
+
+    @property
+    def source(self) -> str:
+        """Where the value was read, as a check names it: "Safari Browser - History: URL"."""
+        return f"{self.artifact or 'crash report'}: {self.role}"
 
 
 @dataclass(frozen=True)
@@ -60,142 +63,63 @@ class SetIndicator:
     expired: bool
 
 
-@dataclass
-class SourceCount:
-    """What one source of one type held in this case."""
+@dataclass(frozen=True)
+class RuleRead:
+    """What one entity rule read of one kind, per source (entity_rule_reads)."""
 
+    kind: str
     source: str
-    values: int = 0
-    #: Values that couldn't be read as this type: not text, or not normalizable.
-    unreadable: int = 0
-    #: Values an `email_only` source holds that aren't email addresses (phone numbers).
-    not_email: int = 0
+    unreadable: int
+    other_kind: int
 
 
 @dataclass(frozen=True)
 class Match:
     indicator: SetIndicator
-    fact: Fact
-    source: str
-    value: str
-    normalized_value: str
+    mention: Mention
     mode: str
 
 
 @dataclass
 class Outcome:
     matches: list[Match] = field(default_factory=list)
-    sources: dict[str, list[SourceCount]] = field(default_factory=dict)
+    #: Per entity kind and source: the values compared.
+    compared: dict[str, Counter[str]] = field(default_factory=dict)
 
 
-def source_label(source: Source, *, host: bool = False) -> str:
-    where = source.artifact if source.source_type == "ileapp_record" else "crash report"
-    return f"{where}: {source.column}{' (host)' if host else ''}"
-
-
-def _origin(fact: Fact) -> tuple[str, str | None]:
-    """Which sources can read a fact: crash reports, or one iLEAPP artifact."""
-    if fact.source_type == "ileapp_record":
-        return fact.source_type, fact.fields.get("source_artifact")
-    return fact.source_type, None
-
-
-def _raw(fact: Fact, source: Source) -> Any:
-    if source.source_type == "crash_report":
-        return {"process_name": fact.process_name, "bundle_id": fact.bundle_id}.get(source.column)
-    return fact.fields.get(source.column)
-
-
-def _text(raw: Any) -> str | None:
-    """A fact value as text, decoding a value stored encoded (EPOCH-502); None if it isn't text."""
-    value = decode_value(raw) if is_encoded(raw) else raw
-    return value if isinstance(value, str) else None
-
-
-def _read(
-    facts: list[Fact], field_map: FieldMap
-) -> tuple[dict[str, list[tuple[Fact, str, str, str]]], dict[str, list[SourceCount]]]:
-    """Every (fact, source, value, normalized value) each matched type's sources hold."""
-    values: dict[str, list[tuple[Fact, str, str, str]]] = {t: [] for t in MATCHED_TYPES}
-    counts: dict[str, list[SourceCount]] = {t: [] for t in MATCHED_TYPES}
-    by_origin: dict[tuple[str, str | None], list[Fact]] = {}
-    for fact in facts:
-        by_origin.setdefault(_origin(fact), []).append(fact)
-
-    def collect(indicator_type: str, source: Source, *, host: bool = False) -> None:
-        label = source_label(source, host=host)
-        count = SourceCount(label)
-        counts[indicator_type].append(count)
-        for fact in by_origin.get((source.source_type, source.artifact), ()):
-            raw = _raw(fact, source)
-            if raw is None or raw == "":
-                continue
-            text = _text(raw)
-            if text is None:
-                count.unreadable += 1
-                continue
-            if host:
-                try:
-                    text = urlsplit(text).hostname or ""
-                except ValueError:
-                    text = ""
-                if not text:
-                    count.unreadable += 1
-                    continue
-            if source.extract == "cookie_host" and text.startswith("."):
-                text = text[1:]
-            if source.extract == "email_only" and "@" not in text:
-                count.not_email += 1
-                continue
-            try:
-                normalized = normalize(indicator_type, text)
-            except ValueError:
-                count.unreadable += 1
-                continue
-            count.values += 1
-            values[indicator_type].append((fact, label, text, normalized))
-
-    for indicator_type in MATCHED_TYPES:
-        sources = field_map.types[indicator_type]
-        for source in sources.sources:
-            collect(indicator_type, source)
-        if sources.from_url_sources:
-            for source in field_map.types["url"].sources:
-                collect(indicator_type, source, host=True)
-    return values, counts
-
-
-def match(facts: list[Fact], indicators: Iterable[SetIndicator], field_map: FieldMap) -> Outcome:
-    by_type: dict[str, dict[str, list[SetIndicator]]] = {t: {} for t in MATCHED_TYPES}
+def match(mentions: Iterable[Mention], indicators: Iterable[SetIndicator], types: IndicatorTypes) -> Outcome:
+    kinds = set(types.kinds.values())
+    by_kind: dict[str, dict[str, list[SetIndicator]]] = {}
     for indicator in indicators:
-        if indicator.indicator_type in by_type:
-            by_type[indicator.indicator_type].setdefault(indicator.normalized_value, []).append(indicator)
-
-    values, counts = _read(facts, field_map)
-    outcome = Outcome(sources=counts)
-    for indicator_type, rows in values.items():
-        wanted = by_type[indicator_type]
+        kind = types.kinds.get(indicator.indicator_type)
+        if kind:
+            by_kind.setdefault(kind, {}).setdefault(indicator.normalized_value, []).append(indicator)
+    outcome = Outcome(compared={kind: Counter() for kind in kinds})
+    for mention in mentions:
+        if mention.kind not in kinds:
+            continue
+        outcome.compared[mention.kind][mention.source] += 1
+        wanted = by_kind.get(mention.kind)
         if not wanted:
             continue
-        for fact, label, value, normalized in rows:
-            for found, mode in _candidates(indicator_type, normalized):
-                for indicator in wanted.get(found, ()):
-                    outcome.matches.append(Match(indicator, fact, label, value, normalized, mode))
+        for found, mode in _candidates(mention.kind, mention.normalized_value):
+            for indicator in wanted.get(found, ()):
+                outcome.matches.append(Match(indicator, mention, mode))
     return outcome
 
 
-def _candidates(indicator_type: str, normalized: str) -> Iterator[tuple[str, str]]:
-    """The indicator values a fact value matches, with the mode."""
+def _candidates(kind: str, normalized: str) -> Iterator[tuple[str, str]]:
+    """The indicator values an entity matches, with the mode."""
     yield normalized, "exact"
-    if indicator_type == "domain":
+    if kind == "domain":
         labels = normalized.split(".")
         for i in range(1, len(labels)):
             yield ".".join(labels[i:]), "subdomain"
 
 
 def record_fields(m: Match, set_hash: str) -> dict[str, Any]:
-    """A match fact's fields: the indicator, the mode, and the fact it matched."""
-    i, f = m.indicator, m.fact
+    """A match fact's fields: the indicator, the mode, and the record and entity it matched."""
+    i, e = m.indicator, m.mention
     return {
         "set_hash": set_hash,
         "indicator": {
@@ -211,13 +135,16 @@ def record_fields(m: Match, set_hash: str) -> dict[str, Any]:
         },
         "match_mode": m.mode,
         "fact": {
-            "record_id": f.record_id,
-            "ingest_id": f.ingest_id,
-            "derivative_id": f.derivative_id,
-            "source_type": f.source_type,
-            "source": m.source,
-            "value": m.value,
-            "normalized_value": m.normalized_value,
+            "record_id": e.record_id,
+            "ingest_id": e.ingest_id,
+            "derivative_id": e.derivative_id,
+            "source_type": e.source_type,
+            "source": e.source,
+            "kind": e.kind,
+            "role": e.role,
+            # Only the normalized value is stored with an entity; the record holds the value as read.
+            "value": e.normalized_value,
+            "normalized_value": e.normalized_value,
         },
     }
 
@@ -225,38 +152,48 @@ def record_fields(m: Match, set_hash: str) -> dict[str, Any]:
 def summarize(
     outcome: Outcome,
     indicators_by_type: Mapping[str, int],
-    field_map: FieldMap,
+    types: IndicatorTypes,
+    reads: Iterable[RuleRead],
 ) -> dict[str, dict[str, Any]]:
-    """Per indicator type in the set: checked, or not checked and why.
+    """Per indicator type in the set: compared, or not and why.
 
-    Two kinds of "not checked" (EPOCH-491): no backup supplies the type at all
-    (`no_source`, with the field map's reason), or the type has sources but
-    none held a value in this case (`no_facts`, with each source's count).
+    Two kinds of "not checked" (EPOCH-491): no entity kind covers the type
+    (`no_source`, with the reason), or the kind has no entity in this
+    evidence (`no_facts`, with what each rule read). Each compared source
+    states its values, and what its rule couldn't read as the kind.
     """
+    by_kind: dict[str, dict[str, RuleRead]] = {}
+    for read in reads:
+        by_kind.setdefault(read.kind, {})[read.source] = read
     summary: dict[str, dict[str, Any]] = {}
     for indicator_type, count in sorted(indicators_by_type.items()):
         entry: dict[str, Any] = {"indicators": count}
-        if indicator_type in outcome.sources:
-            sources = outcome.sources[indicator_type]
-            checked = sum(s.values for s in sources)
-            entry["values_checked"] = checked
+        kind = types.kinds.get(indicator_type)
+        if kind is not None:
+            compared = outcome.compared.get(kind, Counter())
+            rule_reads = by_kind.get(kind, {})
+            sources = sorted(set(compared) | set(rule_reads))
+            entry["kind"] = kind
+            entry["values_checked"] = sum(compared.values())
             entry["matches"] = sum(1 for m in outcome.matches if m.indicator.indicator_type == indicator_type)
             entry["sources"] = [
                 {
-                    "source": s.source,
-                    "values": s.values,
-                    "unreadable": s.unreadable,
-                    "not_email": s.not_email,
+                    "source": source,
+                    "values": compared.get(source, 0),
+                    "unreadable": rule_reads[source].unreadable if source in rule_reads else 0,
+                    "other_kind": rule_reads[source].other_kind if source in rule_reads else 0,
                 }
-                for s in sources
+                for source in sources
             ]
-            entry["status"] = "checked" if checked else "no_facts"
-            if not checked:
-                entry["reason"] = "none of its sources held a value in this case"
-        elif indicator_type in field_map.no_source:
+            entry["status"] = "checked" if entry["values_checked"] else "no_facts"
+            if not entry["values_checked"]:
+                entry["reason"] = f"no record in this case mentions a {kind} its rules read"
+        elif indicator_type in types.no_source:
             entry["status"] = "no_source"
-            entry["reason"] = field_map.no_source[indicator_type]
+            entry["reason"] = types.no_source[indicator_type]
         else:
-            raise ValueError(f"the set holds {indicator_type!r} indicators, which the field map doesn't account for")
+            raise ValueError(
+                f"the set holds {indicator_type!r} indicators, which indicator_types.json doesn't account for"
+            )
         summary[indicator_type] = entry
     return summary

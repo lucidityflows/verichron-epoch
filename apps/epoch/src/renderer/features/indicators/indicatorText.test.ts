@@ -32,7 +32,7 @@ const base: IndicatorCheckRow = {
       domain: { indicators: 6692, status: 'checked', values_checked: 7545, matches: 0, sources: [] },
     },
     not_loaded: { indicator_type: 501 },
-    not_read: { free_text: 'URLs inside message text are not read.' },
+    coverage: { unread_fields: 2251, unread_sources: 107, shaped_fields: 31, records_not_read_for_entities: 4 },
     ileapp_plugin_errors: [{ module: 'ZaloChats', artifact: 'zalo_messages' }],
   },
   sources: [
@@ -89,7 +89,8 @@ describe('indicator wording', () => {
       'IP address (73): no source in any backup. an iOS backup keeps no network connection log.',
       'Bundle ID (684): no facts in this case: none of its sources held a value in this case.',
       'Not loaded from the set: 501 indicators. Of types no iOS backup holds (app certificates, Android properties, configuration profiles): 501.',
-      'Not read: URLs inside message text are not read.',
+      'Not compared: 2,251 field(s) in 107 source(s) held values that no entity rule reads (31 shaped like an entity); Forensic Records lists them.',
+      "Not read for entities: 4 record(s), so they weren't compared. Analyze again to read them.",
       "iLEAPP plugin errored: zalo_messages (ZaloChats); its records weren't checked.",
     ]);
   });

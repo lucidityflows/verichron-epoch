@@ -30,8 +30,8 @@ PAYLOAD = {
             "values_checked": 7545,
             "matches": 1,
             "sources": [
-                {"source": "Safari Browser - History: URL (host)", "values": 4518, "unreadable": 1, "not_email": 0},
-                {"source": "iOS Screens: URL (host)", "values": 0, "unreadable": 0, "not_email": 0},
+                {"source": "Safari Browser - History: URL (host)", "values": 4518, "unreadable": 1, "other_kind": 0},
+                {"source": "iOS Screens: URL (host)", "values": 0, "unreadable": 0, "other_kind": 0},
             ],
         },
         "bundle_id": {
@@ -44,7 +44,7 @@ PAYLOAD = {
         },
     },
     "not_loaded": {"indicator_type": 501},
-    "not_read": {"free_text": "URLs inside message text are not read."},
+    "coverage": {"unread_fields": 2251, "unread_sources": 107, "shaped_fields": 31, "records_not_read_for_entities": 4},
     "ileapp_plugin_errors": [{"module": "ZaloChats", "artifact": "zalo_messages"}],
 }
 
@@ -129,7 +129,8 @@ def test_a_set_and_no_match_states_the_set_its_age_and_what_was_not_checked() ->
     assert "- **IP address** (73): no source in any backup." in out
     assert "- **Bundle ID** (684): no facts in this case" in out
     assert "- **Not loaded from the set:** 501 indicators. Of types no iOS backup holds" in out
-    assert "- **Not read:** URLs inside message text are not read." in out
+    assert "- **Not compared:** 2,251 field(s) in 107 source(s) held values that no entity rule reads (31 shaped" in out
+    assert "- **Not read for entities:** 4 record(s), so they weren't compared." in out
     assert "- **iLEAPP plugin errored:** `zalo_messages` (ZaloChats)" in out
     assert "- `mvt-project/mvt-indicators` @ `b22ddf05e1a3`, MIT: 14 file(s)" in out
 

@@ -26,7 +26,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import indicator_field_map
+import indicator_types
 from indicator_normalize import SUPPORTED_TYPES, normalize
 from indicator_set import FileReport, IndexSource, Indicator, LoadedSet, SetFile, SetManifest, UnsupportedReason
 from stix2patterns.exceptions import ParseException
@@ -234,7 +234,7 @@ def _load_file(name: str, content: bytes, as_of: datetime) -> tuple[FileReport, 
         elif source["type"] == "indicator" and isinstance(target.get("name"), str):
             campaigns.setdefault(source["id"], set()).add(target["name"])
 
-    field_map = indicator_field_map.load()
+    types = indicator_types.load()
     unsupported: Counter[UnsupportedReason] = Counter()
     values_by_type: Counter[str] = Counter()
     revoked = loaded = expired = 0
@@ -261,7 +261,7 @@ def _load_file(name: str, content: bytes, as_of: datetime) -> tuple[FileReport, 
             raise LoadError(f"{name}: {obj['id']} has an invalid pattern: {e}") from None
         walker = _Comparisons()
         parsed.walk(walker)
-        values, reason = _values(walker, field_map)
+        values, reason = _values(walker, types)
         if reason is not None:
             unsupported[reason] += 1
             continue
@@ -299,7 +299,7 @@ def _load_file(name: str, content: bytes, as_of: datetime) -> tuple[FileReport, 
 
 
 def _values(
-    walker: _Comparisons, field_map: indicator_field_map.FieldMap
+    walker: _Comparisons, types: indicator_types.IndicatorTypes
 ) -> tuple[list[tuple[str, str, str, str]], UnsupportedReason | None]:
     """Each distinct (path, type, value, normalized value) the pattern tests,
     or the reason it can't be loaded. All of a pattern or none of it."""
@@ -308,7 +308,7 @@ def _values(
     out: list[tuple[str, str, str, str]] = []
     seen: set[tuple[str, str]] = set()
     for stix_path, literals in walker.comparisons:
-        indicator_type = field_map.type_of(stix_path)
+        indicator_type = types.type_of(stix_path)
         if indicator_type is None:
             return [], "object_path"
         if indicator_type not in SUPPORTED_TYPES:

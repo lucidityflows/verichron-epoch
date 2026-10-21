@@ -18,6 +18,7 @@ in one form (R2).
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from functools import cache
 from pathlib import Path
@@ -26,6 +27,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, model_validator
 
 RULES_PATH = Path(__file__).resolve().parent.parent / "entity_rules.json"
+SCHEMA_DIR = Path(__file__).resolve().parent.parent / "ileapp_schema"
 
 #: How a rule reads its field. `value`: the whole value. `cookie_host`: a
 #: cookie's host, without the leading dot that also covers subdomains.
@@ -144,3 +146,12 @@ class EntityRules(_Strict):
 @cache
 def load() -> EntityRules:
     return EntityRules.model_validate_json(RULES_PATH.read_text(encoding="utf-8"))
+
+
+def declared_ileapp_columns(ileapp_commit: str) -> dict[str, list[str]]:
+    """The headers the given iLEAPP commit declares, for the artifacts the
+    rules name (recorded by scripts/snapshot_ileapp_schema.py)."""
+    snapshot = json.loads((SCHEMA_DIR / f"{ileapp_commit}.json").read_text(encoding="utf-8"))
+    if snapshot["ileapp_commit"] != ileapp_commit:
+        raise ValueError(f"the schema snapshot for {ileapp_commit} records commit {snapshot['ileapp_commit']}")
+    return snapshot["artifacts"]

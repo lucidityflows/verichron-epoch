@@ -5,8 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from entity_rules import EntityRules, load
-from indicator_field_map import declared_ileapp_columns
+from entity_rules import EntityRules, declared_ileapp_columns, load
 from normalized_record import NormalizedRecord
 
 REPO = Path(__file__).resolve().parents[3]

@@ -1,5 +1,9 @@
-"""indicator_match stage (EPOCH-491): one evidence's current facts against one
+"""indicator_match stage (EPOCH-491): one evidence's entities against one
 registered indicator set. `main.py` is the entrypoint.
+
+Indicators are compared with the entities the entities stage read from the
+evidence's current records (EPOCH-581, `current_record_entities`), never with
+raw columns.
 
 The orchestrator passes the set it chose (--indicator-set-id): the newest
 registered set, unless one was chosen by its hash. Without a registered set
@@ -7,12 +11,14 @@ the stage isn't spawned; it is recorded as skipped, with the reason.
 
 The whole check is one unit, filed under the set (not a derivative) and
 identified by (evidence, content hash, `indicator_match`, parser version).
-The content hash covers the set hash, the field map, and the identity of
-every fact unit read, so the same set over the same facts is already done
-(R22), while a newer set or newer facts get a new unit beside the old one
-(R8). A check that finds nothing is still a completed unit: its summary says
-which types were checked against which facts, and which weren't and why, so
-"no match" is never written without what wasn't checked.
+The content hash covers the set hash, `indicator_types.json`, and the
+identity of every entity unit read, so the same set over the same entities
+is already done (R22), while a newer set, newer rules or newer facts get a
+new unit beside the old one (R8). A check that finds nothing is still a
+completed unit: its summary says which types were compared with which
+entities, which weren't and why, what the entity rules didn't read, and any
+fact unit the entities stage hasn't read, so "no match" is never written
+without what wasn't checked.
 """
 
 from __future__ import annotations
@@ -25,12 +31,13 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-import indicator_field_map
+import indicator_types
 import psycopg2
 import psycopg2.extras
 from db_writer import add_context_args, context_from_args, ingest
+from entity_rules import load as load_entity_rules
 from etl_run import ETLRunResult, Note
-from matching import Fact, SetIndicator, match, record_fields, summarize
+from matching import Mention, RuleRead, SetIndicator, match, record_fields, summarize
 from normalized_record import NormalizedRecord, SourceType
 from runtime_env import redact_password, require_database_url
 
@@ -64,34 +71,111 @@ def read_set(conn, set_id: str) -> tuple[str, str, list[SetIndicator], dict[str,
     return set_hash, name, indicators, dict(by_type), {k: v for k, v in sorted(not_loaded.items()) if v}
 
 
-def read_facts(conn, evidence_id: str, artifacts: list[str]) -> list[Fact]:
-    """The evidence's current crash reports and the iLEAPP records of the mapped artifacts."""
+def read_mentions(conn, evidence_id: str, kinds: list[str]) -> list[Mention]:
+    """The evidence's current entities of the compared kinds, each with its record's unit and derivative."""
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT id, ingest_id, derivative_id, source_type, event_time, process_name, bundle_id, fields
-            FROM current_forensic_records
-            WHERE evidence_id = %s
-              AND (source_type = 'crash_report'
-                   OR (source_type = 'ileapp_record' AND fields ->> 'source_artifact' = ANY(%s)))
-            ORDER BY id
+            SELECT e.record_id, r.ingest_id, r.derivative_id, e.source_type, e.source_artifact, e.event_time,
+                   e.kind, e.role, e.normalized_value
+            FROM current_record_entities e
+            JOIN current_forensic_records r ON r.id = e.record_id
+            WHERE e.evidence_id = %s AND e.kind = ANY(%s)
+            ORDER BY e.record_id, e.kind, e.role, e.normalized_value
             """,
-            (evidence_id, artifacts),
+            (evidence_id, kinds),
         )
         return [
-            Fact(r[0], r[1], str(r[2]) if r[2] is not None else None, r[3], r[4], r[5], r[6], r[7])
+            Mention(r[0], r[1], str(r[2]) if r[2] is not None else None, r[3], r[4], r[5], r[6], r[7], r[8])
             for r in cur.fetchall()
         ]
 
 
-def fact_units(conn, ingest_ids: list[int]) -> list[list[Any]]:
-    """The identity of each fact unit read: (file hash, source type, parser version)."""
+def entity_units(conn, evidence_id: str) -> list[list[Any]]:
+    """The identity of each current entity unit: (file hash, source type, parser version)."""
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT file_hash, source_type, parser_version FROM ingested_files WHERE ingest_id = ANY(%s)",
-            (ingest_ids,),
+            """
+            SELECT f.file_hash, f.source_type, f.parser_version
+            FROM current_entity_units c JOIN ingested_files f ON f.ingest_id = c.ingest_id
+            WHERE c.evidence_id = %s
+            """,
+            (evidence_id,),
         )
         return sorted([list(r) for r in cur.fetchall()])
+
+
+def rule_reads(conn, evidence_id: str) -> list[RuleRead]:
+    """What each rule couldn't read, per kind and source, including the kind a value also yields (a URL's host)."""
+    rules = load_entity_rules()
+    totals: dict[tuple[str, str], list[int]] = {}
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT kind, artifact, field, unreadable, also_unreadable, other_kind
+            FROM entity_rule_reads WHERE evidence_id = %s
+            """,
+            (evidence_id,),
+        )
+        for kind, artifact, fld, unreadable, also_unreadable, other_kind in cur.fetchall():
+            source = f"{artifact or 'crash report'}: {fld}"
+            t = totals.setdefault((kind, source), [0, 0])
+            # sum() over bigint arrives as a Decimal.
+            t[0] += int(unreadable)
+            t[1] += int(other_kind)
+            also = rules.kinds[kind].also
+            if also:
+                totals.setdefault((also, source), [0, 0])[0] += int(also_unreadable)
+    return [RuleRead(kind, source, u, o) for (kind, source), (u, o) in sorted(totals.items())]
+
+
+def coverage(conn, evidence_id: str) -> dict[str, Any]:
+    """What the entity rules didn't read, and the fact units the entities stage hasn't read."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT count(*), count(DISTINCT (source_type, artifact)),
+                   count(*) FILTER (WHERE shaped <> '{}'::jsonb)
+            FROM entity_unread_fields WHERE evidence_id = %s
+            """,
+            (evidence_id,),
+        )
+        fields, sources, shaped = cur.fetchone()
+        # The current fact units with no current entity unit, and their records.
+        cur.execute(
+            """
+            SELECT coalesce(sum(i.record_count), 0)
+            FROM ingested_files i
+            WHERE i.evidence_id = %s AND i.ingest_complete AND i.source_type IN ('crash_report', 'ileapp_record')
+              AND NOT EXISTS (
+                SELECT 1 FROM ingested_files newer
+                WHERE newer.evidence_id = i.evidence_id AND newer.file_hash = i.file_hash
+                  AND newer.source_type = i.source_type AND newer.parser_version > i.parser_version
+                  AND newer.ingest_complete)
+              AND NOT EXISTS (SELECT 1 FROM current_entity_units c WHERE c.source_ingest_id = i.ingest_id)
+            """,
+            (evidence_id,),
+        )
+        unread_records = cur.fetchone()[0]
+    return {
+        "unread_fields": int(fields),
+        "unread_sources": int(sources),
+        "shaped_fields": int(shaped),
+        "records_not_read_for_entities": int(unread_records),
+    }
+
+
+def ileapp_outputs(conn, evidence_id: str) -> list[str]:
+    """The iLEAPP outputs the evidence's current iLEAPP records were read from."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT DISTINCT derivative_id::text FROM ingested_files
+            WHERE evidence_id = %s AND source_type = 'ileapp_record' AND ingest_complete AND derivative_id IS NOT NULL
+            """,
+            (evidence_id,),
+        )
+        return sorted(r[0] for r in cur.fetchall())
 
 
 def plugin_errors(conn, derivative_ids: list[str]) -> list[dict[str, Any]]:
@@ -110,11 +194,11 @@ def plugin_errors(conn, derivative_ids: list[str]) -> list[dict[str, Any]]:
 
 
 def content_hash(set_hash: str, units: list[list[Any]]) -> str:
-    """What this check read: the set, the field map, and every fact unit."""
+    """What this check read: the set, the indicator types, and every entity unit."""
     identity = {
         "set_hash": set_hash,
-        "field_map": hashlib.sha256(indicator_field_map.MAP_PATH.read_bytes()).hexdigest(),
-        "fact_units": units,
+        "indicator_types": hashlib.sha256(indicator_types.TYPES_PATH.read_bytes()).hexdigest(),
+        "entity_units": units,
     }
     return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
@@ -142,8 +226,23 @@ def notes(name: str, set_hash: str, payload: dict[str, Any]) -> list[Note]:
         lines.append(Note(text, "info", place, len(types)))
     if payload["not_loaded"]:
         lines.append(Note(f"not loaded from the set: {payload['not_loaded']}"))
-    for reason in payload["not_read"].values():
-        lines.append(Note(f"not read: {reason}"))
+    cov = payload["coverage"]
+    if cov["unread_fields"]:
+        lines.append(
+            Note(
+                f"not compared: {cov['unread_fields']:,} field(s) in {cov['unread_sources']:,} source(s) held values "
+                f"that no entity rule reads ({cov['shaped_fields']:,} of them shaped like an entity)"
+            )
+        )
+    if cov["records_not_read_for_entities"]:
+        # Records the entities stage hasn't read were not compared at all: a gap in this check.
+        lines.append(
+            Note(
+                f"{cov['records_not_read_for_entities']:,} record(s) were not read for entities, so they weren't "
+                "compared; analyze again to read them",
+                "warning",
+            )
+        )
     for error in payload["ileapp_plugin_errors"]:
         lines.append(
             Note(
@@ -162,28 +261,29 @@ def result_line(name: str, matches: int) -> str:
 
 def run(conn, ctx, set_id: str) -> ETLRunResult:
     result = ETLRunResult()
-    field_map = indicator_field_map.load()
+    types = indicator_types.load()
     set_hash, name, indicators, by_type, not_loaded = read_set(conn, set_id)
-    artifacts = sorted({s.artifact for t in field_map.types.values() for s in t.sources if s.artifact is not None})
-    facts = read_facts(conn, ctx.evidence_id, artifacts)
-    units = fact_units(conn, sorted({f.ingest_id for f in facts}))
-    outcome = match(facts, indicators, field_map)
+    mentions = read_mentions(conn, ctx.evidence_id, sorted(set(types.kinds.values())))
+    units = entity_units(conn, ctx.evidence_id)
+    outcome = match(mentions, indicators, types)
     payload = {
         "set": {"set_id": set_id, "set_hash": set_hash, "name": name},
-        "facts_read": {"records": len(facts), "units": len(units)},
+        "entities_read": {
+            "mentions": len(mentions),
+            "records": len({m.record_id for m in mentions}),
+            "units": len(units),
+        },
         "matches": len(outcome.matches),
-        "types": summarize(outcome, by_type, field_map),
+        "types": summarize(outcome, by_type, types, rule_reads(conn, ctx.evidence_id)),
         "not_loaded": not_loaded,
-        "not_read": field_map.not_read,
-        "ileapp_plugin_errors": plugin_errors(
-            conn, sorted({f.derivative_id for f in facts if f.source_type == "ileapp_record" and f.derivative_id})
-        ),
+        "coverage": coverage(conn, ctx.evidence_id),
+        "ileapp_plugin_errors": plugin_errors(conn, ileapp_outputs(conn, ctx.evidence_id)),
     }
     records = [
         NormalizedRecord(
             source_type=SourceType.INDICATOR_MATCH,
-            # The matched fact's time exactly as stored; never guessed (R11).
-            event_time=m.fact.event_time,
+            # The matched record's time exactly as stored; never guessed (R11).
+            event_time=m.mention.event_time,
             fields=record_fields(m, set_hash),
         )
         for m in outcome.matches
@@ -199,7 +299,7 @@ def run(conn, ctx, set_id: str) -> ETLRunResult:
         content_hash=content_hash(set_hash, units),
     ) as unit:
         if unit.already_ingested:
-            result.note("the same set over the same facts was already checked; nothing written")
+            result.note("the same set over the same entities was already checked; nothing written")
         else:
             unit.write(records)
             result.ok(len(records))

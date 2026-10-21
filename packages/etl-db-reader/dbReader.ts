@@ -1111,9 +1111,20 @@ export interface IndicatorTypeSummary {
   indicators: number;
   status: 'checked' | 'no_facts' | 'no_source';
   reason?: string;
+  /** The entity kind the type is compared with (EPOCH-581). */
+  kind?: string;
   values_checked?: number;
   matches?: number;
-  sources?: { source: string; values: number; unreadable: number; not_email: number }[];
+  /** Per source ("artifact: field"): values compared, and values its rule couldn't read as the kind or read as another. */
+  sources?: { source: string; values: number; unreadable: number; other_kind: number }[];
+}
+
+/** What a check could not compare beyond its types (EPOCH-581): fields no entity rule reads, and records not read for entities. */
+export interface IndicatorCheckCoverage {
+  unread_fields: number;
+  unread_sources: number;
+  shaped_fields: number;
+  records_not_read_for_entities: number;
 }
 
 export interface IndicatorCheckSummary {
@@ -1121,7 +1132,8 @@ export interface IndicatorCheckSummary {
   matches: number;
   types: Record<string, IndicatorTypeSummary>;
   not_loaded: Record<string, number>;
-  not_read: Record<string, string>;
+  /** Absent from a check made before entities were read (matcher parser version 1). */
+  coverage?: IndicatorCheckCoverage;
   ileapp_plugin_errors: { module: string | null; artifact: string | null }[];
 }
 

@@ -4,6 +4,6 @@
   "runtime": "python",
   "order": 500,
   "reads": "indicator_set",
-  "parserVersion": 1,
+  "parserVersion": 2,
   "enabled": true
 }

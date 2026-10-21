@@ -55,7 +55,8 @@
     "cookie_values": "A cookie's value is the site's own opaque identifier. Measured on a real backup (2026-10-20), its dotted numbers have an IPv4 address's shape inside longer identifiers; nothing says they are addresses.",
     "note_snippets": "Notes \"Snippet\" is the start of \"Note Contents\", which is read.",
     "pending_research": "Values that carry an identifier inside an Apple-internal format are reviewed under EPOCH-582 before a rule reads them: InteractionC Contacts \"Content URL\", Personalization Portrait \"Group ID\", Photos \"Adjustment Format ID\", Health Source Devices \"Local ID\".",
-    "file_urls": "A file URL (file:///…) names a path on the device, not a host, so it is not read as a URL. File paths are not a kind yet."
+    "file_urls": "A file URL (file:///…) names a path on the device, not a host, so it is not read as a URL. File paths are not a kind yet.",
+    "search_terms_redirects": "Safari Browser - Search Terms' \"Redirect Source\" and \"Redirect Destination\" hold four-digit numbers, not URLs, despite their names: 103 values across two reference backups, every one numeric (checked 2026-10-15, EPOCH-491)."
   },
   "shape_hints": {
     "url": "URL",

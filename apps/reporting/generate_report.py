@@ -867,8 +867,18 @@ def _check_body(check: dict, stale_days: int, times: ZoneTimes) -> list[str]:
         lines.append(
             f"- **Not loaded from the set:** {sum(not_loaded.values()):,} indicators. {detail[0].upper()}{detail[1:]}."
         )
-    for reason in (payload.get("not_read") or {}).values():
-        lines.append(f"- **Not read:** {_table_cell(reason)}")
+    coverage = payload.get("coverage") or {}
+    if coverage.get("unread_fields"):
+        lines.append(
+            f"- **Not compared:** {coverage['unread_fields']:,} field(s) in {coverage['unread_sources']:,} source(s) "
+            f"held values that no entity rule reads ({coverage['shaped_fields']:,} shaped like an entity); the "
+            "Entities section lists them."
+        )
+    if coverage.get("records_not_read_for_entities"):
+        lines.append(
+            f"- **Not read for entities:** {coverage['records_not_read_for_entities']:,} record(s), so they weren't "
+            "compared."
+        )
     for error in payload.get("ileapp_plugin_errors") or []:
         lines.append(
             f"- **iLEAPP plugin errored:** `{_table_cell(str(error['artifact']))}` "
