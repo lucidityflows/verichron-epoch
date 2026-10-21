@@ -110,6 +110,8 @@ export function notCheckedLines(check: IndicatorCheckRow): string[] {
     const detail = notLoaded.map(([reason, n]) => `${NOT_LOADED[reason] ?? reason}: ${count(n)}`).join('; ');
     lines.push(`Not loaded from the set: ${count(total)} indicators. ${detail[0].toUpperCase()}${detail.slice(1)}.`);
   }
+  // A check made before entities were read (matcher version 1) stated its gaps as `not_read`.
+  for (const reason of Object.values(summary.not_read ?? {})) lines.push(`Not read: ${reason}`);
   const coverage = summary.coverage;
   if (coverage && coverage.unread_fields > 0) {
     lines.push(

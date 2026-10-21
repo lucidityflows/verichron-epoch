@@ -286,3 +286,26 @@ def test_the_report_reads_each_runs_check_from_the_database(db, tmp_path: Path) 
     assert "1 match(es) against this set." in out
     assert "| Domain | `evil.example` | not named | subdomain |" in out.replace(" | 2026-03-01 12:00:00 UTC", "")
     assert "- 2026-10-14 UTC · not checked: No indicator set is registered" in out
+
+
+def test_plugin_errors_come_only_from_the_current_parse_of_each_output(db) -> None:
+    from match_stage import ileapp_outputs
+
+    older = "aaaa0000-0000-0000-0000-0000000000db"
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key) "
+            "VALUES (%s, %s, 'ileapp_output', '/older', '{\"name\": \"iLEAPP\", \"version\": \"old\"}', '{}', "
+            "repeat('9', 64))",
+            (older, EVIDENCE),
+        )
+    db.commit()
+    record = history("https://example.com/")
+    for derivative, version in ((older, 1), (DERIVATIVE, 2)):
+        ctx = IngestContext(evidence_id=EVIDENCE, derivative_id=derivative, run_id=RUN, parser_version=version)
+        with ingest(
+            db, ctx, Path("t"), source_type="ileapp_record", payload_kind="none", content_hash="7" * 64
+        ) as unit:
+            unit.write([record])
+    # The older parse of the same table is superseded (R8): its output isn't read for plugin errors.
+    assert ileapp_outputs(db, EVIDENCE) == [DERIVATIVE]

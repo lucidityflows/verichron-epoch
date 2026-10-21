@@ -84,6 +84,15 @@ describe('indicator wording', () => {
     );
   });
 
+  it('keeps what a check made before entities did not read', () => {
+    const older = {
+      ...base,
+      summary: { ...base.summary!, coverage: undefined, not_read: { free_text: 'URLs in messages.' } },
+    };
+    assert.ok(notCheckedLines(older).includes('Not read: URLs in messages.'));
+    assert.ok(!notCheckedLines(older).some((line) => line.startsWith('Not compared')));
+  });
+
   it('lists every type not checked, with why, in a fixed order', () => {
     assert.deepEqual(notCheckedLines(base), [
       'IP address (73): no source in any backup. an iOS backup keeps no network connection log.',

@@ -135,6 +135,16 @@ def test_a_set_and_no_match_states_the_set_its_age_and_what_was_not_checked() ->
     assert "- `mvt-project/mvt-indicators` @ `b22ddf05e1a3`, MIT: 14 file(s)" in out
 
 
+def test_a_check_made_before_entities_keeps_what_it_did_not_read() -> None:
+    # Completed units never change (R9): a version-1 check still states its gaps as it stored them.
+    older = check()
+    payload = {k: v for k, v in PAYLOAD.items() if k != "coverage"}
+    older["unit"] = {**older["unit"], "raw_payload": {**payload, "not_read": {"free_text": "URLs in messages."}}}
+    out = text([older])
+    assert "- **Not read:** URLs in messages." in out
+    assert "Not compared" not in out
+
+
 def test_a_set_with_matches_lists_each_with_campaign_mode_fact_and_time() -> None:
     out = text([check(matches=[MATCH])])
     assert "1 match(es) against this set." in out

@@ -867,6 +867,9 @@ def _check_body(check: dict, stale_days: int, times: ZoneTimes) -> list[str]:
         lines.append(
             f"- **Not loaded from the set:** {sum(not_loaded.values()):,} indicators. {detail[0].upper()}{detail[1:]}."
         )
+    # A check made before entities were read (matcher version 1) stated its gaps as `not_read`.
+    for reason in (payload.get("not_read") or {}).values():
+        lines.append(f"- **Not read:** {_table_cell(reason)}")
     coverage = payload.get("coverage") or {}
     if coverage.get("unread_fields"):
         lines.append(

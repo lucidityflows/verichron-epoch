@@ -143,6 +143,7 @@ def test_each_type_says_what_was_compared_and_what_was_not() -> None:
     ]
     assert summary["bundle_id"]["status"] == "no_facts"
     assert summary["bundle_id"]["kind"] == "app"
+    assert summary["bundle_id"]["reason"] == "the entity rules read no App from the records"
     assert summary["file_hash"]["status"] == "no_source"
     assert "EPOCH-523" in summary["file_hash"]["reason"]
 

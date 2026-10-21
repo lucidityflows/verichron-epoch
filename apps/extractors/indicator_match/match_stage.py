@@ -37,7 +37,7 @@ import psycopg2.extras
 from db_writer import add_context_args, context_from_args, ingest
 from entity_rules import load as load_entity_rules
 from etl_run import ETLRunResult, Note
-from matching import Mention, RuleRead, SetIndicator, match, record_fields, summarize
+from matching import Mention, RuleRead, SetIndicator, match, record_fields, source_label, summarize
 from normalized_record import NormalizedRecord, SourceType
 from runtime_env import redact_password, require_database_url
 
@@ -118,7 +118,7 @@ def rule_reads(conn, evidence_id: str) -> list[RuleRead]:
             (evidence_id,),
         )
         for kind, artifact, fld, unreadable, also_unreadable, other_kind in cur.fetchall():
-            source = f"{artifact or 'crash report'}: {fld}"
+            source = source_label(artifact, fld)
             t = totals.setdefault((kind, source), [0, 0])
             # sum() over bigint arrives as a Decimal.
             t[0] += int(unreadable)
@@ -166,12 +166,18 @@ def coverage(conn, evidence_id: str) -> dict[str, Any]:
 
 
 def ileapp_outputs(conn, evidence_id: str) -> list[str]:
-    """The iLEAPP outputs the evidence's current iLEAPP records were read from."""
+    """The iLEAPP outputs the evidence's current iLEAPP records were read from (R8: not a superseded parse)."""
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT DISTINCT derivative_id::text FROM ingested_files
-            WHERE evidence_id = %s AND source_type = 'ileapp_record' AND ingest_complete AND derivative_id IS NOT NULL
+            SELECT DISTINCT i.derivative_id::text FROM ingested_files i
+            WHERE i.evidence_id = %s AND i.source_type = 'ileapp_record' AND i.ingest_complete
+              AND i.derivative_id IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM ingested_files newer
+                WHERE newer.evidence_id = i.evidence_id AND newer.file_hash = i.file_hash
+                  AND newer.source_type = i.source_type AND newer.parser_version > i.parser_version
+                  AND newer.ingest_complete)
             """,
             (evidence_id,),
         )

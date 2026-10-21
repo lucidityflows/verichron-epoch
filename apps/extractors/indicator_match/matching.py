@@ -25,7 +25,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from entity_rules import load as load_entity_rules
 from indicator_types import IndicatorTypes
+
+
+def source_label(artifact: str | None, role: str) -> str:
+    """Where a value was read, as a check names it: "Safari Browser - History: URL".
+    The one place the label is built, so compared values and rule reads meet on it (R2)."""
+    return f"{artifact or 'crash report'}: {role}"
 
 
 @dataclass(frozen=True)
@@ -47,7 +54,7 @@ class Mention:
     @property
     def source(self) -> str:
         """Where the value was read, as a check names it: "Safari Browser - History: URL"."""
-        return f"{self.artifact or 'crash report'}: {self.role}"
+        return source_label(self.artifact, self.role)
 
 
 @dataclass(frozen=True)
@@ -187,7 +194,8 @@ def summarize(
             ]
             entry["status"] = "checked" if entry["values_checked"] else "no_facts"
             if not entry["values_checked"]:
-                entry["reason"] = f"no record in this case mentions a {kind} its rules read"
+                title = load_entity_rules().kinds[kind].title
+                entry["reason"] = f"the entity rules read no {title} from the records"
         elif indicator_type in types.no_source:
             entry["status"] = "no_source"
             entry["reason"] = types.no_source[indicator_type]

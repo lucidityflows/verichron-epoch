@@ -1134,6 +1134,8 @@ export interface IndicatorCheckSummary {
   not_loaded: Record<string, number>;
   /** Absent from a check made before entities were read (matcher parser version 1). */
   coverage?: IndicatorCheckCoverage;
+  /** What a check made before entities were read (matcher parser version 1) did not read, with why. */
+  not_read?: Record<string, string>;
   ileapp_plugin_errors: { module: string | null; artifact: string | null }[];
 }
 
