@@ -556,9 +556,8 @@ requires-dist = [
 name = "verichron-epoch"
 version = "0.1.0"
 source = { editable = "." }
-default-groups = ["dev", "feeds", "test"]
+default-groups = ["analysis", "dev", "feeds", "test"]
 dependencies = [
-    { name = "verichron-analysis" },
     { name = "verichron-contracts" },
     { name = "verichron-crash" },
     { name = "verichron-entities" },
@@ -573,6 +572,9 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+analysis = [
+    { name = "verichron-analysis" },
+]
 dev = [
     { name = "pyright" },
     { name = "ruff" },
@@ -589,7 +591,6 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "verichron-analysis", editable = "apps/analysis" },
     { name = "verichron-contracts", editable = "packages/contracts" },
     { name = "verichron-crash", editable = "apps/extractors/crash" },
     { name = "verichron-entities", editable = "apps/extractors/entities" },
@@ -604,6 +605,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+analysis = [{ name = "verichron-analysis", editable = "apps/analysis" }]
 dev = [
     { name = "pyright", specifier = "==1.1.414" },
     { name = "ruff", specifier = "==0.17.0" },
