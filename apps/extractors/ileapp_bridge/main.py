@@ -82,13 +82,22 @@ def to_record(scan: ArtifactScan, read: RowRead) -> NormalizedRecord:
 
 
 def _summary(scan: ArtifactScan) -> dict:
-    """The unit's raw payload: what the artifact is and a sample of its rows (R12)."""
+    """The unit's raw payload: what the artifact is and a sample of its rows
+    (R12). `columns` names each column as iLEAPP's table does and as its
+    records do, with the type iLEAPP declared (`datetime`, `date`,
+    `phonenumber`, `latitude`, `longitude`, `media`, or none), so a reader
+    shows a time as a time without guessing which numbers are times
+    (EPOCH-556, R11)."""
     artifact = scan.artifact
     return {
         "artifact": artifact.name,
         "category": artifact.category,
         "module": artifact.module,
         "table": artifact.tablename,
+        "columns": [
+            {"column": column, "header": header, "type": artifact.object_columns.get(column)}
+            for column, header in artifact.column_map.items()
+        ],
         "source_path": scan.source_path,
         "record_count": scan.row_count,
         "event_time_column": (

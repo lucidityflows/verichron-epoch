@@ -217,15 +217,19 @@ content edge or the title (EPOCH-464).
 - **Height:** the content below the header is a flex column that fills the
   remaining height. A view either scrolls with the page or holds a table that
   scrolls inside it, and says which (`scroll`):
-  - `page` (the default: New Investigation, Indicator Matches, Reports) fills
+  - `page` (the default: New Investigation, Forensic Records, Indicator Matches, Reports) fills
     the window when its content is short and grows with it when long, so the
     shell's 32px gutter always follows the last card. It must not shrink to the
     window (`min-h-0`): its content would spill past its box and end flush at
     the window's edge (found 2026-10-18, the Analyze card on New Investigation).
-  - `contained` (Investigations, Forensic Records) is held to the window
+  - `contained` (Investigations) is held to the window
     (`flex-1 min-h-0`). It passes `overflow-hidden` and gives the table
     `flex-1 min-h-0`, so the table's scrollport is bounded by the layout, never
     by a `calc(100vh - …)` constant.
+  - Forensic Records is a `page` view because what sits above its table (what
+    was examined, the filters) leaves no room for rows at the smallest window
+    (1024×720, measured 2026-10-20). Its table fills the space left and is
+    never shorter than 24rem; the page scrolls to it.
 - **No data:** every state with nothing to show (nothing selected, still
   loading, nothing found, evidence not registered) is an `EmptyState`
   (`components/ui/EmptyState.tsx`): centered in the space it fills, its icon
@@ -732,4 +736,42 @@ boards "Reports View" and "Exported Report").
 - **Values print as values** (EPOCH-553): a missing one reads "not recorded",
   never `None`; every time is UTC in one format, labelled; a bug type reads
   "145 · no label known" until a verified source labels it.
+
+## 14. Forensic Records — every fact, read from the database
+
+Decided 2026-10-20 by the project owner (EPOCH-411, EPOCH-556, U6a; board 14
+"Forensic Records View" as guidance).
+
+- **What was examined comes first.** A compact Evidence Completeness panel above
+  the filters: records, artifacts with records, what iLEAPP's modules did
+  (completed, found no files, failed), and each fact-writing stage whose
+  latest attempt didn't complete, with its reason, in the warning role. A
+  module that found nothing never reads like one that didn't run.
+- **Filters:** search across every field's value (never a field's name),
+  Source, Category (iLEAPP's own grouping), Module, Artifact and Tier, and a
+  time range typed in the examiner's zone. Module narrows Artifact. There is
+  no "type of fact" filter until entity normalization (EPOCH-581) can count it
+  completely.
+- **True counts:** every filter lists every value with its count from the
+  database, exact for the other filters in use, and a value another filter
+  excludes is listed with 0. A chosen value stays listed, with 0, when the
+  search or the time range leaves none of its records, so the filter in use
+  is always shown. The time range's end is exclusive: just after the last
+  second or minute typed, so records inside it are kept. The line above the table gives the total and the
+  records with no time, which are listed last. Nothing is counted or filtered
+  from the rows on screen (R25).
+- **The table:** Time, Artifact (or the source's title), Summary and Tier.
+  The summary is built from the record's text values only, so no number is
+  shown as something it might not be. Tool judgements carry a filled chip;
+  leads never appear.
+- **An opened record** shows in a sheet over the right of the page, at full
+  height, so it reads at every window size and the table stays beside it.
+  Fields keep iLEAPP's headers. A value is made readable only from the type
+  iLEAPP declared (a `datetime` column's seconds become a time in the
+  examiner's zone) or from the stored-value encoding (binary by its size).
+  "Show stored values" puts each stored value beside the readable one.
+  "Where it came from" gives the source, module, artifact, category, source
+  file, unit, record, hash and the analyses that read it; "Used by" lists the
+  indicator matches that cite it. Copy Record copies it as it reads; Copy Raw
+  Data copies it exactly as stored.
 

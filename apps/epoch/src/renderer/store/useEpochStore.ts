@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { PipelineRunRow, StageStatusRow, ForensicRecordRow } from '@verichron/etl-db-reader';
+import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
 import type { Section } from '../components/layout/Sidebar';
 import type { ReportResult } from '../../shared/types/window';
 
@@ -8,11 +8,6 @@ interface EpochState {
   runs: PipelineRunRow[];
   selectedRun: PipelineRunRow | null;
   stages: StageStatusRow[];
-  records: ForensicRecordRow[];
-  /** Every record for the run's evidence; `records` may be only the first page (R25). */
-  recordsTotal: number;
-  recordsLoaded: boolean;
-  sourceTypeFilter: string | null;
   loading: boolean;
   error: string | null;
   dbStatus: 'connected' | 'error' | 'unknown';
@@ -26,9 +21,6 @@ interface EpochState {
   setRuns: (runs: PipelineRunRow[]) => void;
   setSelectedRun: (run: PipelineRunRow | null) => void;
   setStages: (stages: StageStatusRow[]) => void;
-  setRecords: (records: ForensicRecordRow[], total: number) => void;
-  setRecordsLoaded: (loaded: boolean) => void;
-  setSourceTypeFilter: (filter: string | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setDbStatus: (status: 'connected' | 'error' | 'unknown') => void;
@@ -44,10 +36,6 @@ export const useEpochStore = create<EpochState>((set) => ({
   runs: [],
   selectedRun: null,
   stages: [],
-  records: [],
-  recordsTotal: 0,
-  recordsLoaded: false,
-  sourceTypeFilter: null,
   loading: true,
   error: null,
   dbStatus: 'unknown',
@@ -60,9 +48,6 @@ export const useEpochStore = create<EpochState>((set) => ({
   setRuns: (runs) => set({ runs }),
   setSelectedRun: (selectedRun) => set({ selectedRun }),
   setStages: (stages) => set({ stages }),
-  setRecords: (records, recordsTotal) => set({ records, recordsTotal }),
-  setRecordsLoaded: (recordsLoaded) => set({ recordsLoaded }),
-  setSourceTypeFilter: (sourceTypeFilter) => set({ sourceTypeFilter }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
   setDbStatus: (dbStatus) => set({ dbStatus }),
@@ -72,10 +57,6 @@ export const useEpochStore = create<EpochState>((set) => ({
   setReportLoading: (reportLoading) => set({ reportLoading }),
   resetRunState: () =>
     set({
-      records: [],
-      recordsTotal: 0,
-      recordsLoaded: false,
-      sourceTypeFilter: null,
       report: null,
       reportLoaded: false,
       reportLoadError: null,

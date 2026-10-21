@@ -34,6 +34,9 @@ import {
   getStillFailing,
   getInterruptedEvidence,
   getInterruptedStages,
+  getRecordFacets,
+  getEvidenceCompleteness,
+  getRecordDetail,
   readerTypes,
   type ForensicRecordQuery,
   type ForensicRecordRow,
@@ -250,7 +253,7 @@ describe('getForensicRecords', live, () => {
     assert.ok(crash.length > 0 && crash.every((r) => r.source_type === 'crash_report'));
     assert.equal((await getForensicRecords(db, EVIDENCE, { sourceType: 'crash_report' })).total, crash.length);
 
-    const ranged = await walk({ eventTimeFrom: '2024-01-15T00:00:00Z', eventTimeTo: '2024-01-15T23:59:59Z' }, 3);
+    const ranged = await walk({ eventTimeFrom: '2024-01-15T00:00:00Z', eventTimeBefore: '2024-01-16T00:00:00Z' }, 3);
     assert.ok(ranged.length > 0);
     assert.ok(
       ranged.every((r) => r.event_time !== null),
@@ -347,6 +350,229 @@ describe('getForensicRecords', live, () => {
       );
     }
     rmSync(reportWorkspaceRoot, { recursive: true, force: true });
+  });
+});
+
+describe('Forensic Records reads (EPOCH-411, EPOCH-556)', live, () => {
+  // Evidence of its own, so the counts above are untouched.
+  const ITEM = '88888888-8888-8888-8888-888888888888';
+  const ILEAPP = '88888888-0000-0000-0000-0000000000aa';
+  const RECORDS_RUN = '88888888-0000-0000-0000-0000000000bb';
+  let safari: string;
+  let usage: string;
+  let lead: string;
+
+  async function unit(input: { derivative?: string; set?: string }, hash: string, payload: object): Promise<string> {
+    const { rows } = await db.query<{ ingest_id: string }>(
+      `INSERT INTO ingested_files
+         (evidence_id, derivative_id, indicator_set_id, file_hash, source_type, parser_version, file_path,
+          file_name, payload_kind, raw_payload)
+       VALUES ($1, $2, $3, $4, 'ileapp_record', 6, '_lava_artifacts.db#t', 't', 'summary', $5)
+       RETURNING ingest_id`,
+      [ITEM, input.derivative ?? null, input.set ?? null, hash, JSON.stringify(payload)]
+    );
+    return rows[0].ingest_id;
+  }
+
+  async function record(ingest: string, sourceType: string, time: string | null, fields: object): Promise<string> {
+    const { rows } = await db.query<{ id: string }>(
+      `INSERT INTO forensic_records (ingest_id, evidence_id, source_type, event_time, fields)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [ingest, ITEM, sourceType, time, JSON.stringify(fields)]
+    );
+    return rows[0].id;
+  }
+
+  before(async () => {
+    await db.query(
+      `INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes, product_type, ios_version, backup_date)
+       VALUES ($1, repeat('8', 64), '99999999-9999-9999-9999-999999999999', 0, 0, 'iPhone17,5', '26.6.1', '2026-10-15T18:05:25Z')`,
+      [ITEM]
+    );
+    await db.query(
+      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
+       VALUES ($1, $1, 'decrypted', '/d', '{"name": "test", "version": "0"}',
+               '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('1', 64)),
+              ($2, $1, 'ileapp_output', '/i', '{"name": "iLEAPP", "version": "abc"}', $3, repeat('2', 64))`,
+      [
+        ITEM,
+        ILEAPP,
+        JSON.stringify({
+          input_type: 'itunes',
+          modules: {
+            total: 5,
+            complete: 2,
+            no_files_found: ['A', 'B'],
+            errors: [{ module: 'ZaloChats', artifact: 'zalo_messages', file_count: 1, error: 'IndexError' }],
+          },
+        }),
+      ]
+    );
+    const set = await db.query<{ set_id: string }>(
+      `INSERT INTO indicator_sets (set_hash, name, manifest, loaded_at, registered_at, indicator_count)
+       VALUES (encode(sha256(convert_to($1, 'UTF8')), 'hex'), 'mvt-test', $1, now(), now(), 1) RETURNING set_id`,
+      ['{"name": "mvt-test"}']
+    );
+    await db.query(
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid, started_at)
+       VALUES ($1, 'test', 'test', '{}', 'UTC', $2, $2, 'test-host', 1, now())`,
+      [RECORDS_RUN, ITEM]
+    );
+    await db.query(
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, error_message, parser_version, derivative_id, finished_at)
+       VALUES ($1, 'ileapp_bridge', 20, 'succeeded', NULL, 6, $2, now()),
+              ($1, 'crash', 10, 'skipped', 'crash logs were not acquired', 1, NULL, now()),
+              ($1, 'reporting', 1000, 'succeeded', NULL, NULL, NULL, now())`,
+      [RECORDS_RUN, ILEAPP]
+    );
+
+    const columns = [
+      { column: 'visit', header: 'Visit Timestamp', type: 'datetime' },
+      { column: 'url', header: 'URL', type: null },
+    ];
+    const ileapp = await unit({ derivative: ILEAPP }, 'a'.repeat(64), {
+      artifact: 'Safari Browser - History',
+      columns,
+    });
+    const safariFields = {
+      source_artifact: 'Safari Browser - History',
+      module: 'safariHistory',
+      category: 'Safari Browser',
+    };
+    safari = await record(ileapp, 'ileapp_record', '2026-10-14T08:12:09Z', {
+      ...safariFields,
+      URL: 'https://update-check.example.invalid/a',
+      'Visit Timestamp': 1791972729,
+    });
+    await record(ileapp, 'ileapp_record', '2026-10-14T09:00:00Z', { ...safariFields, URL: 'https://example.org/' });
+    usage = await record(ileapp, 'ileapp_record', null, {
+      source_artifact: 'Data Usage',
+      module: 'DataUsage',
+      category: 'Device Usage',
+      'Process Name': 'exampled',
+    });
+    await db.query(`INSERT INTO ingest_run_links (ingest_id, run_id) VALUES ($1, $2)`, [ileapp, RECORDS_RUN]);
+    await completeUnit(ileapp, 3);
+
+    const crash = await unit({ derivative: ITEM }, 'b'.repeat(64), {});
+    await record(crash, 'crash_report', '2026-10-13T00:00:00Z', { filename: 'a.ips' });
+    await completeUnit(crash, 1);
+
+    const match = await unit({ set: set.rows[0].set_id }, 'c'.repeat(64), {});
+    await record(match, 'indicator_match', '2026-10-14T08:12:09Z', {
+      indicator: { type: 'domain', value: 'update-check.example.invalid' },
+      match_mode: 'url_host',
+      fact: { source: 'Safari Browser - History: URL (host)', record_id: Number(safari) },
+    });
+    await completeUnit(match, 1);
+
+    const leads = await unit({ derivative: ITEM }, 'd'.repeat(64), {});
+    lead = await record(leads, 'llm_flagged_anomaly', '2026-10-14T08:12:09Z', { lead: 'a pattern' });
+    await completeUnit(leads, 1);
+  });
+
+  it('never reads a lead as a record, and gives each record its tier (R10)', async () => {
+    const page = await getForensicRecords(db, ITEM, { limit: 100 });
+    assert.equal(page.total, 5);
+    assert.ok(!page.rows.some((row) => row.source_type === 'llm_flagged_anomaly'));
+    const tiers = Object.fromEntries(page.rows.map((row) => [row.source_type, row.tier]));
+    assert.deepEqual(tiers, { ileapp_record: 'observed', crash_report: 'observed', indicator_match: 'tool_judgement' });
+  });
+
+  it('filters by artifact, module, category, tier and a search of values, with true totals', async () => {
+    const total = async (query: ForensicRecordQuery) => (await getForensicRecords(db, ITEM, query)).total;
+    assert.equal(await total({ artifact: 'Safari Browser - History' }), 2);
+    assert.equal(await total({ module: 'DataUsage' }), 1);
+    assert.equal(await total({ category: 'Safari Browser' }), 2);
+    assert.equal(await total({ tier: 'tool_judgement' }), 1);
+    assert.equal(await total({ search: 'update-CHECK.example' }), 2, 'the record and the match that cites it');
+    assert.equal(await total({ search: 'Visit Timestamp' }), 0, "a field's name is not searched");
+    assert.equal(await total({ search: '100%' }), 0, 'LIKE wildcards are literal');
+    await assert.rejects(
+      getForensicRecords(db, ITEM, { tier: 'lead' as 'observed' }),
+      /unsupported tier "lead"/,
+      'a lead is never asked for'
+    );
+  });
+
+  it('counts every facet exactly for the other filters, lists zeros, and counts untimed records', async () => {
+    const all = await getRecordFacets(db, ITEM);
+    assert.equal(all.total, 5);
+    assert.equal(all.untimed, 1);
+    assert.deepEqual(all.facets.source, [
+      { value: 'ileapp_record', count: 3 },
+      { value: 'crash_report', count: 1 },
+      { value: 'indicator_match', count: 1 },
+    ]);
+    assert.deepEqual(all.facets.tier, [
+      { value: 'observed', count: 4 },
+      { value: 'tool_judgement', count: 1 },
+    ]);
+
+    const safariOnly = await getRecordFacets(db, ITEM, { module: 'safariHistory' });
+    assert.equal(safariOnly.total, 2);
+    assert.deepEqual(
+      safariOnly.facets.module.find((m) => m.value === 'DataUsage'),
+      { value: 'DataUsage', count: 1 },
+      "a module's own count ignores the module chosen"
+    );
+    assert.deepEqual(
+      safariOnly.facets.artifact,
+      [
+        { value: 'Safari Browser - History', count: 2 },
+        { value: 'Data Usage', count: 0 },
+        { value: null, count: 0 },
+      ],
+      'the module narrows the artifacts, and the others are listed with 0'
+    );
+    await assert.rejects(getRecordFacets(db, ITEM, { limit: 5 }), /unsupported parameter "limit"/);
+  });
+
+  it("states each fact-writing stage's latest attempt and what iLEAPP's modules did", async () => {
+    const complete = await getEvidenceCompleteness(db, ITEM);
+    assert.equal(complete.records, 5, 'the lead is not a record');
+    assert.equal(complete.artifacts_with_records, 2);
+    assert.deepEqual(
+      complete.stages.map((s) => [s.stage_name, s.stage_title, s.status, s.reason]),
+      [
+        ['crash', 'Crash Reports', 'skipped', 'crash logs were not acquired'],
+        ['ileapp_bridge', 'iLEAPP Artifacts', 'succeeded', null],
+      ],
+      'in declared order; the report stage writes no facts'
+    );
+    assert.deepEqual(complete.ileapp, {
+      total: 5,
+      complete: 2,
+      found_none: 2,
+      errored: [{ module: 'ZaloChats', artifact: 'zalo_messages', error: 'IndexError' }],
+    });
+  });
+
+  it('opens a record with its columns, its runs and the matches that cite it', async () => {
+    const detail = await getRecordDetail(db, ITEM, safari);
+    assert.ok(detail);
+    assert.equal(detail.record.fields.URL, 'https://update-check.example.invalid/a');
+    assert.deepEqual(detail.columns, [
+      { column: 'visit', header: 'Visit Timestamp', type: 'datetime' },
+      { column: 'url', header: 'URL', type: null },
+    ]);
+    assert.deepEqual(detail.produced_by_runs, [RECORDS_RUN]);
+    assert.equal(detail.file_path, '_lava_artifacts.db#t');
+    assert.deepEqual(
+      detail.used_by.map(({ match_id: _id, ...c }) => c),
+      [
+        {
+          indicator_type: 'domain',
+          indicator_value: 'update-check.example.invalid',
+          match_mode: 'url_host',
+          set_name: 'mvt-test',
+        },
+      ]
+    );
+    assert.deepEqual((await getRecordDetail(db, ITEM, usage))?.used_by, [], 'cited by nothing');
+    assert.equal(await getRecordDetail(db, ITEM, lead), null, 'a lead is not opened as a record');
+    assert.equal(await getRecordDetail(db, EVIDENCE, safari), null, "another evidence's record is not opened");
+    await assert.rejects(getRecordDetail(db, ITEM, '1; DROP TABLE x'), /is not a record id/);
   });
 });
 

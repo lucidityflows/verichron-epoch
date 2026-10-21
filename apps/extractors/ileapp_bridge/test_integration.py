@@ -169,6 +169,21 @@ def test_rows_keep_original_headers_and_the_declared_time(db, tmp_path):
     assert fields["engine"] == "iLEAPP"
 
 
+def test_the_unit_names_each_column_and_the_type_ileapp_declared(db, tmp_path):
+    """A reader formats a time from its declared type, never by guessing (EPOCH-556, R11)."""
+    report = write_report(tmp_path / "BK1", SAFARI)
+    assert ingest_report(db, CTX, report).failed == 0
+    cur = db.cursor()
+    cur.execute("SELECT raw_payload FROM ingested_files WHERE source_type = 'ileapp_record'")
+    payload = cur.fetchone()[0]
+    payload = json.loads(payload) if isinstance(payload, str) else payload
+    assert payload["columns"] == [
+        {"column": "visit_timestamp", "header": "Visit Timestamp", "type": "datetime"},
+        {"column": "url", "header": "URL", "type": None},
+        {"column": "title", "header": "Title", "type": None},
+    ]
+
+
 def test_nothing_is_read_from_exports_or_input_copies(db, tmp_path):
     report = write_report(tmp_path / "BK1", SAFARI)
     (report / "_TSV Exports").mkdir()

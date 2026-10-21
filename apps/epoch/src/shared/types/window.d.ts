@@ -7,6 +7,9 @@ import type {
   ItemFailurePage,
   PipelineRunRow,
   StageStatusRow,
+  RecordFacets,
+  EvidenceCompleteness,
+  RecordDetail,
 } from '@verichron/etl-db-reader';
 import type {
   BackupProgress,
@@ -277,6 +280,10 @@ declare global {
       // EPOCH-561
       getInterruptedStages: (runId: string) => Promise<InterruptedStageRow[]>;
       getForensicRecords: (runId: string, query?: ForensicRecordQuery) => Promise<ForensicRecordPage>;
+      // EPOCH-411, EPOCH-556: null when the run has no registered evidence.
+      getRecordFacets: (runId: string, query?: ForensicRecordQuery) => Promise<RecordFacets | null>;
+      getEvidenceCompleteness: (runId: string) => Promise<EvidenceCompleteness | null>;
+      getRecordDetail: (runId: string, recordId: string) => Promise<RecordDetail | null>;
       getIndicatorResults: (runId: string) => Promise<IndicatorResults>;
       getReport: (runId: string) => Promise<ReportResult>;
       openReport: (runId: string) => Promise<boolean>;

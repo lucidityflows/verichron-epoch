@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { tableFeatures, stockFeatures, useTable, flexRender, metaHelper } from '@tanstack/react-table';
 import type { ColumnDef, Row } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -27,7 +27,7 @@ export type DataTableColumn<TData extends Record<string, any>> = ColumnDef<typeo
 const DEFAULT_COLUMN_TRACK = 'minmax(7.5rem, 1fr)';
 
 const headerCellClass =
-  'flex items-center px-4 py-3 text-label text-muted-foreground bg-surface/90 border-b border-border/60';
+  'flex items-center px-4 py-3 text-label text-muted-foreground bg-surface border-b border-border/60';
 
 export interface DataTableProps<TData extends Record<string, any>> {
   data: TData[];
@@ -53,6 +53,8 @@ export interface DataTableProps<TData extends Record<string, any>> {
    * first-paint scroll math -- never affects final layout. */
   estimateRowHeight?: number;
   emptyState?: React.ReactNode;
+  /** Called when the last rows come into view, so a paged caller reads its next page. */
+  onNearEnd?: () => void;
   /** Height of the scroll viewport. A virtualizer needs a bounded
    * scrollport to compute which rows are visible; callers embed this in
    * a flex/grid layout that already constrains height (see RecordsView). */
@@ -69,6 +71,7 @@ export function DataTable<TData extends Record<string, any>>({
   onRowClick,
   estimateRowHeight = 44,
   emptyState,
+  onNearEnd,
   className,
 }: DataTableProps<TData>) {
   const table = useTable({
@@ -88,6 +91,12 @@ export function DataTable<TData extends Record<string, any>>({
     overscan: 8,
     getItemKey: (index) => rows[index]?.id ?? index,
   });
+
+  // Ask for more while about a page of rows is still left to scroll.
+  const lastShown = virtualizer.getVirtualItems().at(-1)?.index ?? -1;
+  useEffect(() => {
+    if (onNearEnd && rows.length > 0 && lastShown >= rows.length - 20) onNearEnd();
+  }, [onNearEnd, lastShown, rows.length]);
 
   const gridTemplateColumns = table
     .getFlatHeaders()

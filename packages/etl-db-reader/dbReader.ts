@@ -141,11 +141,19 @@ export interface ForensicRecordRow {
   pid: number | null;
   bundle_id: string | null;
   fields: Record<string, unknown>;
+  /** The source type's registered tier (R10, migration 0021). A lead is never read as a record. */
+  tier: RecordTier;
 }
 
-const RECORD_COLUMNS = `id, ingest_id, evidence_id, derivative_id, file_hash, parser_version,
-       incident_id, source_type, event_time, bug_type, process_name, pid,
-       bundle_id, fields`;
+/** The tiers a record can have here. A Lead (an AI-assisted lead) never appears among the facts (R10, EPOCH-442). */
+export type RecordTier = 'observed' | 'tool_judgement';
+
+/** Read from a records view aliased `records`. */
+const RECORD_COLUMNS = `records.id, records.ingest_id, records.evidence_id, records.derivative_id,
+       records.file_hash, records.parser_version, records.incident_id, records.source_type,
+       records.event_time, records.bug_type, records.process_name, records.pid, records.bundle_id,
+       records.fields,
+       (SELECT t.tier FROM source_type_tiers t WHERE t.source_type = records.source_type) AS tier`;
 
 /**
  * Most recent pipeline runs, newest first.
@@ -412,9 +420,23 @@ const DEFAULT_RECORDS_PAGE = 500;
 export interface ForensicRecordQuery {
   /** Narrow to one source type. */
   sourceType?: string;
-  /** Inclusive event_time range (ISO 8601). Untimed records never match a range. */
+  /** Narrow to one iLEAPP artifact, module or category, as each record names it in `fields` (EPOCH-556). */
+  artifact?: string;
+  module?: string;
+  category?: string;
+  /** Narrow to one tier (R10). */
+  tier?: RecordTier;
+  /** Case-insensitive substring of any field's value (never a field's name), by trigram (migration 0021). */
+  search?: string;
+  /**
+   * An event_time range (ISO 8601): from `eventTimeFrom`, inclusive, to
+   * before `eventTimeBefore`, exclusive. A bound the examiner types names a
+   * whole second or minute, and a stored time can hold microseconds, so the
+   * caller passes the instant just after the last unit named; an inclusive
+   * end would leave out records inside it. Untimed records never match a range.
+   */
   eventTimeFrom?: string;
-  eventTimeTo?: string;
+  eventTimeBefore?: string;
   /** Case-insensitive substring of process_name or bundle_id. */
   text?: string;
   sort?: RecordSortKey;
@@ -438,8 +460,13 @@ export interface ForensicRecordPage {
 
 const QUERY_KEYS = new Set<keyof ForensicRecordQuery>([
   'sourceType',
+  'artifact',
+  'module',
+  'category',
+  'tier',
+  'search',
   'eventTimeFrom',
-  'eventTimeTo',
+  'eventTimeBefore',
   'text',
   'sort',
   'direction',
@@ -467,6 +494,56 @@ function decodeCursor(cursor: string): CursorState {
   }
   throw new Error('invalid cursor: pass back nextCursor exactly as returned');
 }
+
+const TIERS: ReadonlySet<string> = new Set<RecordTier>(['observed', 'tool_judgement']);
+
+/** The filters a record count can be broken down by (EPOCH-556). */
+export type RecordFacet = 'source' | 'artifact' | 'module' | 'category' | 'tier';
+
+/**
+ * The WHERE clauses for one evidence's facts and the filters asked for, as
+ * the records read and the counts read both use them, so the two can't
+ * disagree (R2). `always` holds what every count keeps (the evidence, no
+ * leads, the time range, the search); `facets` holds each facet's own filter,
+ * which that facet's count leaves out, so a count is exact for the other
+ * filters in use. Every value is a parameter (R24).
+ */
+function recordFilters(
+  evidenceId: string,
+  query: ForensicRecordQuery
+): { params: unknown[]; always: string[]; facets: Partial<Record<RecordFacet, string>> } {
+  const params: unknown[] = [evidenceId];
+  const param = (value: unknown) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+  // A lead is never read as a record (R10, EPOCH-442).
+  const always = [
+    'records.evidence_id = $1',
+    `records.source_type IN (SELECT t.source_type FROM source_type_tiers t WHERE t.tier <> 'lead')`,
+  ];
+  if (query.eventTimeFrom !== undefined) always.push(`records.event_time >= ${param(query.eventTimeFrom)}`);
+  if (query.eventTimeBefore !== undefined) always.push(`records.event_time < ${param(query.eventTimeBefore)}`);
+  if (query.text !== undefined && query.text !== '') {
+    const p = param(`%${likeEscape(query.text)}%`);
+    always.push(`(records.process_name ILIKE ${p} OR records.bundle_id ILIKE ${p})`);
+  }
+  if (query.search !== undefined && query.search.trim() !== '') {
+    always.push(`record_values_text(records.fields) ILIKE ${param(`%${likeEscape(query.search.trim())}%`)}`);
+  }
+  const facets: Partial<Record<RecordFacet, string>> = {};
+  if (query.sourceType !== undefined) facets.source = `records.source_type = ${param(query.sourceType)}`;
+  if (query.artifact !== undefined) facets.artifact = `records.source_artifact = ${param(query.artifact)}`;
+  if (query.module !== undefined) facets.module = `records.module = ${param(query.module)}`;
+  if (query.category !== undefined) facets.category = `records.category = ${param(query.category)}`;
+  if (query.tier !== undefined) {
+    if (!TIERS.has(query.tier)) throw new Error(`unsupported tier "${String(query.tier)}"`);
+    facets.tier = `records.source_type IN (SELECT t.source_type FROM source_type_tiers t WHERE t.tier = ${param(query.tier)})`;
+  }
+  return { params, always, facets };
+}
+
+const likeEscape = (text: string) => text.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 /**
  * Forensic records for one evidence item, one page at a time.
@@ -503,24 +580,9 @@ export async function getForensicRecords(
 
   const source = query.history ? RECORD_SOURCES.history : RECORD_SOURCES.current;
   const column = SORT_COLUMNS[sort];
-  const params: unknown[] = [evidenceId];
-  const filters = ['evidence_id = $1'];
-  if (query.sourceType !== undefined) {
-    params.push(query.sourceType);
-    filters.push(`source_type = $${params.length}`);
-  }
-  if (query.eventTimeFrom !== undefined) {
-    params.push(query.eventTimeFrom);
-    filters.push(`event_time >= $${params.length}`);
-  }
-  if (query.eventTimeTo !== undefined) {
-    params.push(query.eventTimeTo);
-    filters.push(`event_time <= $${params.length}`);
-  }
-  if (query.text !== undefined && query.text !== '') {
-    params.push(`%${query.text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-    filters.push(`(process_name ILIKE $${params.length} OR bundle_id ILIKE $${params.length})`);
-  }
+  const built = recordFilters(evidenceId, query);
+  const params = built.params;
+  const filters = [...built.always, ...Object.values(built.facets)];
 
   // Keyset: rows strictly after the cursor in (col IS NULL, col, id) order.
   // NULLs sort last whatever the direction, so the null region is always the
@@ -558,10 +620,10 @@ export async function getForensicRecords(
     { [K in keyof ForensicRecordRow]: ForensicRecordRow[K] | null } & { total: string; sort_value: string | null }
   >(
     `SELECT counted.total, page.*
-       FROM (SELECT COUNT(*) AS total FROM ${source} WHERE ${filters.join(' AND ')}) counted
+       FROM (SELECT COUNT(*) AS total FROM ${source} records WHERE ${filters.join(' AND ')}) counted
        LEFT JOIN LATERAL (
          SELECT ${RECORD_COLUMNS}, (${column})::text AS sort_value
-           FROM ${source}
+           FROM ${source} records
           WHERE ${pageFilters.join(' AND ')}
           ORDER BY (${column} IS NULL), ${column} ${dir}, id ${dir}
           LIMIT $${pageParams.length}
@@ -577,6 +639,266 @@ export async function getForensicRecords(
   const nextCursor = fetched.length > limit && last ? encodeCursor({ v: last.sort_value, id: String(last.id) }) : null;
   const rows = pageRows.map(({ total: _total, sort_value: _cursorOnly, ...row }) => row as ForensicRecordRow);
   return { rows, total, nextCursor };
+}
+
+// --- record counts, completeness and detail (EPOCH-411, EPOCH-556) ----------
+
+/** One value of a facet and how many records have it under the other filters in use. */
+export interface FacetCount {
+  /** Null for records that have no such value (a crash report has no iLEAPP artifact). */
+  value: string | null;
+  count: number;
+}
+
+/** True counts for Forensic Records' filters, read from the database, never from loaded rows (R25). */
+export interface RecordFacets {
+  /** Records matching every filter in use. */
+  total: number;
+  /** Of those, records with no event time (R11). */
+  untimed: number;
+  /** Each facet's values with records under the search and time range, listed with 0 when another facet's filter excludes them. */
+  facets: Record<RecordFacet, FacetCount[]>;
+}
+
+/** Each facet's value, as a column of the records view (migration 0021) or the tier joined to it. */
+const FACET_KEYS: Record<RecordFacet, string> = {
+  source: 'records.source_type',
+  artifact: 'records.source_artifact',
+  module: 'records.module',
+  category: 'records.category',
+  tier: 'tiers.tier',
+};
+
+/**
+ * Forensic Records' counts for one evidence (EPOCH-556): the total and the
+ * untimed count under every filter in use, and each facet's values with
+ * counts exact for the other filters. A value that another facet's filter
+ * excludes is listed with 0, not hidden, so an empty combination is visible
+ * before it is chosen. The search and the time range narrow every count, so a
+ * value with no records under them is not listed; Forensic Records lists a
+ * chosen one with 0 itself. ONE statement, so every count
+ * describes the same state of the data (R25). Only `history` and paging
+ * parameters are refused here; the rest are the records read's filters.
+ */
+export async function getRecordFacets(
+  client: Db,
+  evidenceId: string,
+  query: ForensicRecordQuery = {}
+): Promise<RecordFacets> {
+  for (const key of Object.keys(query)) {
+    if (
+      !QUERY_KEYS.has(key as keyof ForensicRecordQuery) ||
+      ['sort', 'direction', 'limit', 'cursor', 'history'].includes(key)
+    ) {
+      throw new Error(`getRecordFacets: unsupported parameter "${key}"`);
+    }
+  }
+  const { params, always, facets } = recordFilters(evidenceId, query);
+  const keys = Object.keys(FACET_KEYS) as RecordFacet[];
+  // The evidence's records under the filters every count keeps, read ONCE,
+  // with each facet's own filter as a flag; every count is taken from that
+  // one pass (measured 2026-10-20: 1.4 s for 200,000 records as separate
+  // scans per count).
+  const flag = (facet: RecordFacet) => `(${facets[facet] ?? 'TRUE'}) AS f_${facet}`;
+  const others = (facet: RecordFacet | null) =>
+    keys
+      .filter((key) => key !== facet)
+      .map((key) => `f_${key}`)
+      .join(' AND ');
+  // One pass: every grouping is a grouping set, and each counts with its own
+  // filter column, the one that leaves out that facet's filter.
+  const { rows } = await client.query<
+    { [K in `v_${RecordFacet}`]: string | null } & { set: number; untimed: string } & {
+      [K in `n_${RecordFacet}` | 'n_all']: string;
+    }
+  >(
+    `SELECT GROUPING(${keys.map((key) => `v_${key}`).join(', ')}) AS set,
+            ${keys.map((key) => `v_${key}`).join(', ')},
+            count(*) FILTER (WHERE ${others(null)}) AS n_all,
+            count(*) FILTER (WHERE untimed AND ${others(null)}) AS untimed,
+            ${keys.map((key) => `count(*) FILTER (WHERE ${others(key)}) AS n_${key}`).join(',\n            ')}
+       FROM (
+         SELECT ${keys.map((key) => `${FACET_KEYS[key]} AS v_${key}`).join(', ')},
+                records.event_time IS NULL AS untimed,
+                ${keys.map(flag).join(', ')}
+           FROM current_forensic_records records
+           JOIN source_type_tiers tiers ON tiers.source_type = records.source_type
+          WHERE ${always.join(' AND ')}
+       ) matched
+      GROUP BY GROUPING SETS ((), ${keys.map((key) => `(v_${key})`).join(', ')})`,
+    params
+  );
+  const result: RecordFacets = {
+    total: 0,
+    untimed: 0,
+    facets: { source: [], artifact: [], module: [], category: [], tier: [] },
+  };
+  // GROUPING() sets one bit per facet left out of the group, the first facet the highest bit.
+  const all = (1 << keys.length) - 1;
+  for (const row of rows) {
+    if (row.set === all) {
+      result.total = Number(row.n_all);
+      result.untimed = Number(row.untimed);
+      continue;
+    }
+    const index = keys.findIndex((_, i) => (row.set & (1 << (keys.length - 1 - i))) === 0);
+    const facet = keys[index];
+    result.facets[facet].push({ value: row[`v_${facet}`], count: Number(row[`n_${facet}`]) });
+  }
+  for (const facet of keys) {
+    result.facets[facet].sort((a, b) => b.count - a.count || String(a.value).localeCompare(String(b.value)));
+  }
+  return result;
+}
+
+/** A fact-writing stage's latest attempt for the evidence, as Forensic Records' completeness panel states it. */
+export interface StageAttempt {
+  stage_name: string;
+  stage_title: string;
+  status: StageStatus;
+  /** Why it failed or was skipped, as the orchestrator recorded it. */
+  reason: string | null;
+  run_id: string;
+  finished_at: string | null;
+  /** How its run ended; a stage left running on an ended run stopped there (EPOCH-435). */
+  run_ended_reason: EndedReason | null;
+}
+
+/** What iLEAPP's modules did on the output the latest attempt read (EPOCH-457). */
+export interface IleappModuleCounts {
+  total: number;
+  complete: number;
+  found_none: number;
+  errored: { module: string; artifact: string; error: string | null }[];
+}
+
+/** What was examined in this evidence, so "found none" never reads as "did not run" (EPOCH-411). */
+export interface EvidenceCompleteness {
+  /** Every fact of the evidence (leads excluded). */
+  records: number;
+  /** iLEAPP artifacts that have at least one record. */
+  artifacts_with_records: number;
+  stages: StageAttempt[];
+  /** Null when no attempt has read an iLEAPP output. */
+  ileapp: IleappModuleCounts | null;
+}
+
+/**
+ * Per fact-writing stage (one that declares a parser version), its latest
+ * attempt against this evidence, and what iLEAPP's modules did on the
+ * output that attempt read. Counts come from the database (R25).
+ */
+export async function getEvidenceCompleteness(client: Db, evidenceId: string): Promise<EvidenceCompleteness> {
+  const counts = await client.query<{ records: string; artifacts: string }>(
+    `SELECT count(*) AS records, count(DISTINCT records.source_artifact) AS artifacts
+       FROM current_forensic_records records
+      WHERE records.evidence_id = $1
+        AND records.source_type IN (SELECT t.source_type FROM source_type_tiers t WHERE t.tier <> 'lead')`,
+    [evidenceId]
+  );
+  const stages = await client.query<
+    Omit<StageAttempt, 'stage_title'> & { derivative_id: string | null; stage_order: number }
+  >(
+    `SELECT DISTINCT ON (s.stage_name)
+            s.stage_name, s.status, s.error_message AS reason, s.run_id, s.finished_at,
+            r.ended_reason AS run_ended_reason, s.derivative_id, s.stage_order
+       FROM pipeline_stage_status s
+       JOIN pipeline_runs r ON r.run_id = s.run_id
+      WHERE r.evidence_id = $1 AND s.parser_version IS NOT NULL
+      ORDER BY s.stage_name, r.started_at DESC, s.run_id`,
+    [evidenceId]
+  );
+  const ileappAttempt = stages.rows.find((row) => row.stage_name === 'ileapp_bridge' && row.derivative_id);
+  let ileapp: IleappModuleCounts | null = null;
+  if (ileappAttempt) {
+    const { rows } = await client.query<{
+      modules: IleappModuleCounts & { no_files_found: string[]; errors: IleappModuleCounts['errored'] };
+    }>(
+      `SELECT params -> 'modules' AS modules FROM evidence_derivatives WHERE derivative_id = $1 AND kind = 'ileapp_output'`,
+      [ileappAttempt.derivative_id]
+    );
+    const modules = rows[0]?.modules;
+    if (!modules) throw new Error(`the iLEAPP output ${ileappAttempt.derivative_id} records no module counts`);
+    ileapp = {
+      total: modules.total,
+      complete: modules.complete,
+      found_none: modules.no_files_found.length,
+      errored: modules.errors.map(({ module, artifact, error }) => ({ module, artifact, error })),
+    };
+  }
+  return {
+    records: Number(counts.rows[0].records),
+    artifacts_with_records: Number(counts.rows[0].artifacts),
+    stages: stages.rows
+      .sort((a, b) => a.stage_order - b.stage_order)
+      .map(({ derivative_id: _input, stage_order: _order, ...row }) => ({
+        ...row,
+        stage_title: stageTitle(row.stage_name),
+      })),
+    ileapp,
+  };
+}
+
+/** A column of an iLEAPP artifact as its unit recorded it: the header its records use, and iLEAPP's declared type. */
+export interface RecordColumn {
+  column: string;
+  header: string;
+  /** `datetime`, `date`, `phonenumber`, `latitude`, `longitude`, `media`, or null when iLEAPP declared none. */
+  type: string | null;
+}
+
+/** An indicator match that cites a record ("Used by", EPOCH-556). */
+export interface RecordCitation {
+  match_id: string;
+  indicator_type: string;
+  indicator_value: string;
+  match_mode: string;
+  set_name: string | null;
+}
+
+/** One record with what Forensic Records shows when it is opened. */
+export interface RecordDetail {
+  record: ForensicRecordRow;
+  /** The unit's file, relative to its derivative, and the runs that read it (R7, migration 0015). */
+  file_path: string;
+  produced_by_runs: string[];
+  /** The artifact's columns with their declared types; null for a record from a stage that records none. */
+  columns: RecordColumn[] | null;
+  used_by: RecordCitation[];
+}
+
+/** One current record of the evidence, or null when it has none by that id (or it is a lead). */
+export async function getRecordDetail(client: Db, evidenceId: string, recordId: string): Promise<RecordDetail | null> {
+  if (!/^\d+$/.test(recordId)) throw new Error(`getRecordDetail: "${recordId}" is not a record id`);
+  const found = await client.query<
+    ForensicRecordRow & { file_path: string; columns: RecordColumn[] | null; runs: string[] }
+  >(
+    `SELECT ${RECORD_COLUMNS}, i.file_path, i.raw_payload -> 'columns' AS columns,
+            ARRAY(SELECT l.run_id::text FROM ingest_run_links l WHERE l.ingest_id = records.ingest_id ORDER BY 1) AS runs
+       FROM current_forensic_records records
+       JOIN ingested_files i ON i.ingest_id = records.ingest_id
+      WHERE records.evidence_id = $1 AND records.id = $2::bigint
+        AND records.source_type IN (SELECT t.source_type FROM source_type_tiers t WHERE t.tier <> 'lead')`,
+    [evidenceId, recordId]
+  );
+  const row = found.rows[0];
+  if (!row) return null;
+  const { file_path, columns, runs, ...record } = row;
+  const cited = await client.query<RecordCitation>(
+    `SELECT records.id::text AS match_id,
+            records.fields -> 'indicator' ->> 'type' AS indicator_type,
+            records.fields -> 'indicator' ->> 'value' AS indicator_value,
+            records.fields ->> 'match_mode' AS match_mode,
+            s.name AS set_name
+       FROM current_forensic_records records
+       JOIN ingested_files i ON i.ingest_id = records.ingest_id
+       LEFT JOIN indicator_sets s ON s.set_id = i.indicator_set_id
+      WHERE records.evidence_id = $1 AND records.source_type = 'indicator_match'
+        AND (records.fields -> 'fact' ->> 'record_id')::bigint = $2::bigint
+      ORDER BY records.id`,
+    [evidenceId, recordId]
+  );
+  return { record: record as ForensicRecordRow, file_path, produced_by_runs: runs, columns, used_by: cited.rows };
 }
 
 // --- indicator checks (EPOCH-491, EPOCH-493) --------------------------------
