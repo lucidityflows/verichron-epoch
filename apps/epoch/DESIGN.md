@@ -784,3 +784,32 @@ Decided 2026-10-20 by the project owner (EPOCH-411, EPOCH-556, U6a; board 14
   indicator matches that cite it. Copy Record copies it as it reads; Copy Raw
   Data copies it exactly as stored.
 
+
+## 15. Indicator Matches — each check on its own, with what it couldn't compare
+
+Built 2026-10-21 for EPOCH-557 (U6b), with board 8 "Indicator Matches View"
+as guidance. The owner's decisions on the board's open questions are pending.
+
+- **The limit sentence comes first,** in the view's body: indicators find only
+  what is already known, and no match is not a finding about the device.
+- **This investigation's check** is shown in full. Its chip names its state:
+  "N matches" and "Not checked" in the warning role; "Checked, no matches" is
+  neutral, with a check mark, so a check that compared nothing never looks like
+  one that found nothing; "Check failed" is danger. A set that was more than 90
+  days old when checked carries its own chip.
+- **Four tiles:** indicators loaded from the set, those of types this check
+  compares, facts compared, and matches. Indicators the loader couldn't load
+  are counted per STIX object, not per value, so they are stated in Not
+  compared and never added to a tile.
+- **Compared and Not compared** sit side by side. Compared lists each type with
+  the number of facts it was compared with. Not compared lists every type, set
+  object and field that wasn't compared, each with why (the report's own lines).
+- **Matches:** Indicator (with its mode, campaign and expiry), Type, Matched
+  fact (its source and record), Fact time and set file. A row, or its record
+  button, opens the record in Forensic Records' sheet.
+- **Other checks of this evidence** are never added together. Checks that share
+  a unit (same set, rules and entities), or that compared nothing for the same
+  recorded reason, are listed together under one chip with their count and time
+  span, so a repeat doesn't read as new information. Each stays openable on its
+  own.
+- No verdict word is used anywhere on the page.

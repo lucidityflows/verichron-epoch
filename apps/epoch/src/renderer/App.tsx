@@ -98,6 +98,10 @@ export const App: React.FC = () => {
   // Forensic Records reads its own pages and counts; a finished rerun reads them again.
   const [recordsVersion, setRecordsVersion] = useState(0);
 
+  // A record Indicator Matches asked Forensic Records to open; it is cleared once opened.
+  const [recordToOpen, setRecordToOpen] = useState<string | null>(null);
+  const recordOpened = useCallback(() => setRecordToOpen(null), []);
+
   const handleSectionSelect = (next: Section) => setSection(next);
 
   return (
@@ -145,10 +149,20 @@ export const App: React.FC = () => {
                 }}
                 onOpenInvestigations={() => setSection('runs')}
                 onOpenIndicatorMatches={() => setSection('iocs')}
+                openRecordId={recordToOpen}
+                onRecordOpened={recordOpened}
               />
             )}
 
-            {section === 'iocs' && <IocsView selectedRun={selectedRun} />}
+            {section === 'iocs' && (
+              <IocsView
+                selectedRun={selectedRun}
+                onOpenRecord={(recordId) => {
+                  setRecordToOpen(recordId);
+                  setSection('records');
+                }}
+              />
+            )}
 
             {section === 'reports' && <ReportsView selectedRun={selectedRun} stages={stages} />}
 

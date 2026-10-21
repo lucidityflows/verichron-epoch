@@ -92,6 +92,82 @@ export function resultLine(check: IndicatorCheckRow, nothingChecked: string): st
   return check.matches ? `${count(check.matches)} match(es) against this set.` : 'No match against this set.';
 }
 
+/**
+ * Where a check stands, as its chip names it (board 8). Matches found and Not
+ * checked are both the caution role; Checked, no matches is neutral, so a
+ * check that compared nothing never looks like one that found nothing.
+ */
+export type CheckState = 'matches' | 'no-match' | 'not-checked' | 'failed';
+
+export function checkState(check: IndicatorCheckRow): CheckState {
+  if (check.status === 'failed') return 'failed';
+  if (check.status !== 'succeeded' || check.summary === null || check.matches === null) return 'not-checked';
+  return check.matches ? 'matches' : 'no-match';
+}
+
+export function stateLabel(check: IndicatorCheckRow): string {
+  switch (checkState(check)) {
+    case 'matches':
+      return `${count(check.matches!)} match${check.matches === 1 ? '' : 'es'}`;
+    case 'no-match':
+      return 'Checked, no matches';
+    case 'not-checked':
+      return 'Not checked';
+    case 'failed':
+      return 'Check failed';
+  }
+}
+
+/** The four counts above a check (board 8), from its summary. */
+export interface CheckTiles {
+  /** Indicators loaded from the set: what the check had to compare. */
+  loaded: number;
+  /** Of those, the ones of a type this check compares (checked, or no facts to compare). */
+  testable: number;
+  /** Values read from the evidence and compared, over every type. */
+  compared: number;
+  matches: number;
+}
+
+export function checkTiles(check: IndicatorCheckRow): CheckTiles | null {
+  const summary = check.summary;
+  if (!summary) return null;
+  const entries = Object.values(summary.types);
+  return {
+    loaded: entries.reduce((sum, e) => sum + e.indicators, 0),
+    testable: entries.filter((e) => e.status !== 'no_source').reduce((sum, e) => sum + e.indicators, 0),
+    compared: entries.reduce((sum, e) => sum + (e.values_checked ?? 0), 0),
+    matches: summary.matches,
+  };
+}
+
+/** The types compared, each with how many values from the evidence it was compared with. */
+export function comparedTypes(check: IndicatorCheckRow): [string, number][] {
+  if (!check.summary) return [];
+  return inOrder(check.summary.types)
+    .filter(([, e]) => e.status === 'checked')
+    .map(([t, e]) => [t, e.values_checked ?? 0]);
+}
+
+/**
+ * Checks listed together because they are the same check (board 8): runs
+ * whose checks share one unit compared the same set, rules and entities; runs
+ * that checked nothing for the same recorded reason are one outcome. Each
+ * check stays in its group, newest first, and is never added to another.
+ */
+export function groupChecks(checks: IndicatorCheckRow[]): IndicatorCheckRow[][] {
+  const groups = new Map<string, IndicatorCheckRow[]>();
+  for (const check of checks) {
+    const key = check.ingest_id
+      ? `unit:${check.ingest_id}`
+      : `none:${check.status}:${check.indicator_set_id ?? ''}:${check.error_message ?? ''}`;
+    const group = groups.get(key);
+    if (group) group.push(check);
+    else groups.set(key, [check]);
+  }
+  return [...groups.values()];
+}
+
 /** Everything the check could not check, each with why. */
 export function notCheckedLines(check: IndicatorCheckRow): string[] {
   const summary = check.summary;

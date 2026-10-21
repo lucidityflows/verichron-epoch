@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { reportsApi } from '../api/reports';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { EmptyState } from '../components/ui/EmptyState';
+import { StatTile } from '../components/ui/StatTile';
 import { analysisName, warningLines } from '../features/investigations/investigations';
 import { NOT_EXAMINED, jumpToSection, notExaminedCount, splitReport } from '../features/reports/reportSections';
 
@@ -19,26 +20,6 @@ interface ReportsViewProps {
   selectedRun: PipelineRunRow | null;
   /** The selected analysis's stages, as Investigations reads them, for the summary tiles. */
   stages: StageStatusRow[];
-}
-
-function Tile({ value, label, onClick }: { value: React.ReactNode; label: string; onClick?: () => void }) {
-  const body = (
-    <>
-      <p className="font-display text-heading text-foreground tabular-nums">{value}</p>
-      <p className="text-label text-muted-foreground">{label}</p>
-    </>
-  );
-  return onClick ? (
-    <button
-      type="button"
-      onClick={onClick}
-      className="text-left bg-surface-raised rounded-lg px-4 py-3 shadow-elevation-1 hover:bg-surface-hover"
-    >
-      {body}
-    </button>
-  ) : (
-    <div className="bg-surface-raised rounded-lg px-4 py-3 shadow-elevation-1">{body}</div>
-  );
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun, stages }) => {
@@ -124,17 +105,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun, stages })
           </div>
           {shown.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Tile
+              <StatTile
                 value={`${shown.filter((stage) => stage.status === 'succeeded').length} of ${shown.length}`}
                 label="Stages complete"
               />
-              <Tile value={selectedRun.records.toLocaleString('en-US')} label="Records found" />
-              <Tile
+              <StatTile value={selectedRun.records.toLocaleString('en-US')} label="Records found" />
+              <StatTile
                 value={notExaminedItems ?? '—'}
                 label="Not examined · jump to list"
                 onClick={notExaminedId ? () => jumpToSection(notExaminedId) : undefined}
               />
-              <Tile value={warningCount} label="Warnings" />
+              <StatTile value={warningCount} label="Warnings" />
             </div>
           )}
           <Suspense fallback={<EmptyState loading title="Loading the report…" />}>

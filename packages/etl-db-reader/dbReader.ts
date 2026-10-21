@@ -1162,7 +1162,8 @@ export interface IndicatorMatchRow {
       source_file: string;
     };
     match_mode: string;
-    fact: { source: string; record_id: number };
+    /** The matched fact; `kind` and `role` are absent from a check made before entities were read (version 1). */
+    fact: { source: string; record_id: number; kind?: string; role?: string };
   };
 }
 
@@ -1177,6 +1178,11 @@ export interface IndicatorCheckRow {
   set_hash: string | null;
   set_registered_at: string | null;
   newest_indicator: string | null;
+  /**
+   * The check's unit. Runs whose checks share one are the same check: the
+   * stage reuses a unit when the set, the rules and the entities are unchanged.
+   */
+  ingest_id: string | null;
   /** The completed unit's record count; null when the check produced no unit. */
   matches: number | null;
   summary: IndicatorCheckSummary | null;
@@ -1194,7 +1200,7 @@ export const MATCH_LIMIT = 500;
  * report reads (migration 0013), so the two can't disagree (R27).
  */
 export async function getIndicatorChecks(client: Db, evidenceId: string): Promise<IndicatorCheckRow[]> {
-  const checks = await client.query<Omit<IndicatorCheckRow, 'sources' | 'match_rows'> & { ingest_id: string | null }>(
+  const checks = await client.query<Omit<IndicatorCheckRow, 'sources' | 'match_rows'>>(
     `SELECT run_id, status, error_message, finished_at, indicator_set_id, set_name, set_hash,
             set_registered_at, newest_indicator, ingest_id, matches, summary
        FROM indicator_checks
@@ -1203,7 +1209,7 @@ export async function getIndicatorChecks(client: Db, evidenceId: string): Promis
     [evidenceId]
   );
   const out: IndicatorCheckRow[] = [];
-  for (const { ingest_id, ...check } of checks.rows) {
+  for (const check of checks.rows) {
     const sources = check.indicator_set_id
       ? (
           await client.query<IndicatorSetSourceRow>(
@@ -1214,12 +1220,12 @@ export async function getIndicatorChecks(client: Db, evidenceId: string): Promis
           )
         ).rows
       : [];
-    const matchRows = ingest_id
+    const matchRows = check.ingest_id
       ? (
           await client.query<IndicatorMatchRow>(
             `SELECT event_time, fields FROM forensic_records
               WHERE ingest_id = $1 ORDER BY event_time, id LIMIT $2`,
-            [ingest_id, MATCH_LIMIT]
+            [check.ingest_id, MATCH_LIMIT]
           )
         ).rows
       : [];

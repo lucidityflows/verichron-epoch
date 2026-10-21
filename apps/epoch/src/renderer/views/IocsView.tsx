@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FileQuestion, MousePointerClick, ShieldQuestion } from 'lucide-react';
+import { Check, FileQuestion, MousePointerClick, ShieldQuestion } from 'lucide-react';
 import type { IndicatorCheckRow, PipelineRunRow } from '@verichron/etl-db-reader';
 import type { IndicatorResults } from '../../shared/types/window';
 import { runsApi } from '../api/runs';
@@ -7,93 +7,124 @@ import { ViewLayout } from '../components/layout/ViewLayout';
 import { Badge } from '../components/ui/Badge';
 import { DateTime } from '../components/ui/DateTime';
 import { Disclosure } from '../components/ui/Disclosure';
+import { StatTile } from '../components/ui/StatTile';
 import { formatDateTime, type DisplayZone } from '../../shared/time';
 import { useDisplayZone } from '../store/useSettings';
 import { EmptyState } from '../components/ui/EmptyState';
 import { analysisName } from '../features/investigations/investigations';
 import {
-  inOrder,
+  checkState,
+  checkTiles,
+  comparedTypes,
+  groupChecks,
   notCheckedLines,
   resultLine,
   setLine,
   sourceLine,
   staleLine,
+  stateLabel,
   typeLabel,
 } from '../features/indicators/indicatorText';
 
 interface IocsViewProps {
   selectedRun: PipelineRunRow | null;
+  /** Open a matched fact's record in Forensic Records. */
+  onOpenRecord: (recordId: string) => void;
 }
 
 const cell = 'py-1.5 pr-4 text-data align-top';
 const head = 'py-1.5 pr-4 text-label text-muted-foreground text-left font-medium';
 
-function ResultBadge({ check }: { check: IndicatorCheckRow }) {
-  if (check.status === 'failed') return <Badge variant="failed">Check failed</Badge>;
-  if (check.status !== 'succeeded' || check.matches === null) return <Badge variant="skipped">Not checked</Badge>;
-  return check.matches ? (
-    <Badge variant="warning">{check.matches.toLocaleString('en-US')} match(es)</Badge>
-  ) : (
-    <Badge variant="neutral">No match</Badge>
+const STATE_VARIANT = {
+  matches: 'warning',
+  'no-match': 'neutral',
+  'not-checked': 'warning',
+  failed: 'failed',
+} as const;
+
+/** The check's state, always in words (board 8). Not checked is in the caution role, never neutral grey. */
+function StateChip({ check }: { check: IndicatorCheckRow }) {
+  const state = checkState(check);
+  return (
+    <Badge variant={STATE_VARIANT[state]} className="gap-1">
+      {state === 'no-match' && <Check size="0.75rem" aria-hidden />}
+      {stateLabel(check)}
+    </Badge>
   );
 }
 
-/** One run's check, in the report's approved order (EPOCH-493). */
-function CheckBody({ check, results }: { check: IndicatorCheckRow; results: IndicatorResults }) {
+/** One run's check, in the report's approved order (EPOCH-493), laid out as board 8. */
+function CheckBody({
+  check,
+  results,
+  onOpenRecord,
+}: {
+  check: IndicatorCheckRow;
+  results: IndicatorResults;
+  onOpenRecord: (recordId: string) => void;
+}) {
   const zone = useDisplayZone();
-  const summary = check.summary;
   const stale = check.set_name ? staleLine(check, results.staleAfterDays, zone) : null;
-  const checked = summary ? inOrder(summary.types).filter(([, e]) => e.status === 'checked') : [];
+  const tiles = checkTiles(check);
+  const compared = comparedTypes(check);
   const notChecked = notCheckedLines(check);
+  const n = (v: number) => v.toLocaleString('en-US');
   return (
     <div className="space-y-4">
+      <p className="text-data text-foreground">{resultLine(check, results.nothingChecked)}</p>
+
+      {tiles && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatTile value={n(tiles.loaded)} label="Indicators loaded from the set" />
+          <StatTile value={n(tiles.testable)} label="Of types this check compares" />
+          <StatTile value={n(tiles.compared)} label="Facts compared" />
+          <StatTile value={n(tiles.matches)} label="Matches" />
+        </div>
+      )}
+
+      {(compared.length > 0 || notChecked.length > 0) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="bg-surface-raised rounded-lg px-4 py-3 shadow-elevation-1">
+            <h3 className="text-label text-muted-foreground mb-2">Compared</h3>
+            {compared.length > 0 ? (
+              <>
+                <dl className="space-y-1 text-data">
+                  {compared.map(([type, values]) => (
+                    <div key={type} className="flex justify-between gap-4">
+                      <dt>{typeLabel(type)}</dt>
+                      <dd className="font-mono tabular-nums">{n(values)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="text-label text-muted-foreground mt-2">
+                  Equal values only (a domain also matches its subdomains), against facts already extracted from this
+                  evidence.
+                </p>
+              </>
+            ) : (
+              <p className="text-data">Nothing was compared.</p>
+            )}
+          </div>
+          <div className="bg-surface-raised rounded-lg px-4 py-3 shadow-elevation-1">
+            <h3 className="text-label text-muted-foreground mb-2">Not compared</h3>
+            {notChecked.length > 0 ? (
+              <ul className="list-disc pl-5 space-y-1 text-data">
+                {notChecked.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-data">Every type in the set was compared.</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {check.set_name && (
         <p className="text-data text-foreground/90">
           {setLine(check, zone)}
           {stale && <span className="block text-warning mt-1">{stale}</span>}
         </p>
-      )}
-      <p className="text-data text-foreground">{resultLine(check, results.nothingChecked)}</p>
-
-      {checked.length > 0 && (
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border">
-              <th className={head}>Type</th>
-              <th className={`${head} text-right`}>In the set</th>
-              <th className={`${head} text-right`}>Facts checked</th>
-              <th className={head}>From</th>
-            </tr>
-          </thead>
-          <tbody>
-            {checked.map(([type, entry]) => {
-              const sources = (entry.sources ?? []).filter((s) => s.values);
-              return (
-                <tr key={type} className="border-b border-border/50">
-                  <td className={cell}>{typeLabel(type)}</td>
-                  <td className={`${cell} text-right font-mono`}>{entry.indicators.toLocaleString('en-US')}</td>
-                  <td className={`${cell} text-right font-mono`}>
-                    {(entry.values_checked ?? 0).toLocaleString('en-US')}
-                  </td>
-                  <td className={cell}>
-                    {sources.map((s) => `${s.source} (${s.values.toLocaleString('en-US')})`).join('; ')}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-
-      {notChecked.length > 0 && (
-        <div>
-          <h3 className="text-label text-muted-foreground mb-1">Not checked</h3>
-          <ul className="list-disc pl-5 space-y-1 text-data">
-            {notChecked.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </div>
       )}
 
       {check.match_rows.length > 0 && (
@@ -101,68 +132,84 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
           <h3 className="text-label text-muted-foreground mb-1">
             Matches
             {check.matches !== null && check.matches > check.match_rows.length
-              ? ` (the first ${check.match_rows.length.toLocaleString('en-US')} of ${check.matches.toLocaleString('en-US')})`
+              ? ` (the first ${n(check.match_rows.length)} of ${n(check.matches)})`
               : ''}
           </h3>
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className={head}>Time</th>
-                <th className={head}>Type</th>
-                <th className={head}>Value</th>
-                <th className={head}>Campaign</th>
-                <th className={head}>Match</th>
-                <th className={head}>Fact</th>
-                <th className={head}>File</th>
-              </tr>
-            </thead>
-            <tbody>
-              {check.match_rows.map((m, i) => {
-                const { indicator, fact, match_mode } = m.fields;
-                return (
-                  <tr key={`${fact.record_id}-${indicator.value}-${i}`} className="border-b border-border/50">
-                    <td className={cell}>
-                      <DateTime value={m.event_time} />
-                    </td>
-                    <td className={cell}>{typeLabel(indicator.type)}</td>
-                    <td className={`${cell} font-mono break-all`}>{indicator.value}</td>
-                    <td className={cell}>{indicator.campaigns.join(', ') || 'not named'}</td>
-                    <td className={cell}>
-                      {match_mode}
-                      {indicator.expired && (
-                        // The day it expired in the examiner's zone, as the report says it (EPOCH-560).
-                        <span className="text-warning">
-                          , expired
-                          {indicator.valid_until && (
-                            <>
+          <p className="text-label text-muted-foreground mb-2">
+            A match means the fact equals the indicator. It says nothing more. Select a match to open its record in
+            Forensic Records.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className={head}>Indicator</th>
+                  <th className={head}>Type</th>
+                  <th className={head}>Matched fact</th>
+                  <th className={head}>Fact time</th>
+                  <th className={head}>From</th>
+                </tr>
+              </thead>
+              <tbody>
+                {check.match_rows.map((m, i) => {
+                  const { indicator, fact, match_mode } = m.fields;
+                  return (
+                    <tr
+                      key={`${fact.record_id}-${indicator.value}-${i}`}
+                      onClick={() => onOpenRecord(String(fact.record_id))}
+                      className="border-b border-border/50 cursor-pointer hover:bg-surface-hover"
+                    >
+                      <td className={cell}>
+                        <span className="font-mono break-all">{indicator.value}</span>
+                        <span className="block text-label text-muted-foreground">
+                          {match_mode} · {indicator.campaigns.join(', ') || 'campaign not named'}
+                          {indicator.expired && (
+                            // The day it expired in the examiner's zone, as the report says it (EPOCH-560).
+                            <span className="text-warning">
                               {' '}
-                              <DateTime value={indicator.valid_until} dateOnly />
-                            </>
+                              · expired
+                              {indicator.valid_until && (
+                                <>
+                                  {' '}
+                                  <DateTime value={indicator.valid_until} dateOnly />
+                                </>
+                              )}
+                            </span>
                           )}
                         </span>
-                      )}
-                    </td>
-                    <td className={cell}>
-                      {fact.source} (record {fact.record_id})
-                    </td>
-                    <td className={`${cell} font-mono`}>{indicator.source_file}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className={cell}>{typeLabel(indicator.type)}</td>
+                      <td className={cell}>
+                        {fact.source} ·{' '}
+                        {/* Its click reaches the row, so the keyboard opens the record as a pointer does. */}
+                        <button
+                          type="button"
+                          className="text-accent hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        >
+                          Record {n(fact.record_id)}
+                        </button>
+                      </td>
+                      <td className={cell}>
+                        <DateTime value={m.event_time} />
+                      </td>
+                      <td className={`${cell} font-mono`}>{indicator.source_file}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {check.sources.length > 0 && (
-        <div>
-          <h3 className="text-label text-muted-foreground mb-1">Sources and licences</h3>
+        <Disclosure label="Show the set's sources and licences" openLabel="Hide the set's sources and licences">
           <ul className="list-disc pl-5 space-y-1 text-data">
             {check.sources.map((s) => (
               <li key={`${s.source_repository}-${s.source_commit}-${s.licence}`}>{sourceLine(s)}</li>
             ))}
           </ul>
-        </div>
+        </Disclosure>
       )}
     </div>
   );
@@ -171,15 +218,23 @@ function CheckBody({ check, results }: { check: IndicatorCheckRow; results: Indi
 const checkedOn = (check: IndicatorCheckRow, zone: DisplayZone) =>
   check.finished_at ? formatDateTime(check.finished_at, zone) : 'not finished';
 
+/** When a group's checks ran: one time, or the first to the last. */
+function groupTimes(group: IndicatorCheckRow[], zone: DisplayZone): string {
+  const first = group.at(-1)!;
+  const last = group[0];
+  return group.length === 1 ? checkedOn(last, zone) : `${checkedOn(first, zone)} to ${checkedOn(last, zone)}`;
+}
+
 /**
- * Indicator Matches (EPOCH-493): every check of the selected investigation's
- * evidence. The selected run's check comes first, in full; every other run's
- * check is kept and shown on its own, never merged. Each states its set and
- * that set's age when checked, what wasn't checked and why, and that
- * indicators find only what is already known, so an empty result is never
- * read as a verdict.
+ * Indicator Matches (EPOCH-493, EPOCH-557; board 8): every check of the
+ * selected investigation's evidence. The selected run's check comes first, in
+ * full; every other check is kept and shown on its own, never added to
+ * another, with identical checks listed together so a repeat doesn't read as
+ * new information. Each states its set and that set's age when checked, what
+ * was and wasn't compared and why, and that indicators find only what is
+ * already known, so an empty result is never read as a verdict.
  */
-export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
+export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord }) => {
   const zone = useDisplayZone();
   const [results, setResults] = useState<IndicatorResults | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -234,38 +289,60 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun }) => {
     );
   } else {
     const thisRun = results.checks.find((c) => c.run_id === selectedRun.run_id);
-    const others = results.checks.filter((c) => c !== thisRun);
+    const groups = groupChecks(results.checks.filter((c) => c !== thisRun));
     body = (
       <div className="space-y-6">
         <p className="text-data text-muted-foreground">{results.limit}</p>
         <section className="card rounded-lg p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="font-display text-heading text-foreground">This run's check</h2>
-            {thisRun && <ResultBadge check={thisRun} />}
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <h2 className="font-display text-heading text-foreground">This Investigation's Check</h2>
+            {thisRun && <StateChip check={thisRun} />}
             {thisRun?.set_name && staleLine(thisRun, results.staleAfterDays, zone) && (
-              <Badge variant="warning">Older than {results.staleAfterDays} days</Badge>
+              <Badge variant="warning">Older than {results.staleAfterDays} days when checked</Badge>
             )}
-            {thisRun && <span className="text-data text-muted-foreground">{checkedOn(thisRun, zone)}</span>}
+            {thisRun && <span className="text-data text-muted-foreground">Checked {checkedOn(thisRun, zone)}</span>}
           </div>
           {thisRun ? (
-            <CheckBody check={thisRun} results={results} />
+            <CheckBody check={thisRun} results={results} onOpenRecord={onOpenRecord} />
           ) : (
             <p className="text-data">{`This run did not check indicators. ${results.nothingChecked}`}</p>
           )}
         </section>
-        {others.length > 0 && (
-          <section className="card rounded-lg p-5 space-y-3">
-            <h2 className="font-display text-heading text-foreground">Other checks of this evidence</h2>
-            {others.map((check) => (
-              <div key={check.run_id} className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-data text-muted-foreground">{checkedOn(check, zone)}</span>
-                  <ResultBadge check={check} />
-                  {check.set_name && <span className="text-data">{check.set_name}</span>}
+        {groups.length > 0 && (
+          <section className="card rounded-lg p-5 space-y-4">
+            <div>
+              <h2 className="font-display text-heading text-foreground">Other Checks of This Evidence</h2>
+              <p className="text-data text-muted-foreground mt-1">
+                Each check stands on its own and is never added to another. Identical checks are listed together so a
+                repeat does not look like new information.
+              </p>
+            </div>
+            {groups.map((group) => (
+              <div
+                key={group[0].run_id}
+                className="bg-surface-raised rounded-lg px-4 py-3 shadow-elevation-1 space-y-2"
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  <StateChip check={group[0]} />
+                  {group.length > 1 && (
+                    <span className="text-data text-foreground">{group.length.toLocaleString('en-US')} checks</span>
+                  )}
+                  <span className="text-data text-muted-foreground">{groupTimes(group, zone)}</span>
+                  {group[0].set_name && <span className="text-data">{group[0].set_name}</span>}
+                  {group[0].set_name && staleLine(group[0], results.staleAfterDays, zone) && (
+                    <Badge variant="warning">Older than {results.staleAfterDays} days when checked</Badge>
+                  )}
                 </div>
-                <Disclosure label="Show this check" openLabel="Hide this check">
-                  <CheckBody check={check} results={results} />
-                </Disclosure>
+                <p className="text-data text-foreground/90">{resultLine(group[0], results.nothingChecked)}</p>
+                {group.map((check) => (
+                  <Disclosure
+                    key={check.run_id}
+                    label={`Show the check of ${checkedOn(check, zone)}`}
+                    openLabel={`Hide the check of ${checkedOn(check, zone)}`}
+                  >
+                    <CheckBody check={check} results={results} onOpenRecord={onOpenRecord} />
+                  </Disclosure>
+                ))}
               </div>
             ))}
           </section>

@@ -1008,6 +1008,8 @@ describe('getIndicatorChecks', live, () => {
     assert.equal(check.sources[0].licence, 'MIT');
     assert.equal(check.sources[0].downloaded_on, '2026-10-15', 'a DATE stays its recorded day, whatever the host zone');
     assert.equal(check.match_rows.length, 1);
+    assert.equal(check.ingest_id, units[0].ingest_id, 'the check names its unit, so identical checks can be told');
+    assert.equal(skipped.ingest_id, null);
     assert.equal(skipped.summary, null);
     assert.deepEqual(skipped.match_rows, []);
     assert.deepEqual(await getIndicatorChecks(db, EVIDENCE), [], 'another evidence item has no checks');
