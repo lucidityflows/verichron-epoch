@@ -18,7 +18,12 @@ import {
 } from '@verichron/contracts';
 import { getInterruptedEvidence, getRunDecryptedPath } from '@verichron/etl-db-reader';
 import type { EventProducer, LogLevel, PipelineEvent, TaskOutcome } from '@verichron/contracts';
-import type { PipelineFinishedResult, AnalysisRunStatus, PipelineLogEntry } from '../../shared/types/window';
+import type {
+  AnalysisState,
+  PipelineFinishedResult,
+  AnalysisRunStatus,
+  PipelineLogEntry,
+} from '../../shared/types/window';
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
 import { PipelineSingleFlight } from './pipelineSingleFlight';
 import { analysisTargets, orchestratorArgs } from './analysisTargets';
@@ -498,8 +503,8 @@ export function registerPipelineHandlers(
 
   /** One orchestrator call: a whole Analyze from New Investigation, or one run retried from Investigations. */
   interface OrchestratorCall {
-    kind: 'workspace' | 'retry';
-    /** What the session shows it is for: the workspace, or the retried run. */
+    kind: NonNullable<AnalysisState['kind']>;
+    /** What the session shows it is for: the workspace, or the retried or re-checked run. */
     target: string;
     workspace: string;
     labels: string[];
@@ -516,6 +521,8 @@ export function registerPipelineHandlers(
   }
 
   async function runOrchestratorCall(call: OrchestratorCall, releasePipeline: () => void): Promise<void> {
+    // What the examiner started, as the log and its messages name it.
+    const task = call.kind === 'check' ? 'Check Again' : 'Analyze';
     analysisSession.start(call.kind, call.target, call.workspace, call.labels);
     let log: TaskLog;
     try {
@@ -524,12 +531,12 @@ export function registerPipelineHandlers(
           workspace: call.workspace,
           kind: 'analyze',
           labels: call.labels,
-          options: call.kind === 'retry' ? { retry: true } : {},
+          options: call.kind === 'retry' ? { retry: true } : call.kind === 'check' ? { check_indicators: true } : {},
           backups: call.backups,
           source: null,
           appRoot: repoRoot,
           appVersion,
-          message: `Analyze started for ${call.labels.length} backup${call.labels.length === 1 ? '' : 's'}`,
+          message: `${task} started for ${call.labels.length} backup${call.labels.length === 1 ? '' : 's'}`,
         },
         (entry) => {
           analysisSession.entry(entry);
@@ -539,7 +546,7 @@ export function registerPipelineHandlers(
     } catch (err) {
       // No log, no task (docs/event-log.md §7).
       releasePipeline();
-      const error = `The task log could not be created, so Analyze did not start: ${
+      const error = `The task log could not be created, so ${task} did not start: ${
         err instanceof Error ? err.message : String(err)
       }`;
       analysisSession.finish({ success: false, error });
@@ -565,17 +572,21 @@ export function registerPipelineHandlers(
       // pnpm --silent: its script banners would print the repository's path (docs/event-log.md §6.6).
       // Its own process group, so Cancel reaches the orchestrator, not only pnpm.
       const zone = await displayZoneSetting();
-      child = spawn('pnpm', ['--silent', ...orchestratorArgs(call.workspace, call.labels, summaryPath, zone)], {
-        cwd: repoRoot,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        detached: true,
-      });
+      child = spawn(
+        'pnpm',
+        ['--silent', ...orchestratorArgs(call.workspace, call.labels, summaryPath, zone, call.kind === 'check')],
+        {
+          cwd: repoRoot,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          detached: true,
+        }
+      );
     } catch (err) {
       releasePipeline();
       const error = `could not start the orchestrator: ${err instanceof Error ? err.message : String(err)}`;
       await finish(
         { outcome: 'crashed', exitCode: null, signal: null, reported: false, failedLabels: [] },
-        `Analyze did not start: ${error}`,
+        `${task} did not start: ${error}`,
         { success: false, error }
       );
       throw err;
@@ -626,13 +637,13 @@ export function registerPipelineHandlers(
       orchestratorTerminationReason = null;
       const { cancelled, timedOut, outcome } = stopped(reason);
       void (async () => {
-        if (call.kind === 'retry' || tracked) {
+        if (call.kind !== 'workspace' || tracked) {
           await closeCallRuns(endedReason(reason), `orchestrator process error: ${err.message}`);
         }
         await rm(summaryPath, { force: true });
         await finish(
           { outcome: outcome ?? 'crashed', exitCode: null, signal: null, reported: false, failedLabels: [] },
-          `Analyze stopped: could not run the orchestrator: ${err.message}`,
+          `${task} stopped: could not run the orchestrator: ${err.message}`,
           { success: false, error: err.message, cancelled, timedOut }
         );
       })();
@@ -655,7 +666,7 @@ export function registerPipelineHandlers(
         // already closed out pipeline_runs/pipeline_stage_status itself.
         // Any other outcome -- a crash, our own timeout kill, or a manual
         // cancel -- can leave rows dangling and needs the same cleanup path.
-        if (code !== 0 && (call.kind === 'retry' || tracked)) {
+        if (code !== 0 && (call.kind !== 'workspace' || tracked)) {
           await closeCallRuns(
             endedReason(reason),
             cancelled
@@ -678,14 +689,14 @@ export function registerPipelineHandlers(
           failedLabels,
         } satisfies Parameters<TaskLog['finish']>[0];
         const message = cancelled
-          ? 'Analyze was cancelled'
+          ? `${task} was cancelled`
           : timedOut
-            ? `Analyze ${stalled}`
+            ? `${task} ${stalled}`
             : !reported
-              ? `Analyze stopped: the orchestrator ended (${howItEnded(code, signal)}) without reporting a result`
+              ? `${task} stopped: the orchestrator ended (${howItEnded(code, signal)}) without reporting a result`
               : code === 0
-                ? 'Analyze finished'
-                : `Analyze finished: ${failedLabels.length} backup${failedLabels.length === 1 ? '' : 's'} need${
+                ? `${task} finished`
+                : `${task} finished: ${failedLabels.length} backup${failedLabels.length === 1 ? '' : 's'} need${
                     failedLabels.length === 1 ? 's' : ''
                   } attention`;
         // Each backup's outcome, for an Analyze Again too: a skipped one means a
@@ -751,8 +762,11 @@ export function registerPipelineHandlers(
    * ran -- no orchestrator or extractor changes required. Shares
    * runningOrchestratorProcess as its single-flight guard, so a retry and a
    * full-workspace analysis can never run concurrently.
+   *
+   * Check Again (EPOCH-557) finds its backup the same way, and asks the
+   * orchestrator for the indicator check alone, as a run of its own.
    */
-  ipcMain.handle('epoch:retryRun', async (_event, runId: string) => {
+  async function rerunEvidenceOf(runId: string, kind: 'retry' | 'check'): Promise<{ started: boolean }> {
     if (runningOrchestratorProcess) {
       throw new Error('The orchestrator is already running -- wait for it to finish before starting another.');
     }
@@ -761,7 +775,7 @@ export function registerPipelineHandlers(
     }
     const trimmedRunId = runId.trim();
     const decryptedPath = await getRunDecryptedPath(dbPool, trimmedRunId);
-    if (!decryptedPath) throw new Error(`Run ${trimmedRunId} has no registered decrypted backup to retry.`);
+    if (!decryptedPath) throw new Error(`Run ${trimmedRunId} has no registered decrypted backup.`);
     const workspaceTarget = await findWorkspaceBackupForPath(decryptedPath);
     if (!workspaceTarget) {
       throw new Error(
@@ -772,7 +786,7 @@ export function registerPipelineHandlers(
     const { entry } = workspaceTarget;
     await runOrchestratorCall(
       {
-        kind: 'retry',
+        kind,
         target: trimmedRunId,
         workspace: workspaceTarget.workspace,
         labels: [entry.label],
@@ -782,7 +796,10 @@ export function registerPipelineHandlers(
       releasePipeline
     );
     return { started: true };
-  });
+  }
+
+  ipcMain.handle('epoch:retryRun', async (_event, runId: string) => rerunEvidenceOf(runId, 'retry'));
+  ipcMain.handle('epoch:checkIndicators', async (_event, runId: string) => rerunEvidenceOf(runId, 'check'));
 
   // EPOCH-570: the workspace's saved task logs, read back after a restart.
   ipcMain.handle('epoch:listTaskLogs', async (_event, workspace: string) => listTaskLogs(workspace));

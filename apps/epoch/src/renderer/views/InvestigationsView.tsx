@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Inbox, Layers, RefreshCw } from 'lucide-react';
 import type { PipelineRunRow, StageStatusRow } from '@verichron/etl-db-reader';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { CopyButton } from '../components/ui/CopyButton';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
@@ -57,8 +58,14 @@ const ANALYSIS_COLUMNS: DataTableColumn<PipelineRunRow>[] = [
   {
     id: 'analysis',
     header: 'Analysis',
-    meta: { width: '7rem' },
-    cell: ({ row }) => <span className="font-mono text-foreground/90">{shortId(row.original.run_id)}</span>,
+    meta: { width: '12rem' },
+    cell: ({ row }) => (
+      <span className="flex items-center gap-2">
+        <span className="font-mono text-foreground/90">{shortId(row.original.run_id)}</span>
+        {/* A run of the indicator check alone (EPOCH-557): it has no report of its own. */}
+        {row.original.kind === 'indicator_check' && <Badge variant="neutral">Check Again</Badge>}
+      </span>
+    ),
   },
   {
     id: 'stages',
@@ -163,7 +170,7 @@ export function InvestigationsView({
 
   // The newest investigation is shown until another is chosen.
   useEffect(() => {
-    if (!selectedRun && investigations.length > 0) onSelectRun(investigations[0].analyses[0]);
+    if (!selectedRun && investigations.length > 0) onSelectRun(investigations[0].latest);
   }, [selectedRun, investigations, onSelectRun]);
 
   // Analyze Again is an analysis kept in the main process (EPOCH-487), so it
@@ -297,7 +304,7 @@ export function InvestigationsView({
             </div>
             <ul className="flex flex-col gap-3">
               {investigations.map((inv) => {
-                const latest = inv.analyses[0];
+                const { latest } = inv;
                 const isSelected = inv === selected;
                 return (
                   <li key={inv.evidenceId}>
@@ -409,7 +416,11 @@ export function InvestigationsView({
                     columns={ANALYSIS_COLUMNS}
                     getRowId={(run) => run.run_id}
                     selectedId={selectedRun.run_id}
-                    onRowClick={onSelectRun}
+                    // A Check Again run is history, never the investigation's analysis (EPOCH-557):
+                    // it has no report, and its stages are the indicator check alone.
+                    onRowClick={(run) => {
+                      if (run.kind === 'analysis') onSelectRun(run);
+                    }}
                     className="max-h-80 rounded-lg border border-border bg-surface-raised shadow-elevation-1"
                   />
                 </section>

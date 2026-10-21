@@ -35,7 +35,13 @@ export function analysisTargets(workspace: string, labels: unknown[]): string[] 
  * (EPOCH-427, EPOCH-530), and the zone the report shows times in, which the
  * run records (EPOCH-560).
  */
-export function orchestratorArgs(workspace: string, labels: string[], summaryPath: string, zone: string): string[] {
+export function orchestratorArgs(
+  workspace: string,
+  labels: string[],
+  summaryPath: string,
+  zone: string,
+  checkIndicators = false
+): string[] {
   return [
     '--filter',
     '@verichron/orchestrator',
@@ -51,5 +57,7 @@ export function orchestratorArgs(workspace: string, labels: string[], summaryPat
     // Typed events only (EPOCH-570): the app reads them, never the text.
     '--output',
     'events',
+    // Check Again (EPOCH-557): the indicator check alone, as a run of its own.
+    ...(checkIndicators ? ['--check-indicators'] : []),
   ];
 }

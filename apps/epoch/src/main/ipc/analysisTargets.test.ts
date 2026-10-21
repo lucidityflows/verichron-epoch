@@ -89,6 +89,11 @@ describe('analysisTargets', () => {
     ]);
   });
 
+  it('asks for the indicator check alone only for Check Again (EPOCH-557)', () => {
+    assert.ok(!orchestratorArgs(ws, ['NEW'], '/tmp/s.json', 'UTC').includes('--check-indicators'));
+    assert.ok(orchestratorArgs(ws, ['NEW'], '/tmp/s.json', 'UTC', true).includes('--check-indicators'));
+  });
+
   it('passes several selected backups once each, in label order', () => {
     assert.deepEqual(analysisTargets(ws, ['OLD-2', 'NEW', 'NEW']), ['NEW', 'OLD-2']);
   });

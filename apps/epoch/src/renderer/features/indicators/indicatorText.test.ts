@@ -7,13 +7,27 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 import type { IndicatorCheckRow } from '@verichron/etl-db-reader';
 
-import { notCheckedLines, resultLine, setLine, sourceLine, staleLine } from './indicatorText';
+import {
+  checkState,
+  checkTiles,
+  comparedTypes,
+  groupChecks,
+  notCheckedLines,
+  resultLine,
+  setLine,
+  shownCheck,
+  sourceLine,
+  staleLine,
+  stateLabel,
+} from './indicatorText';
 
 const NOTHING = 'No match is reported because nothing was checked.';
 const VERDICTS = /\b(compromised|infected|clean)\b/i;
 
 const base: IndicatorCheckRow = {
   run_id: 'run-1',
+  run_kind: 'analysis',
+  run_started_at: '2026-10-15T14:00:00.000Z',
   status: 'succeeded',
   error_message: null,
   finished_at: '2026-10-15T14:30:00.000Z',
@@ -22,6 +36,7 @@ const base: IndicatorCheckRow = {
   set_hash: 'e3fb2081f3e1' + '0'.repeat(52),
   set_registered_at: '2026-10-15T12:00:00.000Z',
   newest_indicator: '2026-10-09T00:00:00.000Z',
+  ingest_id: 'unit-1',
   matches: 0,
   summary: {
     set: { set_id: 'set-1', set_hash: 'e3fb', name: 'x' },
@@ -128,12 +143,81 @@ describe('indicator wording', () => {
     );
   });
 
+  it('names where a check stands, so nothing compared never reads like nothing found (board 8)', () => {
+    const skipped = { ...base, status: 'skipped' as const, summary: null, matches: null };
+    assert.deepEqual(
+      [base, { ...base, matches: 1 }, { ...base, matches: 3 }, skipped, { ...base, status: 'failed' as const }].map(
+        (c) => [checkState(c), stateLabel(c)]
+      ),
+      [
+        ['no-match', 'Checked, no matches'],
+        ['matches', '1 match'],
+        ['matches', '3 matches'],
+        ['not-checked', 'Not checked'],
+        ['failed', 'Check failed'],
+      ]
+    );
+  });
+
+  it('counts the indicators loaded, those of types compared, the facts compared and the matches', () => {
+    assert.deepEqual(checkTiles(base), { loaded: 7449, testable: 7376, compared: 7545, matches: 0 });
+    assert.deepEqual(comparedTypes(base), [['domain', 7545]]);
+    assert.equal(checkTiles({ ...base, summary: null }), null);
+  });
+
+  it('lists checks of one unit, or of one reason for comparing nothing, together and in order', () => {
+    const run = (run_id: string, ingest_id: string | null, error_message: string | null = null) => ({
+      ...base,
+      run_id,
+      ingest_id,
+      error_message,
+    });
+    const groups = groupChecks([
+      run('a', 'u1'),
+      run('b', null, 'No indicator set is registered.'),
+      run('c', 'u1'),
+      run('d', 'u2'),
+      run('e', null, 'No indicator set is registered.'),
+      run('f', null, 'another reason'),
+    ]);
+    assert.deepEqual(
+      groups.map((g) => g.map((c) => c.run_id)),
+      [['a', 'c'], ['b', 'e'], ['d'], ['f']]
+    );
+  });
+
+  it("shows the newest Check Again since the selected analysis, up to the next analysis, or else the analysis's own check (EPOCH-557)", () => {
+    const at = (run_id: string, run_kind: 'analysis' | 'indicator_check', run_started_at: string) => ({
+      ...base,
+      run_id,
+      run_kind,
+      run_started_at,
+    });
+    const checks = [
+      at('analysis-2', 'analysis', '2026-10-17T00:00:00.000Z'),
+      at('recheck-3', 'indicator_check', '2026-10-17T06:00:00.000Z'),
+      at('recheck-2', 'indicator_check', '2026-10-16T12:00:00.000Z'),
+      at('recheck-1', 'indicator_check', '2026-10-16T06:00:00.000Z'),
+      at('analysis-1', 'analysis', '2026-10-16T00:00:00.000Z'),
+    ];
+    const shown = (run_id: string, started_at: string) => shownCheck(checks, { run_id, started_at })?.run_id;
+    assert.equal(shown('analysis-1', '2026-10-16T00:00:00.000Z'), 'recheck-2', 'not the one after the next analysis');
+    assert.equal(shown('analysis-2', '2026-10-17T00:00:00.000Z'), 'recheck-3');
+    assert.equal(shown('recheck-1', '2026-10-16T06:00:00.000Z'), 'recheck-2');
+    assert.equal(
+      shownCheck(checks.slice(0, 1), { run_id: 'analysis-2', started_at: '2026-10-17T00:00:00.000Z' })?.run_id,
+      'analysis-2'
+    );
+  });
+
   it('uses no verdict word', () => {
     const texts = [
       setLine(base, 'UTC'),
       staleLine({ ...base, newest_indicator: '2025-01-01T00:00:00.000Z' }, 90, 'UTC') ?? '',
       resultLine(base, NOTHING),
       resultLine({ ...base, matches: 2 }, NOTHING),
+      stateLabel(base),
+      stateLabel({ ...base, matches: 2 }),
       ...notCheckedLines(base),
       ...base.sources.map(sourceLine),
     ];

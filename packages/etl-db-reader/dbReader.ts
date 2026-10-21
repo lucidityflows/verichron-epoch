@@ -56,6 +56,8 @@ export interface PipelineRunRow {
   /** NULL until EPOCH-404's pre-flight registration sets it. */
   evidence_id: string | null;
   derivative_id: string | null;
+  /** What the run was started to do (migration 0023, EPOCH-557): an analysis, or Check Again's indicator check. */
+  kind: RunKind;
   contract_version: string;
   tool_versions: Record<string, string>;
   /** From the run_completeness view: the ONE completeness predicate (R23,
@@ -86,6 +88,8 @@ export interface PipelineRunRow {
 }
 
 export type StageStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
+
+export type RunKind = 'analysis' | 'indicator_check';
 
 /** How a run ended (migration 0017). The last four mean it didn't finish. */
 export type EndedReason = 'completed' | 'cancelled' | 'timeout' | 'crashed' | 'abandoned';
@@ -166,11 +170,16 @@ const RECORD_COLUMNS = `records.id, records.ingest_id, records.evidence_id, reco
        (SELECT t.tier FROM source_type_tiers t WHERE t.source_type = records.source_type) AS tier`;
 
 /**
- * Most recent pipeline runs, newest first.
+ * The most recent `limit` analyses, newest first, with every Check Again run
+ * of their evidence (EPOCH-557). The limit counts analyses only, so repeated
+ * checks never push an investigation's analysis out of the list.
  */
 export async function getPipelineRuns(client: Db, limit = 100): Promise<PipelineRunRow[]> {
   const result = await client.query<Omit<PipelineRunRow, 'records'>>(
-    `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id,
+    `WITH shown AS (
+       SELECT run_id, evidence_id FROM pipeline_runs WHERE kind = 'analysis' ORDER BY started_at DESC LIMIT $1
+     )
+     SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id, r.kind,
             r.contract_version, r.tool_versions, c.state, r.ended_reason, r.ended_detail, d.label AS device_label,
             e.product_type, e.ios_version, e.backup_date, e.total_bytes, s.stage_counts, s.stages_with_warnings
        FROM pipeline_runs r
@@ -189,8 +198,9 @@ export async function getPipelineRuns(client: Db, limit = 100): Promise<Pipeline
            FROM pipeline_stage_status ps
           WHERE ps.run_id = r.run_id
        ) s
-      ORDER BY r.started_at DESC
-      LIMIT $1`,
+      WHERE r.run_id IN (SELECT run_id FROM shown)
+         OR (r.kind = 'indicator_check' AND r.evidence_id IN (SELECT evidence_id FROM shown))
+      ORDER BY r.started_at DESC`,
     [limit]
   );
   // The records in a query of its own, through R7's links: a statement that
@@ -1162,13 +1172,17 @@ export interface IndicatorMatchRow {
       source_file: string;
     };
     match_mode: string;
-    fact: { source: string; record_id: number };
+    /** The matched fact; `kind` and `role` are absent from a check made before entities were read (version 1). */
+    fact: { source: string; record_id: number; kind?: string; role?: string };
   };
 }
 
 /** One run's indicator check of the evidence, from the indicator_checks view (R27). */
 export interface IndicatorCheckRow {
   run_id: string;
+  /** The run's kind: an analysis's check, or a Check Again (EPOCH-557). */
+  run_kind: RunKind;
+  run_started_at: string;
   status: StageStatus;
   error_message: string | null;
   finished_at: string | null;
@@ -1177,6 +1191,11 @@ export interface IndicatorCheckRow {
   set_hash: string | null;
   set_registered_at: string | null;
   newest_indicator: string | null;
+  /**
+   * The check's unit. Runs whose checks share one are the same check: the
+   * stage reuses a unit when the set, the rules and the entities are unchanged.
+   */
+  ingest_id: string | null;
   /** The completed unit's record count; null when the check produced no unit. */
   matches: number | null;
   summary: IndicatorCheckSummary | null;
@@ -1194,16 +1213,18 @@ export const MATCH_LIMIT = 500;
  * report reads (migration 0013), so the two can't disagree (R27).
  */
 export async function getIndicatorChecks(client: Db, evidenceId: string): Promise<IndicatorCheckRow[]> {
-  const checks = await client.query<Omit<IndicatorCheckRow, 'sources' | 'match_rows'> & { ingest_id: string | null }>(
-    `SELECT run_id, status, error_message, finished_at, indicator_set_id, set_name, set_hash,
-            set_registered_at, newest_indicator, ingest_id, matches, summary
-       FROM indicator_checks
-      WHERE evidence_id = $1
-      ORDER BY finished_at DESC NULLS FIRST, run_id`,
+  const checks = await client.query<Omit<IndicatorCheckRow, 'sources' | 'match_rows'>>(
+    `SELECT c.run_id, r.kind AS run_kind, r.started_at AS run_started_at, c.status, c.error_message,
+            c.finished_at, c.indicator_set_id, c.set_name, c.set_hash, c.set_registered_at, c.newest_indicator,
+            c.ingest_id, c.matches, c.summary
+       FROM indicator_checks c
+       JOIN pipeline_runs r USING (run_id)
+      WHERE c.evidence_id = $1
+      ORDER BY c.finished_at DESC NULLS FIRST, c.run_id`,
     [evidenceId]
   );
   const out: IndicatorCheckRow[] = [];
-  for (const { ingest_id, ...check } of checks.rows) {
+  for (const check of checks.rows) {
     const sources = check.indicator_set_id
       ? (
           await client.query<IndicatorSetSourceRow>(
@@ -1214,12 +1235,12 @@ export async function getIndicatorChecks(client: Db, evidenceId: string): Promis
           )
         ).rows
       : [];
-    const matchRows = ingest_id
+    const matchRows = check.ingest_id
       ? (
           await client.query<IndicatorMatchRow>(
             `SELECT event_time, fields FROM forensic_records
               WHERE ingest_id = $1 ORDER BY event_time, id LIMIT $2`,
-            [ingest_id, MATCH_LIMIT]
+            [check.ingest_id, MATCH_LIMIT]
           )
         ).rows
       : [];

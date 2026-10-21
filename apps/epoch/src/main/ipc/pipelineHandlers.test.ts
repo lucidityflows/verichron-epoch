@@ -291,15 +291,15 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     // (this test's own), so only an id can close one.
     await db.query(
       `INSERT INTO pipeline_runs
-         (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid,
+         (run_id, backup_source, contract_version, tool_versions, display_zone, kind, evidence_id, derivative_id, host, pid,
           started_at, finished_at, ended_reason)
-       VALUES ($1, $2, 'test', '{}', 'UTC', $3, $3, $4, $5, now() - interval '1 hour', now() - interval '50 minutes', 'crashed'),
-              ($6, $2, 'test', '{}', 'UTC', $3, $3, $4, $5, now(), NULL, NULL)`,
+       VALUES ($1, $2, 'test', '{}', 'UTC', 'analysis', $3, $3, $4, $5, now() - interval '1 hour', now() - interval '50 minutes', 'crashed'),
+              ($6, $2, 'test', '{}', 'UTC', 'analysis', $3, $3, $4, $5, now(), NULL, NULL)`,
       [RETRIED, decryptPath, EVIDENCE, os.hostname(), process.pid, CREATED]
     );
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, host, pid)
-       VALUES ($1, '/other/decrypted/X', 'test', '{}', 'UTC', $2, $3)`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, host, pid)
+       VALUES ($1, '/other/decrypted/X', 'test', '{}', 'UTC', 'analysis', $2, $3)`,
       [OTHER, os.hostname(), process.pid]
     );
     await db.query(
@@ -386,8 +386,8 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
   it('ends the run as crashed, with the exit code, when the orchestrator exits unexpectedly', async () => {
     const CRASHED = '88888888-8888-8888-8888-888888888888';
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid)
-       VALUES ($1, $2, 'test', '{}', 'UTC', $3, $3, $4, $5)`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, evidence_id, derivative_id, host, pid)
+       VALUES ($1, $2, 'test', '{}', 'UTC', 'analysis', $3, $3, $4, $5)`,
       [CRASHED, decryptPath, EVIDENCE, os.hostname(), process.pid]
     );
     // The stage it was running when it died.
@@ -409,6 +409,29 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
       (await db.query(`SELECT ended_reason, ended_detail FROM pipeline_runs WHERE run_id = $1`, [CRASHED])).rows[0];
     await vi.waitFor(async () => assert.equal((await ended()).ended_reason, 'crashed'));
     assert.equal((await ended()).ended_detail, 'orchestrator process exited unexpectedly (exit code 1)');
+  });
+
+  it("Check Again runs the orchestrator for the run's backup with --check-indicators, as a check (EPOCH-557)", async () => {
+    const orchestrator = childProcess();
+    spawnMock.mockReturnValueOnce(orchestrator);
+    const before = spawnMock.mock.calls.length;
+    assert.deepEqual(await invoke('epoch:checkIndicators', RETRIED), { started: true });
+    const args = spawnMock.mock.calls[before][1] as string[];
+    assert.ok(args.includes('--check-indicators'));
+    assert.deepEqual(args.slice(args.indexOf('--label'), args.indexOf('--label') + 2), ['--label', 'BK']);
+    const state = (await invoke('epoch:getAnalysisState')) as { kind: string; target: string };
+    assert.deepEqual([state.kind, state.target], ['check', RETRIED]);
+    // What the orchestrator writes for its caller (EPOCH-409): the check's own run.
+    const results = [{ backupPath: decryptPath, status: 'succeeded', runId: 'check-run' }];
+    writeFileSync(args[args.indexOf('--summary-path') + 1], JSON.stringify({ results }));
+    orchestrator.emit('close', 0);
+    type Finished = { status: string; result: { success: boolean; analysis: typeof results } | null };
+    await vi.waitFor(async () =>
+      assert.equal(((await invoke('epoch:getAnalysisState')) as Finished).status, 'finished')
+    );
+    const { result } = (await invoke('epoch:getAnalysisState')) as Finished;
+    assert.equal(result?.success, true);
+    assert.deepEqual(result?.analysis, results, 'the check reported its run');
   });
 
   it("reports the workspace interrupted when its evidence's latest run was, found by the sidecar's content root", async () => {
@@ -443,9 +466,9 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     const ABANDONED = '66666666-6666-6666-6666-666666666666';
     const ELSEWHERE = '77777777-7777-7777-7777-777777777777';
     await db.query(
-      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, host, pid) VALUES
-         ($1, '/x', 'test', '{}', 'UTC', $3, $4),
-         ($2, '/y', 'test', '{}', 'UTC', 'another-host', $4)`,
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, host, pid) VALUES
+         ($1, '/x', 'test', '{}', 'UTC', 'analysis', $3, $4),
+         ($2, '/y', 'test', '{}', 'UTC', 'analysis', 'another-host', $4)`,
       [ABANDONED, ELSEWHERE, os.hostname(), deadPid]
     );
 

@@ -306,6 +306,32 @@ export interface RunPipelineOptions {
    * done" check: an analysis that is complete stays complete in any zone.
    */
   displayZone?: string;
+  /**
+   * Check Again (EPOCH-557): a run of its own, recorded as an indicator check,
+   * that runs only the stage reading the indicator set. It compares the
+   * entities an analysis already read, so it never resumes an earlier run:
+   * each check is new and separate, and earlier checks stay (board 8).
+   */
+  checkIndicators?: boolean;
+}
+
+export const CHECK_NEEDS_ANALYSIS =
+  'Check Again needs a complete analysis of this evidence first; nothing was checked. Analyze it, then check again.';
+
+async function hasCompleteAnalysis(client: Client, evidenceId: string): Promise<boolean> {
+  const { rows } = await client.query(
+    `SELECT 1 FROM run_completeness c JOIN pipeline_runs r USING (run_id)
+      WHERE c.evidence_id = $1 AND c.state = 'complete' AND r.kind = 'analysis' LIMIT 1`,
+    [evidenceId]
+  );
+  return rows.length > 0;
+}
+
+/** The stages a check runs: those reading the indicator set, and nothing else. */
+export function checkStages(stages: StageSet): StageSet {
+  const enabled = stages.enabled.filter((stage) => stage.manifest.reads === 'indicator_set');
+  if (enabled.length === 0) throw new Error('no enabled stage reads an indicator set, so there is nothing to check');
+  return { enabled, disabled: [] };
 }
 
 /**
@@ -387,7 +413,16 @@ export async function runPipelineForBackup(
   // registered from another mount path is the same evidence. It is also
   // keyed by the stage plan and its inputs: a bumped parserVersion, a newly
   // enabled stage or another indicator set is not "already done".
-  const completeRun = await findCompleteRunFor(client, registration, stages.enabled, indicatorSet);
+  // A check compares the entities an analysis read, so with no complete
+  // analysis there is nothing to compare: refused before any run (EPOCH-557).
+  if (options.checkIndicators && !(await hasCompleteAnalysis(client, registration.evidenceId))) {
+    return { success: false, error: CHECK_NEEDS_ANALYSIS };
+  }
+  const kind = options.checkIndicators ? 'indicator_check' : 'analysis';
+  const plan = options.checkIndicators ? checkStages(stages) : stages;
+  const completeRun = options.checkIndicators
+    ? null
+    : await findCompleteRunFor(client, registration, plan.enabled, indicatorSet);
   if (completeRun) {
     // A run marked complete whose summary export then failed (a full disk)
     // would otherwise never get its file: write it now (EPOCH-409).
@@ -407,10 +442,11 @@ export async function runPipelineForBackup(
   const runId = await createRun(
     client,
     backupPath,
-    stages,
+    plan,
     collectProvenance(pythonBin, displayZone(options.displayZone ?? DEFAULT_DISPLAY_ZONE)),
     registration,
-    indicatorSet
+    indicatorSet,
+    kind
   );
   emitEvent({
     type: 'run:created',
@@ -418,14 +454,14 @@ export async function runPipelineForBackup(
     evidence_id: registration.evidenceId,
     derivative_id: registration.decryptedDerivativeId,
     label: target.label,
-    stages: stages.enabled.map((stage) => stage.name),
+    stages: plan.enabled.map((stage) => stage.name),
   });
   const results: { stage: string; success: boolean }[] = [];
   // Registration located the workspace, so a backup that reached here has one.
   const summaryPath = resolveRunSummaryPath(target, runId);
 
   try {
-    for (const stage of stages.enabled) {
+    for (const stage of plan.enabled) {
       await markStage(client, runId, stage.name, 'running');
       emitEvent({ type: 'stage:started', run_id: runId, stage: stage.name });
       const outcome = await runStage(

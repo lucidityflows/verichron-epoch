@@ -70,6 +70,7 @@ async function run(cfg: CliConfig) {
       const result = await runPipelineForBackup(client, target, cfg.dbUrl, pythonBin, stages, {
         indicatorSetHash: cfg.indicatorSetHash,
         displayZone: cfg.displayZone,
+        checkIndicators: cfg.checkIndicators,
       });
       if (result.skipped) {
         analysisResults.push({ backupPath, status: 'skipped' });

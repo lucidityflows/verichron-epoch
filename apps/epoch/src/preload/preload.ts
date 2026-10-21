@@ -97,6 +97,7 @@ const dbApi = {
     ipcRenderer.invoke('epoch:startAnalysis', workspace, labels),
   // EPOCH-308: retries the evidence for a run from its current workspace manifest entry.
   retryRun: (runId: string): Promise<{ started: boolean }> => ipcRenderer.invoke('epoch:retryRun', runId),
+  checkIndicators: (runId: string): Promise<{ started: boolean }> => ipcRenderer.invoke('epoch:checkIndicators', runId),
   // EPOCH-305: lets the renderer break out of a stalled/deadlocked run
   // without restarting the app. Resolves { cancelled: false } (rather than
   // rejecting) when nothing was actually running, since "there was nothing
