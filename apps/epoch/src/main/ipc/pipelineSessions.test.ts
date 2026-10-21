@@ -173,13 +173,13 @@ describe('AnalysisSession', () => {
 
   it('records whether a run is a workspace analysis or one retried backup, and its workspace', () => {
     const analysis = new AnalysisSession(() => {});
-    analysis.start('retry', 'run-123', '/w', ['BK'], 1000);
-    analysis.entry(entry(1, 'Analyze started for 1 backup'));
+    const call = analysis.start('retry', 'run-123', '/w', ['BK'], 1000);
+    analysis.entry(call, entry(1, 'Analyze started for 1 backup'));
     assert.deepEqual(
       (({ status, kind, target, workspace }) => ({ status, kind, target, workspace }))(analysis.snapshot()),
       { status: 'running', kind: 'retry', target: 'run-123', workspace: '/w' }
     );
-    analysis.finish({ success: true });
+    analysis.finish(call, { success: true });
     assert.equal(analysis.snapshot().status, 'finished');
     assert.equal(analysis.snapshot().log.length, 1);
   });
@@ -205,10 +205,11 @@ describe('AnalysisSession', () => {
 
   it("tracks the running stage's place and its own count, and clears the stage at completion (EPOCH-443, EPOCH-551)", () => {
     const analysis = new AnalysisSession(() => {});
-    analysis.start('workspace', '/w', '/w', ['A'], 1000);
-    analysis.follow(created(RUN, 'A'));
-    analysis.follow(event({ type: 'stage:started', run_id: RUN, stage: 'ileapp_bridge' }), 2500);
+    const call = analysis.start('workspace', '/w', '/w', ['A'], 1000);
+    analysis.follow(call, created(RUN, 'A'));
+    analysis.follow(call, event({ type: 'stage:started', run_id: RUN, stage: 'ileapp_bridge' }), 2500);
     analysis.follow(
+      call,
       event({
         type: 'stage:log',
         stage: 'ileapp_bridge',
@@ -229,29 +230,31 @@ describe('AnalysisSession', () => {
     });
     assert.equal(analysis.hasActiveStage(), true);
 
-    analysis.follow(stageFinished(RUN, 'ileapp_bridge'), 3500);
+    analysis.follow(call, stageFinished(RUN, 'ileapp_bridge'), 3500);
     assert.equal(analysis.snapshot().currentStage, null);
-    assert.deepEqual(analysis.runIds(), [RUN]);
+    assert.deepEqual(analysis.runIds(call), [RUN]);
     assert.equal(analysis.snapshot().log.length, 0, 'following an event adds no entry; the task log does');
   });
 
   it('says what each backup did when a cancel ends the call: finished, interrupted where it stopped, not started (EPOCH-550)', () => {
     const OTHER = '44444444-4444-4444-4444-444444444444';
     const analysis = new AnalysisSession(() => {});
-    analysis.start('workspace', '/w', '/w', ['A', 'B', 'C', 'D'], 1000);
-    analysis.follow(created(RUN, 'A'));
-    analysis.follow(event({ type: 'run:finished', run_id: RUN, label: 'A', state: 'complete' }));
+    const call = analysis.start('workspace', '/w', '/w', ['A', 'B', 'C', 'D'], 1000);
+    analysis.follow(call, created(RUN, 'A'));
+    analysis.follow(call, event({ type: 'run:finished', run_id: RUN, label: 'A', state: 'complete' }));
     analysis.follow(
+      call,
       event({ type: 'run:skipped', evidence_id: RUN, label: 'D', reason: 'a complete run already covers it' })
     );
-    analysis.follow(created(OTHER, 'B'));
-    analysis.follow(event({ type: 'stage:started', run_id: OTHER, stage: 'crash' }));
-    analysis.follow(stageFinished(OTHER, 'crash'));
-    analysis.follow(event({ type: 'stage:started', run_id: OTHER, stage: 'ileapp_bridge' }));
+    analysis.follow(call, created(OTHER, 'B'));
+    analysis.follow(call, event({ type: 'stage:started', run_id: OTHER, stage: 'crash' }));
+    analysis.follow(call, stageFinished(OTHER, 'crash'));
+    analysis.follow(call, event({ type: 'stage:started', run_id: OTHER, stage: 'ileapp_bridge' }));
     analysis.follow(
+      call,
       event({ type: 'stage:log', stage: 'ileapp_bridge', level: 'debug', message: 't', index: 211, total: 540 })
     );
-    analysis.finish({ success: false, cancelled: true });
+    analysis.finish(call, { success: false, cancelled: true });
 
     assert.deepEqual(
       analysis.snapshot().backups.map(({ label, status, runState, stopped }) => ({ label, status, runState, stopped })),
@@ -275,20 +278,41 @@ describe('AnalysisSession', () => {
       { success: false, error: 'the orchestrator crashed' },
     ]) {
       const analysis = new AnalysisSession(() => {});
-      analysis.start('workspace', '/w', '/w', ['A'], 1000);
-      analysis.follow(created(RUN, 'A'));
-      analysis.follow(event({ type: 'stage:started', run_id: RUN, stage: 'crash' }));
-      analysis.finish(result);
+      const call = analysis.start('workspace', '/w', '/w', ['A'], 1000);
+      analysis.follow(call, created(RUN, 'A'));
+      analysis.follow(call, event({ type: 'stage:started', run_id: RUN, stage: 'crash' }));
+      analysis.finish(call, result);
       const [backup] = analysis.snapshot().backups;
       assert.equal(backup.status, 'failed');
       assert.deepEqual(backup.stopped, { stage: 'crash', title: 'Crash Reports', progress: null });
     }
   });
 
+  it("keeps a call's late end, log and events off a newer call, and still names the old call's runs (EPOCH-580)", () => {
+    const analysis = new AnalysisSession(() => {});
+    const first = analysis.start('retry', 'run-1', '/w', ['A'], 1000);
+    analysis.follow(first, created(RUN, 'A'));
+    const second = analysis.start('check', 'run-2', '/w', ['B'], 2000);
+    // The first call's close work runs on after the second started.
+    analysis.follow(first, created('55555555-5555-5555-5555-555555555555', 'A'));
+    analysis.entry(first, entry(9, 'from the first call'));
+    analysis.logFile(first, 'first.ndjson');
+    assert.deepEqual(analysis.runIds(first), [RUN, '55555555-5555-5555-5555-555555555555'], 'its own runs to close');
+    assert.deepEqual(analysis.runIds(second), []);
+    analysis.finish(first, { success: true });
+    const now = analysis.snapshot();
+    assert.deepEqual(
+      [now.status, now.kind, now.target, now.taskLog, now.log.length],
+      ['running', 'check', 'run-2', null, 0]
+    );
+    analysis.finish(second, { success: true, analysis: [] });
+    assert.deepEqual(analysis.snapshot().result, { success: true, analysis: [] });
+  });
+
   it('refuses an event for a backup this Analyze did not ask for', () => {
     const analysis = new AnalysisSession(() => {});
-    analysis.start('workspace', '/w', '/w', ['A'], 1000);
-    assert.throws(() => analysis.follow(created(RUN, 'Z')), /did not ask for/);
+    const call = analysis.start('workspace', '/w', '/w', ['A'], 1000);
+    assert.throws(() => analysis.follow(call, created(RUN, 'Z')), /did not ask for/);
   });
 });
 

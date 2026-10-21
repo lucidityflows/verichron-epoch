@@ -48,6 +48,17 @@ function childProcess() {
 const DSN = safeTestDatabaseUrl();
 const MIGRATIONS = path.resolve(__dirname, '../../../../../packages/etl-db-writer/migrations');
 
+/**
+ * Waits until the orchestrator call a test started has finished, so its close
+ * work (the summary, the task log, the session's end) never runs on into the
+ * next test (EPOCH-580: it did on CI, and overwrote that test's state).
+ */
+async function analysisFinished(): Promise<void> {
+  await vi.waitFor(async () =>
+    assert.equal((await invoke<{ status: string }>('epoch:getAnalysisState')).status, 'finished')
+  );
+}
+
 function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   const handler = handlers.get(channel);
   assert.ok(handler, `${channel} is registered`);
@@ -112,6 +123,7 @@ describe('pipeline IPC single-flight', () => {
       /Cannot start processor while orchestrator is running/
     );
     orchestrator.emit('close', 0);
+    await analysisFinished();
   });
 });
 
@@ -381,6 +393,7 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     assert.deepEqual(await invoke('epoch:retryRun', RETRIED), { started: true });
     assert.equal(spawnMock.mock.calls.length, 2);
     next.emit('close', 0);
+    await analysisFinished();
   });
 
   it('ends the run as crashed, with the exit code, when the orchestrator exits unexpectedly', async () => {
@@ -409,6 +422,7 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
       (await db.query(`SELECT ended_reason, ended_detail FROM pipeline_runs WHERE run_id = $1`, [CRASHED])).rows[0];
     await vi.waitFor(async () => assert.equal((await ended()).ended_reason, 'crashed'));
     assert.equal((await ended()).ended_detail, 'orchestrator process exited unexpectedly (exit code 1)');
+    await analysisFinished();
   });
 
   it("Check Again runs the orchestrator for the run's backup with --check-indicators, as a check (EPOCH-557)", async () => {

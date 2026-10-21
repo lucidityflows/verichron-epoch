@@ -203,8 +203,15 @@ export class AnalysisSession {
   };
   private readonly log = new LogBuffer();
   private readonly notifier: Notifier<AnalysisState>;
-  /** The runs this call's orchestrator created, from its run:created events (EPOCH-443). */
-  private createdRuns: string[] = [];
+  /**
+   * The current call. Each call's log, events and end carry the token start()
+   * gave it, and only the current call's change the state: a call that ends
+   * after another has started (its close work runs on after the pipeline is
+   * released) can't overwrite the newer call's state (EPOCH-580).
+   */
+  private call = 0;
+  /** The runs each call's orchestrator created, from its run:created events (EPOCH-443), until it ends. */
+  private readonly createdRuns = new Map<number, string[]>();
   /** Each created run's label and stages, in order (EPOCH-550, EPOCH-551). */
   private runPlans = new Map<string, { label: string; stages: string[] }>();
 
@@ -218,9 +225,10 @@ export class AnalysisSession {
     workspace: string,
     labels: string[],
     now = Date.now()
-  ): void {
+  ): number {
+    this.call += 1;
     this.log.clear();
-    this.createdRuns = [];
+    this.createdRuns.set(this.call, []);
     this.runPlans = new Map();
     this.state = {
       status: 'running',
@@ -241,16 +249,19 @@ export class AnalysisSession {
       workspace,
     };
     this.notifier.now();
+    return this.call;
   }
 
   /** The saved log this task writes (EPOCH-570). */
-  logFile(file: string): void {
+  logFile(call: number, file: string): void {
+    if (call !== this.call) return;
     this.state.taskLog = file;
     this.notifier.soon();
   }
 
   /** Keeps one entry of the task's log, as the writer saved it (EPOCH-570). */
-  entry(entry: PipelineLogEntry): void {
+  entry(call: number, entry: PipelineLogEntry): void {
+    if (call !== this.call) return;
     this.log.add(entry);
   }
 
@@ -259,9 +270,11 @@ export class AnalysisSession {
    * what each backup did (EPOCH-550), and the running stage with its place
    * and its own count (EPOCH-551). Nothing is taken from text.
    */
-  follow(event: PipelineEvent, now = Date.now()): void {
+  follow(call: number, event: PipelineEvent, now = Date.now()): void {
+    // An earlier call's runs are still its own to close; nothing else of it is shown.
+    if (event.type === 'run:created') this.createdRuns.get(call)?.push(event.run_id);
+    if (call !== this.call) return;
     if (event.type === 'run:created') {
-      this.createdRuns.push(event.run_id);
       this.runPlans.set(event.run_id, { label: event.label, stages: event.stages });
       this.backup(event.label, { status: 'running', runId: event.run_id });
     } else if (event.type === 'run:skipped') {
@@ -310,9 +323,9 @@ export class AnalysisSession {
     this.notifier.soon();
   }
 
-  /** The runs the current or last call's orchestrator created, in order. */
-  runIds(): string[] {
-    return [...this.createdRuns];
+  /** The runs a call's orchestrator created, in order: the call's own, whichever call is current. */
+  runIds(call: number): string[] {
+    return [...(this.createdRuns.get(call) ?? [])];
   }
 
   /**
@@ -321,7 +334,9 @@ export class AnalysisSession {
    * cancelled, failed when a crash, a timeout or a process error ended it
    * (DESIGN.md §9).
    */
-  finish(result: PipelineFinishedResult): void {
+  finish(call: number, result: PipelineFinishedResult): void {
+    this.createdRuns.delete(call);
+    if (call !== this.call) return;
     const ended = result.cancelled ? ('interrupted' as const) : ('failed' as const);
     const backups = this.state.backups.map((b) => (b.status === 'running' ? { ...b, status: ended } : b));
     this.state = { ...this.state, status: 'finished', currentStage: null, backups, result };
