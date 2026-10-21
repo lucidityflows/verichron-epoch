@@ -1,4 +1,12 @@
-import type { Backup, IndicatorResultsConfig } from '@verichron/contracts';
+import type {
+  Backup,
+  IndicatorResultsConfig,
+  PrepareStep,
+  ReadTaskLog,
+  TaskKind,
+  TaskLogEntry,
+  TaskOutcome,
+} from '@verichron/contracts';
 import type {
   ForensicRecordPage,
   ForensicRecordQuery,
@@ -37,7 +45,6 @@ import type {
   ToolAvailabilityStatus,
 } from './tools';
 import type { PrepareRunProgress } from '../prepareProgress';
-import type { PrepareStep, ReadTaskLog, TaskKind, TaskLogEntry, TaskOutcome } from '@verichron/contracts';
 
 /** The examiner's settings (EPOCH-560), kept by the main process in the app's settings folder. */
 export interface AppSettings {

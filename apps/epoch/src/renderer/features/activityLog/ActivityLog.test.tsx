@@ -92,7 +92,7 @@ describe('ActivityLog', () => {
     assert.match(log.textContent ?? '', /Error: \[BK\] Reading device activity with iLEAPP failed/);
 
     fireEvent.click(screen.getByRole('button', { name: 'Full log' }));
-    assert.match(screen.getByRole('log').textContent ?? '', /DEBUG  the processor started/);
+    assert.match(screen.getByRole('log').textContent ?? '', /DEBUG {2}the processor started/);
   });
 
   it('filters by level, and says when nothing is at that level', () => {

@@ -22,14 +22,14 @@ export const features = tableFeatures({
  * use. Exported so callers can type their column arrays against the same
  * `features` this table actually renders with, instead of reconstructing
  * (or casting around) the generic by hand. */
-export type DataTableColumn<TData extends Record<string, any>> = ColumnDef<typeof features, TData, any>;
+export type DataTableColumn<TData extends object> = ColumnDef<typeof features, TData, unknown>;
 
 const DEFAULT_COLUMN_TRACK = 'minmax(7.5rem, 1fr)';
 
 const headerCellClass =
   'flex items-center px-4 py-3 text-label text-muted-foreground bg-surface border-b border-border/60';
 
-export interface DataTableProps<TData extends Record<string, any>> {
+export interface DataTableProps<TData extends object> {
   data: TData[];
   columns: DataTableColumn<TData>[];
   /** Stable row id -- required for measurement/expansion to survive
@@ -61,7 +61,7 @@ export interface DataTableProps<TData extends Record<string, any>> {
   className?: string;
 }
 
-export function DataTable<TData extends Record<string, any>>({
+export function DataTable<TData extends object>({
   data,
   columns,
   getRowId,

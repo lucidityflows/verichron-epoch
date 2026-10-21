@@ -10,7 +10,6 @@ import type {
   ToolSetupStatus,
   BackupProgress,
   CrashReportsRetryLookup,
-  CrashReportsRetryTarget,
 } from '../../shared/types/tools';
 
 export const devicesApi = {

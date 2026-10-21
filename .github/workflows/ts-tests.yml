@@ -110,6 +110,12 @@ jobs:
       - name: Typecheck app
         run: pnpm --filter @verichron/epoch typecheck
 
+      # EPOCH-571: errors fail the job, so they can't build up unseen again.
+      # Warnings are reported, not failed: today's three are the React
+      # Compiler skipping components built on TanStack Virtual.
+      - name: Lint app
+        run: pnpm --filter @verichron/epoch lint
+
       - name: Build app (main, preload, renderer)
         run: pnpm --filter @verichron/epoch build:vite
 

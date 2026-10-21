@@ -324,19 +324,29 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord, o
     onCheckFinished?.();
   });
 
-  useEffect(() => {
-    let active = true;
+  // Read again for another run, when its state changes, or after a Check Again: the reset
+  // happens while rendering, the read in the effect, which sets state only when it answers.
+  const readFor = selectedRun
+    ? `${selectedRun.run_id}|${selectedRun.state}|${selectedRun.finished_at}|${version}`
+    : null;
+  const [shownFor, setShownFor] = useState<string | null>(null);
+  if (shownFor !== readFor) {
+    setShownFor(readFor);
     setResults(null);
     setError(null);
-    if (!selectedRun) return;
+  }
+  const runId = selectedRun?.run_id ?? null;
+  useEffect(() => {
+    if (readFor === null || runId === null) return;
+    let active = true;
     runsApi
-      .getIndicatorResults(selectedRun.run_id)
+      .getIndicatorResults(runId)
       .then((r) => active && setResults(r))
       .catch((err) => active && setError(err instanceof Error ? err.message : String(err)));
     return () => {
       active = false;
     };
-  }, [selectedRun, version]);
+  }, [readFor, runId]);
 
   let body: React.ReactNode;
   if (!selectedRun) {

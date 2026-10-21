@@ -15,15 +15,12 @@ import {
   resolveProcessorSummaryPaths,
   resolveWorkspaceBackup,
   type Backup,
+  type EventProducer,
+  type PipelineEvent,
+  type TaskOutcome,
 } from '@verichron/contracts';
 import { getInterruptedEvidence, getRunDecryptedPath } from '@verichron/etl-db-reader';
-import type { EventProducer, LogLevel, PipelineEvent, TaskOutcome } from '@verichron/contracts';
-import type {
-  AnalysisState,
-  PipelineFinishedResult,
-  AnalysisRunStatus,
-  PipelineLogEntry,
-} from '../../shared/types/window';
+import type { AnalysisState, PipelineFinishedResult, AnalysisRunStatus } from '../../shared/types/window';
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
 import { PipelineSingleFlight } from './pipelineSingleFlight';
 import { analysisTargets, orchestratorArgs } from './analysisTargets';
@@ -302,7 +299,8 @@ export function registerPipelineHandlers(
     const only = options?.only ?? [];
     const releasePipeline = pipelineSingleFlight.reserve('processor');
     const startedAt = Date.now();
-    prepareSession.start(source, workspacePath, only, startedAt);
+    // This Prepare's token: its log, events and end change only its own state (EPOCH-592).
+    const token = prepareSession.start(source, workspacePath, only, startedAt);
 
     // The selected backups' identifiers, so the log can replace them (docs/event-log.md §6.3).
     const notes: TaskLogSetup['notes'] = [];
@@ -335,8 +333,8 @@ export function registerPipelineHandlers(
           notes,
         },
         (entry) => {
-          prepareSession.entry(entry);
-          sendToRenderer('epoch:prepareLog', entry);
+          // An earlier Prepare's late entries (its task:finished) stay in its saved log, off the screen.
+          if (prepareSession.entry(token, entry)) sendToRenderer('epoch:prepareLog', entry);
         }
       );
     } catch (err) {
@@ -345,10 +343,10 @@ export function registerPipelineHandlers(
       const error = `The task log could not be created, so Prepare Evidence did not start: ${
         err instanceof Error ? err.message : String(err)
       }`;
-      prepareSession.finish({ success: false, error, workspace: workspacePath });
-      throw new Error(error);
+      prepareSession.finish(token, { success: false, error, workspace: workspacePath });
+      throw new Error(error, { cause: err });
     }
-    prepareSession.logFile(log.file);
+    prepareSession.logFile(token, log.file);
 
     // pnpm --silent: its script banners would print the repository's path (docs/event-log.md §6.6).
     const args = ['--silent', '--filter', '@verichron/processor', 'dev', '--', '--source', source];
@@ -367,7 +365,7 @@ export function registerPipelineHandlers(
       runningProcessor = null;
       pendingPasswordResolve = null;
       await log.finish(result, message);
-      prepareSession.finish(outcome);
+      prepareSession.finish(token, outcome);
     };
 
     let child: ChildProcessWithoutNullStreams;
@@ -392,14 +390,14 @@ export function registerPipelineHandlers(
     // The failed labels from prepare:finished, once the processor reports its own result.
     const reported: { failedLabels: string[] | null } = { failedLabels: null };
     const feed = feedTaskLog(log, 'processor', child, (event) => {
-      prepareSession.follow(event);
+      prepareSession.follow(token, event);
       if (event.type === 'password:required') {
         // The answer goes to stdin, and the log holds it only to remove it if it ever appears (§6.2).
         pendingPasswordResolve = (password: string) => {
           log.addSecret(password);
           child.stdin.write(password + '\n');
         };
-        prepareSession.passwordRequested(event.label);
+        prepareSession.passwordRequested(token, event.label);
       } else if (event.type === 'prepare:finished') {
         reported.failedLabels = event.failed_labels;
       }
@@ -551,7 +549,7 @@ export function registerPipelineHandlers(
         err instanceof Error ? err.message : String(err)
       }`;
       analysisSession.finish(token, { success: false, error });
-      throw new Error(error);
+      throw new Error(error, { cause: err });
     }
     analysisSession.logFile(token, log.file);
 

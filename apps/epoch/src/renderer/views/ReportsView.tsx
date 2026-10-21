@@ -27,27 +27,35 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ selectedRun, stages })
   const [reportLoadError, setReportLoadError] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
 
-  const loadReport = async (run: PipelineRunRow) => {
-    setReportLoading(true);
+  // Read again for another run, or when this one's state changes: an analysis
+  // that is still running writes its report at the end. The reset happens
+  // while rendering, the read in the effect, which sets state only when it
+  // answers (EPOCH-571).
+  const readFor = selectedRun ? `${selectedRun.run_id}|${selectedRun.state}|${selectedRun.finished_at}` : null;
+  const [shownFor, setShownFor] = useState<string | null>(null);
+  if (shownFor !== readFor) {
+    setShownFor(readFor);
+    setReport(null);
     setReportLoadError(null);
-    try {
-      const result = await reportsApi.getReport(run.run_id);
-      setReport(result);
-    } catch (err) {
-      console.error('Failed to load report:', err);
-      setReportLoadError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setReportLoading(false);
-    }
-  };
+    setReportLoading(readFor !== null);
+  }
 
+  const runId = selectedRun?.run_id ?? null;
   useEffect(() => {
-    if (selectedRun) {
-      loadReport(selectedRun);
-    } else {
-      setReport(null);
-    }
-  }, [selectedRun]);
+    if (readFor === null || runId === null) return;
+    let active = true;
+    reportsApi
+      .getReport(runId)
+      .then((result) => active && setReport(result))
+      .catch((err: unknown) => {
+        console.error('Failed to load report:', err);
+        if (active) setReportLoadError(err instanceof Error ? err.message : 'Unknown error');
+      })
+      .finally(() => active && setReportLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [readFor, runId]);
 
   const openReportFile = async () => {
     if (!selectedRun) return;

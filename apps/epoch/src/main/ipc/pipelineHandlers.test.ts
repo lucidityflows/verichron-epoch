@@ -1,4 +1,3 @@
-import { safeTestDatabaseUrl } from '@verichron/contracts';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
@@ -15,6 +14,7 @@ import {
   emptyWorkspaceManifest,
   readWorkspaceManifestSync,
   resolveWorkspaceBackup,
+  safeTestDatabaseUrl,
 } from '@verichron/contracts';
 
 const { handlers, spawnMock } = vi.hoisted(() => ({
@@ -56,6 +56,13 @@ const MIGRATIONS = path.resolve(__dirname, '../../../../../packages/etl-db-write
 async function analysisFinished(): Promise<void> {
   await vi.waitFor(async () =>
     assert.equal((await invoke<{ status: string }>('epoch:getAnalysisState')).status, 'finished')
+  );
+}
+
+/** As analysisFinished, for a Prepare (EPOCH-592). */
+async function prepareFinished(): Promise<void> {
+  await vi.waitFor(async () =>
+    assert.equal((await invoke<{ status: string }>('epoch:getPrepareState')).status, 'finished')
   );
 }
 
@@ -103,6 +110,7 @@ describe('pipeline IPC single-flight', () => {
     );
     await assert.rejects(invoke('epoch:retryRun', 'run-123'), /Cannot start orchestrator while processor is running/);
     processor.emit('close', 0);
+    await prepareFinished();
 
     const orchestrator = childProcess();
     spawnMock.mockReturnValueOnce(orchestrator);

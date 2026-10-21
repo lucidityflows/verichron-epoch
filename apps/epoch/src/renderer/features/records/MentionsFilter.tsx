@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { EntityValueRow } from '@verichron/etl-db-reader';
 import { runsApi } from '../../api/runs';
 import type { EntityOverview } from '../../../shared/types/window';
@@ -30,15 +30,16 @@ export function MentionsFilter({ runId, overview, kind, value, onChange }: Menti
   // The kind being browsed; a kind alone narrows nothing, so it is the filter's own until a value is chosen.
   const [browsing, setBrowsing] = useState(kind);
   const [text, setText] = useState(value ?? '');
-  // Set when this filter cleared the mention itself, so the kind being browsed stays.
-  const clearedHere = useRef(false);
+  // Set when this filter cleared the mention itself, so the kind being browsed stays. State, not a
+  // ref: it decides what the next render shows, when the cleared filters come back as props.
+  const [clearedHere, setClearedHere] = useState(false);
   const [values, setValues] = useState<EntityValueRow[]>([]);
   const [total, setTotal] = useState(0);
   const [shownFor, setShownFor] = useState(`${kind}|${value}`);
   if (shownFor !== `${kind}|${value}`) {
     setShownFor(`${kind}|${value}`);
-    if (clearedHere.current) {
-      clearedHere.current = false;
+    if (clearedHere) {
+      setClearedHere(false);
     } else {
       // Changed from outside (Clear Filters): show what is in use.
       setText(value ?? '');
@@ -78,7 +79,7 @@ export function MentionsFilter({ runId, overview, kind, value, onChange }: Menti
             setValues([]);
             setBrowsing(event.target.value || undefined);
             if (value !== undefined) {
-              clearedHere.current = true;
+              setClearedHere(true);
               onChange(undefined, undefined);
             }
           }}
@@ -109,10 +110,10 @@ export function MentionsFilter({ runId, overview, kind, value, onChange }: Menti
               const typed = event.target.value;
               setText(typed);
               if (values.some((v) => v.value === typed)) {
-                clearedHere.current = true;
+                setClearedHere(true);
                 onChange(browsing, typed);
               } else if (value !== undefined) {
-                clearedHere.current = true;
+                setClearedHere(true);
                 onChange(undefined, undefined);
               }
             }}

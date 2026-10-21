@@ -113,11 +113,11 @@ describe('PrepareSession', () => {
 
   it('keeps progress, a pending password, its log and the result for a page that mounts later', () => {
     const { prepare } = session();
-    prepare.start('/home/x/Downloads', '/home/x/verichron-workspace', ['BK'], 1000);
-    prepare.logFile('prepare-2026-10-18T153002Z-1f3a9c2e.ndjson');
-    prepare.entry(entry(1, 'Prepare Evidence started for 1 backup'));
-    prepare.follow(event({ type: 'backup:step', label: 'BK', step: 'hash', status: 'started' }), 2000);
-    prepare.passwordRequested('BK');
+    const call = prepare.start('/home/x/Downloads', '/home/x/verichron-workspace', ['BK'], 1000);
+    prepare.logFile(call, 'prepare-2026-10-18T153002Z-1f3a9c2e.ndjson');
+    prepare.entry(call, entry(1, 'Prepare Evidence started for 1 backup'));
+    prepare.follow(call, event({ type: 'backup:step', label: 'BK', step: 'hash', status: 'started' }), 2000);
+    prepare.passwordRequested(call, 'BK');
 
     const mid = prepare.snapshot();
     assert.equal(mid.status, 'running');
@@ -130,7 +130,7 @@ describe('PrepareSession', () => {
     );
 
     prepare.passwordSubmitted();
-    prepare.finish({ success: true, exitCode: 0, workspace: '/home/x/verichron-workspace' });
+    prepare.finish(call, { success: true, exitCode: 0, workspace: '/home/x/verichron-workspace' });
     const done = prepare.snapshot();
     assert.equal(done.status, 'finished');
     assert.equal(done.passwordFor, null);
@@ -140,9 +140,9 @@ describe('PrepareSession', () => {
 
   it('sends a change at once for a start, a password and a finish, without the log', () => {
     const { prepare, sent } = session();
-    prepare.start('/s', '/w', ['BK'], 1000);
-    prepare.passwordRequested('BK');
-    prepare.finish({ success: false, error: 'x' });
+    const call = prepare.start('/s', '/w', ['BK'], 1000);
+    prepare.passwordRequested(call, 'BK');
+    prepare.finish(call, { success: false, error: 'x' });
     assert.deepEqual(
       sent.map((s) => [s.status, s.passwordFor]),
       [
@@ -156,8 +156,8 @@ describe('PrepareSession', () => {
 
   it('keeps the most recent entries for a page that mounts mid-run; the saved log keeps all', () => {
     const { prepare } = session();
-    prepare.start('/s', '/w', ['BK']);
-    for (let i = 1; i <= KEPT_LOG_LINES + 5; i++) prepare.entry(entry(i, `line ${i}`));
+    const call = prepare.start('/s', '/w', ['BK']);
+    for (let i = 1; i <= KEPT_LOG_LINES + 5; i++) prepare.entry(call, entry(i, `line ${i}`));
     const log = prepare.snapshot().log;
     assert.equal(log.length, KEPT_LOG_LINES);
     assert.equal(log[0].message, 'line 6');
@@ -165,6 +165,26 @@ describe('PrepareSession', () => {
     prepare.start('/s', '/w', ['BK']);
     assert.equal(prepare.snapshot().log.length, 0, 'a new run starts a new log');
     assert.equal(prepare.snapshot().taskLog, null);
+  });
+
+  it("keeps a Prepare's late end, log, events and password request off a newer Prepare (EPOCH-592)", () => {
+    const { prepare } = session();
+    const first = prepare.start('/s', '/w', ['A'], 1000);
+    const second = prepare.start('/s', '/w', ['B'], 2000);
+    // The first Prepare's close work runs on after the second started.
+    assert.equal(prepare.entry(first, entry(9, 'from the first Prepare')), false, 'not kept, so not shown');
+    prepare.logFile(first, 'first.ndjson');
+    prepare.follow(first, event({ type: 'backup:step', label: 'A', step: 'hash', status: 'started' }));
+    prepare.passwordRequested(first, 'A');
+    prepare.finish(first, { success: false, error: 'the first Prepare failed' });
+    const now = prepare.snapshot();
+    assert.deepEqual(
+      [now.status, now.labels, now.taskLog, now.passwordFor, now.result, now.log.length],
+      ['running', ['B'], null, null, null, 0]
+    );
+    assert.equal(prepare.entry(second, entry(1, 'from the second Prepare')), true);
+    prepare.finish(second, { success: true });
+    assert.equal(prepare.snapshot().result?.success, true);
   });
 });
 

@@ -222,10 +222,11 @@ export class IosBackupSource implements DeviceBackupSource {
         try {
           await discardCrashReportsCopy(backupDir);
         } catch (removal) {
+          // The removal's failure is what this error reports; the record's failure is in its message.
           throw new Error(
             `The crash logs were copied, but neither the pull record (${reason}) nor the removal of the unrecorded copy ` +
               `(${removal instanceof Error ? removal.message : String(removal)}) succeeded.`,
-            { cause: err }
+            { cause: removal }
           );
         }
         throw new Error(
