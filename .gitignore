@@ -154,3 +154,6 @@ summary.md
 # Compiler output beside the contracts source; it belongs in dist/ (EPOCH-451)
 packages/contracts/ts/*.js
 packages/contracts/ts/*.d.ts
+
+# The PostgreSQL source tarball tools/postgres/build.sh downloads (EPOCH-477)
+tools/postgres/.cache/

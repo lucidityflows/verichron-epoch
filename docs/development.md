@@ -249,6 +249,23 @@ External tools are tested through stub executables and servers (a stub decrypt
 interpreter, `sqlite3`, iLEAPP, Ollama), so tests exercise the real process
 boundary.
 
+### The Lab bundle's PostgreSQL
+
+The Lab bundle carries its own PostgreSQL 17, built from source (EPOCH-477).
+The source's version and SHA-256, and the Debian 13 container it is built in
+(pinned by digest), are in `tools/postgres/versions.env`. Docker is needed; the
+compile runs for several minutes.
+
+```bash
+tools/postgres/build.sh <output directory>   # <output directory>/postgresql
+tools/postgres/check.sh <output directory>   # moved, socket-only, every migration
+```
+
+The check moves the build to another path and requires that psql loads the
+build's own libpq, that the server loads nothing beyond libc, libm and zlib
+(Debian 13's base system), that it listens on no TCP port, and that every
+migration applies, leaving exactly the extensions the schema uses (`pg_trgm`).
+
 ### Real-device checks for iPhone pulls
 
 Stub tools can't show what an iPhone does. A ticket that changes the iPhone
@@ -275,9 +292,10 @@ New device behaviour seen during these checks is added to the verified list in
 | Workflow | Runs |
 |---|---|
 | `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 17, pytest on both tiers, the runtime environment and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
+| `.github/workflows/postgres-build.yml` | Only when `tools/postgres/` or the migrations change: the Lab bundle's PostgreSQL built from source, then checked as below |
 | `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, lint (`pnpm --filter @verichron/epoch lint`: errors fail the job, EPOCH-571), Vite build and tests |
 
-Both workflows install the toolchain from `mise.toml` and Python from
+The Python and TypeScript workflows install the toolchain from `mise.toml` and Python from
 `.python-version`, the same files a development machine uses. All Actions are
 pinned to full commit SHAs.
 

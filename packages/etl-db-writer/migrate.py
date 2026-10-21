@@ -75,6 +75,18 @@ def _constraint(name: str) -> str:
     return f"SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '{name}')"
 
 
+# 0024's last statement grants the runtime the counts function.
+_RECORD_CONTEXT_GRANTED = (
+    "SELECT CASE WHEN to_regprocedure('public.record_context_counts(uuid, bigint, interval)') IS NOT NULL "
+    "AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'verichron_epoch_runtime') "
+    "THEN has_function_privilege('verichron_epoch_runtime', "
+    "'public.record_context_counts(uuid, bigint, interval)', 'EXECUTE') ELSE FALSE END"
+)
+_PGCRYPTO_DROPPED = (
+    f"SELECT ({_RECORD_CONTEXT_GRANTED}) AND NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto')"
+)
+
+
 #: For each migration, two checks: `started` is true once its FIRST object
 #: exists, `finished` once its LAST statement has run. Used only by
 #: bootstrap_if_needed(); add an entry with every new migration, and keep
@@ -176,12 +188,12 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
     ),
     "0024_record_context.sql": (
         "SELECT to_regprocedure('public.correlation_window()') IS NOT NULL",
-        # Its last statement grants the runtime the counts function.
-        "SELECT CASE WHEN to_regprocedure('public.record_context_counts(uuid, bigint, interval)') IS NOT NULL "
-        "AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'verichron_epoch_runtime') "
-        "THEN has_function_privilege('verichron_epoch_runtime', "
-        "'public.record_context_counts(uuid, bigint, interval)', 'EXECUTE') ELSE FALSE END",
+        _RECORD_CONTEXT_GRANTED,
     ),
+    # A drop leaves nothing to find, and "no pgcrypto" alone holds on an empty
+    # database too: so 0024 finished and pgcrypto gone. One statement, so
+    # started and finished are the same check.
+    "0025_drop_pgcrypto.sql": (_PGCRYPTO_DROPPED, _PGCRYPTO_DROPPED),
 }
 
 
