@@ -5,7 +5,17 @@ import { runsApi } from '../../api/runs';
 /** The filters Forensic Records offers (EPOCH-556); paging is the hook's own. */
 export type RecordFilters = Pick<
   ForensicRecordQuery,
-  'sourceType' | 'artifact' | 'module' | 'category' | 'tier' | 'eventTimeFrom' | 'eventTimeTo' | 'search' | 'direction'
+  | 'sourceType'
+  | 'artifact'
+  | 'module'
+  | 'category'
+  | 'tier'
+  | 'eventTimeFrom'
+  | 'eventTimeTo'
+  | 'search'
+  | 'mentionKind'
+  | 'mentionValue'
+  | 'direction'
 >;
 
 /** Rows read per page: enough to fill a tall window twice. */

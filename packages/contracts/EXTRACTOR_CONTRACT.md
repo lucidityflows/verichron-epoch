@@ -17,7 +17,7 @@ The stage's name is its directory name.
 | `entrypoint` | File to run, relative to the stage directory |
 | `runtime` | `python` (run with the repo's `.venv` interpreter) or `node` |
 | `order` | Run position; unique among enabled stages |
-| `reads` | What the stage reads: a derivative, `decrypted` (the decrypted backup), `ileapp_output` (iLEAPP's report), both produced by the processor, or `crash_reports` (the device's crash logs); or `indicator_set`, a registered indicator set the stage checks the evidence's facts against (EPOCH-491) |
+| `reads` | What the stage reads: a derivative, `decrypted` (the decrypted backup), `ileapp_output` (iLEAPP's report), both produced by the processor, or `crash_reports` (the device's crash logs); or `indicator_set`, a registered indicator set the stage checks the evidence's facts against (EPOCH-491); or `facts`, the evidence's current facts, which the stage reads unit by unit (EPOCH-581) |
 | `parserVersion` | Integer, bumped whenever what the stage writes changes; omit if it writes no facts |
 | `enabled` | `false` records the stage as `skipped` instead of running it. Disabling a stage is a team decision, never a shortcut |
 
@@ -32,7 +32,7 @@ The orchestrator registers the evidence before the run and passes every stage:
 |---|---|
 | `--run-id`, `--evidence-id` | This run and the evidence it processes |
 | `--derivative-id`, `--derivative-path` | The derivative this stage reads (`reads` in `stage.json`): its id, and the directory to read. A stage whose derivative isn't registered for the backup fails before it is spawned, unless its absence is a fact (crash logs never acquired): it is then skipped with the reason |
-| `--indicator-set-id` | Instead of a derivative, for a stage that reads `indicator_set`: the registered set to check, the newest unless the orchestrator was given one. With none registered, the stage is skipped with the reason. Its facts are filed under the set |
+| `--indicator-set-id` | Instead of a derivative, for a stage that reads `indicator_set`: the registered set to check, the newest unless the orchestrator was given one. With none registered, the stage is skipped with the reason. Its facts are filed under the set. A stage that reads `facts` is given neither: it files each unit it writes under the fact unit it read (`db_writer.with_source_unit`) |
 | `--parser-version` | From `stage.json`, when declared |
 | `--stage-name` | The stage's name (its directory), passed with `--parser-version`; it labels the items the stage records as failed (EPOCH-432) |
 | `--backup-path` | Where the decrypted backup is |

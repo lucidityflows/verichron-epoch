@@ -4,7 +4,7 @@ export interface StageManifest {
   entrypoint: string;
   runtime: 'python' | 'node';
   order: number;
-  /** The derivative this stage reads, whose id and path the orchestrator passes (EPOCH-416), or the indicator set it checks (EPOCH-491). */
+  /** The derivative this stage reads, whose id and path the orchestrator passes (EPOCH-416), the indicator set it checks (EPOCH-491), or the evidence's facts (EPOCH-581). */
   reads: StageInput;
   /** Declared by every stage that writes facts; passed as --parser-version (EPOCH-404). */
   parserVersion?: number;

@@ -8,6 +8,9 @@ import {
   getRecordFacets,
   getEvidenceCompleteness,
   getRecordDetail,
+  getEntityKinds,
+  getEntityValues,
+  getEntityCoverage,
   getIndicatorChecks,
   getStageFailures,
   getStillFailing,
@@ -15,9 +18,10 @@ import {
   type ForensicRecordPage,
   type ItemFailurePage,
   type ForensicRecordQuery,
+  type EntityValueQuery,
 } from '@verichron/etl-db-reader';
-import { indicatorResultsConfig } from '@verichron/contracts';
-import type { IndicatorResults } from '../../shared/types/window';
+import { entityKinds, entityShapeHints, indicatorResultsConfig } from '@verichron/contracts';
+import type { EntityOverview, IndicatorResults } from '../../shared/types/window';
 
 /** What a run with no registered evidence (pre-EPOCH-404) shows: nothing,
  * stated as such, rather than another evidence item's facts. */
@@ -106,6 +110,28 @@ export function registerDbHandlers(dbPool: Pool) {
   ipcMain.handle('epoch:getRecordDetail', async (_event, runId: string, recordId: string) => {
     const evidenceId = await getRunEvidence(dbPool, runId);
     return evidenceId ? getRecordDetail(dbPool, evidenceId, recordId) : null;
+  });
+
+  // What the evidence's records mention (EPOCH-581): each kind with its title
+  // from entity_rules.json, and what the rules didn't read.
+  ipcMain.handle('epoch:getEntityOverview', async (_event, runId: string): Promise<EntityOverview | null> => {
+    const evidenceId = await getRunEvidence(dbPool, runId);
+    if (!evidenceId) return null;
+    const titles = new Map(entityKinds().map((k) => [k.kind, k.title]));
+    const [kinds, coverage] = await Promise.all([
+      getEntityKinds(dbPool, evidenceId),
+      getEntityCoverage(dbPool, evidenceId),
+    ]);
+    return {
+      kinds: kinds.map((k) => ({ ...k, title: titles.get(k.kind) ?? k.kind })),
+      coverage,
+      shapeHints: entityShapeHints(),
+    };
+  });
+
+  ipcMain.handle('epoch:getEntityValues', async (_event, runId: string, kind: string, query?: EntityValueQuery) => {
+    const evidenceId = await getRunEvidence(dbPool, runId);
+    return evidenceId ? getEntityValues(dbPool, evidenceId, kind, query ?? {}) : { rows: [], total: 0 };
   });
 
   // Every check of the selected run's evidence (EPOCH-493), with the stale

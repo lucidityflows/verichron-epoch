@@ -13,6 +13,8 @@ Owns exactly what the two shared tables need:
                      evidence-scoped (EPOCH-402): see IngestContext.
   - write_record() / write_records() -> validated insert into forensic_records
   - record_failures() -> the items a stage could not ingest (EPOCH-432)
+  - IngestUnit.write_entities() -> what a fact unit's records mention, into
+                     record_entities (EPOCH-581)
 
 Deliberately does NOT own:
   - source-format parsing (each extractor's own code)
@@ -109,8 +111,13 @@ class IngestContext:
     """Who an ingest is stamped with: the evidence, the input being read, the
     run doing the reading, and the parser version doing the parsing.
 
-    The input is exactly one of a derivative of the evidence (every extractor)
-    or a registered indicator set (the indicator-match stage, EPOCH-491).
+    The input is exactly one of a derivative of the evidence (every extractor),
+    a registered indicator set (the indicator-match stage, EPOCH-491), or a
+    completed fact unit of the evidence (the entities stage, EPOCH-581). The
+    entities stage reads the evidence's facts, not one input the orchestrator
+    names: it builds one context per fact unit it reads, with that unit's
+    ingest_id as read from the ledger, and every other value from the
+    orchestrator (`with_source_unit`).
 
     Built once per extractor process from the orchestrator's CLI arguments
     (`add_context_args` / `context_from_args`) and handed to every `ingest()`
@@ -129,6 +136,7 @@ class IngestContext:
     parser_version: int
     indicator_set_id: str | None = None
     stage_name: str | None = None
+    source_ingest_id: int | None = None
 
     def __post_init__(self) -> None:
         for name in ("evidence_id", "run_id"):
@@ -137,14 +145,44 @@ class IngestContext:
                     f"IngestContext.{name} is required: an ingest cannot happen before "
                     "evidence is registered (EPOCH-404's pre-flight step)"
                 )
-        if bool(self.derivative_id) == bool(self.indicator_set_id):
+        if sum(map(bool, (self.derivative_id, self.indicator_set_id, self.source_ingest_id))) != 1:
             raise ValueError(
-                "IngestContext needs exactly one input: a derivative_id (the derivative read) "
-                "or an indicator_set_id (the set checked, EPOCH-491)"
+                "IngestContext needs exactly one input: a derivative_id (the derivative read), "
+                "an indicator_set_id (the set checked, EPOCH-491) or a source_ingest_id (the fact unit read, EPOCH-581)"
             )
         version = self.parser_version
         if not isinstance(version, int) or isinstance(version, bool) or version < 1:
             raise ValueError(f"IngestContext.parser_version must be an integer >= 1, got {version!r}")
+
+
+def with_source_unit(args, source_ingest_id: int) -> IngestContext:
+    """The context for one unit the entities stage reads from a fact unit
+    (EPOCH-581): the orchestrator's identity, and that unit's ingest_id."""
+    if args.derivative_id or args.indicator_set_id:
+        raise ValueError("a stage that reads the evidence's facts is given no derivative and no indicator set")
+    return IngestContext(
+        evidence_id=args.evidence_id,
+        derivative_id=None,
+        run_id=args.run_id,
+        parser_version=args.parser_version,
+        stage_name=args.stage_name,
+        source_ingest_id=source_ingest_id,
+    )
+
+
+@dataclass(frozen=True)
+class Mention:
+    """One value a record mentions (EPOCH-581): its kind, the field it was
+    read from (its role), and its normalized value."""
+
+    record_id: int
+    kind: str
+    role: str
+    normalized_value: str
+
+    def __post_init__(self) -> None:
+        if not self.kind.strip() or not self.role.strip() or self.normalized_value == "":
+            raise ValueError(f"a mention needs a kind, a role and a value: {self!r}")
 
 
 def add_context_args(parser) -> None:
@@ -200,6 +238,7 @@ class IngestUnit:
         self.ingest_id = ingest_id
         self.already_ingested = already_ingested
         self.records_written = 0
+        self.entities_written = 0
 
     def write(self, records: list[NormalizedRecord]) -> int:
         """Write validated records for this file. Callable more than once;
@@ -216,6 +255,36 @@ class IngestUnit:
         self._guard()
         write_record(self._conn, self.ingest_id, self._ctx.evidence_id, record)
         self.records_written += 1
+
+    def write_entities(self, mentions: Iterable[Mention]) -> int:
+        """Write what the records of this unit's source unit mention (EPOCH-581).
+
+        Only a unit read from a fact unit holds entities, and each must name a
+        record of that unit; the database refuses any other (0022). A value
+        mentioned twice in one field is written once. Entities are not
+        records: the ledger's record_count doesn't include them.
+        """
+        self._guard()
+        if self._ctx.source_ingest_id is None:
+            raise RuntimeError("only a unit read from a fact unit (source_ingest_id) holds entities")
+        rows = list(dict.fromkeys(mentions))
+        if not rows:
+            return 0
+        with self._conn.cursor() as cur:
+            psycopg2.extras.execute_values(
+                cur,
+                """
+                INSERT INTO record_entities (ingest_id, evidence_id, record_id, kind, role, normalized_value)
+                VALUES %s
+                """,
+                [
+                    (self.ingest_id, self._ctx.evidence_id, m.record_id, m.kind, m.role, m.normalized_value)
+                    for m in rows
+                ],
+                page_size=1000,
+            )
+        self.entities_written += len(rows)
+        return len(rows)
 
     def set_raw_payload(self, payload: dict[str, Any]) -> None:
         """Attach the parsed payload to the ledger row.
@@ -351,12 +420,13 @@ def ingest(
             cur.execute(
                 """
                 INSERT INTO ingested_files
-                    (evidence_id, derivative_id, indicator_set_id, file_hash, source_type, parser_version,
-                     file_path, file_name, payload_kind, raw_payload)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (evidence_id, derivative_id, indicator_set_id, source_ingest_id, file_hash, source_type,
+                     parser_version, file_path, file_name, payload_kind, raw_payload)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (evidence_id, file_hash, source_type, parser_version) DO UPDATE SET
                     derivative_id = EXCLUDED.derivative_id,
                     indicator_set_id = EXCLUDED.indicator_set_id,
+                    source_ingest_id = EXCLUDED.source_ingest_id,
                     file_path     = EXCLUDED.file_path,
                     file_name     = EXCLUDED.file_name,
                     payload_kind  = EXCLUDED.payload_kind,
@@ -369,6 +439,7 @@ def ingest(
                     ctx.evidence_id,
                     ctx.derivative_id,
                     ctx.indicator_set_id,
+                    ctx.source_ingest_id,
                     file_hash,
                     source_type,
                     parser_version,
@@ -400,6 +471,7 @@ def ingest(
                 # Reclaim an abandoned unit. A no-op for a row we just
                 # inserted; for a stranded one it clears partial records so
                 # this attempt's write is the only contribution.
+                cur.execute("DELETE FROM record_entities WHERE ingest_id = %s", (ingest_id,))
                 cur.execute("DELETE FROM forensic_records WHERE ingest_id = %s", (ingest_id,))
 
         unit = IngestUnit(conn, ctx, file_path, file_hash, ingest_id, already_ingested)

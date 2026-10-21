@@ -10,6 +10,10 @@ import type {
   RecordFacets,
   EvidenceCompleteness,
   RecordDetail,
+  EntityKindCount,
+  EntityCoverage,
+  EntityValueQuery,
+  EntityValuePage,
 } from '@verichron/etl-db-reader';
 import type {
   BackupProgress,
@@ -254,6 +258,14 @@ export interface PullLogState {
   log: PipelineLogEntry[];
 }
 
+/** What the evidence's records mention, by kind, and what the entity rules didn't read (EPOCH-581). */
+export interface EntityOverview {
+  kinds: Array<EntityKindCount & { title: string }>;
+  coverage: EntityCoverage;
+  /** What each shape hint in `coverage.unread[].shaped` is called. */
+  shapeHints: Record<string, string>;
+}
+
 declare global {
   interface Window {
     epoch: {
@@ -284,6 +296,9 @@ declare global {
       getRecordFacets: (runId: string, query?: ForensicRecordQuery) => Promise<RecordFacets | null>;
       getEvidenceCompleteness: (runId: string) => Promise<EvidenceCompleteness | null>;
       getRecordDetail: (runId: string, recordId: string) => Promise<RecordDetail | null>;
+      // EPOCH-581: null when the run has no registered evidence.
+      getEntityOverview: (runId: string) => Promise<EntityOverview | null>;
+      getEntityValues: (runId: string, kind: string, query?: EntityValueQuery) => Promise<EntityValuePage>;
       getIndicatorResults: (runId: string) => Promise<IndicatorResults>;
       getReport: (runId: string) => Promise<ReportResult>;
       openReport: (runId: string) => Promise<boolean>;

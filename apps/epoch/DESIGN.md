@@ -749,9 +749,18 @@ Decided 2026-10-20 by the project owner (EPOCH-411, EPOCH-556, U6a; board 14
   module that found nothing never reads like one that didn't run.
 - **Filters:** search across every field's value (never a field's name),
   Source, Category (iLEAPP's own grouping), Module, Artifact and Tier, and a
-  time range typed in the examiner's zone. Module narrows Artifact. There is
-  no "type of fact" filter until entity normalization (EPOCH-581) can count it
-  completely.
+  time range typed in the examiner's zone. Module narrows Artifact.
+  **Mentions** (EPOCH-581) takes the place of a "type of fact" filter: a
+  kind (Domain, App, Phone number…) with its count of values, then one of the
+  values found, offered as the examiner types with each value's record count;
+  the records narrow only once a value found is chosen.
+- **Entities:** a panel under Evidence Completeness gives each kind's values
+  and records, and the values in ruled fields that didn't fit their kind. The
+  fields no entity rule reads whose values are shaped like an entity are
+  listed in the warning role, each with its shapes ("1,752 shaped like a phone
+  number"), to review first; every field that held values and that no rule
+  reads is behind a disclosure. Before the entities stage has read the
+  evidence, it says so rather than showing nothing.
 - **True counts:** every filter lists every value with its count from the
   database, exact for the other filters in use, and a value the other filters
   exclude is listed with 0. The line above the table gives the total and the

@@ -12,6 +12,7 @@
     "ts/evidenceSidecar.ts",
     "ts/contractVersion.ts",
     "ts/indicatorResults.ts",
+    "ts/entityRules.ts",
     "ts/derivativeMarker.ts",
     "ts/crashReportsAcquisition.ts",
     "ts/discoverBackups.ts",

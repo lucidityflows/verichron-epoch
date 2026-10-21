@@ -274,6 +274,63 @@ Reads go through two views (R27):
 
 The report and the desktop app both read these views, so they can't disagree.
 
+## Entities
+
+What a record mentions is read out of it once, by declared rules, and stored
+(EPOCH-581): domains, URLs, apps (bundle IDs), processes, email addresses,
+phone numbers, IP addresses, Wi-Fi networks and access points, and Bluetooth
+devices. One value of one kind is an **entity**; it always names its record.
+
+- **A rule names a field, never a shape.** Each rule in
+  `packages/contracts/entity_rules.json` names one field of one source (an
+  iLEAPP artifact's header, or a crash report's column) and the kind it holds.
+  On a real backup, 129 columns had a phone number's shape and most held
+  coordinates, byte counts and scores, so a shape only checks a rule: a value
+  that doesn't fit its kind is counted, never stored. The one general rule is
+  iLEAPP's own: a column it declares `phonenumber` holds phone numbers. Free
+  text (SMS, Notes, page titles) is read for URLs with a scheme, email
+  addresses and IPv4 addresses only, shapes nothing else has; numbers in text
+  are not read as phone numbers. What the rules leave out on purpose is in the
+  file's `not_covered`, with the reason.
+- **The field is the role.** An entity keeps the field it was read from
+  ("Imported by Bundle ID"), so "the app that imported this photo" and "the app
+  whose state this is" stay apart without a second taxonomy.
+- **One normalization for facts and indicators (R2).** URLs, domains, apps,
+  processes, email and IP addresses are normalized by `indicator_normalize`, as
+  indicators are; phone numbers (digits, a leading + kept, nothing added), MAC
+  addresses and SSIDs by `entity_normalize`.
+- **A stage that reads facts.** The `entities` stage reads the evidence's
+  current crash-report and iLEAPP units (`"reads": "facts"`), and writes one
+  unit of its own per fact unit, which names it (`source_ingest_id`, migration
+  0022). Its parser version is the rules' version; a changed rule set is a new
+  unit beside the old (R8). An entity unit holds no records (its
+  `record_count` is 0); its entities are in `record_entities`, which, like
+  records, can't change once their unit completed (R9), and can only name a
+  record of the unit their unit was read from. Only the normalized value is
+  kept; the value as stored is the record's own.
+- **What isn't read is stated.** Each unit's payload counts, per rule, the
+  values read, those that didn't fit and those of another kind, and lists every
+  field that held values and that no rule reads. The app and the report state
+  both, so a gap in the rules is never read as "not mentioned".
+- **Shape hints rank what isn't read.** For each field no rule reads, the
+  stage counts the values shaped like a URL, an email, IPv4 or MAC address, a
+  phone number (with its +) or a bundle ID (`entity_normalize.SHAPE_HINTS`,
+  titled in the rules file's `shape_hints`). The app and the report list those
+  fields first. A hint never decides a value's kind and nothing is stored from
+  it; it is permanent, so a field from a new iOS, iLEAPP or app is flagged on
+  every analysis until it is classified. On the reference backup it ranked 31
+  of 2,251 unread fields (2026-10-20).
+
+| View | Shows |
+|---|---|
+| `current_record_entities` | The entities of current entity units whose record is current |
+| `current_entity_units` | Each current entity unit of a current fact unit, with its payload |
+| `entity_rule_reads` | What each rule read, per source |
+| `entity_unread_fields` | Each field that held values and that no rule reads, per source |
+
+`scripts/check_entity_rules.py` runs every rule against a real iLEAPP output,
+counts only, before a rule changes and on every iLEAPP update.
+
 ## Time
 
 Timestamps are UTC and timezone-aware, or null; a time is never guessed (R11).

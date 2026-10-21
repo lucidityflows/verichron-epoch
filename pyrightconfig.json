@@ -12,7 +12,8 @@
     "apps",
     "apps/extractors",
     "apps/extractors/ileapp_bridge",
-    "apps/extractors/indicator_match"
+    "apps/extractors/indicator_match",
+    "apps/extractors/entities"
   ],
   "include": [
     "packages/*",

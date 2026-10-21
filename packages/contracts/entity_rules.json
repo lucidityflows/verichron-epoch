@@ -1,0 +1,831 @@
+{
+  "description": "Which values a record mentions, by kind, and where they are (EPOCH-581). Each rule names one field of one source and what it holds; a value's shape never decides its kind (measured 2026-10-20 on a real backup: 129 columns had a phone number's shape, most of them coordinates, byte counts and scores). The field's name is the entity's role. Shapes only check a rule: a value that doesn't fit its kind is counted as unreadable, never stored. The Python reader is entity_rules.py; scripts/check_entity_rules.py runs every rule against a real iLEAPP output.",
+  "version": 1,
+  "kinds": {
+    "url": {
+      "title": "URL",
+      "normalize": "url",
+      "also": "domain"
+    },
+    "domain": {
+      "title": "Domain",
+      "normalize": "domain"
+    },
+    "app": {
+      "title": "App",
+      "normalize": "bundle_id"
+    },
+    "process": {
+      "title": "Process",
+      "normalize": "process_name"
+    },
+    "email": {
+      "title": "Email address",
+      "normalize": "email"
+    },
+    "phone": {
+      "title": "Phone number",
+      "normalize": "phone"
+    },
+    "wifi_network": {
+      "title": "Wi-Fi network",
+      "normalize": "ssid"
+    },
+    "wifi_access_point": {
+      "title": "Wi-Fi access point",
+      "normalize": "mac"
+    },
+    "bluetooth_device": {
+      "title": "Bluetooth device",
+      "normalize": "mac"
+    },
+    "ip": {
+      "title": "IP address",
+      "normalize": "ip"
+    }
+  },
+  "declared_types": {
+    "phonenumber": "phone"
+  },
+  "not_covered": {
+    "own_wifi_mac": "The phone's own Wi-Fi addresses (WiFi Scanned Networks: MAC Used For Network, Private MAC Computed For Network) are the device itself, not another device or network.",
+    "uniform_type_ids": "Type identifiers (public.jpeg, Uniform Type ID, Attachment Type) have a bundle ID's shape but name a file type, not an app.",
+    "random_bluetooth_addresses": "A Bluetooth LE address of type Random rotates, so it identifies no device; only Public addresses are read as devices, and Random ones are counted.",
+    "phone_numbers_in_text": "A number inside free text is not read as a phone number: in text, digits with a phone number's shape are as often amounts, codes and times. URLs, email addresses and IP addresses have shapes nothing else has, and are read from text.",
+    "cookie_values": "A cookie's value is the site's own opaque identifier. Measured on a real backup (2026-10-20), its dotted numbers have an IPv4 address's shape inside longer identifiers; nothing says they are addresses.",
+    "note_snippets": "Notes \"Snippet\" is the start of \"Note Contents\", which is read.",
+    "pending_research": "Values that carry an identifier inside an Apple-internal format are reviewed under EPOCH-582 before a rule reads them: InteractionC Contacts \"Content URL\", Personalization Portrait \"Group ID\", Photos \"Adjustment Format ID\", Health Source Devices \"Local ID\".",
+    "file_urls": "A file URL (file:///…) names a path on the device, not a host, so it is not read as a URL. File paths are not a kind yet."
+  },
+  "shape_hints": {
+    "url": "URL",
+    "email": "email address",
+    "ipv4": "IPv4 address",
+    "phone": "phone number",
+    "mac": "MAC address",
+    "bundle_id": "bundle ID"
+  },
+  "rules": [
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Address Book",
+      "field": "Phone Numbers",
+      "extract": "labelled_list",
+      "dropped_when_empty": true
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Address Book",
+      "field": "Email addresses",
+      "extract": "labelled_list",
+      "dropped_when_empty": true
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - History",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - History",
+      "field": "Redirect Source"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - History",
+      "field": "Redirect Destination"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Search Terms",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Tabs (BrowserState)",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Tabs (BrowserState)",
+      "field": "User Visible URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Bookmarks",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "iOS Screens",
+      "field": "URL"
+    },
+    {
+      "kind": "domain",
+      "source_type": "ileapp_record",
+      "artifact": "Cookies - Binary Cookies",
+      "field": "Host",
+      "extract": "cookie_host"
+    },
+    {
+      "kind": "app",
+      "source_type": "crash_report",
+      "field": "bundle_id"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "iTunes Backup - Installed Applications",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "iTunes Backup - Installed Applications",
+      "field": "Source App"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Application State",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Application Snapshot",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Application Snapshot lastUsedDate",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Application Permissions",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "App Usage Events (AMDSQLiteDB)",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Data Usage",
+      "field": "Bundle Name"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "InteractionC - Contacts",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "InteractionC - Attachments",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "InteractionC - Attachments",
+      "field": "Target Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "interactionC Call History - Group Call",
+      "field": "Application Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Call History",
+      "field": "Service Provider"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Call History - Group Call",
+      "field": "Service Provider"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Files App - iCloud Application List",
+      "field": "Application Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Files App - Files stored in iCloud Drive",
+      "field": "Application Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Personalization Portrait - Locations",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Account Data",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Control Center Configuration",
+      "field": "App Bundle"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Recents",
+      "field": "Original Source"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Photos.sqlite Metadata",
+      "field": "Editor Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "fsCachedData",
+      "field": "Bundle Name"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph001.1-Asset Basic Data-PhDaPsql",
+      "field": "zAddAssetAttr- Imported by Bundle Identifier-15"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph002.1-Asset Basic Data & GenAlbum Data-PhDaPsql",
+      "field": "zAddAssetAttr-Imported by Bundle ID-23"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph002.1-Asset Basic Data & GenAlbum Data-PhDaPsql",
+      "field": "zCldMast-Imported by Bundle ID-26"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph002.1-Asset Basic Data & GenAlbum Data-PhDaPsql",
+      "field": "zGenAlbum-Imported by Bundle Identifier-70"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph008.1-Has Adjustment-PhDaPsql",
+      "field": "zAddAssetAttr-Editor Bundle ID-4"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph016.1-People & Faces Asset Data-PhDaPsql",
+      "field": "zAddAssetAttr-Imported by Bundle ID-16"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph016.1-People & Faces Asset Data-PhDaPsql",
+      "field": "zCldMast-Imported by Bundle ID-18"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph020.1-Album Records NAD-PhDaPsql",
+      "field": "zGenAlbum-Imported by Bundle Identifier-6"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph021-Non-Shared Album Records NAD-PhDaPsql",
+      "field": "zGenAlbum-Imported by Bundle Identifier-9"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph022-Assets in Non-Shared Albums-PhDaPsql",
+      "field": "zAddAssetAttr- Imported by Bundle Identifier-9"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph022-Assets in Non-Shared Albums-PhDaPsql",
+      "field": "zGenAlbum-Imported by Bundle Identifier-38"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph026.1-Syndication ID Assets-PhDaPsql",
+      "field": "zAddAssetAttr.Imported by Bundle Identifier-15"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph050.1-Asset_IntResou-PhDaPsql",
+      "field": "zAddAssetAttr.Imported by Bundle Identifier-35"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph050.1-Asset_IntResou-PhDaPsql",
+      "field": "zCldMast-Imported by Bundle ID-37"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph050.1-Asset_IntResou-PhDaPsql",
+      "field": "zAddAssetAttr-Editor Bundle ID-152"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph051-Possible_Optimized_Assets_IntResou-PhDaPsql",
+      "field": "zAddAssetAttr.Imported by Bundle Identifier-35"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph051-Possible_Optimized_Assets_IntResou-PhDaPsql",
+      "field": "zCldMast-Imported by Bundle ID-37"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph051-Possible_Optimized_Assets_IntResou-PhDaPsql",
+      "field": "zAddAssetAttr-Editor Bundle ID-152"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zAddAssetAttr.Imported by Bundle Identifier-28"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zCldMast-Imported by Bundle ID-30"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zAddAssetAttr-Editor Bundle ID-204"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zGenAlbum-Imported by Bundle Identifier-494"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zGenAlbum-Imported by Bundle Identifier- 4QueryStart-111"
+    },
+    {
+      "kind": "process",
+      "source_type": "crash_report",
+      "field": "process_name"
+    },
+    {
+      "kind": "process",
+      "source_type": "ileapp_record",
+      "artifact": "Data Usage",
+      "field": "Process Name"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "SMS",
+      "field": "Account Login",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "SMS",
+      "field": "Account",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "SMS",
+      "field": "Chat Contact ID",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Recents",
+      "field": "Contact Address",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Recents",
+      "field": "Sending Address",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "InteractionC - Contacts",
+      "field": "Identifier",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Account Data",
+      "field": "Username",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar List",
+      "field": "Account Email",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar List",
+      "field": "Owner Email",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "iTunes Backup - Installed Applications",
+      "field": "Downloaded by",
+      "extract": "email_only"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "SMS",
+      "field": "Account Login",
+      "extract": "phone_only"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "SMS",
+      "field": "Account",
+      "extract": "phone_only"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "SMS",
+      "field": "Chat Contact ID",
+      "extract": "phone_only"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Recents",
+      "field": "Contact Address",
+      "extract": "phone_only"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Recents",
+      "field": "Sending Address",
+      "extract": "phone_only"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "InteractionC - Contacts",
+      "field": "Identifier",
+      "extract": "phone_only"
+    },
+    {
+      "kind": "wifi_network",
+      "source_type": "ileapp_record",
+      "artifact": "WiFi BSS List",
+      "field": "SSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "WiFi BSS List",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_network",
+      "source_type": "ileapp_record",
+      "artifact": "WiFi Known Networks Info",
+      "field": "SSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "WiFi Known Networks Info",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_network",
+      "source_type": "ileapp_record",
+      "artifact": "WiFi Known Networks Times",
+      "field": "SSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "WiFi Known Networks Times",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_network",
+      "source_type": "ileapp_record",
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "SSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "BSSID"
+    },
+    {
+      "kind": "bluetooth_device",
+      "source_type": "ileapp_record",
+      "artifact": "Bluetooth Paired",
+      "field": "MAC Address"
+    },
+    {
+      "kind": "bluetooth_device",
+      "source_type": "ileapp_record",
+      "artifact": "Bluetooth Paired LE",
+      "field": "Address",
+      "extract": "public_address"
+    },
+    {
+      "kind": "bluetooth_device",
+      "source_type": "ileapp_record",
+      "artifact": "Bluetooth Paired LE",
+      "field": "Resolved Address",
+      "extract": "public_address"
+    },
+    {
+      "kind": "bluetooth_device",
+      "source_type": "ileapp_record",
+      "artifact": "Bluetooth Other LE",
+      "field": "Address",
+      "extract": "public_address"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "InteractionC - Contacts",
+      "field": "Display Name",
+      "extract": "phone_if_shaped"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "InteractionC - Contacts",
+      "field": "Display Name",
+      "extract": "email_only"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Draft Native Messages",
+      "field": "Chat Directory Name",
+      "extract": "phone_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Draft Native Messages",
+      "field": "Chat Directory Name",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar List",
+      "field": "Calendar Name",
+      "extract": "email_only"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Blocked contacts",
+      "field": "Email"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Email Address"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Share URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "InteractionC - Attachments",
+      "field": "Content URL"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "iOS Home Screen Layout",
+      "field": "Name",
+      "extract": "app_if_shaped"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Subscriber Info",
+      "field": "MSISDN"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "SIM - UUID",
+      "field": "MDN"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "SMS",
+      "field": "Message",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "SMS",
+      "field": "Message",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "SMS",
+      "field": "Message",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Notes",
+      "field": "Note Contents",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Notes",
+      "field": "Note Contents",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Notes",
+      "field": "Note Contents",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Notes",
+      "field": "Note Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Notes",
+      "field": "Note Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Notes",
+      "field": "Note Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - History",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - History",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - History",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Tabs (BrowserState)",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Tabs (BrowserState)",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Tabs (BrowserState)",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari - Downloads",
+      "field": "Other Fields",
+      "extract": "urls_in_text"
+    }
+  ]
+}

@@ -37,6 +37,9 @@ import {
   getRecordFacets,
   getEvidenceCompleteness,
   getRecordDetail,
+  getEntityKinds,
+  getEntityValues,
+  getEntityCoverage,
   readerTypes,
   type ForensicRecordQuery,
   type ForensicRecordRow,
@@ -576,6 +579,138 @@ describe('Forensic Records reads (EPOCH-411, EPOCH-556)', live, () => {
   });
 });
 
+describe('entities: what records mention (EPOCH-581)', live, () => {
+  const ITEM = '66666666-6666-6666-6666-666666666666';
+  const ILEAPP = '66666666-0000-0000-0000-0000000000aa';
+  const recordIds: string[] = [];
+
+  async function ledger(
+    input: { derivative?: string; source?: string },
+    hash: string,
+    sourceType: string,
+    payload: object
+  ): Promise<string> {
+    const { rows } = await db.query<{ ingest_id: string }>(
+      `INSERT INTO ingested_files
+         (evidence_id, derivative_id, source_ingest_id, file_hash, source_type, parser_version, file_path,
+          file_name, payload_kind, raw_payload)
+       VALUES ($1, $2, $3, $4, $5, 1, 'u', 'u', 'summary', $6)
+       RETURNING ingest_id`,
+      [ITEM, input.derivative ?? null, input.source ?? null, hash, sourceType, JSON.stringify(payload)]
+    );
+    return rows[0].ingest_id;
+  }
+
+  before(async () => {
+    await db.query(
+      `INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes, product_type, ios_version, backup_date)
+       VALUES ($1, repeat('6', 64), '99999999-9999-9999-9999-999999999999', 0, 0, 'iPhone17,5', '26.6.1', '2026-10-15T18:05:25Z')`,
+      [ITEM]
+    );
+    await db.query(
+      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
+       VALUES ($1, $1, 'decrypted', '/d', '{"name": "test", "version": "0"}',
+               '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('6', 64)),
+              ($2, $1, 'ileapp_output', '/i', '{"name": "iLEAPP", "version": "abc"}', '{}', repeat('7', 64))`,
+      [ITEM, ILEAPP]
+    );
+    const fact = await ledger({ derivative: ILEAPP }, 'e'.repeat(64), 'ileapp_record', {
+      artifact: 'Safari Browser - History',
+    });
+    for (const [time, url] of [
+      ['2026-10-14T08:00:00Z', 'https://example.com/a'],
+      ['2026-10-15T09:00:00Z', 'https://example.com/b'],
+      [null, 'https://example.org/'],
+    ]) {
+      const { rows } = await db.query<{ id: string }>(
+        `INSERT INTO forensic_records (ingest_id, evidence_id, source_type, event_time, fields)
+         VALUES ($1, $2, 'ileapp_record', $3, $4) RETURNING id`,
+        [fact, ITEM, time, JSON.stringify({ source_artifact: 'Safari Browser - History', URL: url })]
+      );
+      recordIds.push(rows[0].id);
+    }
+    await completeUnit(fact, 3);
+    // As entity_stage.py writes it: the unit it read, what each rule read, and what no rule read.
+    const entities = await ledger({ source: fact }, 'f'.repeat(64), 'entity', {
+      source: { ingest_id: Number(fact), source_type: 'ileapp_record', artifact: 'Safari Browser - History' },
+      unread_fields: {
+        'Visit Count': { records: 2, shaped: {} },
+        Referrer: { records: 1, shaped: { url: 1 } },
+      },
+      rules: [{ kind: 'url', field: 'URL', read: 3, also_read: 3, unreadable: 1, also_unreadable: 0, other_kind: 0 }],
+    });
+    const mention = (record: string, kind: string, value: string) =>
+      db.query(
+        `INSERT INTO record_entities (ingest_id, evidence_id, record_id, kind, role, normalized_value)
+         VALUES ($1, $2, $3, $4, 'URL', $5)`,
+        [entities, ITEM, record, kind, value]
+      );
+    await mention(recordIds[0], 'url', 'https://example.com/a');
+    await mention(recordIds[1], 'url', 'https://example.com/b');
+    await mention(recordIds[2], 'url', 'https://example.org/');
+    await mention(recordIds[0], 'domain', 'example.com');
+    await mention(recordIds[1], 'domain', 'example.com');
+    await mention(recordIds[2], 'domain', 'example.org');
+    await completeUnit(entities, 0);
+  });
+
+  it('counts each kind by distinct values and records', async () => {
+    assert.deepEqual(await getEntityKinds(db, ITEM), [
+      { kind: 'domain', values: 2, records: 3 },
+      { kind: 'url', values: 3, records: 3 },
+    ]);
+  });
+
+  it("lists a kind's values most-mentioned first, with when they were seen and the true total", async () => {
+    const page = await getEntityValues(db, ITEM, 'domain', { limit: 1 });
+    assert.equal(page.total, 2);
+    assert.equal(page.rows.length, 1);
+    assert.equal(page.rows[0].value, 'example.com');
+    assert.equal(page.rows[0].records, 2);
+    assert.equal(new Date(page.rows[0].first_seen as string).toISOString(), '2026-10-14T08:00:00.000Z');
+    assert.equal(new Date(page.rows[0].last_seen as string).toISOString(), '2026-10-15T09:00:00.000Z');
+    const searched = await getEntityValues(db, ITEM, 'domain', { search: 'ORG' });
+    assert.deepEqual(
+      searched.rows.map((row) => [row.value, row.first_seen]),
+      [['example.org', null]]
+    );
+    await assert.rejects(getEntityValues(db, ITEM, 'domain', { sort: 'x' } as never), /unsupported parameter/);
+  });
+
+  it('narrows Forensic Records to the records that mention a value, with counts to match', async () => {
+    const page = await getForensicRecords(db, ITEM, { mentionKind: 'domain', mentionValue: 'example.com' });
+    assert.deepEqual(page.rows.map((row) => row.id).sort(), [recordIds[0], recordIds[1]].sort());
+    assert.equal(page.total, 2);
+    const facets = await getRecordFacets(db, ITEM, { mentionKind: 'domain', mentionValue: 'example.com' });
+    assert.equal(facets.total, 2);
+    await assert.rejects(getForensicRecords(db, ITEM, { mentionKind: 'domain' }), /both or neither/);
+  });
+
+  it('says what the rules read and every field they did not', async () => {
+    assert.deepEqual(await getEntityCoverage(db, ITEM), {
+      units: 1,
+      unreadable: 1,
+      // A field whose values have an entity's shape comes first, whatever its count.
+      unread: [
+        {
+          source_type: 'ileapp_record',
+          artifact: 'Safari Browser - History',
+          field: 'Referrer',
+          records: 1,
+          shaped: { url: 1 },
+        },
+        {
+          source_type: 'ileapp_record',
+          artifact: 'Safari Browser - History',
+          field: 'Visit Count',
+          records: 2,
+          shaped: {},
+        },
+      ],
+    });
+  });
+});
+
 describe('evidence-scoped helpers', live, () => {
   it('resolves a run to its evidence', async () => {
     assert.equal(await getRunEvidence(db, RUN), EVIDENCE);
@@ -706,6 +841,89 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
     assert.equal(crash.error_message, null, 'warnings are never stored as an error');
     const skipped = stages.find((s) => s.stage_name === 'llm')!;
     assert.deepEqual([skipped.derivative_kind, skipped.units, skipped.records], [null, 0, 0]);
+  });
+});
+
+describe('what each kind of stage produced (EPOCH-491, EPOCH-581)', live, () => {
+  // Evidence of its own, so no other test's counts change.
+  const STAGES_RUN = '99999999-0000-0000-0000-0000000000cc';
+  const ITEM = '99999999-0000-0000-0000-0000000000dd';
+
+  before(async () => {
+    await db.query(
+      `INSERT INTO evidence_items (evidence_id, content_root, device_id, file_count, total_bytes, product_type, ios_version, backup_date)
+       VALUES ($1, repeat('9', 64), '99999999-9999-9999-9999-999999999999', 0, 0, 'iPhone17,5', '26.6.1', '2026-10-15T18:05:25Z')`,
+      [ITEM]
+    );
+    await db.query(
+      `INSERT INTO evidence_derivatives (derivative_id, evidence_id, kind, path, tool, params, provenance_key)
+       VALUES ($1, $1, 'decrypted', '/d', '{"name": "test", "version": "0"}',
+               '{"repair": {"status": "skipped", "reason": "test fixture"}}', repeat('9', 64))`,
+      [ITEM]
+    );
+    const set = await db.query<{ set_id: string }>(
+      `INSERT INTO indicator_sets (set_hash, name, manifest, loaded_at, registered_at, indicator_count)
+       VALUES (encode(sha256(convert_to($1, 'UTF8')), 'hex'), 'stage-counts', $1, now(), now(), 1) RETURNING set_id`,
+      ['{"name": "stage-counts"}']
+    );
+    const setId = set.rows[0].set_id;
+    await db.query(
+      `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid, started_at)
+       VALUES ($1, 'test', 'test', '{}', 'UTC', $2, $2, 'test-host', 1, now())`,
+      [STAGES_RUN, ITEM]
+    );
+    await db.query(
+      `INSERT INTO pipeline_stage_status (run_id, stage_name, stage_order, status, derivative_id, indicator_set_id, parser_version)
+       VALUES ($1, 'crash', 10, 'succeeded', $2, NULL, 1),
+              ($1, 'entities', 30, 'succeeded', NULL, NULL, 1),
+              ($1, 'indicator_match', 500, 'succeeded', NULL, $3, 1),
+              ($1, 'reporting', 1000, 'succeeded', NULL, NULL, NULL)`,
+      [STAGES_RUN, ITEM, setId]
+    );
+    const unit = async (
+      input: { derivative?: string; set?: string; source?: string },
+      hash: string,
+      type: string,
+      records: number,
+      payload: object
+    ) => {
+      const { rows } = await db.query<{ ingest_id: string }>(
+        `INSERT INTO ingested_files
+           (evidence_id, derivative_id, indicator_set_id, source_ingest_id, file_hash, source_type, parser_version,
+            file_path, file_name, payload_kind, raw_payload, ingest_complete, record_count, completed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 1, '/u', 'u', 'summary', $7, TRUE, $8, now()) RETURNING ingest_id`,
+        [
+          ITEM,
+          input.derivative ?? null,
+          input.set ?? null,
+          input.source ?? null,
+          hash,
+          type,
+          JSON.stringify(payload),
+          records,
+        ]
+      );
+      await db.query(`INSERT INTO ingest_run_links (ingest_id, run_id) VALUES ($1, $2)`, [
+        rows[0].ingest_id,
+        STAGES_RUN,
+      ]);
+      return rows[0].ingest_id;
+    };
+    const crash = await unit({ derivative: ITEM }, '7'.repeat(64), 'crash_report', 2, {});
+    await unit({ source: crash }, '8'.repeat(64), 'entity', 0, { mentions: 5 });
+    await unit({ set: setId }, '9'.repeat(64), 'indicator_match', 1, {});
+  });
+
+  it('counts each stage by what it read: a derivative, an indicator set, or the facts', async () => {
+    const stages = Object.fromEntries((await getStageStatus(db, STAGES_RUN)).map((s) => [s.stage_name, s]));
+    const counts = (name: string) => {
+      const s = stages[name];
+      return [s.reads, s.units, s.records, s.mentions];
+    };
+    assert.deepEqual(counts('crash'), ['derivative', 1, 2, 0]);
+    assert.deepEqual(counts('entities'), ['facts', 1, 0, 5], 'its mentions are entities, not records');
+    assert.deepEqual(counts('indicator_match'), ['indicator_set', 1, 1, 0], 'its matches are filed under the set');
+    assert.deepEqual(counts('reporting'), ['none', 0, 0, 0]);
   });
 });
 

@@ -246,6 +246,7 @@ export type StageReport = z.infer<typeof StageReport>;
 export const STAGE_NAMES: Record<string, string> = {
   crash: 'Reading crash logs',
   ileapp_bridge: 'Reading device activity',
+  entities: 'Reading what records mention',
   indicator_match: 'Checking indicators',
   reporting: 'Writing the report',
 };
@@ -259,6 +260,7 @@ export const stageName = (stage: string): string => STAGE_NAMES[stage] ?? stage;
 export const STAGE_TITLES: Record<string, string> = {
   crash: 'Crash Reports',
   ileapp_bridge: 'iLEAPP Artifacts',
+  entities: 'Entities',
   indicator_match: 'Indicator Matching',
   reporting: 'Report',
 };

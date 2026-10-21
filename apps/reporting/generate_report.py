@@ -34,6 +34,7 @@ from pathlib import Path
 import psycopg2
 import psycopg2.extras
 from display_zone import ZoneTimes
+from entity_rules import load as load_entity_rules
 from indicator_set import results_config, stale_after_days
 from runtime_env import redact_password, require_database_url
 from stage_report import report
@@ -929,6 +930,94 @@ def render_indicator_section(checks: list[dict], run_id: str, stale_days: int, t
 # --- coverage (EPOCH-448) --------------------------------------------------
 
 
+# --- entities: what the records mention (EPOCH-581) ------------------------
+
+
+def fetch_entities(conn, evidence_id: str) -> dict:
+    """What the entity rules read, by kind, and every field they didn't, from
+    the views the app reads too (R27)."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT count(*) AS units FROM current_entity_units WHERE evidence_id = %s", (evidence_id,))
+        units = cur.fetchone()["units"]
+        cur.execute(
+            """
+            SELECT kind, count(DISTINCT normalized_value) AS values, count(DISTINCT record_id) AS records
+            FROM current_record_entities WHERE evidence_id = %s
+            GROUP BY kind ORDER BY count(DISTINCT record_id) DESC, kind
+            """,
+            (evidence_id,),
+        )
+        kinds = cur.fetchall()
+        cur.execute(
+            """
+            SELECT kind, sum(unreadable) AS unreadable FROM entity_rule_reads
+            WHERE evidence_id = %s GROUP BY kind
+            """,
+            (evidence_id,),
+        )
+        unreadable = {r["kind"]: r["unreadable"] for r in cur.fetchall()}
+        cur.execute(
+            """
+            SELECT source_type, artifact, field, records, shaped FROM entity_unread_fields
+            WHERE evidence_id = %s
+            ORDER BY (SELECT coalesce(sum(n.value::bigint), 0) FROM jsonb_each_text(shaped) n) DESC,
+                     records DESC, artifact NULLS FIRST, field
+            """,
+            (evidence_id,),
+        )
+        unread = cur.fetchall()
+    return {"units": units, "kinds": kinds, "unreadable": unreadable, "unread": unread}
+
+
+def render_entities_section(entities: dict) -> list[str]:
+    """Each kind's distinct values and the records that mention them, and
+    every field that held values and that no rule reads: what the rules miss
+    is stated, so "not mentioned" is never read from a field no rule reads."""
+    lines = ["## Entities", ""]
+    if not entities["units"]:
+        return lines + [
+            "The entities stage did not read this evidence's records, so what they mention is not stated here. "
+            "That is not the same as mentioning nothing.",
+            "",
+        ]
+    rules = load_entity_rules()
+    titles = {kind: k.title for kind, k in rules.kinds.items()}
+    lines += [
+        f"What the records mention, read from {entities['units']} fact unit(s) by the entity rules. Each value was "
+        "read from a named field, never guessed from its shape; Forensic Records' Mentions filter lists the records.",
+        "",
+        "| Kind | Distinct values | Records | Values that didn't fit the kind |",
+        "| :--- | ---: | ---: | ---: |",
+    ]
+    for k in entities["kinds"]:
+        lines.append(
+            f"| {titles.get(k['kind'], k['kind'])} | {k['values']} | {k['records']} | "
+            f"{entities['unreadable'].get(k['kind'], 0)} |"
+        )
+    lines.append("")
+    unread = entities["unread"]
+    if unread:
+        sources = len({(r["source_type"], r["artifact"]) for r in unread})
+        shaped = sum(1 for r in unread if r["shaped"])
+        lines += [
+            f"**{len(unread)} field(s) in {sources} source(s) held values that no entity rule reads.** Their values "
+            "are in the records, but are not read as entities or checked against indicators. "
+            f"{shaped} of them hold values shaped like an entity and are listed first: a shape suggests what a "
+            "field holds, but never decides it.",
+            "",
+            "| Source | Field | Records with a value | Values shaped like |",
+            "| :--- | :--- | ---: | :--- |",
+        ]
+        for r in unread:
+            source = _table_cell(r["artifact"]) if r["artifact"] else stage_title("crash")
+            hints = ", ".join(f"{rules.shape_hints.get(h, h)} {n}" for h, n in r["shaped"].items())
+            lines.append(f"| {source} | {_table_cell(r['field'])} | {r['records']} | {hints} |")
+        lines.append("")
+    else:
+        lines += ["Every field that held a value is read by an entity rule.", ""]
+    return lines
+
+
 def fetch_fact_counts(conn, evidence_id: str) -> list[dict]:
     """Every fact type recorded for this evidence, with its record count."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -1095,6 +1184,7 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     lines += render_tool_checks_section(fetch_corrections(conn, evidence_id), times)
     lines += render_time_review_section(fetch_time_review(conn, evidence_id), times)
     lines += render_indicator_section(fetch_indicator_checks(conn, evidence_id), run_id, stale_after_days(), times)
+    lines += render_entities_section(fetch_entities(conn, evidence_id))
 
     for title, fetch, render in RENDERERS.values():
         rows = fetch(conn, evidence_id)

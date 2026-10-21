@@ -109,11 +109,21 @@ export interface StageStatusRow {
   derivative_id: string | null;
   derivative_kind: string | null;
   derivative_tool: { name: string; version: string } | null;
-  /** The completed ingest units this run labelled for that derivative, and
+  /** The indicator set the stage checked (migration 0013); null for every other stage. */
+  indicator_set_id: string | null;
+  /**
+   * What the stage read: a derivative, an indicator set, or the evidence's
+   * facts (a stage with neither that declares a parser version, EPOCH-581);
+   * `none` for a stage that writes no units (the report).
+   */
+  reads: 'derivative' | 'indicator_set' | 'facts' | 'none';
+  /** The completed ingest units this run labelled for what the stage read, and
    * their records: what the stage covered (EPOCH-431). A unit already
    * ingested by an earlier run counts too, since this run saw it. */
   units: number;
   records: number;
+  /** For a stage that reads facts: the entities its units hold, which are not records (EPOCH-581). */
+  mentions: number;
   /** How the stage's run ended (EPOCH-435): a stage still pending or running
    * on a run that ended stopped there, and never finished. */
   run_ended_reason: EndedReason | null;
@@ -256,13 +266,31 @@ export async function getStageStatus(client: Db, runId: string): Promise<StageSt
   const result = await client.query<Omit<StageStatusRow, 'stage_title' | 'run_ended_reason' | 'run_finished_at'>>(
     `SELECT s.run_id, s.stage_name, s.stage_order, s.status, s.error_message, s.warnings, s.started_at, s.finished_at,
             s.parser_version, s.derivative_id, d.kind AS derivative_kind, d.tool AS derivative_tool,
-            u.units, u.records
+            s.indicator_set_id, i.reads, u.units, u.records, u.mentions
        FROM pipeline_stage_status s
        LEFT JOIN evidence_derivatives d ON d.derivative_id = s.derivative_id
        CROSS JOIN LATERAL (
-         SELECT count(f.ingest_id)::int AS units, coalesce(sum(f.record_count), 0)::int AS records
+         SELECT CASE
+                  WHEN s.derivative_id IS NOT NULL THEN 'derivative'
+                  WHEN s.indicator_set_id IS NOT NULL THEN 'indicator_set'
+                  WHEN s.parser_version IS NOT NULL THEN 'facts'
+                  ELSE 'none'
+                END AS reads
+       ) i
+       CROSS JOIN LATERAL (
+         -- Each stage's units by what it read: filed under its derivative, under
+         -- the set it checked, or, for a stage that reads facts, under the fact
+         -- units it read (source_ingest_id, migration 0022).
+         SELECT count(f.ingest_id)::int AS units, coalesce(sum(f.record_count), 0)::int AS records,
+                coalesce(sum((f.raw_payload ->> 'mentions')::bigint) FILTER (WHERE f.source_ingest_id IS NOT NULL), 0)::int
+                  AS mentions
            FROM ingested_files f
-          WHERE f.derivative_id = s.derivative_id
+          WHERE CASE i.reads
+                  WHEN 'derivative' THEN f.derivative_id = s.derivative_id
+                  WHEN 'indicator_set' THEN f.indicator_set_id = s.indicator_set_id
+                  WHEN 'facts' THEN f.source_ingest_id IS NOT NULL
+                  ELSE FALSE
+                END
             AND EXISTS (
               SELECT 1 FROM ingest_run_links l
                WHERE l.ingest_id = f.ingest_id
@@ -433,6 +461,13 @@ export interface ForensicRecordQuery {
   eventTimeTo?: string;
   /** Case-insensitive substring of process_name or bundle_id. */
   text?: string;
+  /**
+   * Narrow to the records that mention one value of one kind (EPOCH-581),
+   * as `getEntityValues` gives it: the normalized value, matched exactly.
+   * Both or neither.
+   */
+  mentionKind?: string;
+  mentionValue?: string;
   sort?: RecordSortKey;
   direction?: 'asc' | 'desc';
   /** Opt in to every parser_version, not just the latest (R8). */
@@ -462,6 +497,8 @@ const QUERY_KEYS = new Set<keyof ForensicRecordQuery>([
   'eventTimeFrom',
   'eventTimeTo',
   'text',
+  'mentionKind',
+  'mentionValue',
   'sort',
   'direction',
   'history',
@@ -524,6 +561,19 @@ function recordFilters(
   }
   if (query.search !== undefined && query.search.trim() !== '') {
     always.push(`record_values_text(records.fields) ILIKE ${param(`%${likeEscape(query.search.trim())}%`)}`);
+  }
+  if ((query.mentionKind === undefined) !== (query.mentionValue === undefined)) {
+    throw new Error('a mention is a kind and a value: give both or neither');
+  }
+  if (query.mentionKind !== undefined && query.mentionValue !== undefined) {
+    // By the value's hash, indexed (0022), and the value itself, so a lookup is exact.
+    const mention = param(query.mentionValue);
+    always.push(
+      `records.id IN (SELECT e.record_id FROM current_record_entities e
+                       WHERE e.evidence_id = $1 AND e.kind = ${param(query.mentionKind)}
+                         AND e.value_hash = sha256(convert_to(${mention}, 'UTF8'))
+                         AND e.normalized_value = ${mention})`
+    );
   }
   const facets: Partial<Record<RecordFacet, string>> = {};
   if (query.sourceType !== undefined) facets.source = `records.source_type = ${param(query.sourceType)}`;
@@ -741,6 +791,159 @@ export async function getRecordFacets(
     result.facets[facet].sort((a, b) => b.count - a.count || String(a.value).localeCompare(String(b.value)));
   }
   return result;
+}
+
+// --- entities: what records mention (EPOCH-581) --------------------------------
+
+/** One kind of entity in one evidence's current records, with true counts (R25). */
+export interface EntityKindCount {
+  kind: string;
+  /** Distinct normalized values. */
+  values: number;
+  /** Records that mention at least one. */
+  records: number;
+}
+
+/** Each kind the evidence's records mention, by count of records. Kinds with none aren't listed: `getEntityCoverage` says what was read. */
+export async function getEntityKinds(client: Db, evidenceId: string): Promise<EntityKindCount[]> {
+  const { rows } = await client.query<{ kind: string; values: string; records: string }>(
+    `SELECT e.kind, count(DISTINCT e.normalized_value) AS values, count(DISTINCT e.record_id) AS records
+       FROM current_record_entities e
+      WHERE e.evidence_id = $1
+      GROUP BY e.kind
+      ORDER BY count(DISTINCT e.record_id) DESC, e.kind`,
+    [evidenceId]
+  );
+  return rows.map((row) => ({ kind: row.kind, values: Number(row.values), records: Number(row.records) }));
+}
+
+/** One value of a kind: how many records mention it, and when the first and last of them happened. */
+export interface EntityValueRow {
+  value: string;
+  records: number;
+  /** The earliest and latest event time of those records; null when none of them has one (R11). */
+  first_seen: string | null;
+  last_seen: string | null;
+}
+
+export interface EntityValueQuery {
+  /** Case-insensitive substring of the value. */
+  search?: string;
+  /** Page size, 1 to MAX_RECORDS_PAGE. */
+  limit?: number;
+  offset?: number;
+}
+
+export interface EntityValuePage {
+  rows: EntityValueRow[];
+  /** Every value of the kind matching the search, across all pages. */
+  total: number;
+}
+
+const DEFAULT_VALUES_PAGE = 100;
+
+/** A kind's values in one evidence, most-mentioned first, one page at a time, with the true total (R25). */
+export async function getEntityValues(
+  client: Db,
+  evidenceId: string,
+  kind: string,
+  query: EntityValueQuery = {}
+): Promise<EntityValuePage> {
+  for (const key of Object.keys(query)) {
+    if (!['search', 'limit', 'offset'].includes(key))
+      throw new Error(`getEntityValues: unsupported parameter "${key}"`);
+  }
+  const limit = query.limit ?? DEFAULT_VALUES_PAGE;
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_RECORDS_PAGE) {
+    throw new Error(`getEntityValues: limit must be an integer from 1 to ${MAX_RECORDS_PAGE}`);
+  }
+  const offset = query.offset ?? 0;
+  if (!Number.isInteger(offset) || offset < 0) throw new Error('getEntityValues: offset must be a whole number');
+  const search = query.search?.trim() ? `%${likeEscape(query.search.trim())}%` : null;
+  // ONE statement for the page and the total, so the two describe the same data (R25).
+  const { rows } = await client.query<{
+    total: string;
+    value: string | null;
+    records: string | null;
+    first_seen: string | null;
+    last_seen: string | null;
+  }>(
+    `WITH grouped AS (
+       SELECT e.normalized_value AS value, count(DISTINCT e.record_id) AS records,
+              min(e.event_time) AS first_seen, max(e.event_time) AS last_seen
+         FROM current_record_entities e
+        WHERE e.evidence_id = $1 AND e.kind = $2 AND ($3::text IS NULL OR e.normalized_value ILIKE $3)
+        GROUP BY e.normalized_value
+     )
+     SELECT counted.total, page.*
+       FROM (SELECT count(*) AS total FROM grouped) counted
+       LEFT JOIN LATERAL (
+         SELECT * FROM grouped ORDER BY records DESC, value LIMIT $4 OFFSET $5
+       ) page ON TRUE
+      ORDER BY page.records DESC, page.value`,
+    [evidenceId, kind, search, limit, offset]
+  );
+  return {
+    total: Number(rows[0]?.total ?? 0),
+    rows: rows
+      .filter((row) => row.value !== null)
+      .map((row) => ({
+        value: row.value as string,
+        records: Number(row.records),
+        first_seen: row.first_seen,
+        last_seen: row.last_seen,
+      })),
+  };
+}
+
+/** A field that held values in a source, and that no entity rule reads. */
+export interface EntityUnreadField {
+  source_type: string;
+  /** The iLEAPP artifact; null for crash reports. */
+  artifact: string | null;
+  field: string;
+  /** Records that held a value in it. */
+  records: number;
+  /**
+   * How many of those values have each shape hint (a URL, a phone number…):
+   * what ranks the field for review. A hint never decides a value's kind.
+   */
+  shaped: Record<string, number>;
+}
+
+/** What the entity rules read in one evidence, and what they didn't (EPOCH-581). */
+export interface EntityCoverage {
+  /** Fact units read by the rules. 0 when the entities stage hasn't run on this evidence. */
+  units: number;
+  /** Values in ruled fields that didn't fit their kind: counted, not stored. */
+  unreadable: number;
+  /** Fields that held values and that no rule reads: those whose values have entity shapes first, then most records. */
+  unread: EntityUnreadField[];
+}
+
+export async function getEntityCoverage(client: Db, evidenceId: string): Promise<EntityCoverage> {
+  const units = await client.query<{ units: string; unreadable: string | null }>(
+    `SELECT (SELECT count(*) FROM current_entity_units WHERE evidence_id = $1) AS units,
+            (SELECT sum(unreadable + also_unreadable) FROM entity_rule_reads WHERE evidence_id = $1) AS unreadable`,
+    [evidenceId]
+  );
+  const unread = await client.query<EntityUnreadField & { records: string }>(
+    `SELECT source_type, artifact, field, records, shaped
+       FROM entity_unread_fields
+      WHERE evidence_id = $1
+      ORDER BY (SELECT coalesce(sum(n.value::bigint), 0) FROM jsonb_each_text(shaped) n) DESC,
+               records DESC, artifact NULLS FIRST, field`,
+    [evidenceId]
+  );
+  return {
+    units: Number(units.rows[0].units),
+    unreadable: Number(units.rows[0].unreadable ?? 0),
+    unread: unread.rows.map((row) => ({
+      ...row,
+      records: Number(row.records),
+      shaped: Object.fromEntries(Object.entries(row.shaped).map(([hint, n]) => [hint, Number(n)])),
+    })),
+  };
 }
 
 /** A fact-writing stage's latest attempt for the evidence, as Forensic Records' completeness panel states it. */

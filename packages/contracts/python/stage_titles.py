@@ -11,6 +11,7 @@ from __future__ import annotations
 STAGE_TITLES: dict[str, str] = {
     "crash": "Crash Reports",
     "ileapp_bridge": "iLEAPP Artifacts",
+    "entities": "Entities",
     "indicator_match": "Indicator Matching",
     "reporting": "Report",
 }

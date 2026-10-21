@@ -20,4 +20,4 @@ dependencies = [
 verichron-contracts = { workspace = true }
 
 [tool.setuptools]
-py-modules = ["indicator_loader", "indicator_normalize"]
+py-modules = ["indicator_loader", "indicator_normalize", "entity_normalize"]

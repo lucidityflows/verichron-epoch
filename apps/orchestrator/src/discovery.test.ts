@@ -102,15 +102,20 @@ describe('stage manifests', () => {
     assert.equal(reads.ileapp_bridge, 'ileapp_output');
     assert.equal(reads.crash, 'crash_reports', 'an iOS backup holds no crash logs (EPOCH-447)');
     assert.equal(reads.indicator_match, 'indicator_set', 'matching checks a registered set (EPOCH-491)');
+    assert.equal(reads.entities, 'facts', "entities are read from the evidence's facts (EPOCH-581)");
     const order = Object.fromEntries(enabled.map((s) => [s.name, s.manifest.order]));
     assert.ok(
       order.indicator_match > order.crash && order.indicator_match > order.ileapp_bridge,
       'matching reads the facts the extractors wrote'
     );
     assert.ok(order.indicator_match < order.reporting, 'the report states the results');
+    assert.ok(
+      order.entities > order.crash && order.entities > order.ileapp_bridge && order.entities < order.indicator_match,
+      'entities are read from the facts the extractors wrote, before anything reads them'
+    );
     assert.deepEqual(
       enabled.map((s) => s.name).sort(),
-      ['crash', 'ileapp_bridge', 'indicator_match', 'reporting'],
+      ['crash', 'entities', 'ileapp_bridge', 'indicator_match', 'reporting'],
       'the AI analysis stage is out of the pipeline until EPOCH-442'
     );
   });

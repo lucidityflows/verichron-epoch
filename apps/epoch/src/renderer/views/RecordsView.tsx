@@ -9,6 +9,8 @@ import { TableSkeleton } from '../components/ui/Skeleton';
 import { InterruptedStagesPanel } from '../features/records/InterruptedStagesPanel';
 import { StillFailingPanel } from '../features/records/StillFailingPanel';
 import { CompletenessPanel } from '../features/records/CompletenessPanel';
+import { EntityCoveragePanel } from '../features/records/EntityCoveragePanel';
+import { useEntityOverview } from '../features/records/useEntityOverview';
 import { RecordFiltersBar } from '../features/records/RecordFiltersBar';
 import { RecordSheet } from '../features/records/RecordSheet';
 import { useRecords, type RecordFilters } from '../features/records/useRecords';
@@ -84,6 +86,7 @@ export function RecordsView({
   const [opened, setOpened] = useState<ForensicRecordRow | null>(null);
   const readable = selectedRun && evidenceRegistered ? runId : null;
   const records = useRecords(readable, filters);
+  const entities = useEntityOverview(readable);
   // A new investigation starts with no filters and nothing open.
   const [shownRun, setShownRun] = useState(runId);
   if (shownRun !== runId) {
@@ -119,6 +122,7 @@ export function RecordsView({
           <InterruptedStagesPanel key={`interrupted-${runId}`} runId={runId} onRerunFinished={onRerunFinished} />
           <StillFailingPanel key={runId} runId={runId} onRerunFinished={onRerunFinished} />
           <CompletenessPanel key={runId} runId={runId} onOpenInvestigations={onOpenInvestigations} />
+          <EntityCoveragePanel overview={entities.overview} error={entities.error} />
           {records.error && (
             <div
               role="alert"
@@ -136,6 +140,8 @@ export function RecordsView({
           ) : (
             <>
               <RecordFiltersBar
+                runId={runId}
+                entities={entities.overview}
                 filters={filters}
                 facets={records.facets}
                 zone={zone}
