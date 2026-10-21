@@ -1,0 +1,54 @@
+{
+  "description": "EPOCH-522: one fixture for the correlated-context functions (migration 0024), read by the report's tests (Python) and the reader's tests (TypeScript), which must both give exactly these answers (R27). Records are named by `label`, kept in their fields; ids are assigned on insert. Times are UTC.",
+  "window_seconds": 900,
+  "records": [
+    { "label": "match-fact", "evidence": "case", "source_type": "ileapp_record", "category": "Safari Browser", "artifact": "Safari Browser - History", "time": "2026-10-01T12:00:00Z" },
+    { "label": "its-match", "evidence": "case", "source_type": "indicator_match", "category": null, "artifact": null, "time": "2026-10-01T12:00:00Z", "cites": "match-fact" },
+    { "label": "same-second", "evidence": "case", "source_type": "ileapp_record", "category": "Safari Browser", "artifact": "Safari Browser - History", "time": "2026-10-01T12:00:00Z" },
+    { "label": "before-1m", "evidence": "case", "source_type": "ileapp_record", "category": "Data Usage", "artifact": "Data Usage", "time": "2026-10-01T11:59:00Z" },
+    { "label": "after-2m", "evidence": "case", "source_type": "crash_report", "category": null, "artifact": null, "time": "2026-10-01T12:02:00Z" },
+    { "label": "edge-before", "evidence": "case", "source_type": "ileapp_record", "category": "Data Usage", "artifact": "Data Usage", "time": "2026-10-01T11:45:00Z" },
+    { "label": "edge-after", "evidence": "case", "source_type": "ileapp_record", "category": "Safari Browser", "artifact": "Safari Browser - History", "time": "2026-10-01T12:15:00.500000Z" },
+    { "label": "just-outside", "evidence": "case", "source_type": "ileapp_record", "category": "Safari Browser", "artifact": "Safari Browser - History", "time": "2026-10-01T12:15:01Z" },
+    { "label": "well-before", "evidence": "case", "source_type": "ileapp_record", "category": "Data Usage", "artifact": "Data Usage", "time": "2026-10-01T11:44:59.999999Z" },
+    { "label": "other-case", "evidence": "other", "source_type": "ileapp_record", "category": "Safari Browser", "artifact": "Safari Browser - History", "time": "2026-10-01T12:00:30Z" },
+    { "label": "alone", "evidence": "case", "source_type": "ileapp_record", "category": "Data Usage", "artifact": "Data Usage", "time": "2026-10-03T00:00:00Z" },
+    { "label": "untimed", "evidence": "case", "source_type": "ileapp_record", "category": "Data Usage", "artifact": "Data Usage", "time": null }
+  ],
+  "cases": [
+    {
+      "name": "a busy window, widened to whole seconds: its last second included, the next second and the microsecond before its first excluded; the record and its own match left out, another case never",
+      "record": "match-fact",
+      "window": { "record_time": "2026-10-01T12:00:00Z", "from": "2026-10-01T11:45:00Z", "before": "2026-10-01T12:15:01Z" },
+      "nearest": ["same-second", "before-1m", "after-2m", "edge-before", "edge-after"],
+      "counts": [
+        { "source_type": "ileapp_record", "category": "Data Usage", "artifact": "Data Usage", "records": 2 },
+        { "source_type": "ileapp_record", "category": "Safari Browser", "artifact": "Safari Browser - History", "records": 2 },
+        { "source_type": "crash_report", "category": null, "artifact": null, "records": 1 }
+      ],
+      "limit": 2,
+      "nearest_limited": ["same-second", "before-1m"]
+    },
+    {
+      "name": "an empty window",
+      "record": "alone",
+      "window": { "record_time": "2026-10-03T00:00:00Z", "from": "2026-10-02T23:45:00Z", "before": "2026-10-03T00:15:01Z" },
+      "nearest": [],
+      "counts": []
+    },
+    {
+      "name": "an untimed record has no window, and no context",
+      "record": "untimed",
+      "window": { "record_time": null, "from": null, "before": null },
+      "nearest": [],
+      "counts": []
+    },
+    {
+      "name": "another case's record has no window in this case",
+      "record": "other-case",
+      "window": "none",
+      "nearest": [],
+      "counts": []
+    }
+  ]
+}

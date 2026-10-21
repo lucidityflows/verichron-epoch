@@ -9,6 +9,7 @@ The last pipeline stage (order 1000). It renders the investigation report,
 | Provenance | The derivatives this run read, and where the facts shown came from |
 | Coverage | Every fact type recorded for the evidence, its record count, and the section that shows it, or that it is not shown |
 | Not examined | Checks this report can't speak to: indicator checks and AI-assisted analysis, not available yet |
+| Indicator Matches | Each check of the evidence, and for this run's matches, the context around each matched record: the database's window, its counts by artifact and the 25 nearest records, labelled as context, not a finding (EPOCH-522) |
 | Per-source-type sections | Crash reports today (`RENDERERS`, which the Coverage table also reads) |
 
 Facts are read by evidence through `current_forensic_records`, so the report and

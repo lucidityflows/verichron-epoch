@@ -785,6 +785,12 @@ Decided 2026-10-20 by the project owner (EPOCH-411, EPOCH-556, U6a; board 14
   file, unit, record, hash and the analyses that read it; "Used by" lists the
   indicator matches that cite it. Copy Record copies it as it reads; Copy Raw
   Data copies it exactly as stored.
+- **Around this record** (EPOCH-522): an opened record states its window from
+  the database ("Around this record, ±15 minutes: … to …", in the examiner's
+  zone). Around This Record shows the window's records in the table, every
+  other filter cleared, and the time filter shows the window to the second;
+  Show on Timeline opens the Timeline on it. A record with no time says it has
+  no window.
 
 
 ## 15. Indicator Matches — each check on its own, with what it couldn't compare
@@ -823,6 +829,8 @@ the board's questions on the Not checked colour and on grouping await review.
   as this investigation's check; Investigations lists its run, labelled and
   not selectable, and still shows the analysis. With no complete analysis of
   the evidence, Check Again is refused and says why.
+- **Around** beside each match's record opens Forensic Records on the
+  database's window around it (EPOCH-522), without opening the record.
 - No verdict word is used anywhere on the page.
 
 ## 16. Timeline — the evidence over its whole recorded span
@@ -860,6 +868,8 @@ is drawn with D3 itself, module by module, not a library built on it.
   the range in its time filters, in the examiner's zone.
 - **Records with no time** are counted by artifact under the timeline, never
   placed (R11), each opening its records in Forensic Records.
+- **A range given from outside** (a record's window, from Show on Timeline)
+  is shown as it is, in place of the main span.
 - **Interaction:** the wheel zooms over the plot and scrolls over the lane
   names; dragging moves; the arrow keys move a tenth and + and − zoom. The
   axis labels the date where a day starts on a clock-time axis.

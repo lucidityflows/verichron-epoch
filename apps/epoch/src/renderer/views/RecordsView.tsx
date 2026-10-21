@@ -38,6 +38,8 @@ interface RecordsViewProps {
   openFilters?: RecordFilters | null;
   /** The filters asked for are in use. */
   onFiltersOpened?: () => void;
+  /** Show a time range on the Timeline (a record's context window, EPOCH-522). */
+  onShowOnTimeline?: (range: [number, number]) => void;
 }
 
 const COLUMNS: DataTableColumn<ForensicRecordRow>[] = [
@@ -93,6 +95,7 @@ export function RecordsView({
   onRecordOpened,
   openFilters,
   onFiltersOpened,
+  onShowOnTimeline,
 }: RecordsViewProps) {
   const zone = useDisplayZone();
   const [filters, setFilters] = useState<RecordFilters>({});
@@ -230,6 +233,13 @@ export function RecordsView({
               row={opened}
               onClose={closeRecord}
               onOpenIndicatorMatches={onOpenIndicatorMatches}
+              // The records in its window, every other filter cleared; the bar shows the window (EPOCH-522).
+              onAround={({ from, before }) => {
+                setFilters({ eventTimeFrom: from, eventTimeBefore: before });
+                setOpened(null);
+                setBarVersion((v) => v + 1);
+              }}
+              onShowOnTimeline={onShowOnTimeline}
             />
           )}
         </>

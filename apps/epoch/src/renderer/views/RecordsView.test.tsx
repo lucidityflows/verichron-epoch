@@ -132,6 +132,15 @@ const answers: Record<string, unknown> = {
   },
   getEvidenceCompleteness: async () => completeness,
   getRecordDetail: async () => detail,
+  getRecordContextWindow: async (_run: string, id: string) =>
+    id === 'untimed'
+      ? { record_time: null, from: null, before: null, half_width_seconds: null }
+      : {
+          record_time: '2026-10-14T10:12:09.000Z',
+          from: '2026-10-14T09:57:09.000Z',
+          before: '2026-10-14T10:27:10.000Z',
+          half_width_seconds: 900,
+        },
   getEntityOverview: async () => ({
     kinds: [{ kind: 'domain', title: 'Domain', values: 2, records: 3 }],
     coverage: {
@@ -330,6 +339,41 @@ describe('Forensic Records', () => {
       /Matched domain update-check.example.invalid \(url_host\) in set mvt-2026-10-15/
     );
     assert.ok(screen.getByRole('button', { name: 'Copy Raw Data' }));
+  });
+
+  it("shows a record's window from the database, and shows its records here or on the Timeline (EPOCH-522)", async () => {
+    const onTimeline = vi.fn();
+    render(
+      <RecordsView
+        selectedRun
+        runId={RUN}
+        analysisName="iPhone 17,5 · iOS 26.6.1"
+        evidenceRegistered
+        onOpenInvestigations={() => undefined}
+        onOpenIndicatorMatches={() => undefined}
+        onShowOnTimeline={onTimeline}
+      />
+    );
+    const row = await screen.findByText('https://update-check.example.invalid/a');
+    await act(async () => fireEvent.click(row));
+    const around = await screen.findByRole('region', { name: 'Around this record' });
+    // The window's last second is the one before its exclusive end.
+    assert.match(around.textContent ?? '', /±15 minutes: 2026-10-14 09:57:09 UTC to 2026-10-14 10:27:09 UTC/);
+    fireEvent.click(within(around).getByRole('button', { name: 'Show on Timeline' }));
+    assert.deepEqual(onTimeline.mock.calls.at(-1), [
+      [Date.parse('2026-10-14T09:57:09Z'), Date.parse('2026-10-14T10:27:10Z')],
+    ]);
+    queries.length = 0;
+    await act(async () => fireEvent.click(within(around).getByRole('button', { name: 'Around This Record' })));
+    await waitFor(() =>
+      assert.ok(
+        queries.some(
+          (q) => q.eventTimeFrom === '2026-10-14T09:57:09.000Z' && q.eventTimeBefore === '2026-10-14T10:27:10.000Z'
+        ),
+        'the window is the filter in force'
+      )
+    );
+    assert.equal((screen.getByLabelText(/^To/) as HTMLInputElement).value.slice(0, 19), '2026-10-14T10:27:09');
   });
 
   it('says what the records mention and every field no entity rule reads (EPOCH-581)', async () => {

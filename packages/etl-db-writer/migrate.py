@@ -174,6 +174,14 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pipeline_runs'"
         " AND column_name = 'kind' AND column_default IS NULL)",
     ),
+    "0024_record_context.sql": (
+        "SELECT to_regprocedure('public.correlation_window()') IS NOT NULL",
+        # Its last statement grants the runtime the counts function.
+        "SELECT CASE WHEN to_regprocedure('public.record_context_counts(uuid, bigint, interval)') IS NOT NULL "
+        "AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'verichron_epoch_runtime') "
+        "THEN has_function_privilege('verichron_epoch_runtime', "
+        "'public.record_context_counts(uuid, bigint, interval)', 'EXECUTE') ELSE FALSE END",
+    ),
 }
 
 

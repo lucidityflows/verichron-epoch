@@ -17,6 +17,7 @@ vi.mock('../hooks/usePipelineState', () => ({
 }));
 
 import { useSettingsStore } from '../store/useSettings';
+import type { RecordFilters } from '../features/records/useRecords';
 import { IocsView } from './IocsView';
 
 const RUN = '11111111-0000-0000-0000-000000000001';
@@ -79,7 +80,14 @@ const skipped = (run: string, finished: string): IndicatorCheckRow => ({
 
 let checks: IndicatorCheckRow[] = [check];
 const checkIndicators = vi.fn(async () => ({ started: true }));
+const contextWindow = vi.fn(async () => ({
+  record_time: '2026-03-01T12:00:00.000Z',
+  from: '2026-03-01T11:45:00.000Z',
+  before: '2026-03-01T12:15:01.000Z',
+  half_width_seconds: 900,
+}));
 vi.stubGlobal('epoch', {
+  getRecordContextWindow: contextWindow,
   checkIndicators,
   getIndicatorResults: async () => ({
     evidenceRegistered: true,
@@ -97,9 +105,18 @@ afterEach(() => {
   checkIndicators.mockClear();
 });
 
-async function show(onOpenRecord: (recordId: string) => void = () => {}) {
+async function show(
+  onOpenRecord: (recordId: string) => void = () => {},
+  onOpenRecords: (filters: RecordFilters) => void = () => {}
+) {
   await act(async () => {
-    render(<IocsView selectedRun={{ run_id: RUN } as PipelineRunRow} onOpenRecord={onOpenRecord} />);
+    render(
+      <IocsView
+        selectedRun={{ run_id: RUN } as PipelineRunRow}
+        onOpenRecord={onOpenRecord}
+        onOpenRecords={onOpenRecords}
+      />
+    );
   });
 }
 
@@ -169,5 +186,20 @@ describe('Indicator Matches', () => {
       screen.getAllByText('Check Again').some((el) => el.tagName === 'SPAN'),
       'the re-check is labelled'
     );
+  });
+
+  it("opens a match's records around it in Forensic Records, from the database's window, without opening the record (EPOCH-522)", async () => {
+    const opened: string[] = [];
+    const ranges: RecordFilters[] = [];
+    await show(
+      (id) => void opened.push(id),
+      (f) => void ranges.push(f)
+    );
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Around' })));
+    assert.deepEqual(contextWindow.mock.calls.at(-1), [RUN, '42']);
+    assert.deepEqual(ranges, [
+      { eventTimeFrom: '2026-03-01T11:45:00.000Z', eventTimeBefore: '2026-03-01T12:15:01.000Z' },
+    ]);
+    assert.deepEqual(opened, [], 'the row itself was not opened');
   });
 });

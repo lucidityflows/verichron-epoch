@@ -280,6 +280,22 @@ Reads go through two views (R27):
 
 The report and the desktop app both read these views, so they can't disagree.
 
+**Correlated context** (EPOCH-522, migration 0024) is read the same way: the
+evidence's other records within a window of time around one record, through
+SQL functions both the report and the app call. Neither declares a window, and
+a test greps the code for one.
+
+| Function | Gives |
+|---|---|
+| `correlation_window()` | The default half-width, ±15 minutes: defined here and nowhere else |
+| `record_context_window(evidence, record)` | The window: whole seconds from the second `time − window` falls in through the second `time + window` falls in, as `[window_from, window_before)`. Nulls for a record with no time (R11); no row for a record that isn't current in this evidence |
+| `record_context(evidence, record, window, limit)` | The records in it, nearest first, leaving out the record and its own indicator matches |
+| `record_context_counts(evidence, record, window)` | The window's true counts by source and artifact (R25) |
+
+The bounds are scalar subqueries, so the range is the time index's own
+condition (`idx_forensic_evidence_time`); on a real 44,000-record backup the
+busiest window (792 records) reads in about 25 ms.
+
 ## Entities
 
 What a record mentions is read out of it once, by declared rules, and stored

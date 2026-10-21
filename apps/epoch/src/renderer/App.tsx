@@ -106,6 +106,16 @@ export const App: React.FC = () => {
   // Filters the Timeline asked Forensic Records to open with (EPOCH-580); cleared once applied.
   const [recordsToShow, setRecordsToShow] = useState<RecordFilters | null>(null);
   const filtersShown = useCallback(() => setRecordsToShow(null), []);
+  // A range the Timeline was asked to show (a record's context window, EPOCH-522); cleared once shown.
+  const [timelineToShow, setTimelineToShow] = useState<[number, number] | null>(null);
+  const timelineShown = useCallback(() => setTimelineToShow(null), []);
+  const showOnTimeline = useCallback(
+    (range: [number, number]) => {
+      setTimelineToShow(range);
+      setSection('timeline');
+    },
+    [setSection]
+  );
 
   const handleSectionSelect = (next: Section) => setSection(next);
 
@@ -151,6 +161,8 @@ export const App: React.FC = () => {
                   setRecordToOpen(recordId);
                   setSection('records');
                 }}
+                openRange={timelineToShow}
+                onRangeOpened={timelineShown}
               />
             )}
 
@@ -172,6 +184,7 @@ export const App: React.FC = () => {
                 onRecordOpened={recordOpened}
                 openFilters={recordsToShow}
                 onFiltersOpened={filtersShown}
+                onShowOnTimeline={showOnTimeline}
               />
             )}
 
@@ -180,6 +193,10 @@ export const App: React.FC = () => {
                 selectedRun={selectedRun}
                 onOpenRecord={(recordId) => {
                   setRecordToOpen(recordId);
+                  setSection('records');
+                }}
+                onOpenRecords={(filters) => {
+                  setRecordsToShow(filters);
                   setSection('records');
                 }}
                 onCheckFinished={loadRuns}

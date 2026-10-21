@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChartGantt, FileQuestion, MousePointerClick } from 'lucide-react';
 import type { PipelineRunRow } from '@verichron/etl-db-reader';
 import { ViewLayout } from '../components/layout/ViewLayout';
@@ -19,6 +19,10 @@ interface TimelineViewProps {
   /** Open records in Forensic Records, filtered to a range and a lane or artifact. */
   onOpenRecords: (filters: RecordFilters) => void;
   onOpenRecord: (recordId: string) => void;
+  /** A range to show, in place of the one shown (a record's context window, EPOCH-522). */
+  openRange?: [number, number] | null;
+  /** The range asked for is shown. */
+  onRangeOpened?: () => void;
 }
 
 const count = (n: number) => n.toLocaleString('en-US');
@@ -56,7 +60,13 @@ export function drillFilters(row: Pick<Row, 'laneKey' | 'artifactKey'>, from: nu
  * shows the whole span. Records with no time are counted beside it, never
  * placed (R11). A bucket or a record opens in Forensic Records.
  */
-export function TimelineView({ selectedRun, onOpenRecords, onOpenRecord }: TimelineViewProps) {
+export function TimelineView({
+  selectedRun,
+  onOpenRecords,
+  onOpenRecord,
+  openRange,
+  onRangeOpened,
+}: TimelineViewProps) {
   const zone = useDisplayZone();
   const runId = selectedRun?.evidence_id ? selectedRun.run_id : null;
   const [range, setRange] = useState<[number, number] | null>(null);
@@ -90,8 +100,17 @@ export function TimelineView({ selectedRun, onOpenRecords, onOpenRecord }: Timel
     return [Math.max(span[0], from - pad), Math.min(span[1], to + pad)];
   }, [overview, span]);
 
-  // It opens on the middle 98% of records (owner, 2026-10-21).
-  if (range === null && focusRange) setRange(focusRange);
+  // A range asked for from outside is shown as it is, once the span is known.
+  const [takenRange, setTakenRange] = useState<[number, number] | null>(null);
+  if (openRange && openRange !== takenRange && span) {
+    setTakenRange(openRange);
+    setRange(openRange);
+  }
+  useEffect(() => {
+    if (openRange && takenRange === openRange) onRangeOpened?.();
+  }, [openRange, takenRange, onRangeOpened]);
+  // Otherwise it opens on the middle 98% of records (owner, 2026-10-21).
+  if (range === null && focusRange && !openRange) setRange(focusRange);
 
   const lanes = useMemo(() => (overview ? buildLanes(overview.artifacts) : []), [overview]);
   const inView = useMemo(() => presentKeys(density?.cells ?? []), [density]);

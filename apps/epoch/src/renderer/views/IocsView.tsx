@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Check, FileQuestion, MousePointerClick, RefreshCw, ShieldQuestion } from 'lucide-react';
 import type { IndicatorCheckRow, PipelineRunRow } from '@verichron/etl-db-reader';
 import type { IndicatorResults } from '../../shared/types/window';
+import type { RecordFilters } from '../features/records/useRecords';
 import { runsApi } from '../api/runs';
 import { ViewLayout } from '../components/layout/ViewLayout';
 import { Badge } from '../components/ui/Badge';
@@ -33,6 +34,8 @@ interface IocsViewProps {
   selectedRun: PipelineRunRow | null;
   /** Open a matched fact's record in Forensic Records. */
   onOpenRecord: (recordId: string) => void;
+  /** Open records in Forensic Records with these filters (a matched record's context window, EPOCH-522). */
+  onOpenRecords: (filters: RecordFilters) => void;
   /** A Check Again has ended: its run is new, so the runs are read again. */
   onCheckFinished?: () => void;
 }
@@ -102,10 +105,12 @@ function CheckBody({
   check,
   results,
   onOpenRecord,
+  onAround,
 }: {
   check: IndicatorCheckRow;
   results: IndicatorResults;
   onOpenRecord: (recordId: string) => void;
+  onAround: (recordId: string) => void;
 }) {
   const zone = useDisplayZone();
   const stale = check.set_name ? staleLine(check, results.staleAfterDays, zone) : null;
@@ -231,6 +236,23 @@ function CheckBody({
                           className="text-accent hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                         >
                           Record {n(fact.record_id)}
+                        </button>{' '}
+                        · {/* The records around it, in the database's window (EPOCH-522); not the row's own action. */}
+                        <button
+                          type="button"
+                          disabled={m.event_time === null}
+                          title={
+                            m.event_time === null
+                              ? 'No time recorded, so this record has no window around it'
+                              : 'Open the records around this one in Forensic Records'
+                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onAround(String(fact.record_id));
+                          }}
+                          className="text-accent hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:text-muted-foreground disabled:no-underline"
+                        >
+                          Around
                         </button>
                       </td>
                       <td className={cell}>
@@ -278,10 +300,23 @@ function groupTimes(group: IndicatorCheckRow[], zone: DisplayZone): string {
  * was and wasn't compared and why, and that indicators find only what is
  * already known, so an empty result is never read as a verdict.
  */
-export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord, onCheckFinished }) => {
+export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord, onOpenRecords, onCheckFinished }) => {
   const zone = useDisplayZone();
   const [results, setResults] = useState<IndicatorResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [aroundError, setAroundError] = useState<string | null>(null);
+  // A matched record's window, from the database (R27), opened in Forensic Records.
+  const around = (recordId: string) => {
+    if (!selectedRun) return;
+    setAroundError(null);
+    runsApi
+      .getRecordContextWindow(selectedRun.run_id, recordId)
+      .then((w) => {
+        if (w?.from && w.before) onOpenRecords({ eventTimeFrom: w.from, eventTimeBefore: w.before });
+        else setAroundError(`Record ${recordId} has no time recorded, or is no longer current, so it has no window.`);
+      })
+      .catch((err: unknown) => setAroundError(err instanceof Error ? err.message : String(err)));
+  };
   // Read again when a Check Again ends, so its check is shown.
   const [version, setVersion] = useState(0);
   const checkAgain = useCheckAgain(selectedRun?.run_id ?? null, () => {
@@ -347,6 +382,14 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord, o
       <div className="space-y-6">
         <p className="text-data text-muted-foreground">{results.limit}</p>
         <CheckAgainBar check={checkAgain} />
+        {aroundError && (
+          <div
+            role="alert"
+            className="text-warning bg-warning/10 shadow-elevation-1 border border-warning/30 rounded-lg p-4 text-data"
+          >
+            {aroundError}
+          </div>
+        )}
         <section className="card rounded-lg p-5">
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <h2 className="font-display text-heading text-foreground">This Investigation's Check</h2>
@@ -357,7 +400,7 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord, o
             {thisRun && <span className="text-data text-muted-foreground">Checked {checkedOn(thisRun, zone)}</span>}
           </div>
           {thisRun ? (
-            <CheckBody check={thisRun} results={results} onOpenRecord={onOpenRecord} />
+            <CheckBody check={thisRun} results={results} onOpenRecord={onOpenRecord} onAround={around} />
           ) : (
             <p className="text-data">{`This run did not check indicators. ${results.nothingChecked}`}</p>
           )}
@@ -394,7 +437,7 @@ export const IocsView: React.FC<IocsViewProps> = ({ selectedRun, onOpenRecord, o
                     label={`Show the check of ${checkedOn(check, zone)}`}
                     openLabel={`Hide the check of ${checkedOn(check, zone)}`}
                   >
-                    <CheckBody check={check} results={results} onOpenRecord={onOpenRecord} />
+                    <CheckBody check={check} results={results} onOpenRecord={onOpenRecord} onAround={around} />
                   </Disclosure>
                 ))}
               </div>

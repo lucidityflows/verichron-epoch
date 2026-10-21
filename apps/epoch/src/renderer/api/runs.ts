@@ -11,6 +11,7 @@ export const runsApi = {
   getRecordDetail: (runId: string, recordId: string) => window.epoch.getRecordDetail(runId, recordId),
   getEntityOverview: (runId: string) => window.epoch.getEntityOverview(runId),
   getTimelineOverview: (runId: string) => window.epoch.getTimelineOverview(runId),
+  getRecordContextWindow: (runId: string, recordId: string) => window.epoch.getRecordContextWindow(runId, recordId),
   getTimelineDensity: (runId: string, boundaries: string[]) => window.epoch.getTimelineDensity(runId, boundaries),
   getTimelineRecords: (runId: string, from: string, before: string) =>
     window.epoch.getTimelineRecords(runId, from, before),

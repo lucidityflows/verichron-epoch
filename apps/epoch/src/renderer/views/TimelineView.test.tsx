@@ -145,6 +145,28 @@ describe('Timeline', () => {
   });
 });
 
+describe('a range given from outside', () => {
+  it("opens on it instead of the main span, and says it is shown (a record's window, EPOCH-522)", async () => {
+    useSettingsStore.setState({ settings: { displayZone: 'UTC', backupsFolder: null } });
+    const shown = vi.fn();
+    const range: [number, number] = [Date.parse('2026-10-01T11:45:00Z'), Date.parse('2026-10-01T12:15:01Z')];
+    await act(async () => {
+      render(
+        <TimelineView
+          selectedRun={RUN}
+          onOpenRecords={vi.fn()}
+          onOpenRecord={vi.fn()}
+          openRange={range}
+          onRangeOpened={shown}
+        />
+      );
+    });
+    assert.ok(screen.getByText('2026-10-01 11:45:00 UTC'));
+    assert.ok(screen.getByText('2026-10-01 12:15:01 UTC'));
+    assert.equal(shown.mock.calls.length, 1);
+  });
+});
+
 describe('drillFilters', () => {
   const from = Date.parse('2026-10-01T00:00:00Z');
   const to = Date.parse('2026-10-01T01:00:00Z');

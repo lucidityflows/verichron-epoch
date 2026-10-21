@@ -14,11 +14,15 @@ export function RecordSheet({
   row,
   onClose,
   onOpenIndicatorMatches,
+  onAround,
+  onShowOnTimeline,
 }: {
   runId: string;
   row: ForensicRecordRow;
   onClose: () => void;
   onOpenIndicatorMatches: () => void;
+  onAround?: (window: { from: string; before: string }) => void;
+  onShowOnTimeline?: (range: [number, number]) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -43,7 +47,14 @@ export function RecordSheet({
           <X size="1rem" aria-hidden /> Close
         </button>
       </div>
-      <RecordDetailPanel key={row.id} runId={runId} row={row} onOpenIndicatorMatches={onOpenIndicatorMatches} />
+      <RecordDetailPanel
+        key={row.id}
+        runId={runId}
+        row={row}
+        onOpenIndicatorMatches={onOpenIndicatorMatches}
+        onAround={onAround}
+        onShowOnTimeline={onShowOnTimeline}
+      />
     </aside>
   );
 }

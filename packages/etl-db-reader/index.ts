@@ -82,3 +82,5 @@ export {
   MAX_TIMELINE_BUCKETS,
   MAX_TIMELINE_RECORDS,
 } from './timeline.js';
+export type { ContextWindow, ContextCount, ContextRecord, RecordContext } from './context.js';
+export { getRecordContext, getRecordContextWindow } from './context.js';
