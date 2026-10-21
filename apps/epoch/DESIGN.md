@@ -762,8 +762,11 @@ Decided 2026-10-20 by the project owner (EPOCH-411, EPOCH-556, U6a; board 14
   reads is behind a disclosure. Before the entities stage has read the
   evidence, it says so rather than showing nothing.
 - **True counts:** every filter lists every value with its count from the
-  database, exact for the other filters in use, and a value the other filters
-  exclude is listed with 0. The line above the table gives the total and the
+  database, exact for the other filters in use, and a value another filter
+  excludes is listed with 0. A chosen value stays listed, with 0, when the
+  search or the time range leaves none of its records, so the filter in use
+  is always shown. The time range's end is exclusive: just after the last
+  second or minute typed, so records inside it are kept. The line above the table gives the total and the
   records with no time, which are listed last. Nothing is counted or filtered
   from the rows on screen (R25).
 - **The table:** Time, Artifact (or the source's title), Summary and Tier.

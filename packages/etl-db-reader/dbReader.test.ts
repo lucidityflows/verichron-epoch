@@ -256,7 +256,7 @@ describe('getForensicRecords', live, () => {
     assert.ok(crash.length > 0 && crash.every((r) => r.source_type === 'crash_report'));
     assert.equal((await getForensicRecords(db, EVIDENCE, { sourceType: 'crash_report' })).total, crash.length);
 
-    const ranged = await walk({ eventTimeFrom: '2024-01-15T00:00:00Z', eventTimeTo: '2024-01-15T23:59:59Z' }, 3);
+    const ranged = await walk({ eventTimeFrom: '2024-01-15T00:00:00Z', eventTimeBefore: '2024-01-16T00:00:00Z' }, 3);
     assert.ok(ranged.length > 0);
     assert.ok(
       ranged.every((r) => r.event_time !== null),

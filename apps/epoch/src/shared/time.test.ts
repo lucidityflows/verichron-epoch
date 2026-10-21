@@ -8,6 +8,7 @@ import {
   formatParts,
   isoWithOffset,
   NO_TIME,
+  wallTimeEnd,
   wallTimeToInstant,
   zoneLabel,
 } from './time';
@@ -123,6 +124,12 @@ describe('time display (EPOCH-559)', () => {
   it('takes the first 01:30 for a range start and the second for its end, the night the clocks go back', () => {
     expect(wallTimeToInstant('2026-11-01T01:30', 'America/Chicago')).toBe('2026-11-01T06:30:00.000Z');
     expect(wallTimeToInstant('2026-11-01T01:30', 'America/Chicago', true)).toBe('2026-11-01T07:30:00.000Z');
+  });
+
+  it('ends a range just after the last second or minute typed, so records inside it are kept', () => {
+    expect(wallTimeEnd('2026-10-14T10:12:09', 'UTC')).toBe('2026-10-14T10:12:10.000Z');
+    expect(wallTimeEnd('2026-10-14T10:12', 'UTC')).toBe('2026-10-14T10:13:00.000Z');
+    expect(wallTimeEnd('2026-11-01T01:30', 'America/Chicago')).toBe('2026-11-01T07:31:00.000Z');
   });
 
   it('refuses a time the clocks skip rather than moving it', () => {
