@@ -158,7 +158,9 @@ Analyze checks the evidence against the newest registered set. To check
 against another one, give the orchestrator its set hash:
 `investigate -- --workspace <dir> --indicator-set <set hash>`. Registering a
 newer set makes the next Analyze of already-analyzed evidence run again; the
-extractors find their facts already ingested and write nothing new.
+extractors find their facts already ingested and write nothing new. To check
+the indicators alone, as Check Again does, add `--check-indicators`: a run of
+its own that runs only the indicator check.
 
 The report shows times in UTC unless the orchestrator is given a zone:
 `--display-zone America/Chicago` (the app passes the one chosen in Settings).

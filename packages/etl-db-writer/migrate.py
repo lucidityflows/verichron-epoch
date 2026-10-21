@@ -168,6 +168,12 @@ APPLIED_MARKERS: dict[str, tuple[str, str]] = {
         _column("ingested_files", "source_ingest_id"),
         _relation("idx_record_entities_kind"),
     ),
+    "0023_run_kind.sql": (
+        _constraint("pipeline_runs_kind_known"),
+        # Its last statement drops the default that filled the earlier runs.
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pipeline_runs'"
+        " AND column_name = 'kind' AND column_default IS NULL)",
+    ),
 }
 
 

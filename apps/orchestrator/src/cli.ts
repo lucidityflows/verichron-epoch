@@ -15,7 +15,7 @@ import { DEFAULT_DISPLAY_ZONE, displayZone, loadRootEnv, resolveDatabaseUrl } fr
 
 export function printUsage() {
   console.error(
-    `Usage:\n  pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace-dir> [--label <label> ...] [--summary-path <file>] [--indicator-set <set hash>] [--display-zone <UTC or a named zone, e.g. America/Chicago>]`
+    `Usage:\n  pnpm --filter @verichron/orchestrator investigate -- --workspace <workspace-dir> [--label <label> ...] [--summary-path <file>] [--indicator-set <set hash>] [--display-zone <UTC or a named zone, e.g. America/Chicago>] [--check-indicators]`
   );
 }
 
@@ -87,6 +87,9 @@ export async function parseCliConfig(): Promise<CliConfig> {
       'indicator-set': { type: 'string' },
       // The zone the report shows times in (EPOCH-560): the app passes the examiner's setting.
       'display-zone': { type: 'string', default: DEFAULT_DISPLAY_ZONE },
+      // Check Again (EPOCH-557): a run of its own that only compares the evidence's
+      // entities with the indicator set, against facts an analysis already wrote.
+      'check-indicators': { type: 'boolean', default: false },
       // Typed events, as the app runs it, or human text on the command line (EPOCH-570).
       output: { type: 'string', default: 'text' },
     },
@@ -115,7 +118,15 @@ export async function parseCliConfig(): Promise<CliConfig> {
   }
   const workspace = path.resolve(values.workspace);
   const targets = await workspaceTargets(workspace, values.label);
-  return { targets, workspacePaths: [workspace], dbUrl, summaryPath, indicatorSetHash, displayZone: zone };
+  return {
+    targets,
+    workspacePaths: [workspace],
+    dbUrl,
+    summaryPath,
+    indicatorSetHash,
+    displayZone: zone,
+    checkIndicators: values['check-indicators'],
+  };
 }
 
 export async function workspaceTargets(

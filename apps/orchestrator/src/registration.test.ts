@@ -53,7 +53,13 @@ import {
 
 import { createRun, getRunState, hasCompleteRunFor } from './db.js';
 import { discoverStages } from './discovery.js';
-import { STOPPED_EXIT_CODE, requestStop, resetStopForTests, runPipelineForBackup } from './pipeline.js';
+import {
+  CHECK_NEEDS_ANALYSIS,
+  STOPPED_EXIT_CODE,
+  requestStop,
+  resetStopForTests,
+  runPipelineForBackup,
+} from './pipeline.js';
 import { readRunSummary } from './runSummary.js';
 import { deviceKey, loadDeviceSecret, readPlistStrings, registerEvidence, RegistrationError } from './registration.js';
 import { setOutputMode } from './events.js';
@@ -648,6 +654,68 @@ describe('stages and the completeness predicate', live, () => {
     const second = await run(ws.backupPath, stages);
     assert.notEqual(second.skipped, true, 'a newer set gets a new run');
     assert.equal(argsOf(matcher)['--indicator-set-id'], newer.setId);
+  });
+
+  it('Check Again runs only the indicator stage, as a run of its own each time, and never stands in for an analysis (EPOCH-557)', async () => {
+    const ws = makeWorkspace('check-again');
+    const entities = recordingStage('entities', 30, { reads: 'facts', parserVersion: 1 });
+    const matcher = recordingStage('matcher', 500, { reads: 'indicator_set', parserVersion: 1 });
+    const stages = { enabled: [entities, matcher], disabled: [] };
+    await registerSet('checked', '2026-10-01T00:00:00Z');
+
+    const analysis = await run(ws.backupPath, stages);
+    assert.equal(analysis.success, true, JSON.stringify(analysis));
+    rmSync(path.join(entities.dir, 'argv.json'));
+
+    const check = async () =>
+      runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', stages, { secretPath, checkIndicators: true });
+    const first = await check();
+    const second = await check();
+    for (const result of [first, second]) {
+      assert.equal(result.success, true, JSON.stringify(result));
+      assert.notEqual(result.skipped, true, 'a check never resumes an earlier run');
+    }
+    assert.notEqual(first.runId, second.runId);
+    assert.ok(!existsSync(path.join(entities.dir, 'argv.json')), 'a check runs no other stage');
+    const { rows } = await db.query(
+      `SELECT r.kind, array_agg(s.stage_name ORDER BY s.stage_order) AS stages
+         FROM pipeline_runs r JOIN pipeline_stage_status s USING (run_id)
+        WHERE r.run_id = ANY($1::uuid[]) GROUP BY r.run_id, r.kind`,
+      [[analysis.runId, first.runId, second.runId]]
+    );
+    assert.deepEqual(rows.map((r) => [r.kind, r.stages]).sort(), [
+      ['analysis', ['entities', 'matcher']],
+      ['indicator_check', ['matcher']],
+      ['indicator_check', ['matcher']],
+    ]);
+    assert.equal(await getRunState(db, first.runId!), 'complete');
+    assert.equal((await run(ws.backupPath, stages)).skipped, true, 'the analysis stands; checks are not analyses');
+
+    const noMatcher = await runPipelineForBackup(
+      db,
+      ws.target,
+      DSN ?? '',
+      'python3',
+      { enabled: [entities], disabled: [] },
+      { secretPath, checkIndicators: true }
+    ).catch((err: Error) => err);
+    assert.ok(noMatcher instanceof Error && /no enabled stage reads an indicator set/.test(noMatcher.message));
+  });
+
+  it('Check Again is refused before any run when the evidence has no complete analysis (EPOCH-557)', async () => {
+    const ws = makeWorkspace('check-first');
+    const matcher = recordingStage('refused-matcher', 500, { reads: 'indicator_set', parserVersion: 1 });
+    const stages = { enabled: [matcher], disabled: [] };
+    await registerSet('checked', '2026-10-01T00:00:00Z');
+    const runs = await count('pipeline_runs');
+    const check = await runPipelineForBackup(db, ws.target, DSN ?? '', 'python3', stages, {
+      secretPath,
+      checkIndicators: true,
+    });
+    assert.equal(check.success, false);
+    assert.equal(check.error, CHECK_NEEDS_ANALYSIS);
+    assert.equal(await count('pipeline_runs'), runs, 'no run was created');
+    assert.ok(!existsSync(path.join(matcher.dir, 'argv.json')), 'nothing was checked');
   });
 
   it('--indicator-set chooses a set by its hash, and an unknown hash fails before any run (EPOCH-491)', async () => {

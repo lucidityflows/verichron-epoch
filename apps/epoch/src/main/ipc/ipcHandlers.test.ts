@@ -112,14 +112,14 @@ beforeAll(async () => {
     );
   }
   await pool.query(
-    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, evidence_id, derivative_id, host, pid)
-     VALUES ($1, $2, 'test', '{}', 'UTC', $3, $3, 'test-host', 1)`,
+    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, evidence_id, derivative_id, host, pid)
+     VALUES ($1, $2, 'test', '{}', 'UTC', 'analysis', $3, $3, 'test-host', 1)`,
     [RUN, path.join(workspace, 'decrypted', 'b'), EVIDENCE]
   );
   // A run from before evidence registration (EPOCH-404).
   await pool.query(
-    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, host, pid)
-     VALUES ($1, '/legacy/decrypted/a', 'test', '{}', 'UTC', 'test-host', 1)`,
+    `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind, host, pid)
+     VALUES ($1, '/legacy/decrypted/a', 'test', '{}', 'UTC', 'analysis', 'test-host', 1)`,
     [UNREGISTERED_RUN]
   );
 

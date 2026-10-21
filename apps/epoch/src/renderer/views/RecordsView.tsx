@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Database, FileQuestion, Filter, MousePointerClick } from 'lucide-react';
 import type { ForensicRecordRow } from '@verichron/etl-db-reader';
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable';
@@ -16,6 +16,7 @@ import { RecordSheet } from '../features/records/RecordSheet';
 import { useRecords, type RecordFilters } from '../features/records/useRecords';
 import { originOf, summaryOf, tierLabel } from '../features/records/recordText';
 import { useDisplayZone } from '../store/useSettings';
+import { runsApi } from '../api/runs';
 
 interface RecordsViewProps {
   selectedRun: boolean;
@@ -29,6 +30,10 @@ interface RecordsViewProps {
   onRerunFinished?: () => void;
   onOpenInvestigations: () => void;
   onOpenIndicatorMatches: () => void;
+  /** A record to open on arrival, by its id (a match on Indicator Matches). */
+  openRecordId?: string | null;
+  /** The record asked for has been read, and is open or said to be missing. */
+  onRecordOpened?: () => void;
 }
 
 const COLUMNS: DataTableColumn<ForensicRecordRow>[] = [
@@ -80,6 +85,8 @@ export function RecordsView({
   onRerunFinished,
   onOpenInvestigations,
   onOpenIndicatorMatches,
+  openRecordId,
+  onRecordOpened,
 }: RecordsViewProps) {
   const zone = useDisplayZone();
   const [filters, setFilters] = useState<RecordFilters>({});
@@ -94,6 +101,23 @@ export function RecordsView({
     setFilters({});
     setOpened(null);
   }
+  const [openError, setOpenError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!openRecordId || !readable) return;
+    let active = true;
+    runsApi
+      .getRecordDetail(readable, openRecordId)
+      .then((detail) => {
+        if (!active) return;
+        setOpenError(detail ? null : `Record ${openRecordId} is no longer current for this evidence.`);
+        if (detail) setOpened(detail.record);
+      })
+      .catch((err: unknown) => active && setOpenError(err instanceof Error ? err.message : String(err)))
+      .finally(() => active && onRecordOpened?.());
+    return () => {
+      active = false;
+    };
+  }, [openRecordId, readable, onRecordOpened]);
   const columns = useMemo(() => COLUMNS, []);
   const closeRecord = useCallback(() => setOpened(null), []);
   const nothingAtAll = records.facets !== null && records.facets.total === 0 && Object.keys(filters).length === 0;
@@ -123,6 +147,14 @@ export function RecordsView({
           <StillFailingPanel key={runId} runId={runId} onRerunFinished={onRerunFinished} />
           <CompletenessPanel key={runId} runId={runId} onOpenInvestigations={onOpenInvestigations} />
           <EntityCoveragePanel overview={entities.overview} error={entities.error} />
+          {openError && (
+            <div
+              role="alert"
+              className="text-warning bg-warning/10 shadow-elevation-1 border border-warning/30 rounded-lg p-4 text-data mb-4 shrink-0"
+            >
+              The record could not be opened: {openError}
+            </div>
+          )}
           {records.error && (
             <div
               role="alert"

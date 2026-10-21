@@ -202,6 +202,7 @@ an audit event; facts belong to evidence, not to runs (R7).**
     - Once it ends, `ended_reason`: `completed`, `cancelled`, `timeout`, `crashed` or `abandoned`. It is set exactly when `finished_at` is.
     - `ended_detail`: what was known about why.
     - `display_zone` (EPOCH-560, migration 0020): the zone its report shows times in, UTC or the named zone chosen in Settings. The report reads it from the run. Stored times stay UTC (R11).
+    - `kind` (EPOCH-557, migration 0023): `analysis`, or `indicator_check` for Check Again, a run of the indicator check alone. Only analyses count as "already done" for Analyze, and the app shows an analysis, not a check, as the investigation's.
   - **Who closes a run the orchestrator didn't finish:**
     - The orchestrator closes its own run as `crashed`, with its error.
     - The app closes a call's runs by ID, from their `run:created` events: as `cancelled` on a cancel, `timeout` when stalled, or `crashed` when the process died.

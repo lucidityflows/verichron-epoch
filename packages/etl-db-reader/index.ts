@@ -20,6 +20,7 @@ export type {
   StageStatusRow,
   ForensicRecordRow,
   StageStatus,
+  RunKind,
   ForensicRecordQuery,
   ForensicRecordPage,
   RecordSortKey,
