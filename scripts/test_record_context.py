@@ -102,20 +102,49 @@ def test_the_report_reads_each_case_as_the_fixture_says(db, case):
         assert sum(c["records"] for c in limited["counts"]) == len(case["nearest"]), "counts are the whole window's"
 
 
-def test_the_context_query_can_read_the_time_index(db):
+def test_the_context_query_reads_the_window_through_the_time_index(db):
+    """The window's range is the time index's own condition, not a filter after scanning the whole evidence.
+
+    On the fixture's dozen rows every plan costs the same, and the planner's
+    choice between them is a tie-break (CI chose differently from a local
+    run). So the evidence gets a year of other records, as real evidence has,
+    and its statistics, and the window is then the selective condition.
+    """
     if not isinstance(db, PgReal):
         pytest.skip("EXPLAIN is PostgreSQL's")
     ids = load(db)
     with db.cursor() as cur:
-        # A handful of rows would be scanned whole anyway; with scans off, the plan shows whether an index serves it.
-        cur.execute("SET LOCAL enable_seqscan = off")
+        cur.execute(
+            "INSERT INTO ingested_files (evidence_id, derivative_id, file_hash, source_type, parser_version, "
+            "file_path, file_name, payload_kind, raw_payload) "
+            "VALUES (%s, %s, %s, 'ileapp_record', 1, 'f', 'f', 'none', '{}') RETURNING ingest_id",
+            (EVIDENCE["case"], DERIVATIVE["case"], "e" * 64),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        bulk = row[0]
+        cur.execute(
+            "INSERT INTO forensic_records (ingest_id, evidence_id, source_type, event_time, fields) "
+            "SELECT %s, %s, 'ileapp_record', timestamptz '2025-01-01' + g * interval '4 hours', "
+            "jsonb_build_object('source_artifact', 'Data Usage', 'category', 'Data Usage') "
+            "FROM generate_series(1, 2000) g",
+            (bulk, EVIDENCE["case"]),
+        )
+        cur.execute(
+            "UPDATE ingested_files SET ingest_complete = TRUE, record_count = 2000, completed_at = now() "
+            "WHERE ingest_id = %s",
+            (bulk,),
+        )
+    db.commit()
+    with db.cursor() as cur:
+        cur.execute("ANALYZE forensic_records")
+        cur.execute("ANALYZE ingested_files")
         cur.execute("EXPLAIN SELECT * FROM record_context(%s, %s)", (EVIDENCE["case"], ids["match-fact"]))
         plan = "\n".join(row[0] for row in cur.fetchall())
     db.rollback()
-    # The window's range is the index's own condition, not a filter applied after scanning the whole evidence.
     assert re.search(
-        r"Index Scan using idx_forensic_evidence_time on forensic_records.*\n\s*Index Cond: \(\(evidence_id = .*"
-        r"AND \(event_time >= .*AND \(event_time < ",
+        r"Index (Only )?Scan using idx_forensic_evidence_time on forensic_records.*\n"
+        r"\s*Index Cond: \(\(evidence_id = .*AND \(event_time >= .*AND \(event_time < ",
         plan,
     ), plan
 
