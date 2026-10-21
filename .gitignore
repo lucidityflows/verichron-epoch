@@ -157,3 +157,6 @@ packages/contracts/ts/*.d.ts
 
 # The PostgreSQL source tarball tools/postgres/build.sh downloads (EPOCH-477)
 tools/postgres/.cache/
+
+# The uv release tools/runtime/build.sh downloads (EPOCH-439)
+tools/runtime/.cache/

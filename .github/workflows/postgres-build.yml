@@ -1,20 +1,30 @@
-name: Lab PostgreSQL build
+name: Lab PostgreSQL and Python build
 
 # The Lab bundle's PostgreSQL (EPOCH-477): built from the pinned source in the
 # pinned Debian 13 container, then checked moved, socket-only, and with every
-# migration applied. It compiles PostgreSQL, so it runs only when the build or
-# the migrations change.
+# migration applied. Then the bundle's Python environment, with psycopg2 built
+# against that PostgreSQL's libpq (EPOCH-439), checked moved and connected. It
+# compiles PostgreSQL, so it runs only when the builds, the migrations or the
+# Python dependencies change.
 
 on:
   push:
     branches: [main]
     paths:
       - "tools/postgres/**"
+      - "tools/runtime/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "**/pyproject.toml"
       - "packages/etl-db-writer/migrations/**"
       - ".github/workflows/postgres-build.yml"
   pull_request:
     paths:
       - "tools/postgres/**"
+      - "tools/runtime/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "**/pyproject.toml"
       - "packages/etl-db-writer/migrations/**"
       - ".github/workflows/postgres-build.yml"
 
@@ -30,3 +40,9 @@ jobs:
 
       - name: Check it moved, socket-only, with every migration
         run: tools/postgres/check.sh "$RUNNER_TEMP/pg"
+
+      - name: Build the Python environment against it
+        run: tools/runtime/build.sh "$RUNNER_TEMP/pg"
+
+      - name: Check psycopg2 loads the bundle's libpq, moved, and connects
+        run: tools/runtime/check.sh "$RUNNER_TEMP/pg"
