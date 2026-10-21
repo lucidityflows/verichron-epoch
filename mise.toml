@@ -28,11 +28,20 @@ description = "Check prerequisites, then install every environment from the lock
 run = "scripts/bootstrap-dev.sh"
 
 [tasks.db]
-description = "Apply migrations, then create or update the runtime login (EPOCH-562)"
+description = "Apply migrations, create or update the runtime login (EPOCH-562), then register an indicator set (EPOCH-579)"
 run = [
   "uv run python packages/etl-db-writer/migrate.py",
   "uv run python packages/etl-db-writer/provision_roles.py",
+  { task = "indicators" },
 ]
+
+[tasks.indicators]
+description = "Fetch the public indicator feeds if none were fetched on this machine, then register the newest set"
+run = "uv run python scripts/dev_indicator_set.py"
+
+[tasks."indicators:update"]
+description = "Fetch a newer indicator set and register it; already-analyzed evidence then runs again (R22)"
+run = "uv run python scripts/dev_indicator_set.py --update"
 
 [tasks.lint]
 description = "Lint, format-check and type-check first-party Python"
