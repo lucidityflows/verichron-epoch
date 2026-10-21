@@ -15,6 +15,9 @@ import {
   getStageFailures,
   getStillFailing,
   getInterruptedStages,
+  getTimelineOverview,
+  getTimelineDensity,
+  getTimelineRecords,
   type ForensicRecordPage,
   type ItemFailurePage,
   type ForensicRecordQuery,
@@ -105,6 +108,36 @@ export function registerDbHandlers(dbPool: Pool) {
   ipcMain.handle('epoch:getEvidenceCompleteness', async (_event, runId: string) => {
     const evidenceId = await getRunEvidence(dbPool, runId);
     return evidenceId ? getEvidenceCompleteness(dbPool, evidenceId) : null;
+  });
+
+  // The Timeline (EPOCH-580): the selected run's evidence placed in time, counted by the database.
+  // Its arguments come from the renderer, so they are checked before any query.
+  const isText = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
+  const timeline = async <T>(runId: unknown, read: (evidenceId: string) => Promise<T>): Promise<T | null> => {
+    if (!isText(runId)) throw new Error('a timeline read needs a run id');
+    try {
+      const evidenceId = await getRunEvidence(dbPool, runId);
+      return evidenceId ? await read(evidenceId) : null;
+    } catch (err) {
+      console.error('DB error:', err);
+      throw err;
+    }
+  };
+
+  ipcMain.handle('epoch:getTimelineOverview', async (_event, runId: unknown) =>
+    timeline(runId, (evidenceId) => getTimelineOverview(dbPool, evidenceId))
+  );
+
+  ipcMain.handle('epoch:getTimelineDensity', async (_event, runId: unknown, boundaries: unknown) => {
+    if (!Array.isArray(boundaries) || !boundaries.every(isText)) {
+      throw new Error('a timeline density needs its bucket boundaries as a list of times');
+    }
+    return timeline(runId, (evidenceId) => getTimelineDensity(dbPool, evidenceId, boundaries));
+  });
+
+  ipcMain.handle('epoch:getTimelineRecords', async (_event, runId: unknown, from: unknown, before: unknown) => {
+    if (!isText(from) || !isText(before)) throw new Error("a timeline's records need a range: from and before");
+    return timeline(runId, (evidenceId) => getTimelineRecords(dbPool, evidenceId, from, before));
   });
 
   ipcMain.handle('epoch:getRecordDetail', async (_event, runId: string, recordId: string) => {

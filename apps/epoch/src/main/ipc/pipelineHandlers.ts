@@ -210,9 +210,9 @@ export function registerPipelineHandlers(
    * they were. Best effort: a database failure here doesn't block reporting
    * the real error to the renderer.
    */
-  async function closeCallRuns(reason: AppEndedReason, detail: string): Promise<void> {
+  async function closeCallRuns(call: number, reason: AppEndedReason, detail: string): Promise<void> {
     try {
-      await closeRuns(dbPool, analysisSession.runIds(), reason, detail);
+      await closeRuns(dbPool, analysisSession.runIds(call), reason, detail);
       await closeAbandonedRuns(dbPool);
     } catch (err) {
       console.error('[pipelineHandlers] could not close the runs this call left open:', err);
@@ -523,7 +523,8 @@ export function registerPipelineHandlers(
   async function runOrchestratorCall(call: OrchestratorCall, releasePipeline: () => void): Promise<void> {
     // What the examiner started, as the log and its messages name it.
     const task = call.kind === 'check' ? 'Check Again' : 'Analyze';
-    analysisSession.start(call.kind, call.target, call.workspace, call.labels);
+    // This call's token: its log, events and end change only its own state.
+    const token = analysisSession.start(call.kind, call.target, call.workspace, call.labels);
     let log: TaskLog;
     try {
       log = await TaskLog.open(
@@ -539,8 +540,8 @@ export function registerPipelineHandlers(
           message: `${task} started for ${call.labels.length} backup${call.labels.length === 1 ? '' : 's'}`,
         },
         (entry) => {
-          analysisSession.entry(entry);
-          sendToRenderer('epoch:orchestratorLog', entry);
+          // An earlier call's late entries (its task:finished) stay in its saved log, off the screen.
+          if (analysisSession.entry(token, entry)) sendToRenderer('epoch:orchestratorLog', entry);
         }
       );
     } catch (err) {
@@ -549,10 +550,10 @@ export function registerPipelineHandlers(
       const error = `The task log could not be created, so ${task} did not start: ${
         err instanceof Error ? err.message : String(err)
       }`;
-      analysisSession.finish({ success: false, error });
+      analysisSession.finish(token, { success: false, error });
       throw new Error(error);
     }
-    analysisSession.logFile(log.file);
+    analysisSession.logFile(token, log.file);
 
     let finished = false;
     const finish = async (
@@ -563,7 +564,7 @@ export function registerPipelineHandlers(
       if (finished) return;
       finished = true;
       await log.finish(result, message);
-      analysisSession.finish(outcome);
+      analysisSession.finish(token, outcome);
     };
 
     const summaryPath = newSummaryPath();
@@ -610,7 +611,7 @@ export function registerPipelineHandlers(
         // An event that breaks the contract is said in the task log, as an
         // error, rather than thrown from a stream listener into the app.
         try {
-          analysisSession.follow(event);
+          analysisSession.follow(token, event);
         } catch (err) {
           log.app(
             'error',
@@ -638,7 +639,7 @@ export function registerPipelineHandlers(
       const { cancelled, timedOut, outcome } = stopped(reason);
       void (async () => {
         if (call.kind !== 'workspace' || tracked) {
-          await closeCallRuns(endedReason(reason), `orchestrator process error: ${err.message}`);
+          await closeCallRuns(token, endedReason(reason), `orchestrator process error: ${err.message}`);
         }
         await rm(summaryPath, { force: true });
         await finish(
@@ -668,6 +669,7 @@ export function registerPipelineHandlers(
         // cancel -- can leave rows dangling and needs the same cleanup path.
         if (code !== 0 && (call.kind !== 'workspace' || tracked)) {
           await closeCallRuns(
+            token,
             endedReason(reason),
             cancelled
               ? 'cancelled by user'

@@ -155,6 +155,16 @@ describe.skipIf(live)('database handlers', () => {
     );
   });
 
+  it("refuses timeline reads whose arguments aren't what the reader takes, before any query (EPOCH-580)", async () => {
+    await assert.rejects(invoke('epoch:getTimelineDensity', RUN, 'not a list'), /a list of times/);
+    await assert.rejects(invoke('epoch:getTimelineDensity', RUN, ['2026-10-01T00:00:00Z', 5]), /a list of times/);
+    await assert.rejects(invoke('epoch:getTimelineRecords', RUN, '2026-10-01T00:00:00Z', null), /from and before/);
+    await assert.rejects(invoke('epoch:getTimelineOverview', 42), /needs a run id/);
+    const overview = await invoke<{ total: number; limits: { buckets: number } }>('epoch:getTimelineOverview', RUN);
+    assert.equal(overview.total, 1);
+    assert.equal(await invoke('epoch:getTimelineOverview', UNREGISTERED_RUN), null);
+  });
+
   it('returns no records for a run with no registered evidence, never another evidence item’s', async () => {
     assert.deepEqual(await invoke('epoch:getForensicRecords', UNREGISTERED_RUN), {
       rows: [],

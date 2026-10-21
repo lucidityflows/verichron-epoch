@@ -15,7 +15,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc --project tsconfig.test.json",
-    "test": "tsx --test '*.test.ts'"
+    "test": "tsx --test --test-concurrency=1 '*.test.ts'"
   },
   "dependencies": {
     "@verichron/contracts": "workspace:*"

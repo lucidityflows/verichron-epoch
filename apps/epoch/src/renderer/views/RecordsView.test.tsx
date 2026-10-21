@@ -207,6 +207,43 @@ const show = () =>
   );
 
 describe('Forensic Records', () => {
+  it('opens with the filters the Timeline gives, shows their range in the zone, and says so once (EPOCH-580)', async () => {
+    const opened = vi.fn();
+    const filters = {
+      eventTimeFrom: '2026-10-14T10:00:00.000Z',
+      eventTimeBefore: '2026-10-14T11:00:00.000Z',
+      artifact: 'Safari Browser - History',
+    };
+    render(
+      <RecordsView
+        selectedRun
+        runId={RUN}
+        analysisName="iPhone 17,5 · iOS 26.6.1"
+        evidenceRegistered
+        onOpenInvestigations={() => undefined}
+        onOpenIndicatorMatches={() => undefined}
+        openFilters={filters}
+        onFiltersOpened={opened}
+      />
+    );
+    await waitFor(() =>
+      assert.ok(
+        queries.some(
+          (q) =>
+            q.eventTimeFrom === filters.eventTimeFrom &&
+            q.eventTimeBefore === filters.eventTimeBefore &&
+            q.artifact === filters.artifact
+        )
+      )
+    );
+    assert.equal(opened.mock.calls.length, 1);
+    // The end is exclusive: the last second shown is the one before it.
+    // A time input drops zero seconds from its value, as browsers do.
+    assert.equal((screen.getByLabelText(/^From/) as HTMLInputElement).value, '2026-10-14T10:00');
+    // jsdom writes the seconds as "59.000", Chromium as "59": either is the second before the end.
+    assert.match((screen.getByLabelText(/^To/) as HTMLInputElement).value, /^2026-10-14T10:59:59(\.000)?$/);
+  });
+
   it('states what was examined above the records', async () => {
     show();
     const panel = await screen.findByRole('region', { name: 'Evidence Completeness' });

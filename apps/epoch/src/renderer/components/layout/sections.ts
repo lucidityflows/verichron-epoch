@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
-import { Activity, Database, FileText, PlusCircle, Settings, Target, type LucideIcon } from 'lucide-react';
+import { Activity, ChartGantt, Database, FileText, PlusCircle, Settings, Target, type LucideIcon } from 'lucide-react';
 
-export type Section = 'workspace' | 'runs' | 'records' | 'iocs' | 'reports' | 'settings';
+export type Section = 'workspace' | 'runs' | 'timeline' | 'records' | 'iocs' | 'reports' | 'settings';
 
 interface SectionInfo {
   label: string;
@@ -18,6 +18,8 @@ interface SectionInfo {
 export const SECTIONS: Record<Section, SectionInfo> = {
   workspace: { label: 'New Investigation', icon: PlusCircle, colorVar: '--section-workspace' },
   runs: { label: 'Investigations', icon: Activity, colorVar: '--section-runs' },
+  // The main way into an investigation's evidence (EPOCH-580), first of its sections.
+  timeline: { label: 'Timeline', icon: ChartGantt, colorVar: '--section-timeline' },
   records: { label: 'Forensic Records', icon: Database, colorVar: '--section-records' },
   iocs: { label: 'Indicator Matches', icon: Target, colorVar: '--section-iocs' },
   reports: { label: 'Reports', icon: FileText, colorVar: '--section-reports' },
@@ -27,7 +29,7 @@ export const SECTIONS: Record<Section, SectionInfo> = {
 };
 
 /** The investigation's sections, in order; Settings sits apart, below them. */
-export const SECTION_ORDER: Section[] = ['workspace', 'runs', 'records', 'iocs', 'reports'];
+export const SECTION_ORDER: Section[] = ['workspace', 'runs', 'timeline', 'records', 'iocs', 'reports'];
 
 /** Sets `--section` on an element, so `text-section` and `bg-section/NN` inside it use this section's colour. */
 export function sectionStyle(section: Section): CSSProperties {

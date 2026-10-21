@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FacetCount, RecordFacet, RecordFacets } from '@verichron/etl-db-reader';
 import { Button } from '../../components/ui/Button';
-import { wallTimeEnd, wallTimeToInstant, type DisplayZone } from '../../../shared/time';
+import { isoWithOffset, wallTimeEnd, wallTimeToInstant, type DisplayZone } from '../../../shared/time';
 import type { RecordFilters } from './useRecords';
 import { sourceTitle, tierLabel } from './recordText';
 import { MentionsFilter } from './MentionsFilter';
@@ -61,8 +61,16 @@ interface RecordFiltersBarProps {
  */
 export function RecordFiltersBar({ runId, entities, filters, facets, zone, onChange }: RecordFiltersBarProps) {
   const [search, setSearch] = useState(filters.search ?? '');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  // A range set from outside (the Timeline) is shown as it is in force, in the examiner's zone:
+  // the end is exclusive, so the last second shown is the one before it.
+  const [from, setFrom] = useState(() =>
+    filters.eventTimeFrom ? isoWithOffset(filters.eventTimeFrom, zone).slice(0, 19) : ''
+  );
+  const [to, setTo] = useState(() =>
+    filters.eventTimeBefore
+      ? isoWithOffset(new Date(Date.parse(filters.eventTimeBefore) - 1000), zone).slice(0, 19)
+      : ''
+  );
   const [timeError, setTimeError] = useState<string | null>(null);
 
   // A search is read once typing pauses, not on every key.

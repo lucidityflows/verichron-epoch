@@ -85,6 +85,11 @@ const dbApi = {
   getEvidenceCompleteness: (runId: string) => ipcRenderer.invoke('epoch:getEvidenceCompleteness', runId),
   getRecordDetail: (runId: string, recordId: string) => ipcRenderer.invoke('epoch:getRecordDetail', runId, recordId),
   getEntityOverview: (runId: string) => ipcRenderer.invoke('epoch:getEntityOverview', runId),
+  getTimelineOverview: (runId: string) => ipcRenderer.invoke('epoch:getTimelineOverview', runId),
+  getTimelineDensity: (runId: string, boundaries: string[]) =>
+    ipcRenderer.invoke('epoch:getTimelineDensity', runId, boundaries),
+  getTimelineRecords: (runId: string, from: string, before: string) =>
+    ipcRenderer.invoke('epoch:getTimelineRecords', runId, from, before),
   getEntityValues: (runId: string, kind: string, query?: EntityValueQuery) =>
     ipcRenderer.invoke('epoch:getEntityValues', runId, kind, query),
   getIndicatorResults: (runId: string) => ipcRenderer.invoke('epoch:getIndicatorResults', runId),

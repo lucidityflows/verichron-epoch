@@ -34,6 +34,7 @@
      Investigation's is the accent. */
   --section-workspace: var(--accent);
   --section-runs: hsl(268 80% 74%);
+  --section-timeline: hsl(296 65% 72%);
   --section-records: hsl(212 85% 66%);
   --section-iocs: hsl(326 75% 70%);
   --section-reports: hsl(244 80% 76%);
@@ -63,6 +64,7 @@
   --danger: oklch(0.52 0.19 25);
   --info: oklch(0.49 0.13 255);
   --section-runs: hsl(268 55% 48%);
+  --section-timeline: hsl(296 50% 41%);
   --section-records: hsl(212 80% 38%);
   --section-iocs: hsl(326 60% 42%);
   --section-reports: hsl(244 50% 50%);
@@ -87,6 +89,7 @@
   --color-info: var(--info);
   --color-section-workspace: var(--section-workspace);
   --color-section-runs: var(--section-runs);
+  --color-section-timeline: var(--section-timeline);
   --color-section-records: var(--section-records);
   --color-section-iocs: var(--section-iocs);
   --color-section-reports: var(--section-reports);
