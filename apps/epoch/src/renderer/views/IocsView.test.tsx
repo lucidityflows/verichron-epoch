@@ -30,7 +30,7 @@ const check: IndicatorCheckRow = {
     matches: 1,
     types: {},
     not_loaded: {},
-    not_read: {},
+    coverage: { unread_fields: 0, unread_sources: 0, shaped_fields: 0, records_not_read_for_entities: 0 },
     ileapp_plugin_errors: [],
   },
   sources: [],

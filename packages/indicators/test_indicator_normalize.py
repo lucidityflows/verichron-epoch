@@ -83,7 +83,7 @@ def test_rejects_what_it_cannot_normalize(indicator_type: str, value: str) -> No
         normalize(indicator_type, value)
 
 
-def test_supported_types_are_known_to_the_field_map() -> None:
-    import indicator_field_map
+def test_supported_types_are_known_to_the_indicator_types() -> None:
+    import indicator_types
 
-    assert SUPPORTED_TYPES <= set(indicator_field_map.load().stix_paths.values())
+    assert SUPPORTED_TYPES <= set(indicator_types.load().stix_paths.values())

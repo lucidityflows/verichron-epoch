@@ -4,8 +4,7 @@
 iLEAPP declares each artifact's columns in its output's `_lava_data.lava`
 (`column_map`), and only for the artifacts that produced output. This script
 reads one or more real iLEAPP outputs and writes the declared column headers
-of the artifacts the indicator field map and the entity rules (EPOCH-581)
-name to `packages/contracts/ileapp_schema/<iLEAPP commit>.json`.
+of the artifacts the entity rules (EPOCH-581) name to `packages/contracts/ileapp_schema/<iLEAPP commit>.json`.
 
 Only those artifacts are written. The full list of artifacts an output holds
 says which apps were on the device, which is case content and never belongs
@@ -25,20 +24,13 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = REPO / "packages" / "contracts" / "ileapp_schema"
-FIELD_MAP = REPO / "packages" / "contracts" / "indicator_field_map.json"
 ENTITY_RULES = REPO / "packages" / "contracts" / "entity_rules.json"
 
 
 def mapped_artifacts() -> set[str]:
-    """The iLEAPP artifacts the indicator field map and the entity rules name."""
-    field_map = json.loads(FIELD_MAP.read_text(encoding="utf-8"))
+    """The iLEAPP artifacts the entity rules name."""
     entity_rules = json.loads(ENTITY_RULES.read_text(encoding="utf-8"))
-    return {
-        source["artifact"]
-        for kind in field_map["types"].values()
-        for source in kind["sources"]
-        if source["source_type"] == "ileapp_record"
-    } | {rule["artifact"] for rule in entity_rules["rules"] if rule["source_type"] == "ileapp_record"}
+    return {rule["artifact"] for rule in entity_rules["rules"] if rule["source_type"] == "ileapp_record"}
 
 
 def pinned_ileapp_commit() -> str:
@@ -108,7 +100,7 @@ def main(argv: list[str]) -> int:
         "ileapp_version": versions.pop(),
         "note": (
             "Column headers the pinned iLEAPP declared in real outputs, "
-            "for the artifacts the indicator field map and the entity rules name only (EPOCH-521, EPOCH-581)."
+            "for the artifacts the entity rules name only (EPOCH-521, EPOCH-581)."
         ),
         "artifacts": {name: union[name] for name in sorted(union)},
     }

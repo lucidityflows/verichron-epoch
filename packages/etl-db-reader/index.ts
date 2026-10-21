@@ -25,6 +25,7 @@ export type {
   RecordSortKey,
   IndicatorCheckRow,
   IndicatorCheckSummary,
+  IndicatorCheckCoverage,
   IndicatorTypeSummary,
   IndicatorSetSourceRow,
   IndicatorMatchRow,

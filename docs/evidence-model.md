@@ -145,29 +145,34 @@ isn't a valid STIX 2.1 bundle rejects the whole set. Each value is normalized
 by the one function the matcher also applies to facts
 (`indicator_normalize.normalize`), so the two can't drift.
 
-Which facts can supply which indicator types is declared in the
-[indicator field map](indicator-field-map.md) (EPOCH-521).
+Which indicator types a check compares, and with which kind of entity, is
+declared in [indicator types](indicator-types.md) (EPOCH-581, replacing the
+field map of EPOCH-521).
 
 **Indicator matching** (EPOCH-491) is the `indicator_match` stage. Its input is
 not a derivative but a registered set, which its stage row records
 (`pipeline_stage_status.indicator_set_id`), so a run states which set it
-checked and a newer set gets a new run. It reads the evidence's current facts
-through the field map, normalizes each value with the indicators'
-normalization, and matches on equality: a domain exactly or as a subdomain on
-a label boundary, with the mode recorded; each URL's host is also checked as a
-domain. No match is fuzzy, and nothing heuristic is recorded as a match.
+checked and a newer set gets a new run. It compares the indicators with the
+evidence's current [entities](#entities) (EPOCH-581), which are normalized as
+the indicators are, and matches on equality: a domain exactly or as a
+subdomain on a label boundary, with the mode recorded; each URL's host is a
+domain entity too. No match is fuzzy, and nothing heuristic is recorded as a
+match.
 
 A check is one unit, filed under the set: a unit reads exactly one input, a
 derivative or a set (`ingested_files.derivative_id` or `indicator_set_id`).
-Its identity hash covers the set, the field map and every fact unit read, so
-the same set over the same facts is already done (R22), and newer facts or
-another set give a new unit beside the old one (R8). Each match is an
+Its identity hash covers the set, `indicator_types.json` and every entity unit
+read, so the same set over the same entities is already done (R22), and newer
+facts, newer rules or another set give a new unit beside the old one (R8). Each match is an
 `indicator_match` fact (tier: tool judgement, R10) holding the indicator, the
-match mode and the fact it matched, which leads back to that fact's derivative
-and evidence; its time is the fact's, exactly as stored (R11). The unit's
-summary says, per indicator type, how many values were checked from which
-sources, and what wasn't checked and why: no source in any backup, or no
-facts in this case. A check that finds nothing is still a completed unit with
+match mode, and the record and entity it matched (the entity's kind, the field
+it was read from and its normalized value), which leads back to that record's
+derivative and evidence; its time is the record's, exactly as stored (R11).
+The unit's summary says, per indicator type, how many values were compared
+from which sources and what each rule couldn't read, and what wasn't checked
+and why: no entity kind covers the type, or no record in this case mentions
+one. It also states the fields that held values and that no entity rule
+reads, and any record the entities stage hasn't read, which is a warning. A check that finds nothing is still a completed unit with
 that summary, so "no match" is never recorded without what wasn't checked.
 The report and the app read checks through the `indicator_checks` and
 `indicator_set_sources` views (R27).

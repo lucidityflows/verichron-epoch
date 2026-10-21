@@ -110,7 +110,21 @@ export function notCheckedLines(check: IndicatorCheckRow): string[] {
     const detail = notLoaded.map(([reason, n]) => `${NOT_LOADED[reason] ?? reason}: ${count(n)}`).join('; ');
     lines.push(`Not loaded from the set: ${count(total)} indicators. ${detail[0].toUpperCase()}${detail.slice(1)}.`);
   }
+  // A check made before entities were read (matcher version 1) stated its gaps as `not_read`.
   for (const reason of Object.values(summary.not_read ?? {})) lines.push(`Not read: ${reason}`);
+  const coverage = summary.coverage;
+  if (coverage && coverage.unread_fields > 0) {
+    lines.push(
+      `Not compared: ${count(coverage.unread_fields)} field(s) in ${count(coverage.unread_sources)} source(s) held ` +
+        `values that no entity rule reads (${count(coverage.shaped_fields)} shaped like an entity); Forensic Records lists them.`
+    );
+  }
+  if (coverage && coverage.records_not_read_for_entities > 0) {
+    lines.push(
+      `Not read for entities: ${count(coverage.records_not_read_for_entities)} record(s), so they weren't compared. ` +
+        'Analyze again to read them.'
+    );
+  }
   for (const e of summary.ileapp_plugin_errors ?? []) {
     lines.push(`iLEAPP plugin errored: ${e.artifact} (${e.module}); its records weren't checked.`);
   }

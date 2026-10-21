@@ -1,14 +1,15 @@
 # indicator_match stage
 
-Checks one evidence item's current facts against one registered indicator set
-(EPOCH-491). It reads the set the orchestrator chose (`--indicator-set-id`),
-not a derivative, and the facts through the
-[indicator field map](../../../docs/indicator-field-map.md). How matching
+Checks one evidence item's current entities against one registered indicator
+set (EPOCH-491, EPOCH-581). It reads the set the orchestrator chose
+(`--indicator-set-id`), not a derivative, and compares it with the entities
+the entities stage read, kind by kind, as
+[indicator types](../../../docs/indicator-types.md) declares. How matching
 works, how a check is identified and what its summary says are in
 [evidence-model.md](../../../docs/evidence-model.md#derivatives).
 
-- `matching.py`: what matches, with no database: reading facts through the
-  field map, normalizing, matching, and the per-type summary.
+- `matching.py`: what matches, with no database: comparing entities with
+  indicators, and the per-type summary.
 - `match_stage.py`: the database reads and the one ingest unit; `main.py` is
   the entrypoint.
 
@@ -18,4 +19,5 @@ works, how a check is identified and what its summary says are in
 uv run pytest apps/extractors/indicator_match
 ```
 
-`test_stage.py` needs `TEST_DATABASE_URL` (real Postgres).
+`test_stage.py` needs `TEST_DATABASE_URL` (real Postgres). It runs the
+entities stage itself to write the entities a check reads.

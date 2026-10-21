@@ -18,7 +18,7 @@ from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 import idna
 
-#: The indicator types the loader loads. The other types the field map names
+#: The indicator types the loader loads. The other types `indicator_types.json` names
 #: (app certificates, Android properties, configuration profiles) are counted
 #: as unsupported: no iOS backup supplies them (EPOCH-521).
 SUPPORTED_TYPES = frozenset(
