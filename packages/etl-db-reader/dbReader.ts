@@ -428,9 +428,15 @@ export interface ForensicRecordQuery {
   tier?: RecordTier;
   /** Case-insensitive substring of any field's value (never a field's name), by trigram (migration 0021). */
   search?: string;
-  /** Inclusive event_time range (ISO 8601). Untimed records never match a range. */
+  /**
+   * An event_time range (ISO 8601): from `eventTimeFrom`, inclusive, to
+   * before `eventTimeBefore`, exclusive. A bound the examiner types names a
+   * whole second or minute, and a stored time can hold microseconds, so the
+   * caller passes the instant just after the last unit named; an inclusive
+   * end would leave out records inside it. Untimed records never match a range.
+   */
   eventTimeFrom?: string;
-  eventTimeTo?: string;
+  eventTimeBefore?: string;
   /** Case-insensitive substring of process_name or bundle_id. */
   text?: string;
   sort?: RecordSortKey;
@@ -460,7 +466,7 @@ const QUERY_KEYS = new Set<keyof ForensicRecordQuery>([
   'tier',
   'search',
   'eventTimeFrom',
-  'eventTimeTo',
+  'eventTimeBefore',
   'text',
   'sort',
   'direction',
@@ -517,7 +523,7 @@ function recordFilters(
     `records.source_type IN (SELECT t.source_type FROM source_type_tiers t WHERE t.tier <> 'lead')`,
   ];
   if (query.eventTimeFrom !== undefined) always.push(`records.event_time >= ${param(query.eventTimeFrom)}`);
-  if (query.eventTimeTo !== undefined) always.push(`records.event_time <= ${param(query.eventTimeTo)}`);
+  if (query.eventTimeBefore !== undefined) always.push(`records.event_time < ${param(query.eventTimeBefore)}`);
   if (query.text !== undefined && query.text !== '') {
     const p = param(`%${likeEscape(query.text)}%`);
     always.push(`(records.process_name ILIKE ${p} OR records.bundle_id ILIKE ${p})`);
@@ -650,7 +656,7 @@ export interface RecordFacets {
   total: number;
   /** Of those, records with no event time (R11). */
   untimed: number;
-  /** Each facet's values for this evidence, every one listed even when its count is 0. */
+  /** Each facet's values with records under the search and time range, listed with 0 when another facet's filter excludes them. */
   facets: Record<RecordFacet, FacetCount[]>;
 }
 
@@ -666,9 +672,11 @@ const FACET_KEYS: Record<RecordFacet, string> = {
 /**
  * Forensic Records' counts for one evidence (EPOCH-556): the total and the
  * untimed count under every filter in use, and each facet's values with
- * counts exact for the other filters. A value of this evidence that the
- * other filters exclude is listed with 0, not hidden, so an empty
- * combination is visible before it is chosen. ONE statement, so every count
+ * counts exact for the other filters. A value that another facet's filter
+ * excludes is listed with 0, not hidden, so an empty combination is visible
+ * before it is chosen. The search and the time range narrow every count, so a
+ * value with no records under them is not listed; Forensic Records lists a
+ * chosen one with 0 itself. ONE statement, so every count
  * describes the same state of the data (R25). Only `history` and paging
  * parameters are refused here; the rest are the records read's filters.
  */

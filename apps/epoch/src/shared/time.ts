@@ -184,6 +184,17 @@ const WALL_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
  * end), so the range covers both. A time the clocks skip doesn't exist, and
  * is refused rather than moved.
  */
+/**
+ * The end of a range the examiner typed: the instant just after the last
+ * second the wall time names, or the last minute when it names no seconds.
+ * Read as an exclusive bound, so a record inside that second or minute is
+ * kept. A wall time a clock change repeats is taken at its later instant.
+ */
+export function wallTimeEnd(wall: string, zone: DisplayZone): string {
+  const unit = WALL_TIME.exec(wall)?.[6] === undefined ? 60_000 : 1_000;
+  return new Date(new Date(wallTimeToInstant(wall, zone, true)).getTime() + unit).toISOString();
+}
+
 export function wallTimeToInstant(wall: string, zone: DisplayZone, later = false): string {
   const m = WALL_TIME.exec(wall);
   if (!m) throw new Error(`not a date and time: ${wall}`);

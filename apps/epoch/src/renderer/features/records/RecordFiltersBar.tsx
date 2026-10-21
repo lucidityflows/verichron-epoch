@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FacetCount, RecordFacet, RecordFacets } from '@verichron/etl-db-reader';
 import { Button } from '../../components/ui/Button';
-import { wallTimeToInstant, type DisplayZone } from '../../../shared/time';
+import { wallTimeEnd, wallTimeToInstant, type DisplayZone } from '../../../shared/time';
 import type { RecordFilters } from './useRecords';
 import { sourceTitle, tierLabel } from './recordText';
 
@@ -24,12 +24,19 @@ const FACETS: { facet: RecordFacet; label: string; all: string; name?: (value: s
   { facet: 'tier', label: 'Tier', all: 'All tiers', name: tierLabel },
 ];
 
-/** A facet's choices: every value it has, with its count, zeros included; a chosen module narrows the artifacts. */
+/**
+ * A facet's choices: every value it has, with its count, zeros included; a
+ * chosen module narrows the artifacts. The chosen value is always listed: a
+ * search or time range can leave none of its records, and a choice missing
+ * from its list would read as no filter while still narrowing every count.
+ */
 function choices(facet: RecordFacet, values: FacetCount[], filters: RecordFilters): (FacetCount & { value: string })[] {
-  const named = values.filter((v): v is FacetCount & { value: string } => v.value !== null);
+  const chosen = filters[FILTER_OF[facet]] as string | undefined;
+  let named = values.filter((v): v is FacetCount & { value: string } => v.value !== null);
   if (facet === 'artifact' && filters.module) {
-    return named.filter((v) => v.count > 0 || v.value === filters.artifact);
+    named = named.filter((v) => v.count > 0 || v.value === chosen);
   }
+  if (chosen !== undefined && !named.some((v) => v.value === chosen)) named = [...named, { value: chosen, count: 0 }];
   return named;
 }
 
@@ -42,9 +49,10 @@ interface RecordFiltersBarProps {
 
 /**
  * Forensic Records' filters (EPOCH-556). Every count is the database's,
- * exact for the other filters in use (R25); a value the other filters
- * exclude is listed with 0, so an empty combination shows before it is
- * chosen. Times are typed in the examiner's zone.
+ * exact for the other filters in use (R25); a value another facet's filter
+ * excludes is listed with 0, so an empty combination shows before it is
+ * chosen, and a chosen value is always listed. Times are typed in the
+ * examiner's zone; the end of a range is exclusive (`wallTimeEnd`).
  */
 export function RecordFiltersBar({ filters, facets, zone, onChange }: RecordFiltersBarProps) {
   const [search, setSearch] = useState(filters.search ?? '');
@@ -70,13 +78,14 @@ export function RecordFiltersBar({ filters, facets, zone, onChange }: RecordFilt
   const applyTimes = (nextFrom: string, nextTo: string) => {
     try {
       const eventTimeFrom = nextFrom ? wallTimeToInstant(nextFrom, zone) : undefined;
-      const eventTimeTo = nextTo ? wallTimeToInstant(nextTo, zone, true) : undefined;
-      if (eventTimeFrom && eventTimeTo && eventTimeFrom > eventTimeTo) {
+      // Exclusive, just after the last second or minute typed, so records inside it are kept.
+      const eventTimeBefore = nextTo ? wallTimeEnd(nextTo, zone) : undefined;
+      if (eventTimeFrom && eventTimeBefore && eventTimeFrom >= eventTimeBefore) {
         setTimeError('The start is after the end.');
         return;
       }
       setTimeError(null);
-      onChange({ ...filters, eventTimeFrom, eventTimeTo });
+      onChange({ ...filters, eventTimeFrom, eventTimeBefore });
     } catch (err) {
       setTimeError(err instanceof Error ? err.message : String(err));
     }

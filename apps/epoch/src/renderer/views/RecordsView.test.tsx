@@ -121,7 +121,11 @@ const detail: RecordDetail = {
 const queries: ForensicRecordQuery[] = [];
 
 const answers: Record<string, unknown> = {
-  getRecordFacets: async (_run: string, query: ForensicRecordQuery) => facets(query.module),
+  getRecordFacets: async (_run: string, query: ForensicRecordQuery) => {
+    const counts = facets(query.module);
+    // A search no record holds leaves no module with records under it.
+    return query.search === 'held by no record' ? { ...counts, facets: { ...counts.facets, module: [] } } : counts;
+  },
   getForensicRecords: async (_run: string, query: ForensicRecordQuery) => {
     queries.push(query);
     return { rows: query.module ? [SAFARI] : [SAFARI, MATCH], total: query.module ? 1 : 3, nextCursor: null };
@@ -231,6 +235,18 @@ describe('Forensic Records', () => {
     const search = await screen.findByRole('searchbox', { name: 'Search records' });
     fireEvent.change(search, { target: { value: 'update-check' } });
     await waitFor(() => assert.equal(queries.at(-1)?.search, 'update-check'), { timeout: 2000 });
+  });
+
+  it('keeps a chosen module listed, with 0, when a search leaves none of its records', async () => {
+    show();
+    const module = await screen.findByRole('combobox', { name: 'Module' });
+    await waitFor(() => assert.ok(within(module).getByRole('option', { name: 'safariHistory (1)' })));
+    await act(async () => fireEvent.change(module, { target: { value: 'safariHistory' } }));
+    const search = screen.getByRole('searchbox', { name: 'Search records' });
+    fireEvent.change(search, { target: { value: 'held by no record' } });
+    await waitFor(() => assert.equal(queries.at(-1)?.search, 'held by no record'), { timeout: 2000 });
+    await waitFor(() => assert.ok(within(module).getByRole('option', { name: 'safariHistory (0)' })));
+    assert.equal((module as HTMLSelectElement).value, 'safariHistory', 'the filter in use is still shown');
   });
 
   it('opens a record as a record: readable fields, where it came from, and what cites it', async () => {

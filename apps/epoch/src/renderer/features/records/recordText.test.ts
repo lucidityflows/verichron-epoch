@@ -73,6 +73,7 @@ describe('a record read by its declared types', () => {
         Text: { $encoded: 'utf8-hex', value: Buffer.from('a\u0000b').toString('hex') },
         Rate: { $encoded: 'float', value: 'Infinity' },
         Empty: null,
+        Blank: '',
       },
       null,
       'UTC'
@@ -84,6 +85,8 @@ describe('a record read by its declared types', () => {
         ['Text', 'a\u0000b', '{"$encoded":"utf8-hex","value":"610062"}'],
         ['Rate', 'Infinity', '{"$encoded":"float","value":"Infinity"}'],
         ['Empty', 'not recorded', null],
+        // A recorded empty text is a value, never "not recorded".
+        ['Blank', 'empty text', '""'],
       ]
     );
   });

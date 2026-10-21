@@ -69,15 +69,20 @@ function describeEncoded(value: Encoded): string {
   return value.value;
 }
 
-/** The value as stored, as text: what "Show stored values" and Copy Raw Data give. */
+/** What a recorded empty text reads as: a value the device stored, never "not recorded". */
+export const EMPTY_TEXT = 'empty text';
+
+/** The value as stored, as text: what "Show stored values" and Copy Raw Data give. An empty text is shown as "". */
 export function storedText(value: unknown): string {
   if (value === null || value === undefined) return NOT_RECORDED;
+  if (value === '') return '""';
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
 /** The value made readable, from its column's declared type; null when it reads as stored. */
 function readable(value: unknown, type: string | null, zone: DisplayZone): string | null {
-  if (value === null || value === undefined || value === '') return NOT_RECORDED;
+  if (value === null || value === undefined) return NOT_RECORDED;
+  if (value === '') return EMPTY_TEXT;
   if (isEncoded(value)) return describeEncoded(value);
   if (type === 'datetime' && typeof value === 'number' && Number.isFinite(value)) {
     return formatDateTime(value * 1000, zone);

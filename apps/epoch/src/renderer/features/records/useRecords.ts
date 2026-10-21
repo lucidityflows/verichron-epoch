@@ -5,7 +5,15 @@ import { runsApi } from '../../api/runs';
 /** The filters Forensic Records offers (EPOCH-556); paging is the hook's own. */
 export type RecordFilters = Pick<
   ForensicRecordQuery,
-  'sourceType' | 'artifact' | 'module' | 'category' | 'tier' | 'eventTimeFrom' | 'eventTimeTo' | 'search' | 'direction'
+  | 'sourceType'
+  | 'artifact'
+  | 'module'
+  | 'category'
+  | 'tier'
+  | 'eventTimeFrom'
+  | 'eventTimeBefore'
+  | 'search'
+  | 'direction'
 >;
 
 /** Rows read per page: enough to fill a tall window twice. */
@@ -77,7 +85,8 @@ export function useRecords(runId: string | null, filters: RecordFilters): Record
   }, [runId, key]);
 
   const loadMore = useCallback(() => {
-    if (!runId || !cursor || loadingMore) return;
+    // A failed page is not read again on its own: new filters or another investigation read again.
+    if (!runId || !cursor || loadingMore || error) return;
     const mine = generation.current;
     setLoadingMore(true);
     runsApi
@@ -91,7 +100,7 @@ export function useRecords(runId: string | null, filters: RecordFilters): Record
         (err: unknown) => generation.current === mine && setError(err instanceof Error ? err.message : String(err))
       )
       .finally(() => generation.current === mine && setLoadingMore(false));
-  }, [runId, key, cursor, loadingMore]);
+  }, [runId, key, cursor, loadingMore, error]);
 
   return { rows, facets, loading, loadingMore, hasMore: cursor !== null, error, loadMore };
 }
