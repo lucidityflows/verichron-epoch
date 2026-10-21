@@ -170,11 +170,16 @@ const RECORD_COLUMNS = `records.id, records.ingest_id, records.evidence_id, reco
        (SELECT t.tier FROM source_type_tiers t WHERE t.source_type = records.source_type) AS tier`;
 
 /**
- * Most recent pipeline runs, newest first.
+ * The most recent `limit` analyses, newest first, with every Check Again run
+ * of their evidence (EPOCH-557). The limit counts analyses only, so repeated
+ * checks never push an investigation's analysis out of the list.
  */
 export async function getPipelineRuns(client: Db, limit = 100): Promise<PipelineRunRow[]> {
   const result = await client.query<Omit<PipelineRunRow, 'records'>>(
-    `SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id, r.kind,
+    `WITH shown AS (
+       SELECT run_id, evidence_id FROM pipeline_runs WHERE kind = 'analysis' ORDER BY started_at DESC LIMIT $1
+     )
+     SELECT r.run_id, r.backup_source, r.started_at, r.finished_at, r.evidence_id, r.derivative_id, r.kind,
             r.contract_version, r.tool_versions, c.state, r.ended_reason, r.ended_detail, d.label AS device_label,
             e.product_type, e.ios_version, e.backup_date, e.total_bytes, s.stage_counts, s.stages_with_warnings
        FROM pipeline_runs r
@@ -193,8 +198,9 @@ export async function getPipelineRuns(client: Db, limit = 100): Promise<Pipeline
            FROM pipeline_stage_status ps
           WHERE ps.run_id = r.run_id
        ) s
-      ORDER BY r.started_at DESC
-      LIMIT $1`,
+      WHERE r.run_id IN (SELECT run_id FROM shown)
+         OR (r.kind = 'indicator_check' AND r.evidence_id IN (SELECT evidence_id FROM shown))
+      ORDER BY r.started_at DESC`,
     [limit]
   );
   // The records in a query of its own, through R7's links: a statement that

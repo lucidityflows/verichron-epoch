@@ -23,7 +23,8 @@ export function useCheckAgain(runId: string | null, onFinished: () => void) {
     (cancelled
       ? 'Check Again was cancelled before it finished.'
       : result && !result.success
-        ? (result.error ?? 'Check Again failed.')
+        ? // The orchestrator's own error, or the backup's (e.g. no complete analysis to check).
+          (result.error ?? result.analysis?.find((r) => r.error)?.error ?? 'Check Again failed.')
         : null);
 
   const finished = useRef(onFinished);

@@ -807,6 +807,43 @@ describe('runs and stages for the Investigations view (EPOCH-430, EPOCH-431)', l
     );
   });
 
+  it('limits the list by analyses, so newer Check Agains never push an analysis out (EPOCH-557)', async () => {
+    const ids = {
+      analysis: 'a5570000-0000-0000-0000-000000000001',
+      older: 'a5570000-0000-0000-0000-000000000002',
+      check1: 'a5570000-0000-0000-0000-000000000003',
+      check2: 'a5570000-0000-0000-0000-000000000004',
+    };
+    const rows: [string, string, string, string][] = [
+      [ids.older, 'analysis', EVIDENCE, '2099-01-01T00:00:00Z'],
+      [ids.analysis, 'analysis', OTHER, '2099-01-02T00:00:00Z'],
+      [ids.check1, 'indicator_check', OTHER, '2099-01-03T00:00:00Z'],
+      [ids.check2, 'indicator_check', OTHER, '2099-01-04T00:00:00Z'],
+    ];
+    try {
+      for (const [run, kind, evidence, started] of rows) {
+        await db.query(
+          `INSERT INTO pipeline_runs (run_id, backup_source, contract_version, tool_versions, display_zone, kind,
+                                      evidence_id, derivative_id, host, pid, started_at)
+           VALUES ($1, 'test', 'test', '{}', 'UTC', $2, $3, $3, 'test-host', 1, $4)`,
+          [run, kind, evidence, started]
+        );
+      }
+      const runs = await getPipelineRuns(db, 1);
+      assert.deepEqual(
+        runs.map((r) => [r.run_id, r.kind]),
+        [
+          [ids.check2, 'indicator_check'],
+          [ids.check1, 'indicator_check'],
+          [ids.analysis, 'analysis'],
+        ],
+        'the newest analysis and its checks; the next analysis is past the limit'
+      );
+    } finally {
+      await db.query(`DELETE FROM pipeline_runs WHERE run_id = ANY($1::uuid[])`, [Object.values(ids)]);
+    }
+  });
+
   it("gives each run its device's name and its stage counts", async () => {
     const run = (await getPipelineRuns(db)).find((r) => r.run_id === RUN)!;
     assert.equal(run.device_label, 'test device');

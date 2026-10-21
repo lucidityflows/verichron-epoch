@@ -315,6 +315,18 @@ export interface RunPipelineOptions {
   checkIndicators?: boolean;
 }
 
+export const CHECK_NEEDS_ANALYSIS =
+  'Check Again needs a complete analysis of this evidence first; nothing was checked. Analyze it, then check again.';
+
+async function hasCompleteAnalysis(client: Client, evidenceId: string): Promise<boolean> {
+  const { rows } = await client.query(
+    `SELECT 1 FROM run_completeness c JOIN pipeline_runs r USING (run_id)
+      WHERE c.evidence_id = $1 AND c.state = 'complete' AND r.kind = 'analysis' LIMIT 1`,
+    [evidenceId]
+  );
+  return rows.length > 0;
+}
+
 /** The stages a check runs: those reading the indicator set, and nothing else. */
 export function checkStages(stages: StageSet): StageSet {
   const enabled = stages.enabled.filter((stage) => stage.manifest.reads === 'indicator_set');
@@ -401,6 +413,11 @@ export async function runPipelineForBackup(
   // registered from another mount path is the same evidence. It is also
   // keyed by the stage plan and its inputs: a bumped parserVersion, a newly
   // enabled stage or another indicator set is not "already done".
+  // A check compares the entities an analysis read, so with no complete
+  // analysis there is nothing to compare: refused before any run (EPOCH-557).
+  if (options.checkIndicators && !(await hasCompleteAnalysis(client, registration.evidenceId))) {
+    return { success: false, error: CHECK_NEEDS_ANALYSIS };
+  }
   const kind = options.checkIndicators ? 'indicator_check' : 'analysis';
   const plan = options.checkIndicators ? checkStages(stages) : stages;
   const completeRun = options.checkIndicators

@@ -818,6 +818,7 @@ the board's questions on the Not checked colour and on grouping await review.
   it says earlier checks stay and the report keeps the check it was written
   with. While it runs the button says "Checking…", and every other task is
   held. When it ends, the page shows the new check, labelled "Check Again",
-  as this investigation's check; Investigations lists its run, labelled, and
-  still shows the analysis.
+  as this investigation's check; Investigations lists its run, labelled and
+  not selectable, and still shows the analysis. With no complete analysis of
+  the evidence, Check Again is refused and says why.
 - No verdict word is used anywhere on the page.

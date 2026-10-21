@@ -207,12 +207,17 @@ describe('InvestigationsView', () => {
       kind: 'indicator_check',
       started_at: '2026-10-17T00:00:00.000Z',
     });
-    const { onSelectRun } = show(null, [], [OLDER, OTHER, NEWER, recheck]);
-    assert.deepEqual(onSelectRun.mock.calls, [[NEWER]]);
+    const { onSelectRun: firstSelect } = show(null, [], [OLDER, OTHER, NEWER, recheck]);
+    assert.deepEqual(firstSelect.mock.calls, [[NEWER]]);
     cleanup();
-    show(NEWER, [stage({})], [OLDER, OTHER, NEWER, recheck]);
+    const { onSelectRun } = show(NEWER, [stage({})], [OLDER, OTHER, NEWER, recheck]);
     const analyses = screen.getByRole('heading', { name: 'Analyses (3)' }).nextElementSibling as HTMLElement;
     assert.ok(within(analyses).getByText('Check Again'));
+    const recheckRow = within(analyses).getByText('Check Again').closest('[role="row"]') as HTMLElement;
+    onSelectRun.mockClear();
+    fireEvent.click(recheckRow);
+    fireEvent.keyDown(recheckRow, { key: 'Enter' });
+    assert.deepEqual(onSelectRun.mock.calls, [], 'a Check Again run is never selected as the analysis');
   });
 
   it('never shows the device identifier or the backup’s path, and keeps the device name to the card', () => {

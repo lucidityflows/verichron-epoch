@@ -146,6 +146,17 @@ describe('Indicator Matches', () => {
     assert.equal((screen.getByRole('button', { name: /Check Again/ }) as HTMLButtonElement).disabled, true);
   });
 
+  it("says why Check Again was refused, from the backup's own error (EPOCH-557)", async () => {
+    hook.analysis = {
+      status: 'finished',
+      kind: 'check',
+      target: RUN,
+      result: { success: false, analysis: [{ backupPath: '/x', status: 'failed', error: 'needs an analysis first' }] },
+    };
+    await show();
+    assert.equal(screen.getByRole('alert').textContent, 'needs an analysis first');
+  });
+
   it('says a Check Again stopped short, in the caution role, and labels a re-check (EPOCH-557)', async () => {
     hook.analysis = { status: 'finished', kind: 'check', target: RUN, result: { success: false, cancelled: true } };
     checks = [

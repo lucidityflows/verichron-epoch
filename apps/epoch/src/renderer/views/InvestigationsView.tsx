@@ -416,7 +416,11 @@ export function InvestigationsView({
                     columns={ANALYSIS_COLUMNS}
                     getRowId={(run) => run.run_id}
                     selectedId={selectedRun.run_id}
-                    onRowClick={onSelectRun}
+                    // A Check Again run is history, never the investigation's analysis (EPOCH-557):
+                    // it has no report, and its stages are the indicator check alone.
+                    onRowClick={(run) => {
+                      if (run.kind === 'analysis') onSelectRun(run);
+                    }}
                     className="max-h-80 rounded-lg border border-border bg-surface-raised shadow-elevation-1"
                   />
                 </section>

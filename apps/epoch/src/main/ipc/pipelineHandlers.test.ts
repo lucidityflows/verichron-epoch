@@ -421,10 +421,17 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     assert.deepEqual(args.slice(args.indexOf('--label'), args.indexOf('--label') + 2), ['--label', 'BK']);
     const state = (await invoke('epoch:getAnalysisState')) as { kind: string; target: string };
     assert.deepEqual([state.kind, state.target], ['check', RETRIED]);
+    // What the orchestrator writes for its caller (EPOCH-409): the check's own run.
+    const results = [{ backupPath: decryptPath, status: 'succeeded', runId: 'check-run' }];
+    writeFileSync(args[args.indexOf('--summary-path') + 1], JSON.stringify({ results }));
     orchestrator.emit('close', 0);
+    type Finished = { status: string; result: { success: boolean; analysis: typeof results } | null };
     await vi.waitFor(async () =>
-      assert.equal(((await invoke('epoch:getAnalysisState')) as { status: string }).status, 'finished')
+      assert.equal(((await invoke('epoch:getAnalysisState')) as Finished).status, 'finished')
     );
+    const { result } = (await invoke('epoch:getAnalysisState')) as Finished;
+    assert.equal(result?.success, true);
+    assert.deepEqual(result?.analysis, results, 'the check reported its run');
   });
 
   it("reports the workspace interrupted when its evidence's latest run was, found by the sidecar's content root", async () => {
