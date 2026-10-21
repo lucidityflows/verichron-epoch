@@ -128,4 +128,12 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except (requests.ConnectionError, requests.Timeout) as e:
+        # Files are written only once every one is fetched, so nothing was written.
+        raise SystemExit(
+            f"could not reach GitHub to fetch the feeds ({type(e).__name__}): fetching needs a network "
+            "connection. Nothing was written. To use a set you already have, register it with "
+            "apps/indicator_registry/register.py."
+        ) from None

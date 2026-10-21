@@ -57,7 +57,7 @@ mise install                             # Node, pnpm and uv at the pinned versi
 mise run check                           # report any missing prerequisite; changes nothing
 mise run setup                           # check again, then install every environment from the lockfiles
 docker compose -f infra/docker-compose.yml up -d postgres
-mise run db                              # migrations as DB_USER, then the runtime login DB_APP_USER
+mise run db                              # migrations as DB_USER, the runtime login DB_APP_USER, then an indicator set
 ```
 
 `mise run setup` reports every missing prerequisite at once, each with the
@@ -141,6 +141,19 @@ remove it from history; assess exposure and credentials, then coordinate a
 history rewrite and any required credential rotation.
 
 ### Indicator sets
+
+`mise run db` runs `mise run indicators` last, so a new database has a set
+and Analyze runs Indicator Matching instead of skipping it (EPOCH-579). The
+task fetches the public feeds only when none were fetched on this machine,
+into `~/indicator-sets/mvt-<date>` (or the directory named by
+`EPOCH_INDICATOR_SETS`), and registers the newest set fetched; run again, it
+fetches nothing and registers nothing new. Fetching needs a network; without
+one it stops, says so and writes nothing. `mise run indicators:update`
+fetches the feeds again into a new directory and registers that set. Ask for
+it on purpose: a newer set makes the next Analyze of already-analyzed
+evidence run again (R22). The Lab build never downloads (EPOCH-492).
+
+By hand, the same steps are:
 
 ```bash
 # Fetch the public feeds at pinned commits (connected machine only), into a new directory
