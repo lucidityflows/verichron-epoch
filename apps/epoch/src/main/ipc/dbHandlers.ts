@@ -15,6 +15,9 @@ import {
   getStageFailures,
   getStillFailing,
   getInterruptedStages,
+  getTimelineOverview,
+  getTimelineDensity,
+  getTimelineRecords,
   type ForensicRecordPage,
   type ItemFailurePage,
   type ForensicRecordQuery,
@@ -105,6 +108,22 @@ export function registerDbHandlers(dbPool: Pool) {
   ipcMain.handle('epoch:getEvidenceCompleteness', async (_event, runId: string) => {
     const evidenceId = await getRunEvidence(dbPool, runId);
     return evidenceId ? getEvidenceCompleteness(dbPool, evidenceId) : null;
+  });
+
+  // The Timeline (EPOCH-580): the selected run's evidence placed in time, counted by the database.
+  ipcMain.handle('epoch:getTimelineOverview', async (_event, runId: string) => {
+    const evidenceId = await getRunEvidence(dbPool, runId);
+    return evidenceId ? getTimelineOverview(dbPool, evidenceId) : null;
+  });
+
+  ipcMain.handle('epoch:getTimelineDensity', async (_event, runId: string, boundaries: string[]) => {
+    const evidenceId = await getRunEvidence(dbPool, runId);
+    return evidenceId ? getTimelineDensity(dbPool, evidenceId, boundaries) : null;
+  });
+
+  ipcMain.handle('epoch:getTimelineRecords', async (_event, runId: string, from: string, before: string) => {
+    const evidenceId = await getRunEvidence(dbPool, runId);
+    return evidenceId ? getTimelineRecords(dbPool, evidenceId, from, before) : null;
   });
 
   ipcMain.handle('epoch:getRecordDetail', async (_event, runId: string, recordId: string) => {

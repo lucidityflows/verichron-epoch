@@ -10,6 +10,9 @@ import type {
   RecordFacets,
   EvidenceCompleteness,
   RecordDetail,
+  TimelineOverview,
+  TimelineDensity,
+  TimelineRecord,
   EntityKindCount,
   EntityCoverage,
   EntityValueQuery,
@@ -302,6 +305,13 @@ declare global {
       getRecordDetail: (runId: string, recordId: string) => Promise<RecordDetail | null>;
       // EPOCH-581: null when the run has no registered evidence.
       getEntityOverview: (runId: string) => Promise<EntityOverview | null>;
+      getTimelineOverview: (runId: string) => Promise<TimelineOverview | null>;
+      getTimelineDensity: (runId: string, boundaries: string[]) => Promise<TimelineDensity | null>;
+      getTimelineRecords: (
+        runId: string,
+        from: string,
+        before: string
+      ) => Promise<{ total: number; rows: TimelineRecord[] } | null>;
       getEntityValues: (runId: string, kind: string, query?: EntityValueQuery) => Promise<EntityValuePage>;
       getIndicatorResults: (runId: string) => Promise<IndicatorResults>;
       getReport: (runId: string) => Promise<ReportResult>;

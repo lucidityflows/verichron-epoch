@@ -74,3 +74,11 @@ export {
   MAX_RECORDS_PAGE,
   readerTypes,
 } from './dbReader.js';
+export type { TimelineArtifact, TimelineOverview, TimelineCell, TimelineDensity, TimelineRecord } from './timeline.js';
+export {
+  getTimelineOverview,
+  getTimelineDensity,
+  getTimelineRecords,
+  MAX_TIMELINE_BUCKETS,
+  MAX_TIMELINE_RECORDS,
+} from './timeline.js';

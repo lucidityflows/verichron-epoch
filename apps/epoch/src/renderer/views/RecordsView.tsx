@@ -34,6 +34,10 @@ interface RecordsViewProps {
   openRecordId?: string | null;
   /** The record asked for has been read, and is open or said to be missing. */
   onRecordOpened?: () => void;
+  /** Filters to open with, in place of the ones in use (a range on the Timeline). */
+  openFilters?: RecordFilters | null;
+  /** The filters asked for are in use. */
+  onFiltersOpened?: () => void;
 }
 
 const COLUMNS: DataTableColumn<ForensicRecordRow>[] = [
@@ -87,6 +91,8 @@ export function RecordsView({
   onOpenIndicatorMatches,
   openRecordId,
   onRecordOpened,
+  openFilters,
+  onFiltersOpened,
 }: RecordsViewProps) {
   const zone = useDisplayZone();
   const [filters, setFilters] = useState<RecordFilters>({});
@@ -101,6 +107,18 @@ export function RecordsView({
     setFilters({});
     setOpened(null);
   }
+  // Filters given from outside replace the ones in use; the bar starts again from them.
+  const [barVersion, setBarVersion] = useState(0);
+  const [takenFilters, setTakenFilters] = useState<RecordFilters | null>(null);
+  if (openFilters && openFilters !== takenFilters) {
+    setTakenFilters(openFilters);
+    setFilters(openFilters);
+    setOpened(null);
+    setBarVersion((v) => v + 1);
+  }
+  useEffect(() => {
+    if (openFilters) onFiltersOpened?.();
+  }, [openFilters, onFiltersOpened]);
   const [openError, setOpenError] = useState<string | null>(null);
   useEffect(() => {
     if (!openRecordId || !readable) return;
@@ -172,6 +190,7 @@ export function RecordsView({
           ) : (
             <>
               <RecordFiltersBar
+                key={barVersion}
                 runId={runId}
                 entities={entities.overview}
                 filters={filters}

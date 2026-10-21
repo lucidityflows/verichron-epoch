@@ -4,6 +4,8 @@ import { Sidebar, type Section } from './components/layout/Sidebar';
 import { WorkspaceView } from './views/WorkspaceView';
 import { InvestigationsView } from './views/InvestigationsView';
 import { RecordsView } from './views/RecordsView';
+import { TimelineView } from './views/TimelineView';
+import type { RecordFilters } from './features/records/useRecords';
 import { IocsView } from './views/IocsView';
 import { ReportsView } from './views/ReportsView';
 import { SettingsView } from './views/SettingsView';
@@ -101,6 +103,9 @@ export const App: React.FC = () => {
   // A record Indicator Matches asked Forensic Records to open; it is cleared once opened.
   const [recordToOpen, setRecordToOpen] = useState<string | null>(null);
   const recordOpened = useCallback(() => setRecordToOpen(null), []);
+  // Filters the Timeline asked Forensic Records to open with (EPOCH-580); cleared once applied.
+  const [recordsToShow, setRecordsToShow] = useState<RecordFilters | null>(null);
+  const filtersShown = useCallback(() => setRecordsToShow(null), []);
 
   const handleSectionSelect = (next: Section) => setSection(next);
 
@@ -135,6 +140,20 @@ export const App: React.FC = () => {
               />
             )}
 
+            {section === 'timeline' && (
+              <TimelineView
+                selectedRun={selectedRun}
+                onOpenRecords={(filters) => {
+                  setRecordsToShow(filters);
+                  setSection('records');
+                }}
+                onOpenRecord={(recordId) => {
+                  setRecordToOpen(recordId);
+                  setSection('records');
+                }}
+              />
+            )}
+
             {section === 'records' && (
               <RecordsView
                 key={recordsVersion}
@@ -151,6 +170,8 @@ export const App: React.FC = () => {
                 onOpenIndicatorMatches={() => setSection('iocs')}
                 openRecordId={recordToOpen}
                 onRecordOpened={recordOpened}
+                openFilters={recordsToShow}
+                onFiltersOpened={filtersShown}
               />
             )}
 

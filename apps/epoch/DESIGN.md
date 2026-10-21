@@ -382,7 +382,7 @@ neutral** (`outline`, EPOCH-574, replacing EPOCH-506's accent tint):
 A destructive secondary (`tone="danger"`: Delete It, Stop) keeps that button
 with `danger` text and a `danger/60` border: 5.7:1 on raised.
 
-**Each section has a colour, as a marker.** The five sidebar sections each
+**Each section has a colour, as a marker.** The six sidebar sections each
 have an identity colour, in the hue range 210–330 that no role uses, so a
 section colour never reads as a state:
 
@@ -390,6 +390,7 @@ section colour never reads as a state:
 |---|---|
 | New Investigation | `section-workspace` (the accent) |
 | Investigations | `section-runs`, violet |
+| Timeline | `section-timeline`, orchid (EPOCH-580) |
 | Forensic Records | `section-records`, blue |
 | Indicator Matches | `section-iocs`, pink |
 | Reports | `section-reports`, periwinkle |
@@ -822,3 +823,48 @@ the board's questions on the Not checked colour and on grouping await review.
   not selectable, and still shows the analysis. With no complete analysis of
   the evidence, Check Again is refused and says why.
 - No verdict word is used anywhere on the page.
+
+## 16. Timeline — the evidence over its whole recorded span
+
+Built 2026-10-21 for EPOCH-580 from the ticket's requirements and real-data
+measurements, approved by the owner ("yes to all"), with no design board. It
+is drawn with D3 itself, module by module, not a library built on it.
+
+- **The first of the investigation's sections,** before Forensic Records.
+- **Focus and context.** The overview strip shows the whole span on a true
+  linear axis; gaps are never compressed, because silence is evidence. Its
+  brush chooses the main view's range and follows it. The view opens on the
+  middle 98% of timed records (padded 2%); dashed marks show where that span
+  begins and ends, with how many records lie before and after it. "Show the
+  Main Span" and "Show Everything" return to either.
+- **Lanes:** an iLEAPP record's lane is its category, any other its source;
+  tool judgements (indicator matches) come first, in the warning colour, apart
+  from the facts (R10). A lane opens into its artifacts. Each row says what
+  its times are ("Safari Browser · Visit Timestamp"), because a time means
+  different things in different artifacts. A row with nothing in the shown
+  range stays as a thin line. Each row's count in the range is beside its
+  name, dimmed while a gesture moves the range and until it is counted again.
+- **Density:** buckets fall on whole wall-clock units of the examiner's zone
+  (a local day, hour or minute), clipped to the range so every count is the
+  range's own, about one bucket per 3 px. Bars are scaled by the square root
+  of their count, against the busiest bucket in view; hover gives the true
+  count, from the database (R25). Times flagged for review (before the first
+  iPhone, or after the run) are a warning-coloured line along the row's top.
+  Time after the backup was made is shaded.
+- **Records one by one** once the range holds no more than 5,000: a tick per
+  record, a count where several share a second, flagged ones outlined.
+- **Drill-down:** a bucket opens its row's records over its time in Forensic
+  Records (by category, artifact or source); a record opens itself; "Open This
+  Range in Forensic Records" opens the whole range. Forensic Records shows
+  the range in its time filters, in the examiner's zone.
+- **Records with no time** are counted by artifact under the timeline, never
+  placed (R11), each opening its records in Forensic Records.
+- **Interaction:** the wheel zooms over the plot and scrolls over the lane
+  names; dragging moves; the arrow keys move a tenth and + and − zoom. The
+  axis labels the date where a day starts on a clock-time axis.
+- **Deviation for the owner's approval:** the observed records' bars are
+  painted in the section colour. §9 keeps a section colour to markers; the
+  timeline has no data colour of its own yet, so this needs the owner's
+  decision (a data colour token, or the section colour for the timeline's
+  data).
+
