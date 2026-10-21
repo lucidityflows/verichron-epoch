@@ -24,9 +24,21 @@ interface TimelineViewProps {
 const count = (n: number) => n.toLocaleString('en-US');
 const iso = (ms: number) => new Date(ms).toISOString();
 
+/**
+ * A range for Forensic Records, out to whole seconds (the start down, the end
+ * up): its time filter shows whole seconds, so the range it shows is then
+ * exactly the filter in force, and still holds every record of [from, to).
+ */
+export function rangeFilters(from: number, to: number): RecordFilters {
+  return {
+    eventTimeFrom: iso(Math.floor(from / 1000) * 1000),
+    eventTimeBefore: iso(Math.ceil(to / 1000) * 1000),
+  };
+}
+
 /** The filters that open one row's records over [from, to) in Forensic Records. */
 export function drillFilters(row: Pick<Row, 'laneKey' | 'artifactKey'>, from: number, to: number): RecordFilters {
-  const filters: RecordFilters = { eventTimeFrom: iso(from), eventTimeBefore: iso(to) };
+  const filters = rangeFilters(from, to);
   const [kind, name] = [
     row.laneKey.slice(0, row.laneKey.indexOf(':')),
     row.laneKey.slice(row.laneKey.indexOf(':') + 1),
@@ -158,10 +170,7 @@ export function TimelineView({ selectedRun, onOpenRecords, onOpenRecord }: Timel
           <Button variant="outline" onClick={() => setRange(span)}>
             Show Everything
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => onOpenRecords({ eventTimeFrom: iso(range[0]), eventTimeBefore: iso(range[1]) })}
-          >
+          <Button variant="outline" onClick={() => onOpenRecords(rangeFilters(range[0], range[1]))}>
             Open This Range in Forensic Records
           </Button>
         </div>

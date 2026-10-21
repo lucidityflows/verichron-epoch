@@ -360,6 +360,7 @@ background / surface / surface-raised:
 | `danger` | 0.75 0.15 25 | 8.3 / 7.9 / 6.8 / 5.7 | 51–56 |
 | `info` | 0.78 0.09 255 | 9.8 / 9.4 / 8.1 / 6.7 | 59–64 |
 | `section-runs` | hsl 268 80% 74% | 7.4 / 7.0 / 6.1 / 5.0 | |
+| `section-timeline` | hsl 296 65% 72% | 8.3 / 8.0 / 6.9 / 5.7 (light theme, hsl 296 50% 41%: 5.5 / 5.9 / 6.4 / 5.9; measured 2026-10-21, EPOCH-580) | |
 | `section-records` | hsl 212 85% 66% | 7.5 / 7.2 / 6.2 / 5.1 | |
 | `section-iocs` | hsl 326 75% 70% | 7.5 / 7.2 / 6.2 / 5.1 | |
 | `section-reports` | hsl 244 80% 76% | 7.2 / 6.9 / 5.9 / 4.9 | |
@@ -604,7 +605,7 @@ only how they are shown.
   can choose a zone in Settings (EPOCH-560), and it then applies everywhere,
   the report included. The report's header names the zone.
 - **Settings** (EPOCH-560, board "Time Display Rules") sits at the foot of the
-  sidebar, apart from the investigation's five sections, in a neutral colour
+  sidebar, apart from the investigation's six sections, in a neutral colour
   (`--section-settings`, the muted foreground): it is the app's, not part of
   an investigation. Its Time Zone card holds the picker ("UTC (default)",
   "America/Chicago (CDT, UTC−05:00)"), the board's sentence ("Evidence times
@@ -862,9 +863,8 @@ is drawn with D3 itself, module by module, not a library built on it.
 - **Interaction:** the wheel zooms over the plot and scrolls over the lane
   names; dragging moves; the arrow keys move a tenth and + and − zoom. The
   axis labels the date where a day starts on a clock-time axis.
-- **Deviation for the owner's approval:** the observed records' bars are
-  painted in the section colour. §9 keeps a section colour to markers; the
-  timeline has no data colour of its own yet, so this needs the owner's
-  decision (a data colour token, or the section colour for the timeline's
-  data).
+- **The section colour is the timeline's data colour,** an exception to §9's
+  markers-only rule decided by the owner (2026-10-21): the observed records'
+  bars are orchid. When the timeline shows data by classification, each
+  classification gets its own colour.
 

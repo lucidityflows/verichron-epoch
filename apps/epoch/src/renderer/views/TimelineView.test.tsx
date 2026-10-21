@@ -11,7 +11,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeAll, describe, it, vi } from 'vitest';
 
 import { useSettingsStore } from '../store/useSettings';
-import { drillFilters, TimelineView } from './TimelineView';
+import { drillFilters, rangeFilters, TimelineView } from './TimelineView';
 
 const RUN = {
   run_id: 'run-1',
@@ -165,5 +165,18 @@ describe('drillFilters', () => {
         sourceType: 'crash_report',
       }
     );
+  });
+});
+
+describe('rangeFilters', () => {
+  it('rounds a range out to whole seconds, so the filter shown is the filter in force', () => {
+    assert.deepEqual(rangeFilters(Date.parse('2026-10-01T10:00:00.437Z'), Date.parse('2026-10-01T10:59:59.500Z')), {
+      eventTimeFrom: '2026-10-01T10:00:00.000Z',
+      eventTimeBefore: '2026-10-01T11:00:00.000Z',
+    });
+    assert.deepEqual(rangeFilters(Date.parse('2026-10-01T10:00:00Z'), Date.parse('2026-10-01T11:00:00Z')), {
+      eventTimeFrom: '2026-10-01T10:00:00.000Z',
+      eventTimeBefore: '2026-10-01T11:00:00.000Z',
+    });
   });
 });
