@@ -143,6 +143,7 @@ describe('getTimelineOverview', live, () => {
     assert.equal(o.first, '2001-01-01T00:00:00.000Z');
     assert.equal(o.last, '2026-10-01T09:30:00.000Z');
     assert.equal(o.backup_date, '2026-10-15T18:05:25.000Z');
+    assert.deepEqual(o.limits, { buckets: 5000, records: 5000 });
   });
 
   it('opens on the middle 98% of timed records and counts what lies outside it', async () => {

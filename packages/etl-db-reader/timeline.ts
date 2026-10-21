@@ -65,6 +65,8 @@ export interface TimelineOverview {
   /** When the backup was made, as its Info.plist says; times after it are shaded. */
   backup_date: string | null;
   artifacts: TimelineArtifact[];
+  /** The most buckets one density read takes, so the app asks for no more (it can't import this package's values). */
+  limits: { buckets: number; records: number };
 }
 
 /** One evidence's timeline: its span, where it opens, and every artifact's counts. */
@@ -133,6 +135,7 @@ export async function getTimelineOverview(client: Db, evidenceId: string): Promi
     after_focus: Number(s.after_focus),
     backup_date: iso(s.backup_date),
     artifacts: rows,
+    limits: { buckets: MAX_TIMELINE_BUCKETS, records: MAX_TIMELINE_RECORDS },
   };
 }
 

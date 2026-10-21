@@ -44,6 +44,7 @@ const overview = {
   before_focus: 0,
   after_focus: 0,
   backup_date: '2026-10-15T18:05:25.000Z',
+  limits: { buckets: 5000, records: 5000 },
   artifacts: [
     artifact({}),
     artifact({ source_type: 'crash_report', category: null, artifact: null, time_column: null, timed: 5, untimed: 3 }),
