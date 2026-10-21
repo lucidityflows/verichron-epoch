@@ -15,8 +15,7 @@ if [ "${1:-}" = server ]; then
   mkdir "$HOME/socket"
   "$PG/bin/pg_ctl" -D "$HOME/data" -l "$HOME/server.log" -w \
     -o "-c listen_addresses='' -c unix_socket_directories=$HOME/socket" start > /dev/null
-  # Warnings and errors only: 0025's "does not exist, skipping" is expected here.
-  q() { PGOPTIONS='-c client_min_messages=warning' "$PG/bin/psql" -X -q -v ON_ERROR_STOP=1 -h "$HOME/socket" -d postgres "$@"; }
+  q() { "$PG/bin/psql" -X -q -v ON_ERROR_STOP=1 -h "$HOME/socket" -d postgres "$@"; }
 
   # 3. Socket-only, reached with peer authentication (no password exists).
   [ "$(q -tAc 'SHOW listen_addresses')" = "" ] || fail "the server listens on TCP"
