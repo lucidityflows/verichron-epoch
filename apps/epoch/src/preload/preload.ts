@@ -86,6 +86,8 @@ const dbApi = {
   getRecordDetail: (runId: string, recordId: string) => ipcRenderer.invoke('epoch:getRecordDetail', runId, recordId),
   getEntityOverview: (runId: string) => ipcRenderer.invoke('epoch:getEntityOverview', runId),
   getTimelineOverview: (runId: string) => ipcRenderer.invoke('epoch:getTimelineOverview', runId),
+  getRecordContextWindow: (runId: string, recordId: string) =>
+    ipcRenderer.invoke('epoch:getRecordContextWindow', runId, recordId),
   getTimelineDensity: (runId: string, boundaries: string[]) =>
     ipcRenderer.invoke('epoch:getTimelineDensity', runId, boundaries),
   getTimelineRecords: (runId: string, from: string, before: string) =>

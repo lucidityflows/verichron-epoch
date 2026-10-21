@@ -18,6 +18,7 @@ import {
   getTimelineOverview,
   getTimelineDensity,
   getTimelineRecords,
+  getRecordContextWindow,
   type ForensicRecordPage,
   type ItemFailurePage,
   type ForensicRecordQuery,
@@ -138,6 +139,12 @@ export function registerDbHandlers(dbPool: Pool) {
   ipcMain.handle('epoch:getTimelineRecords', async (_event, runId: unknown, from: unknown, before: unknown) => {
     if (!isText(from) || !isText(before)) throw new Error("a timeline's records need a range: from and before");
     return timeline(runId, (evidenceId) => getTimelineRecords(dbPool, evidenceId, from, before));
+  });
+
+  // A record's correlated-context window (EPOCH-522), from the database's own function (R27).
+  ipcMain.handle('epoch:getRecordContextWindow', async (_event, runId: unknown, recordId: unknown) => {
+    if (!isText(recordId) || !/^\d+$/.test(recordId)) throw new Error('a context window needs a record id');
+    return timeline(runId, (evidenceId) => getRecordContextWindow(dbPool, evidenceId, recordId));
   });
 
   ipcMain.handle('epoch:getRecordDetail', async (_event, runId: string, recordId: string) => {

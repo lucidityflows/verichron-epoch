@@ -28,7 +28,7 @@ Three things this file must always do, per the "fix, don't punish" principle:
 import argparse
 import re
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import psycopg2
@@ -785,6 +785,97 @@ def fetch_indicator_checks(conn, evidence_id: str) -> list[dict]:
     return checks
 
 
+#: Context records listed per matched record; the counts beside them are always the whole window's.
+CONTEXT_LISTED = 25
+
+#: Keys the iLEAPP stage adds beside a row's own values: never part of a record's summary.
+_RECORD_METADATA = {"engine", "source_artifact", "module", "category", "source_path", "corrections", "time_review"}
+
+
+def fetch_record_context(conn, evidence_id: str, record_id: int, limit: int = CONTEXT_LISTED) -> dict | None:
+    """One record's correlated context (EPOCH-522), from the database's own
+    functions (migration 0024, R27): its window, the records in it by
+    artifact, and the nearest of them. The window is the database's
+    default; nothing here declares one. None when the record isn't a current
+    record of this evidence; a record with no time has no window."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT * FROM record_context_window(%s, %s)", (evidence_id, record_id))
+        window = cur.fetchone()
+        if window is None:
+            return None
+        cur.execute("SELECT * FROM record_context_counts(%s, %s)", (evidence_id, record_id))
+        counts = cur.fetchall()
+        cur.execute("SELECT * FROM record_context(%s, %s, p_limit => %s)", (evidence_id, record_id, limit))
+        nearest = cur.fetchall()
+    return {"window": window, "counts": counts, "nearest": nearest}
+
+
+def fetch_match_contexts(conn, evidence_id: str, checks: list[dict], run_id: str) -> dict[int, dict | None]:
+    """The context of each record this run's check matched, by record id, each read once."""
+    ids = {
+        m["fields"]["fact"]["record_id"]
+        for check in checks
+        if str(check["run_id"]) == str(run_id)
+        for m in check["matches"]
+    }
+    return {record_id: fetch_record_context(conn, evidence_id, record_id) for record_id in sorted(ids)}
+
+
+def _half_width(window: dict) -> str:
+    seconds = int(window["half_width"].total_seconds())
+    return f"±{seconds // 60} minutes" if seconds % 60 == 0 else f"±{seconds} seconds"
+
+
+def _record_summary(record: dict) -> str:
+    """A context record in a line: its own text values, never the stage's metadata."""
+    fields = record["fields"] or {}
+    if record["source_type"] == "indicator_match":
+        indicator = fields.get("indicator") or {}
+        return f"indicator match: {indicator.get('type')} {indicator.get('value')}"
+    values = [v for k, v in fields.items() if k not in _RECORD_METADATA and isinstance(v, str) and v.strip()]
+    text = " · ".join(values)
+    return text if len(text) <= 120 else text[:119] + "…"
+
+
+def _context_lines(context: dict | None, record_id: int, source: str, times: ZoneTimes) -> list[str]:
+    """One matched record's context: what happened around it, stated as context, never as a finding."""
+    head = f"**Record {record_id}** ({_table_cell(source)})"
+    if context is None:
+        return [f"{head}: no longer a current record of this evidence, so it has no context.", ""]
+    window = context["window"]
+    if window["record_time"] is None:
+        return [f"{head}: no time recorded, so it has no window (R11).", ""]
+    total = sum(c["records"] for c in context["counts"])
+    lines = [
+        f"{head}, {times.at(window['record_time'])}. Context, not a finding: {total:,} other record(s) "
+        # The window ends before `window_before`, a whole second: its last second is the one before it.
+        f"within {_half_width(window)} of it "
+        f"({times.span(window['window_from'], window['window_before'] - timedelta(seconds=1))}).",
+        "",
+    ]
+    if not total:
+        return lines
+    by_artifact = "; ".join(
+        f"{_table_cell(c['artifact'] or c['category'] or c['source_type'])}: {c['records']:,}"
+        for c in context["counts"]
+    )
+    lines += [f"By artifact: {by_artifact}.", ""]
+    shown = context["nearest"]
+    lines += [
+        f"The {len(shown):,} nearest{'' if len(shown) == total else f' of {total:,}'}:",
+        "",
+        "| From the match | Time | Artifact | Summary |",
+        "| ---: | :--- | :--- | :--- |",
+    ]
+    for r in shown:
+        lines.append(
+            f"| {r['offset_seconds']:+.0f} s | {times.at(r['event_time'])} "
+            f"| {_table_cell(r['artifact'] or r['category'] or r['source_type'])} "
+            f"| {_table_cell(_record_summary(r))} |"
+        )
+    return lines + [""]
+
+
 def _set_line(check: dict, stale_days: int, times: ZoneTimes) -> str:
     """The set, when it was fetched or registered, and how old its newest indicator was when checked."""
     downloaded = [s["downloaded_on"] for s in check["sources"] if s["downloaded_on"] is not None]
@@ -824,7 +915,7 @@ def _in_order(types: dict) -> list[tuple[str, dict]]:
     return sorted(types.items(), key=lambda item: (order.index(item[0]) if item[0] in order else len(order), item[0]))
 
 
-def _check_body(check: dict, stale_days: int, times: ZoneTimes) -> list[str]:
+def _check_body(check: dict, stale_days: int, times: ZoneTimes, contexts: dict | None = None) -> list[str]:
     status = check["status"]
     if status == "skipped":
         reason = check["error_message"] or "the orchestrator recorded no reason."
@@ -907,10 +998,28 @@ def _check_body(check: dict, stale_days: int, times: ZoneTimes) -> list[str]:
                 f"| {_table_cell(f['source'])} (record {f['record_id']}) | `{_table_cell(i['source_file'])}` |"
             )
         lines.append("")
+        if contexts is not None:
+            # Each matched record once, however many indicators it matched (EPOCH-522).
+            lines += [
+                "#### Around each matched record",
+                "",
+                "The other records near each matched record's time, from the database's own window. They are "
+                "context for the examiner, not findings: nothing here is matched or judged.",
+                "",
+            ]
+            seen: set[int] = set()
+            for m in check["matches"]:
+                fact = m["fields"]["fact"]
+                if fact["record_id"] in seen:
+                    continue
+                seen.add(fact["record_id"])
+                lines += _context_lines(contexts.get(fact["record_id"]), fact["record_id"], fact["source"], times)
     return lines + _sources_lines(check)
 
 
-def render_indicator_section(checks: list[dict], run_id: str, stale_days: int, times: ZoneTimes) -> list[str]:
+def render_indicator_section(
+    checks: list[dict], run_id: str, stale_days: int, times: ZoneTimes, contexts: dict | None = None
+) -> list[str]:
     """This run's indicator check, then every earlier check of the same
     evidence, each with its own set and date and never merged (EPOCH-493).
     Each states what wasn't checked, so "no match" never reads as a clean
@@ -922,7 +1031,7 @@ def render_indicator_section(checks: list[dict], run_id: str, stale_days: int, t
         check = this_run[0]
         when = f" ({times.at(check['finished_at'])})" if check["finished_at"] else ""
         lines += [f"### This run's check{when}", ""]
-        lines += _check_body(check, stale_days, times)
+        lines += _check_body(check, stale_days, times, contexts)
     else:
         lines += ["### This run's check", "", f"This run did not check indicators. {NOTHING_CHECKED}", ""]
     if earlier:
@@ -1196,7 +1305,10 @@ def generate_report(conn, run_id: str, evidence_id: str | None, output_path: str
     )
     lines += render_tool_checks_section(fetch_corrections(conn, evidence_id), times)
     lines += render_time_review_section(fetch_time_review(conn, evidence_id), times)
-    lines += render_indicator_section(fetch_indicator_checks(conn, evidence_id), run_id, stale_after_days(), times)
+    checks = fetch_indicator_checks(conn, evidence_id)
+    lines += render_indicator_section(
+        checks, run_id, stale_after_days(), times, fetch_match_contexts(conn, evidence_id, checks, run_id)
+    )
     lines += render_entities_section(fetch_entities(conn, evidence_id))
 
     for title, fetch, render in RENDERERS.values():

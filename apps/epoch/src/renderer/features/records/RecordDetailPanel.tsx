@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { ForensicRecordRow, RecordDetail } from '@verichron/etl-db-reader';
+import type { ContextWindow, ForensicRecordRow, RecordDetail } from '@verichron/etl-db-reader';
 import { runsApi } from '../../api/runs';
+import { Button } from '../../components/ui/Button';
 import { CopyButton } from '../../components/ui/CopyButton';
 import { Loader } from '../../components/ui/Loader';
 import { useDisplayZone } from '../../store/useSettings';
+import { formatDateTime } from '../../../shared/time';
 import { fieldLines, noteLines, originOf, rawText, recordText, sourceTitle, storedText } from './recordText';
 
 const shortId = (id: string) => id.slice(0, 8);
@@ -17,10 +19,16 @@ export function RecordDetailPanel({
   runId,
   row,
   onOpenIndicatorMatches,
+  onAround,
+  onShowOnTimeline,
 }: {
   runId: string;
   row: ForensicRecordRow;
   onOpenIndicatorMatches: () => void;
+  /** Show this record's context window's records in Forensic Records (EPOCH-522). */
+  onAround?: (window: { from: string; before: string }) => void;
+  /** Show this record's context window on the Timeline. */
+  onShowOnTimeline?: (range: [number, number]) => void;
 }) {
   const zone = useDisplayZone();
   const [detail, setDetail] = useState<RecordDetail | null | undefined>(undefined);
@@ -33,6 +41,19 @@ export function RecordDetailPanel({
       .getRecordDetail(runId, row.id)
       .then((answer) => active && setDetail(answer))
       .catch((err: unknown) => active && setError(err instanceof Error ? err.message : String(err)));
+    return () => {
+      active = false;
+    };
+  }, [runId, row.id]);
+
+  // Its correlated-context window, from the database (EPOCH-522, R27): nothing here declares one.
+  const [contextWindow, setContextWindow] = useState<ContextWindow | null | undefined>(undefined);
+  useEffect(() => {
+    let active = true;
+    runsApi
+      .getRecordContextWindow(runId, row.id)
+      .then((answer) => active && setContextWindow(answer))
+      .catch(() => active && setContextWindow(null));
     return () => {
       active = false;
     };
@@ -80,6 +101,40 @@ export function RecordDetailPanel({
         <CopyButton label="Copy Record" title="Copy the record as it reads" text={() => recordText(row, lines, zone)} />
         <CopyButton label="Copy Raw Data" title="Copy the record exactly as stored" text={() => rawText(row)} />
       </div>
+
+      {contextWindow !== undefined && contextWindow !== null && (
+        <section aria-label="Around this record" className="flex flex-wrap items-center gap-3">
+          {contextWindow.record_time === null || contextWindow.from === null || contextWindow.before === null ? (
+            <p className="text-data text-muted-foreground">No time recorded, so this record has no window around it.</p>
+          ) : (
+            <>
+              <p className="text-data text-foreground/90 flex-1 min-w-[16rem]">
+                Around this record, ±{Math.round((contextWindow.half_width_seconds ?? 0) / 60)} minutes:{' '}
+                <span className="font-mono">
+                  {formatDateTime(contextWindow.from, zone)} to{' '}
+                  {formatDateTime(new Date(Date.parse(contextWindow.before) - 1000), zone)}
+                </span>
+              </p>
+              {onAround && (
+                <Button
+                  variant="outline"
+                  onClick={() => onAround({ from: contextWindow.from!, before: contextWindow.before! })}
+                >
+                  Around This Record
+                </Button>
+              )}
+              {onShowOnTimeline && (
+                <Button
+                  variant="outline"
+                  onClick={() => onShowOnTimeline([Date.parse(contextWindow.from!), Date.parse(contextWindow.before!)])}
+                >
+                  Show on Timeline
+                </Button>
+              )}
+            </>
+          )}
+        </section>
+      )}
 
       <div className="flex flex-col gap-6">
         <section aria-label="Record fields">

@@ -11,6 +11,7 @@ import type {
   EvidenceCompleteness,
   RecordDetail,
   TimelineOverview,
+  ContextWindow,
   TimelineDensity,
   TimelineRecord,
   EntityKindCount,
@@ -306,6 +307,7 @@ declare global {
       // EPOCH-581: null when the run has no registered evidence.
       getEntityOverview: (runId: string) => Promise<EntityOverview | null>;
       getTimelineOverview: (runId: string) => Promise<TimelineOverview | null>;
+      getRecordContextWindow: (runId: string, recordId: string) => Promise<ContextWindow | null>;
       getTimelineDensity: (runId: string, boundaries: string[]) => Promise<TimelineDensity | null>;
       getTimelineRecords: (
         runId: string,
