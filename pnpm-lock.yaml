@@ -69,6 +69,9 @@ importers:
       '@verichron/etl-db-reader':
         specifier: workspace:*
         version: link:../../packages/etl-db-reader
+      '@verichron/workspace-lock':
+        specifier: workspace:*
+        version: link:../../packages/workspace-lock
       pg:
         specifier: ^8.23.0
         version: 8.23.0

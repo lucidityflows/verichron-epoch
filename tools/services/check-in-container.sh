@@ -74,6 +74,37 @@ if [ "${1:-}" = run ]; then
     || fail "the second start did not reuse the database: $again"
   echo "[services] ok: stopped, and started again on the same database"
 
+  # Two overlapping starts: one waits for the other's lock and finds its
+  # server, so neither stops the server the other started.
+  dbserver stop
+  dbserver ensure > "$HOME/first.json" 2> "$HOME/first.err" &
+  one=$!
+  dbserver ensure > "$HOME/second.json" 2> "$HOME/second.err" &
+  two=$!
+  wait "$one" || fail "the first of two overlapping starts failed: $(cat "$HOME/first.err")"
+  wait "$two" || fail "the second of two overlapping starts failed: $(cat "$HOME/second.err")"
+  psql "$admin" -c 'SELECT 1' > /dev/null || fail "the server stopped after two overlapping starts"
+  echo "[services] ok: two overlapping starts both succeeded, and the server stayed up"
+
+  # And that a start does wait: with the lock held by another live process,
+  # ensure waits, starting no server, until the holder is gone, then succeeds.
+  dbserver stop
+  sleep 600 &
+  holder=$!
+  printf '{"id":"%s","pid":%d,"tool":"dbserver","startedAt":"%s"}\n' \
+    "$("$node" -e 'console.log(crypto.randomUUID())')" "$holder" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    > "$XDG_DATA_HOME/verichron-epoch/.verichron.lock"
+  dbserver ensure > "$HOME/waited.json" 2> "$HOME/waited.err" &
+  waiter=$!
+  sleep 3
+  kill -0 "$waiter" 2> /dev/null || fail "ensure did not wait for the lock: $(cat "$HOME/waited.err")"
+  ! psql "$admin" -c 'SELECT 1' 2> /dev/null || fail "ensure started the server while another process held the lock"
+  kill "$holder"
+  wait "$holder" 2> /dev/null || true
+  wait "$waiter" || fail "ensure failed once the lock was free: $(cat "$HOME/waited.err")"
+  psql "$admin" -c 'SELECT 1' > /dev/null || fail "the server is not running after the waiting start"
+  echo "[services] ok: a start waits while another process holds the lock, then succeeds"
+
   psql "$admin" -c "DELETE FROM schema_migrations WHERE filename = (SELECT max(filename) FROM schema_migrations)"
   dbserver stop
   set +e
