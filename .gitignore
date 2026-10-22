@@ -163,3 +163,6 @@ tools/runtime/.cache/
 
 # The Node release tools/services/build.sh downloads (EPOCH-478)
 tools/services/.cache/
+
+# The sources tools/iphone/build.sh downloads (EPOCH-472)
+tools/iphone/.cache/

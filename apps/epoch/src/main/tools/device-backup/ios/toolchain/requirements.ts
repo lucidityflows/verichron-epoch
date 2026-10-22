@@ -176,7 +176,7 @@ async function systemRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): Pr
   return reqs;
 }
 
-async function serviceRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): Promise<ToolSetupRequirement[]> {
+export async function serviceRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): Promise<ToolSetupRequirement[]> {
   if (ctx.platform === 'darwin') return []; // macOS runs its own usbmuxd
   const found = USBMUXD_PATHS.find((p) => ctx.exists(p));
   if (!found) {

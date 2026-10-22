@@ -17,6 +17,7 @@ function at(kind: Layout['kind'], root: string): Layout {
     ileappPython: `${root}/tools/ileapp/.venv/bin/python`,
     ileappCommitFile: kind === 'bundle' ? `${root}/tools/ileapp/iLEAPP.commit` : null,
     postgresql: kind === 'bundle' ? `${root}/postgresql` : null,
+    bin: kind === 'bundle' ? `${root}/bin` : null,
   };
 }
 

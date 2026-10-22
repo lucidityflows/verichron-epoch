@@ -67,11 +67,20 @@ describe('crashReportArgs', () => {
     assert.deepEqual(mentions, [
       'main/tools/device-backup/ios/crashReports.ts',
       'main/tools/device-backup/ios/iosBackupSource.ts',
+      // The Lab bundle's list of the tools it ships (EPOCH-472): a name, never run there.
+      'main/tools/device-backup/ios/toolchain/bundled.ts',
     ]);
+    const bundled = fs.readFileSync(path.join(appSrc, 'main/tools/device-backup/ios/toolchain/bundled.ts'), 'utf8');
+    assert.ok(
+      codeLines(bundled)
+        .filter((line) => line.includes('idevicecrashreport'))
+        .every((line) => line.includes('BUNDLED_TOOLS')),
+      'bundled.ts may only list the tool'
+    );
     const pull = fs.readFileSync(path.join(appSrc, 'main/tools/device-backup/ios/iosBackupSource.ts'), 'utf8');
     const uses = codeLines(pull).filter((line) => line.includes('idevicecrashreport'));
     assert.ok(
-      uses.every((line) => /detectBinary\('idevicecrashreport', trustedToolPath\('idevicecrashreport'\)\)/.test(line)),
+      uses.every((line) => /findTool\('idevicecrashreport'\)/.test(line)),
       `the pull may only locate the tool: ${uses.join(' | ')}`
     );
   });

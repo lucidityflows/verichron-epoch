@@ -20,6 +20,9 @@ export const DEFAULT_DECRYPT_SCRIPT = LAYOUT.decryptScript;
 export const DEFAULT_ILEAPP_DIR = LAYOUT.ileappDir;
 export const DEFAULT_ILEAPP_PYTHON = LAYOUT.ileappPython;
 
+/** sqlite3, for the repair pass: the Lab bundle's own (EPOCH-439), or PATH's in a checkout. */
+export const DEFAULT_SQLITE_BIN = LAYOUT.bin ? path.join(LAYOUT.bin, 'sqlite3') : 'sqlite3';
+
 export interface Config {
   source: string;
   workspace: string;
@@ -55,7 +58,7 @@ export function parseFlags(): Config {
       'decrypt-python': { type: 'string', default: DEFAULT_DECRYPT_PYTHON },
       'decrypt-script': { type: 'string', default: DEFAULT_DECRYPT_SCRIPT },
       'decrypt-stall-timeout': { type: 'string', default: '30m' },
-      'sqlite-bin': { type: 'string', default: 'sqlite3' },
+      'sqlite-bin': { type: 'string', default: DEFAULT_SQLITE_BIN },
       'ileapp-dir': { type: 'string', default: DEFAULT_ILEAPP_DIR },
       'ileapp-python': { type: 'string', default: DEFAULT_ILEAPP_PYTHON },
       'ileapp-module-timeout': { type: 'string', default: '60m' },
@@ -123,7 +126,7 @@ Options:
   --decrypt-stall-timeout <dur>
                            stop the decrypt if it writes nothing for this long, e.g. "45m" (default: 30m);
                            a long decrypt that keeps writing is never stopped
-  --sqlite-bin <path>      path to sqlite3 binary used for repairing malformed DBs (default: "sqlite3" on PATH)
+  --sqlite-bin <path>      path to sqlite3 binary used for repairing malformed DBs (default: the Lab bundle's, or "sqlite3" on PATH)
   --ileapp-dir <dir>       the iLEAPP checkout to run (default: <repo-root>/tools/ileapp/iLEAPP, the submodule)
   --ileapp-python <path>   interpreter for iLEAPP (default: <repo-root>/tools/ileapp/.venv/bin/python,
                            the pinned environment "mise run setup" creates)
