@@ -191,14 +191,15 @@ export async function serviceRequirements(ctx: SetupContext, env: NodeJS.Process
     ];
   }
   const version = await ctx.run(found, ['--version'], { env });
+  const ok = version.code === 0;
   return [
     {
       id: 'usbmuxd',
       group: 'service',
       label: 'usbmuxd',
-      ok: true,
-      version: version.code === 0 ? firstLine(version.output) : undefined,
-      detail: 'Connects to the iPhone over USB.',
+      ok,
+      version: ok ? firstLine(version.output) : undefined,
+      detail: ok ? 'Connects to the iPhone over USB.' : 'Failed to run usbmuxd --version.',
     },
   ];
 }

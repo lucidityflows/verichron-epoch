@@ -9,7 +9,7 @@ fail() {
   exit 1
 }
 
-TOOLS=(idevicebackup2 idevicecrashreport idevice_id ideviceinfo)
+TOOLS=(idevicebackup2 idevicecrashreport idevice_id ideviceinfo plistutil)
 
 if [ "${1:-}" = run ]; then
   B="$2"

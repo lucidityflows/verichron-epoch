@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # The tools a pull runs (iosBackupSource.ts); nothing else of libimobiledevice ships.
-TOOLS=(idevicebackup2 idevicecrashreport idevice_id ideviceinfo)
+TOOLS=(idevicebackup2 idevicecrashreport idevice_id ideviceinfo plistutil)
 
 if [ "${1:-}" = build ]; then
   prefix="$HOME/prefix"

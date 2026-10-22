@@ -6,8 +6,8 @@
 #
 # Adds, beside the bundle's other parts (docs/architecture.md, "The Lab
 # bundle"):
-#   <bundle>/bin  idevicebackup2, idevicecrashreport, idevice_id, ideviceinfo
-#                 (what a pull runs) and sqlite3 (the processor's repair pass)
+#   <bundle>/bin  idevicebackup2, idevicecrashreport, idevice_id, ideviceinfo,
+#                 plistutil (what a pull runs) and sqlite3 (the processor's repair pass)
 #   <bundle>/lib  the iPhone libraries those tools load, and nothing else
 #
 # The iPhone libraries are the app's own pins (EPOCH-465, read by
