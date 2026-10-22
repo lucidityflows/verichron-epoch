@@ -16,6 +16,7 @@ function at(kind: Layout['kind'], root: string): Layout {
     ileappDir: `${root}/tools/ileapp/iLEAPP`,
     ileappPython: `${root}/tools/ileapp/.venv/bin/python`,
     ileappCommitFile: kind === 'bundle' ? `${root}/tools/ileapp/iLEAPP.commit` : null,
+    postgresql: kind === 'bundle' ? `${root}/postgresql` : null,
   };
 }
 
@@ -50,5 +51,13 @@ describe('serviceCommand (EPOCH-478)', () => {
       '--source',
       '/src',
     ]);
+  });
+
+  it('runs the database server only from the Lab bundle (EPOCH-477)', () => {
+    assert.deepEqual(serviceCommand(at('bundle', '/opt/epoch'), 'dbserver', ['ensure']).args, [
+      '/opt/epoch/services/dbserver.mjs',
+      'ensure',
+    ]);
+    assert.throws(() => serviceCommand(at('checkout', '/repo'), 'dbserver', ['ensure']), /only in the Lab bundle/);
   });
 });

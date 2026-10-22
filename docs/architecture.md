@@ -293,7 +293,7 @@ without root; the decisions behind it are in
 |---|---|---|
 | `app/` | The packaged Electron app | Electron Forge, packaging only |
 | `node/` | Node 24, the version `mise.toml` pins: `bin/node` and its licence | `tools/services/build.sh` |
-| `services/` | The orchestrator and processor, each compiled to one JavaScript file | `tools/services/build.sh` |
+| `services/` | The orchestrator, the processor and the database server, each compiled to one JavaScript file | `tools/services/build.sh` |
 | `python/` | The interpreter `.python-version` pins | `tools/runtime/build.sh` |
 | `runtime-venv/` | The Python environment that runs: no dependency groups | `tools/runtime/build.sh` |
 | `source/` | Our Python stages, writer, report and the contract files they read | `tools/runtime/build.sh`, from the commit |
@@ -321,8 +321,12 @@ exactly as development runs them through pnpm (`apps/epoch/src/main/ipc/serviceC
 The stages run with `runtime-venv/`, from `source/`.
 
 **Configuration.** The bundle has no `.env`. The app manages its own PostgreSQL
-over a unix socket (EPOCH-477), with its data directory under
-`$XDG_DATA_HOME/verichron-epoch/` (by default `~/.local/share/verichron-epoch/`).
+over a unix socket (EPOCH-477): before its window opens it runs
+`services/dbserver.mjs ensure`, which creates the database on the first start,
+and it gives every service the runtime login's address as `DATABASE_URL`. The
+data directory is under `$XDG_DATA_HOME/verichron-epoch/` (by default
+`~/.local/share/verichron-epoch/`), and the socket under
+`$XDG_RUNTIME_DIR/verichron-epoch/`. One app runs per bundle.
 The app's settings stay where Electron keeps them, and evidence workspaces stay
 where the examiner chooses.
 
@@ -332,7 +336,7 @@ paths in its test jobs, and the bundle's parts in `postgres-build.yml`.
 
 Built so far, each with its check: `postgresql/`, the Python parts
 (`python/`, `source/`, `runtime-venv/`, `tools/`), and `node/` with `services/`,
-all movable ([PostgreSQL](development.md#the-lab-bundles-postgresql),
+the database server among them, all movable ([PostgreSQL](development.md#the-lab-bundles-postgresql),
 [Python parts](development.md#the-lab-bundles-python-parts),
 [services](development.md#the-lab-bundles-services)).
 
@@ -345,7 +349,9 @@ all movable ([PostgreSQL](development.md#the-lab-bundles-postgresql),
 **Built — roles (EPOCH-562):**
 - **The schema owner:** `verichron_epoch_schema_owner`, a non-login role, owns every table, view, sequence and trigger function. `migrate.py` gives each new object to it after every run.
 - **The runtime:** the app and its stages connect as a login that holds only `verichron_epoch_runtime`. That role reads everything and writes only what the writers write, and it purges only through `purge_evidence`. It cannot TRUNCATE, disable a trigger, change privileges or become an owner, so the immutability triggers (R9) hold against the running application.
-- **Who runs migrations:** the administrative identity, a superuser, which the app never uses. On the Lab build's bundled server, these roles are provisioned by EPOCH-477.
+- **Who runs migrations:** the administrative identity, a superuser, which the app never uses.
+
+**Built — the Lab bundle's server (EPOCH-477):** `apps/dbserver` creates and runs the bundle's own database, socket-only, with no password anywhere: peer authentication maps the examiner's OS account to `verichron_epoch_admin` (initdb's superuser, for migrations and provisioning) and `epoch_app` (the runtime login). Any program running as that same OS account could connect as the administrative role too; the boundary is the OS account, as it is for a server the examiner runs themselves, and R9 holds against the app's own connection. See [the database server](../apps/dbserver/README.md).
 
 **Built — R30 (EPOCH-423):** the URL never travels on a command line. The
 orchestrator resolves it once and gives each stage `DATABASE_URL` in its

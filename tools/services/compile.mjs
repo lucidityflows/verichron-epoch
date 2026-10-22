@@ -1,5 +1,6 @@
-// Compile the orchestrator and processor into one file each, for the Lab
-// bundle's Node (EPOCH-478): node tools/services/compile.mjs <bundle>/services
+// Compile the orchestrator, the processor and the database server into one
+// file each, for the Lab bundle's Node (EPOCH-478, EPOCH-477):
+// node tools/services/compile.mjs <bundle>/services
 import { build } from 'esbuild';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +12,7 @@ if (!out) {
   process.exit(2);
 }
 
-for (const service of ['orchestrator', 'processor']) {
+for (const service of ['orchestrator', 'processor', 'dbserver']) {
   await build({
     entryPoints: [path.join(root, 'apps', service, 'src', 'main.ts')],
     outfile: path.join(out, `${service}.mjs`),

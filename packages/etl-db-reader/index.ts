@@ -84,3 +84,4 @@ export {
 } from './timeline.js';
 export type { ContextWindow, ContextCount, ContextRecord, RecordContext } from './context.js';
 export { getRecordContext, getRecordContextWindow } from './context.js';
+export { MIGRATIONS_DIR, readMigrationStatus, type MigrationStatus } from './migrations.js';

@@ -21,14 +21,37 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent.parent
 
 
-def ensure_repo_venv() -> Path:
-    """Require a repo-root .venv before a standalone Python command runs.
+def bundle_root() -> Path | None:
+    """The Lab bundle's root when this source runs from one, else None.
 
-    The project expects a local virtual environment in the repository root so all
-    Python tooling resolves the same dependencies and the same interpreter. If the
-    venv is missing, the script exits with a clear setup message instead of the
-    much less useful ModuleNotFoundError that comes from using the wrong Python.
+    The Python twin of packages/contracts/ts/layout.ts's rule (EPOCH-478): the
+    bundle's source/ keeps the repository's layout, and the root above it
+    holds MANIFEST, source/ and runtime-venv/. Keep the two in step.
     """
+    root = repo_root()
+    parent = root.parent
+    if root.name == "source" and all((parent / name).exists() for name in ("MANIFEST", "source", "runtime-venv")):
+        return parent
+    return None
+
+
+def ensure_repo_venv() -> Path:
+    """Require the project's own virtual environment before a standalone Python command runs.
+
+    The project expects one virtual environment so all Python tooling resolves
+    the same dependencies and the same interpreter: a checkout's .venv, or the
+    Lab bundle's runtime-venv. If it is missing, the script exits with a clear
+    message instead of the much less useful ModuleNotFoundError that comes from
+    using the wrong Python.
+    """
+    bundle = bundle_root()
+    if bundle is not None:
+        venv_python = bundle / "runtime-venv" / "bin" / "python"
+        if not venv_python.exists():
+            raise RuntimeError(
+                f"The bundle's Python environment is missing at {venv_python}; the bundle is incomplete."
+            )
+        return venv_python
     root = repo_root()
     venv_python = root / ".venv" / "bin" / "python"
     if not venv_python.exists():

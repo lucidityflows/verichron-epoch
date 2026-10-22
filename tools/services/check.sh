@@ -4,9 +4,9 @@
 #
 #   tools/services/check.sh <bundle directory>
 #
-# The bundle needs the parts the services use: python/, source/, runtime-venv/
-# and tools/ (tools/runtime/build.sh), and node/ and services/
-# (tools/services/build.sh). It is moved to another path and run with nothing
+# The bundle needs the parts the services use: postgresql/
+# (tools/postgres/build.sh), python/, source/, runtime-venv/ and tools/
+# (tools/runtime/build.sh), and node/ and services/ (tools/services/build.sh). It is moved to another path and run with nothing
 # on PATH but the base system, so pnpm, uv or a checkout can't stand in. Then,
 # with the bundled Node:
 # - the orchestrator finds the bundle from its own location, validates the
@@ -14,6 +14,12 @@
 #   at an empty workspace;
 # - the processor runs the bundle's decrypt to identify it, reads iLEAPP's
 #   commit as the build recorded it, and stops at a source with no backups.
+# - the database server (EPOCH-477) creates the database on its first start:
+#   no TCP listener, every migration applied, only the extensions the schema
+#   uses; the runtime login reads but cannot TRUNCATE, and the OS account
+#   reaches no role but the two mapped. It stops, starts again on the same
+#   database, and refuses a database behind this version and one whose first
+#   start never finished.
 # Assembly writes the bundle's MANIFEST (step 6); until then the check stands
 # an empty one in for it.
 
@@ -30,7 +36,7 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 . "$REPO_ROOT/tools/postgres/versions.env"
 NODE_VERSION="$(sed -n 's/^node = "\(.*\)"$/\1/p' "$REPO_ROOT/mise.toml")"
 BUNDLE="$(cd "$1" && pwd)"
-for d in node services python source runtime-venv tools; do
+for d in node services postgresql python source runtime-venv tools; do
   [ -e "$BUNDLE/$d" ] || {
     echo "[services] no $BUNDLE/$d; run tools/runtime/build.sh and tools/services/build.sh first" >&2
     exit 1

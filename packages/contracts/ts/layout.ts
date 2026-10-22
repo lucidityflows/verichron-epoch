@@ -29,6 +29,8 @@ export interface Layout {
   ileappPython: string;
   /** iLEAPP's commit as the build recorded it; null in a checkout, where git says it. */
   ileappCommitFile: string | null;
+  /** The bundle's own PostgreSQL, which the app manages (EPOCH-477); null in a checkout, which uses Docker's. */
+  postgresql: string | null;
 }
 
 /** The layout whose root holds `dir`, or null when `dir` is no root. */
@@ -46,6 +48,7 @@ export function layoutAt(dir: string): Layout | null {
       pythonVersionFile: path.join(dir, 'source', '.python-version'),
       ...tools(dir),
       ileappCommitFile: path.join(dir, 'tools', 'ileapp', 'iLEAPP.commit'),
+      postgresql: path.join(dir, 'postgresql'),
     };
   }
   if (existsSync(path.join(dir, 'pnpm-workspace.yaml')) && existsSync(path.join(dir, 'packages', 'contracts'))) {
@@ -57,6 +60,7 @@ export function layoutAt(dir: string): Layout | null {
       pythonVersionFile: path.join(dir, '.python-version'),
       ...tools(dir),
       ileappCommitFile: null,
+      postgresql: null,
     };
   }
   return null;

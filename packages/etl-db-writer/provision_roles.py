@@ -13,6 +13,11 @@ changes: it is idempotent.
 
     uv run python packages/etl-db-writer/provision_roles.py
 
+With --peer (the Lab bundle's own server, EPOCH-477) the login has no password
+at all: the server accepts only local peer connections, mapped from the
+examiner's OS account, so no credential exists to keep (R28). DB_APP_PASSWORD
+is then neither needed nor read.
+
 The login is a member of verichron_epoch_runtime and of nothing else: an
 existing role's other memberships are revoked. It is refused if it would be
 the administrative identity, a superuser, a role that owns anything or holds a
@@ -22,6 +27,7 @@ project's or PostgreSQL's own roles.
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 
@@ -57,9 +63,14 @@ def other_memberships(cur, login: str) -> list[tuple[str, str]]:
     return [(row[0], row[1]) for row in cur.fetchall()]
 
 
-def provision(conn, login: str, password: str) -> str:
-    """Creates or updates `login` as a runtime login. Returns 'created' or 'updated'."""
-    if not login or not password:
+def provision(conn, login: str, password: str | None) -> str:
+    """Creates or updates `login` as a runtime login. Returns 'created' or 'updated'.
+
+    `password` None makes a login with no password, for peer authentication only.
+    """
+    if not login:
+        raise ProvisionError("DB_APP_USER is required")
+    if password is not None and not password:
         raise ProvisionError("DB_APP_USER and DB_APP_PASSWORD are required")
     with conn.cursor() as cur:
         cur.execute("SELECT current_user, current_database()")
@@ -116,7 +127,9 @@ def provision(conn, login: str, password: str) -> str:
         statement = sql.SQL(
             verb + " ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT NOREPLICATION NOBYPASSRLS PASSWORD {}"
         )
-        cur.execute(statement.format(sql.Identifier(login), sql.Literal(password)))
+        cur.execute(
+            statement.format(sql.Identifier(login), sql.Literal(password) if password is not None else sql.SQL("NULL"))
+        )
 
         # A member of the runtime role and of nothing else: every other
         # membership is revoked, each by the role that granted it (PostgreSQL
@@ -141,10 +154,13 @@ def provision(conn, login: str, password: str) -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Create or update the runtime login.")
+    parser.add_argument("--peer", action="store_true", help="no password: peer authentication only (EPOCH-477)")
+    peer = parser.parse_args().peer
     load_root_env()
     db_url = require_admin_database_url()
     login = os.environ.get("DB_APP_USER", "")
-    password = os.environ.get("DB_APP_PASSWORD", "")
+    password = None if peer else os.environ.get("DB_APP_PASSWORD", "")
     try:
         conn = psycopg2.connect(db_url)
     except Exception as e:

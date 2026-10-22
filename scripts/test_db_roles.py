@@ -390,6 +390,30 @@ def test_provisioning_is_rerunnable_and_refuses_the_administrative_identity(runt
     psycopg2.connect(runtime_dsn).close()
 
 
+def test_a_peer_login_has_no_password_and_only_the_runtime_role(db: PgReal):
+    """The Lab bundle's login (EPOCH-477): no credential exists, only peer authentication reaches it."""
+    login = "epoch_peer_login_test"
+    admin = psycopg2.connect(admin_dsn())
+    try:
+        assert provision_roles.provision(admin, login, None) == "created"
+        assert one(
+            admin, "SELECT rolpassword IS NULL, rolcanlogin, rolsuper FROM pg_authid WHERE rolname = %s", (login,)
+        ) == (
+            True,
+            True,
+            False,
+        )
+        assert provision_roles.other_memberships(admin.cursor(), login) == []
+        assert one(admin, "SELECT pg_has_role(%s, %s, 'MEMBER')", (login, RUNTIME))[0]
+        assert provision_roles.provision(admin, login, None) == "updated"
+    finally:
+        with admin.cursor() as cur:
+            cur.execute(f'DROP OWNED BY "{login}"')
+            cur.execute(f'DROP ROLE IF EXISTS "{login}"')
+        admin.commit()
+        admin.close()
+
+
 @pytest.mark.parametrize("name", [SCHEMA_OWNER, PURGE_OWNER, RUNTIME, "pg_monitor", "verichron_epoch_new"])
 def test_provisioning_refuses_the_projects_and_postgresqls_own_role_names(db: PgReal, name):
     """Making an owner role login-capable would undo the boundary."""

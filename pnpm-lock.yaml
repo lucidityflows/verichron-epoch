@@ -61,6 +61,31 @@ importers:
         specifier: ^4.5.2
         version: 4.5.4
 
+  apps/dbserver:
+    dependencies:
+      '@verichron/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@verichron/etl-db-reader':
+        specifier: workspace:*
+        version: link:../../packages/etl-db-reader
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.43
+        version: 20.19.43
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      tsx:
+        specifier: ^4.23.12
+        version: 4.23.12
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   apps/epoch:
     dependencies:
       '@radix-ui/react-tooltip':
@@ -271,6 +296,9 @@ importers:
       '@verichron/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@verichron/etl-db-reader':
+        specifier: workspace:*
+        version: link:../../packages/etl-db-reader
       '@verichron/workspace-lock':
         specifier: workspace:*
         version: link:../../packages/workspace-lock

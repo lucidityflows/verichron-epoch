@@ -46,6 +46,61 @@ if [ "${1:-}" = run ]; then
   grep -q "iLEAPP: ${commit:0:12}" <<< "$processor" || fail "the processor did not read iLEAPP's recorded commit: $processor"
   grep -q 'no backup directories found' <<< "$processor" || fail "the processor did not stop at the empty source: $processor"
   echo "[services] ok: the processor ran the bundle's decrypt, read iLEAPP ${commit:0:12}, and stopped at the empty source"
+
+  # The database server (EPOCH-477), with the XDG directories a desktop session gives.
+  export XDG_DATA_HOME="$HOME/data" XDG_RUNTIME_DIR="$HOME/run"
+  mkdir -p "$XDG_DATA_HOME" && mkdir -m 700 "$XDG_RUNTIME_DIR"
+  dbserver() { "$node" "$B/services/dbserver.mjs" "$@"; }
+  first="$(dbserver ensure)" || fail "dbserver ensure failed on the first start"
+  url="$("$node" -e 'const r = JSON.parse(process.argv[1]); if (!r.created) process.exit(1); console.log(r.database_url)' "$first")" \
+    || fail "the first start did not create the database: $first"
+  socket="$XDG_RUNTIME_DIR/verichron-epoch"
+  psql() { "$B/postgresql/bin/psql" -X -q -v ON_ERROR_STOP=1 -tA "$@"; }
+  admin="postgresql://verichron_epoch_admin@/verichron_epoch?host=$socket"
+  [ "$(psql "$admin" -c 'SHOW listen_addresses')" = "" ] || fail "the server listens on TCP"
+  migrations="$(find "$B/source/packages/etl-db-writer/migrations" -name '*.sql' | wc -l)"
+  [ "$(psql "$admin" -c 'SELECT count(*) FROM schema_migrations')" = "$migrations" ] || fail "not every migration was applied"
+  [ "$(psql "$admin" -c "SELECT string_agg(extname, ' ' ORDER BY extname) FROM pg_extension")" = "pg_trgm plpgsql" ] \
+    || fail "unexpected extensions"
+  [ "$(psql "$url" -c 'SELECT count(*) FROM forensic_records')" = "0" ] || fail "the runtime login cannot read"
+  ! psql "$url" -c 'TRUNCATE forensic_records' 2> /dev/null || fail "the runtime login could TRUNCATE"
+  ! psql "postgresql://postgres@/verichron_epoch?host=$socket" -c 'SELECT 1' 2> /dev/null || fail "the OS account reached the postgres role"
+  echo "[services] ok: the database server created the database: socket only, $migrations migrations, the runtime login cannot TRUNCATE"
+
+  dbserver stop
+  ! psql "$admin" -c 'SELECT 1' 2> /dev/null || fail "the server still runs after stop"
+  again="$(dbserver ensure)" || fail "dbserver ensure failed on the second start"
+  "$node" -e 'const r = JSON.parse(process.argv[1]); if (r.created || r.database_url !== process.argv[2]) process.exit(1)' "$again" "$url" \
+    || fail "the second start did not reuse the database: $again"
+  echo "[services] ok: stopped, and started again on the same database"
+
+  psql "$admin" -c "DELETE FROM schema_migrations WHERE filename = (SELECT max(filename) FROM schema_migrations)"
+  dbserver stop
+  set +e
+  behind="$(dbserver ensure 2>&1)"
+  status=$?
+  set -e
+  [ "$status" -eq 1 ] && grep -q 'is behind this version' <<< "$behind" || fail "a database behind this version was not refused: $behind"
+  # A refused start leaves no server behind (R14).
+  ! psql "$admin" -c 'SELECT 1' 2> /dev/null || fail "the server still runs after a refused start"
+
+  # An unfinished first start, with a server still running on it as an older
+  # version would have left it: refused, and the server stopped, so removing
+  # the data and starting again works.
+  rm "$XDG_DATA_HOME/verichron-epoch/postgresql.ready"
+  "$B/postgresql/bin/pg_ctl" -D "$XDG_DATA_HOME/verichron-epoch/postgresql" -w -l "$HOME/orphan.log" \
+    -o "-c listen_addresses='' -c unix_socket_directories=$socket" start > /dev/null
+  set +e
+  unfinished="$(dbserver ensure 2>&1)"
+  status=$?
+  set -e
+  [ "$status" -eq 1 ] && grep -q 'was never finished' <<< "$unfinished" || fail "an unfinished database was not refused: $unfinished"
+  ! psql "$admin" -c 'SELECT 1' 2> /dev/null || fail "the server left on an unfinished database still runs"
+  rm -r "$XDG_DATA_HOME/verichron-epoch/postgresql"
+  fresh="$(dbserver ensure)" || fail "starting again after removing the unfinished database failed"
+  grep -q '"created":true' <<< "$fresh" || fail "starting again did not create the database: $fresh"
+  dbserver stop
+  echo "[services] ok: refused a database behind this version and an unfinished one, leaving no server running; started again cleanly"
   exit 0
 fi
 
