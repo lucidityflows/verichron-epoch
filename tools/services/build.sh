@@ -11,10 +11,11 @@
 #                      (orchestrator.mjs, processor.mjs), with the licence
 #                      comments of what they include beside them (*.LEGAL.txt)
 #
-# The services are compiled from this checkout, which must have no uncommitted
-# changes to what they include, so the bundle holds the commit's code; the
-# Node tarball is refused unless its SHA-256 is the pinned one. Needs the
-# workspace installed (mise run setup).
+# The services are compiled from this checkout, which must be at the commit
+# tools/runtime/build.sh recorded in <bundle>/COMMIT and have no uncommitted
+# changes to what the services are built from, so the whole bundle is one
+# commit's code; the Node tarball is refused unless its SHA-256 is the pinned
+# one. Needs the workspace installed (mise run setup).
 
 set -euo pipefail
 
@@ -37,10 +38,24 @@ for d in node services; do
   fi
 done
 
-# What the services include: their own sources and the workspace packages.
-changed="$(git -C "$REPO_ROOT" status --porcelain -- apps/orchestrator apps/processor packages package.json pnpm-lock.yaml)"
+# One commit for the whole bundle: the one tools/runtime/build.sh recorded.
+[ -f "$BUNDLE/COMMIT" ] || {
+  echo "[services] $BUNDLE/COMMIT is missing; run tools/runtime/build.sh $1 first" >&2
+  exit 1
+}
+recorded="$(cat "$BUNDLE/COMMIT")"
+head="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+if [ "$recorded" != "$head" ]; then
+  echo "[services] the bundle's source/ is commit $recorded, but this checkout is at $head; build both from one commit" >&2
+  exit 1
+fi
+
+# What the services are built from: their own sources, the workspace packages,
+# the dependencies, and this build itself. None may differ from the commit.
+changed="$(git -C "$REPO_ROOT" status --porcelain -- apps/orchestrator apps/processor packages \
+  package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json mise.toml tools/services)"
 if [ -n "$changed" ]; then
-  echo "[services] uncommitted changes to what the services include; commit them first:" >&2
+  echo "[services] uncommitted changes to what the services are built from; commit them first:" >&2
   echo "$changed" >&2
   exit 1
 fi

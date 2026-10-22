@@ -300,7 +300,10 @@ The orchestrator and processor are compiled into one file each
 the bundled Node, `mise.toml`'s version, from the official tarball refused unless
 its SHA-256 is the one in `tools/services/versions.env` (EPOCH-478). Only
 `bin/node` and Node's `LICENSE` ship. The services are compiled from this
-checkout, which must have no uncommitted changes to what they include.
+checkout, which must be at the commit `tools/runtime/build.sh` recorded in
+`<bundle>/COMMIT`, with no uncommitted changes to what the services are built
+from (their sources, the packages, the dependencies, and `tools/services/`
+itself), so the whole bundle is one commit's code.
 
 ```bash
 tools/runtime/build.sh <bundle>     # the Python parts the services run

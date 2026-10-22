@@ -300,6 +300,7 @@ without root; the decisions behind it are in
 | `tools/decrypt/`, `tools/ileapp/` | The decrypt and iLEAPP, each with its own environment | `tools/runtime/build.sh` |
 | `bin/` | The iPhone tools (EPOCH-472) and `sqlite3` | Assembly |
 | `postgresql/` | PostgreSQL 17, socket-only | `tools/postgres/build.sh` |
+| `COMMIT` | The commit the bundle is built from; every part's build must match it | `tools/runtime/build.sh` |
 | `MANIFEST`, `MANIFEST.sig` | Every file's SHA-256, and the owner's signature over it | Assembly; signed on the owner's machine |
 
 **Finding its parts.** One module, `packages/contracts/ts/layout.ts`, knows

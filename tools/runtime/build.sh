@@ -11,6 +11,7 @@
 #   <bundle>/python        the interpreter .python-version pins, installed by uv
 #   <bundle>/source        our Python stages, writer, report and contract files
 #   <bundle>/runtime-venv  the lockfile with no dependency groups: what runs
+#   <bundle>/COMMIT        the commit built, which the bundle's other parts must match
 #   <bundle>/tools/decrypt, <bundle>/tools/ileapp
 #                          each tool with its own environment; iLEAPP at the
 #                          submodule commit this commit records, which is
@@ -49,7 +50,7 @@ BUNDLE="$(cd "$1" && pwd)"
   echo "[runtime] no PostgreSQL at $BUNDLE/postgresql; run tools/postgres/build.sh $1 first" >&2
   exit 1
 }
-for d in python source runtime-venv tools; do
+for d in python source runtime-venv tools COMMIT; do
   if [ -e "$BUNDLE/$d" ]; then
     echo "[runtime] $BUNDLE/$d already exists; start from a bundle holding only postgresql/" >&2
     exit 1
@@ -96,5 +97,7 @@ docker run --rm \
 
 # The bundle has no git: the processor reads iLEAPP's identity from here (layout.ts).
 echo "$recorded" > "$BUNDLE/tools/ileapp/iLEAPP.commit"
+# The commit every later part must be built from (tools/services/build.sh checks it).
+git -C "$REPO_ROOT" rev-parse HEAD > "$BUNDLE/COMMIT"
 
 echo "[runtime] built: $BUNDLE/python, source, runtime-venv, tools"
