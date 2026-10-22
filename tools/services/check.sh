@@ -19,7 +19,7 @@
 #   uses; the runtime login reads but cannot TRUNCATE, and the OS account
 #   reaches no role but the two mapped. It stops, starts again on the same
 #   database, takes two overlapping starts without one stopping the other's
-#   server, and refuses a database behind this version and one whose first
+#   server, waits while another process holds its lock, and refuses a database behind this version and one whose first
 #   start never finished.
 # Assembly writes the bundle's MANIFEST (step 6); until then the check stands
 # an empty one in for it.

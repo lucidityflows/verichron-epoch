@@ -29,7 +29,8 @@ starts the printed address as `DATABASE_URL`; it runs `stop` when it quits.
 - **One at a time:** `ensure` and `stop` take the workspace lock
   (`@verichron/workspace-lock`) on `$XDG_DATA_HOME/verichron-epoch/`. An
   overlapping call waits, up to five minutes, then finds the server the first
-  one started; so a failed start can only ever stop a server it started itself.
+  one started; so of two overlapping starts, neither stops the server the
+  other started.
 - **A failed start leaves no server running:** a server this call started is
   stopped when a later step fails, and one left on an unfinished database is
   stopped before its removal is advised.
