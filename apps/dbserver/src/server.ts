@@ -129,6 +129,9 @@ export async function ensure(lay: Layout, paths: ServerPaths, osUser = os.userIn
 
   const exists = existsSync(path.join(paths.dataDir, 'PG_VERSION'));
   if (exists && !existsSync(paths.readyMarker)) {
+    // A server left running on it (by a version before this one stopped it) would
+    // hold the socket's lock and keep a fresh first start from starting.
+    stop(lay, paths);
     throw new DbServerError(
       `the database at ${paths.dataDir} was never finished: its first start stopped part-way, so it holds nothing. ` +
         `Remove ${paths.dataDir} and ${paths.readyMarker}, then start Verichron Epoch again.`
@@ -152,6 +155,9 @@ export async function ensure(lay: Layout, paths: ServerPaths, osUser = os.userIn
   }
 
   let socketDir = paths.socketDir;
+  // Set when this call started the server: a later failure stops it again, so a
+  // failed start leaves no server behind (R14) and the next start begins clean.
+  let started = false;
   if (running(lay, paths.dataDir)) {
     socketDir = runningSocketDir(paths.dataDir);
   } else {
@@ -167,8 +173,25 @@ export async function ensure(lay: Layout, paths: ServerPaths, osUser = os.userIn
       '-o',
       `-c listen_addresses='' -c unix_socket_directories='${socketDir}'`,
     ]);
+    started = true;
   }
 
+  try {
+    return await prepare(lay, paths, socketDir, created);
+  } catch (err) {
+    if (started) {
+      try {
+        stop(lay, paths);
+      } catch {
+        // The failure that stopped the start is the one to report.
+      }
+    }
+    throw err;
+  }
+}
+
+/** The running server's database: created and migrated on the first start, checked on every start. */
+async function prepare(lay: Layout, paths: ServerPaths, socketDir: string, created: boolean): Promise<Ensured> {
   const adminUrl = databaseUrl(ADMIN, socketDir);
   const appUrl = databaseUrl(APP_LOGIN, socketDir);
   if (created) {

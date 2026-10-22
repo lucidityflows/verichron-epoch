@@ -81,14 +81,26 @@ if [ "${1:-}" = run ]; then
   status=$?
   set -e
   [ "$status" -eq 1 ] && grep -q 'is behind this version' <<< "$behind" || fail "a database behind this version was not refused: $behind"
-  dbserver stop
+  # A refused start leaves no server behind (R14).
+  ! psql "$admin" -c 'SELECT 1' 2> /dev/null || fail "the server still runs after a refused start"
+
+  # An unfinished first start, with a server still running on it as an older
+  # version would have left it: refused, and the server stopped, so removing
+  # the data and starting again works.
   rm "$XDG_DATA_HOME/verichron-epoch/postgresql.ready"
+  "$B/postgresql/bin/pg_ctl" -D "$XDG_DATA_HOME/verichron-epoch/postgresql" -w -l "$HOME/orphan.log" \
+    -o "-c listen_addresses='' -c unix_socket_directories=$socket" start > /dev/null
   set +e
   unfinished="$(dbserver ensure 2>&1)"
   status=$?
   set -e
   [ "$status" -eq 1 ] && grep -q 'was never finished' <<< "$unfinished" || fail "an unfinished database was not refused: $unfinished"
-  echo "[services] ok: refused a database behind this version, and one whose first start never finished"
+  ! psql "$admin" -c 'SELECT 1' 2> /dev/null || fail "the server left on an unfinished database still runs"
+  rm -r "$XDG_DATA_HOME/verichron-epoch/postgresql"
+  fresh="$(dbserver ensure)" || fail "starting again after removing the unfinished database failed"
+  grep -q '"created":true' <<< "$fresh" || fail "starting again did not create the database: $fresh"
+  dbserver stop
+  echo "[services] ok: refused a database behind this version and an unfinished one, leaving no server running; started again cleanly"
   exit 0
 fi
 
