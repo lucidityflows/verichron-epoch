@@ -4,6 +4,7 @@
 # PATH but the base system, it runs them (`check-in-container.sh run <bundle>`).
 set -euo pipefail
 
+# Write the check failure to stderr and terminate with exit status 1.
 fail() {
   echo "[iphone] FAIL: $*" >&2
   exit 1

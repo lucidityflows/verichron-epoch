@@ -5,12 +5,14 @@ import type { Run } from './process';
 
 const BIN = '/opt/epoch/bin';
 
+/** Creates a Lab setup fixture with the listed files and a successful usbmuxd probe. */
 function setup(present: string[]) {
   const files = new Set(present);
   const run: Run = async () => ({ code: 0, output: 'usbmuxd 1.1.1\n' });
   return bundledSetup(BIN, { platform: 'linux', run, exists: (file) => files.has(file), env: {} });
 }
 
+/** Checks Lab availability against the listed files and a successful usbmuxd probe. */
 function availability(present: string[]) {
   const files = new Set(present);
   const run: Run = async () => ({ code: 0, output: 'usbmuxd 1.1.1\n' });

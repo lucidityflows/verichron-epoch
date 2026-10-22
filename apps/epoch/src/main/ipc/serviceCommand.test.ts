@@ -3,6 +3,7 @@ import { describe, it } from 'vitest';
 import type { Layout } from '@verichron/contracts';
 import { serviceCommand } from './serviceCommand';
 
+/** Creates a checkout or bundle layout fixture rooted at the supplied path. */
 function at(kind: Layout['kind'], root: string): Layout {
   const source = kind === 'bundle' ? `${root}/source` : root;
   return {

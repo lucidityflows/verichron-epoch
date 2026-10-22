@@ -176,6 +176,10 @@ async function systemRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): Pr
   return reqs;
 }
 
+/**
+ * Reports whether a known usbmuxd executable passes its version probe.
+ * macOS needs no check because it supplies its own device service.
+ */
 export async function serviceRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): Promise<ToolSetupRequirement[]> {
   if (ctx.platform === 'darwin') return []; // macOS runs its own usbmuxd
   const found = USBMUXD_PATHS.find((p) => ctx.exists(p));

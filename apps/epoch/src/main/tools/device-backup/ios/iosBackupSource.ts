@@ -96,6 +96,7 @@ function findTool(name: string): ToolAvailabilityStatus {
   return detectBinary(name, trustedToolPath(name));
 }
 
+/** Resolves pull tools, requiring all four bundled tools for Lab availability. */
 function toolBinaryPath(): { available: boolean; idevicebackup2?: string; idevice_id?: string; ideviceinfo?: string } {
   const backup2 = findTool('idevicebackup2');
   const idTool = findTool('idevice_id');
@@ -332,6 +333,7 @@ export class IosBackupSource implements DeviceBackupSource {
     return reference;
   }
 
+  /** Checks all bundled tools and host requirements in Lab, or locates idevicebackup2 in a checkout. */
   async checkToolAvailable(
     ctx?: Pick<SetupContext, 'platform' | 'run' | 'exists' | 'env'>
   ): Promise<ToolAvailabilityStatus> {

@@ -19,6 +19,7 @@ export const USBMUXD_UDEV_RULES = '/usr/lib/udev/rules.d/39-usbmuxd.rules';
 /** In the Lab bundle the tools are never installed by the app, only found. */
 const NOT_IN_LAB = 'The Lab build installs nothing: its iPhone tools are part of the bundle.';
 
+/** Supplies the running host's platform, process runner, file lookup and environment for Lab checks. */
 export function defaultBundledContext(): Pick<SetupContext, 'platform' | 'run' | 'exists' | 'env'> {
   return {
     platform: process.platform,
@@ -40,6 +41,7 @@ export function bundledSetup(
   bin: string,
   ctx: Pick<SetupContext, 'platform' | 'run' | 'exists' | 'env'> = defaultBundledContext()
 ): GuidedToolSetup {
+  /** Lists bundled tools and host requirements, with manual installation guidance for missing host steps. */
   const status = async (): Promise<ToolSetupStatus> => {
     const service = await serviceRequirements(ctx as SetupContext, ctx.env);
     const udev: ToolSetupRequirement = {
@@ -81,6 +83,7 @@ export function bundledSetup(
       canResume: false,
     };
   };
+  /** Rejects install and build requests because the Lab bundle supplies prebuilt tools. */
   const refuse = async (): Promise<ToolSetupResult> => {
     throw new Error(NOT_IN_LAB);
   };
@@ -99,6 +102,7 @@ export function labAvailability(status: ToolSetupStatus, bin: string): ToolAvail
   return { available: true, path: path.join(bin, 'idevicebackup2') };
 }
 
+/** Probes the Lab setup and returns the backup tool's path or names unmet requirements. */
 export async function bundledAvailability(
   bin: string,
   ctx: Pick<SetupContext, 'platform' | 'run' | 'exists' | 'env'> = defaultBundledContext()

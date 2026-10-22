@@ -44,6 +44,10 @@ export interface Config {
   output: OutputMode;
 }
 
+/**
+ * Parses processor arguments with defaults from the current layout, validates
+ * output mode and timeouts, and exits for help or invalid required options.
+ */
 export function parseFlags(): Config {
   const home = os.homedir();
 
@@ -113,6 +117,7 @@ export function parseFlags(): Config {
   };
 }
 
+/** Writes processor options and their defaults to stderr. */
 function printUsage() {
   console.error(`Usage: processor --source <dir> [options]
 

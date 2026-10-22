@@ -64,6 +64,7 @@ fi
 
 CACHE="$HERE/.cache"
 mkdir -p "$CACHE"
+# Fetch <url> into CACHE/<file> if absent, publishing the download only once curl succeeds.
 fetch() { # <url> <file>
   if [ ! -f "$CACHE/$2" ]; then
     echo "[iphone] downloading $2"
