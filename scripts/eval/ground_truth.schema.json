@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Verichron private ground-truth labels",
+  "type": "object",
+  "required": ["schema_version", "labels"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "labels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "label_id",
+          "record_ref",
+          "timestamp_utc",
+          "process",
+          "category",
+          "anomaly",
+          "verification"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "label_id": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "record_ref": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "timestamp_utc": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+          },
+          "process": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "category": {
+            "enum": ["network", "process", "crash", "shutdown"]
+          },
+          "anomaly": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "verification": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        }
+      }
+    }
+  }
+}
