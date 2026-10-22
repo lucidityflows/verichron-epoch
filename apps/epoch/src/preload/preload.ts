@@ -1,234 +1,28 @@
-import type { EntityValueQuery, ForensicRecordQuery } from '@verichron/etl-db-reader';
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Backup } from '@verichron/contracts';
 import type {
-  AnalysisRunStatus,
-  AnalysisState,
-  PipelineLogEntry,
-  ReadTaskLog,
-  TaskLogSummary,
-  PrepareState,
-  BackupDescription,
-  PullLogState,
-  ReportResult,
-  AppSettings,
-} from '../shared/types/window';
-import type {
-  BackupProgress,
-  CrashReportsResult,
-  CrashReportsRetryLookup,
-  DeviceInfo,
-  PullOptions,
-  BackupStats,
-  DevicePullState,
-  IncompleteBackup,
-  ToolAcquisitionAction,
-  ToolAcquisitionCommand,
-  ToolAcquisitionResult,
-  ToolSetupEvent,
-  ToolSetupResult,
-  ToolSetupStatus,
-  ToolAvailabilityStatus,
-} from '../shared/types/tools';
+  EventChannel,
+  EventPayload,
+  EpochBridge,
+  InvokeArgs,
+  InvokeChannel,
+  InvokeResult,
+} from '../shared/ipc/channels';
 
-// This file previously created its own `pg.Pool` and issued its own SQL
-// directly from the preload script, bypassing main.ts's `ipcMain.handle`
-// channels entirely -- those handlers existed but nothing ever called
-// them. main.ts's comment already documented the reason this shape is
-// wrong (a sandboxed preload script can't reliably resolve the Node core
-// modules `pg` needs, which previously crashed the renderer to a white
-// screen); this file just hadn't been updated to match. There is now
-// exactly one Pool in the app, owned by main.ts, and this file only
-// relays IPC calls to it.
-interface StartPipelineOptions {
-  workspace?: string;
-  forceDecrypt?: boolean;
-  only?: string[];
-}
-
-const dbApi = {
+const epochBridge: EpochBridge = {
   platform: process.platform,
-  selectBackupDirectory: () => ipcRenderer.invoke('epoch:selectBackupDirectory'),
-  selectDeviceBackupDestination: (): Promise<string | null> =>
-    ipcRenderer.invoke('epoch:selectDeviceBackupDestination'),
-  discoverBackups: (source: string): Promise<Backup[]> => ipcRenderer.invoke('epoch:discoverBackups', source),
-  describeBackups: (paths: string[]): Promise<BackupDescription[]> =>
-    ipcRenderer.invoke('epoch:describeBackups', paths),
-  displayPath: (folder: string): Promise<string> => ipcRenderer.invoke('epoch:displayPath', folder),
-  getPreparedBackups: (workspace?: string) => ipcRenderer.invoke('epoch:getPreparedBackups', workspace),
-  startPipeline: (source: string, options?: StartPipelineOptions): Promise<{ started: boolean; workspace: string }> =>
-    ipcRenderer.invoke('epoch:startPipeline', source, options),
-  submitBackupPassword: (password: string) => ipcRenderer.invoke('epoch:submitBackupPassword', password),
-  onPrepareLog: (callback: (entry: PipelineLogEntry) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, entry: PipelineLogEntry) => callback(entry);
-    ipcRenderer.on('epoch:prepareLog', listener);
-    return () => ipcRenderer.removeListener('epoch:prepareLog', listener);
-  },
-  // EPOCH-487: Prepare Evidence's state lives in the main process, so a
-  // remounted New Investigation reads it here and follows its changes.
-  getPrepareState: (): Promise<PrepareState> => ipcRenderer.invoke('epoch:getPrepareState'),
-  onPrepareState: (callback: (state: PrepareState) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, state: PrepareState) => callback(state);
-    ipcRenderer.on('epoch:prepareState', listener);
-    return () => ipcRenderer.removeListener('epoch:prepareState', listener);
-  },
-  getPipelineRuns: () => ipcRenderer.invoke('epoch:getPipelineRuns'),
-  getStageStatus: (runId: string) => ipcRenderer.invoke('epoch:getStageStatus', runId),
-  getStageFailures: (runId: string, stageName: string) =>
-    ipcRenderer.invoke('epoch:getStageFailures', runId, stageName),
-  getStillFailing: (runId: string) => ipcRenderer.invoke('epoch:getStillFailing', runId),
-  getInterruptedStages: (runId: string) => ipcRenderer.invoke('epoch:getInterruptedStages', runId),
-  getForensicRecords: (runId: string, query?: ForensicRecordQuery) =>
-    ipcRenderer.invoke('epoch:getForensicRecords', runId, query),
-  getRecordFacets: (runId: string, query?: ForensicRecordQuery) =>
-    ipcRenderer.invoke('epoch:getRecordFacets', runId, query),
-  getEvidenceCompleteness: (runId: string) => ipcRenderer.invoke('epoch:getEvidenceCompleteness', runId),
-  getRecordDetail: (runId: string, recordId: string) => ipcRenderer.invoke('epoch:getRecordDetail', runId, recordId),
-  getEntityOverview: (runId: string) => ipcRenderer.invoke('epoch:getEntityOverview', runId),
-  getTimelineOverview: (runId: string) => ipcRenderer.invoke('epoch:getTimelineOverview', runId),
-  getRecordContextWindow: (runId: string, recordId: string) =>
-    ipcRenderer.invoke('epoch:getRecordContextWindow', runId, recordId),
-  getTimelineDensity: (runId: string, boundaries: string[]) =>
-    ipcRenderer.invoke('epoch:getTimelineDensity', runId, boundaries),
-  getTimelineRecords: (runId: string, from: string, before: string) =>
-    ipcRenderer.invoke('epoch:getTimelineRecords', runId, from, before),
-  getEntityValues: (runId: string, kind: string, query?: EntityValueQuery) =>
-    ipcRenderer.invoke('epoch:getEntityValues', runId, kind, query),
-  getIndicatorResults: (runId: string) => ipcRenderer.invoke('epoch:getIndicatorResults', runId),
-  getReport: (runId: string): Promise<ReportResult> => ipcRenderer.invoke('epoch:getReport', runId),
-  openReport: (runId: string): Promise<boolean> => ipcRenderer.invoke('epoch:openReport', runId),
 
-  // Stage 3: runs the orchestrator on the selected backups in `workspace`,
-  // each checked to be prepared there (EPOCH-530).
-  startAnalysis: (workspace: string, labels: string[]): Promise<{ started: boolean }> =>
-    ipcRenderer.invoke('epoch:startAnalysis', workspace, labels),
-  // EPOCH-308: retries the evidence for a run from its current workspace manifest entry.
-  retryRun: (runId: string): Promise<{ started: boolean }> => ipcRenderer.invoke('epoch:retryRun', runId),
-  checkIndicators: (runId: string): Promise<{ started: boolean }> => ipcRenderer.invoke('epoch:checkIndicators', runId),
-  // EPOCH-305: lets the renderer break out of a stalled/deadlocked run
-  // without restarting the app. Resolves { cancelled: false } (rather than
-  // rejecting) when nothing was actually running, since "there was nothing
-  // to cancel" isn't an error condition for a Cancel button that may be
-  // clicked in a race with the run finishing on its own.
-  cancelAnalysis: (): Promise<{ cancelled: boolean }> => ipcRenderer.invoke('epoch:cancelAnalysis'),
-  // EPOCH-554: Stop on Preparing.
-  cancelPrepare: (): Promise<{ cancelled: boolean }> => ipcRenderer.invoke('epoch:cancelPrepare'),
-  // EPOCH-305: cross-references a workspace against both the in-memory
-  // "is anything actually running right now" state and the Postgres
-  // pipeline_runs table, so a remounted WorkspaceView can tell "fresh",
-  // "still running", and "interrupted by a past crash" apart instead of
-  // guessing from nothing.
-  getAnalysisRunStatus: (workspace: string): Promise<AnalysisRunStatus> =>
-    ipcRenderer.invoke('epoch:getAnalysisRunStatus', workspace),
-  onOrchestratorLog: (callback: (entry: PipelineLogEntry) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, entry: PipelineLogEntry) => callback(entry);
-    ipcRenderer.on('epoch:orchestratorLog', listener);
-    return () => ipcRenderer.removeListener('epoch:orchestratorLog', listener);
-  },
-  // EPOCH-487: Analyze's state, kept in the main process like Prepare Evidence's.
-  getAnalysisState: (): Promise<AnalysisState> => ipcRenderer.invoke('epoch:getAnalysisState'),
-  // EPOCH-570: the workspace's saved task logs.
-  listTaskLogs: (workspace: string): Promise<TaskLogSummary[]> => ipcRenderer.invoke('epoch:listTaskLogs', workspace),
-  readTaskLog: (workspace: string, file: string): Promise<ReadTaskLog> =>
-    ipcRenderer.invoke('epoch:readTaskLog', workspace, file),
-  saveTaskLogAs: (workspace: string, file: string): Promise<{ saved: string | null }> =>
-    ipcRenderer.invoke('epoch:saveTaskLogAs', workspace, file),
-  popOutActivityLog: (): Promise<void> => ipcRenderer.invoke('epoch:popOutActivityLog'),
-  // EPOCH-560: the examiner's settings, kept by the main process.
-  getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('epoch:getSettings'),
-  getDisplayZones: (): Promise<string[]> => ipcRenderer.invoke('epoch:getDisplayZones'),
-  setDisplayZone: (zone: string): Promise<AppSettings> => ipcRenderer.invoke('epoch:setDisplayZone', zone),
-  rememberBackupsFolder: (folder: string): Promise<AppSettings> =>
-    ipcRenderer.invoke('epoch:rememberBackupsFolder', folder),
-  onSettingsChanged: (callback: (settings: AppSettings) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, settings: AppSettings) => callback(settings);
-    ipcRenderer.on('epoch:settingsChanged', listener);
-    return () => ipcRenderer.removeListener('epoch:settingsChanged', listener);
-  },
-  onAnalysisState: (callback: (state: AnalysisState) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, state: AnalysisState) => callback(state);
-    ipcRenderer.on('epoch:analysisState', listener);
-    return () => ipcRenderer.removeListener('epoch:analysisState', listener);
-  },
-  // EPOCH-436: the iPhone pull's task log, kept in the main process like Prepare's.
-  getPullLogState: (): Promise<PullLogState> => ipcRenderer.invoke('epoch:getPullLogState'),
-  onPullLogState: (callback: (state: PullLogState) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, state: PullLogState) => callback(state);
-    ipcRenderer.on('epoch:pullLogState', listener);
-    return () => ipcRenderer.removeListener('epoch:pullLogState', listener);
-  },
-  onPullLog: (callback: (entry: PipelineLogEntry) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, entry: PipelineLogEntry) => callback(entry);
-    ipcRenderer.on('epoch:pullLog', listener);
-    return () => ipcRenderer.removeListener('epoch:pullLog', listener);
+  invoke<Channel extends InvokeChannel>(
+    channel: Channel,
+    ...args: InvokeArgs<Channel>
+  ): Promise<InvokeResult<Channel>> {
+    return ipcRenderer.invoke(channel, ...args);
   },
 
-  // Device backup acquisition -- see apps/epoch/src/tools/device-backup.
-  listDeviceBackupSources: (): Promise<Array<{ id: string; label: string }>> =>
-    ipcRenderer.invoke('epoch:listDeviceBackupSources'),
-  checkDeviceBackupToolAvailable: (sourceId: string): Promise<ToolAvailabilityStatus> =>
-    ipcRenderer.invoke('epoch:checkDeviceBackupToolAvailable', sourceId),
-  listConnectedDevices: (sourceId: string): Promise<DeviceInfo[]> =>
-    ipcRenderer.invoke('epoch:listConnectedDevices', sourceId),
-  getToolAcquisitionActions: (sourceId: string): Promise<ToolAcquisitionAction[]> =>
-    ipcRenderer.invoke('epoch:getToolAcquisitionActions', sourceId),
-  getDevicePullState: (): Promise<DevicePullState | null> => ipcRenderer.invoke('epoch:getDevicePullState'),
-  getBackupEncryption: (sourceId: string, device: DeviceInfo): Promise<boolean> =>
-    ipcRenderer.invoke('epoch:getBackupEncryption', sourceId, device),
-  pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions): Promise<string> =>
-    ipcRenderer.invoke('epoch:pullDeviceBackup', sourceId, device, destDir, options),
-  cancelDeviceBackup: (sourceId: string): Promise<boolean> => ipcRenderer.invoke('epoch:cancelDeviceBackup', sourceId),
-  listIncompleteBackups: (sourceId: string, device: DeviceInfo, destDir: string | null): Promise<IncompleteBackup[]> =>
-    ipcRenderer.invoke('epoch:listIncompleteBackups', sourceId, device, destDir),
-  deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo): Promise<void> =>
-    ipcRenderer.invoke('epoch:deleteIncompleteBackup', sourceId, destDir, device),
-  copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string): Promise<CrashReportsResult> =>
-    ipcRenderer.invoke('epoch:copyDeviceCrashReports', sourceId, device, backupDir),
-  copyDeviceCrashReportsByReference: (
-    sourceId: string,
-    deviceRef: string,
-    backupDir: string
-  ): Promise<CrashReportsResult> =>
-    ipcRenderer.invoke('epoch:copyDeviceCrashReportsByReference', sourceId, deviceRef, backupDir),
-  findCrashReportsRetryTargets: (sourceId: string, backupDirs: string[]): Promise<CrashReportsRetryLookup> =>
-    ipcRenderer.invoke('epoch:findCrashReportsRetryTargets', sourceId, backupDirs),
-  onDeviceBackupStats: (callback: (stats: BackupStats) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, stats: BackupStats) => callback(stats);
-    ipcRenderer.on('epoch:deviceBackupStats', listener);
-    return () => ipcRenderer.removeListener('epoch:deviceBackupStats', listener);
-  },
-  runToolAcquisitionSteps: (steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> =>
-    ipcRenderer.invoke('epoch:runToolAcquisitionSteps', steps, installPrefix),
-  getToolSetupStatus: (sourceId: string): Promise<ToolSetupStatus | null> =>
-    ipcRenderer.invoke('epoch:getToolSetupStatus', sourceId),
-  installToolSetupRequirements: (sourceId: string): Promise<ToolSetupResult> =>
-    ipcRenderer.invoke('epoch:installToolSetupRequirements', sourceId),
-  buildToolSetup: (sourceId: string): Promise<ToolSetupResult> => ipcRenderer.invoke('epoch:buildToolSetup', sourceId),
-  onToolSetupEvent: (callback: (event: ToolSetupEvent) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, event: ToolSetupEvent) => callback(event);
-    ipcRenderer.on('epoch:toolSetupEvent', listener);
-    return () => ipcRenderer.removeListener('epoch:toolSetupEvent', listener);
-  },
-  onDeviceBackupProgress: (callback: (progress: BackupProgress) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, progress: BackupProgress) => callback(progress);
-    ipcRenderer.on('epoch:deviceBackupProgress', listener);
-    return () => ipcRenderer.removeListener('epoch:deviceBackupProgress', listener);
-  },
-  onToolAcquisitionStepStarted: (callback: (label: string) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, label: string) => callback(label);
-    ipcRenderer.on('epoch:toolAcquisitionStepStarted', listener);
-    return () => ipcRenderer.removeListener('epoch:toolAcquisitionStepStarted', listener);
-  },
-  onToolAcquisitionOutput: (callback: (entry: { step: string; line: string }) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, entry: { step: string; line: string }) => callback(entry);
-    ipcRenderer.on('epoch:toolAcquisitionOutput', listener);
-    return () => ipcRenderer.removeListener('epoch:toolAcquisitionOutput', listener);
-  },
-  onToolAcquisitionFinished: (callback: (result: ToolAcquisitionResult) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, result: ToolAcquisitionResult) => callback(result);
-    ipcRenderer.on('epoch:toolAcquisitionFinished', listener);
-    return () => ipcRenderer.removeListener('epoch:toolAcquisitionFinished', listener);
+  on<Channel extends EventChannel>(channel: Channel, callback: (payload: EventPayload<Channel>) => void): () => void {
+    const listener = (_event: Electron.IpcRendererEvent, payload: EventPayload<Channel>) => callback(payload);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
   },
 };
 
-contextBridge.exposeInMainWorld('epoch', dbApi);
+contextBridge.exposeInMainWorld('epoch', epochBridge);

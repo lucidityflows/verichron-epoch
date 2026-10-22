@@ -35,9 +35,9 @@ export function useActivityLog(): ActivityLogSource {
     let active = true;
     (async () => {
       const { workspace } = await pipelineApi.getPreparedBackups();
-      const [newest] = await window.epoch.listTaskLogs(workspace);
+      const [newest] = await pipelineApi.listTaskLogs(workspace);
       if (!newest) return;
-      const read = await window.epoch.readTaskLog(workspace, newest.file);
+      const read = await pipelineApi.readTaskLog(workspace, newest.file);
       if (active) setSaved({ workspace, file: newest.file, entries: read.entries });
     })().catch((err: unknown) => {
       if (active) setError(`The last saved log could not be read: ${err instanceof Error ? err.message : String(err)}`);

@@ -1,8 +1,10 @@
+import { invokeIpc } from './ipc';
+import type { AppSettings } from '../../shared/types/window';
+
 export const settingsApi = {
-  getSettings: () => window.epoch.getSettings(),
-  getDisplayZones: () => window.epoch.getDisplayZones(),
-  setDisplayZone: (zone: string) => window.epoch.setDisplayZone(zone),
-  rememberBackupsFolder: (folder: string) => window.epoch.rememberBackupsFolder(folder),
-  onSettingsChanged: (callback: Parameters<typeof window.epoch.onSettingsChanged>[0]) =>
-    window.epoch.onSettingsChanged(callback),
+  getSettings: () => invokeIpc('epoch:getSettings'),
+  getDisplayZones: () => invokeIpc('epoch:getDisplayZones'),
+  setDisplayZone: (zone: string) => invokeIpc('epoch:setDisplayZone', zone),
+  rememberBackupsFolder: (folder: string) => invokeIpc('epoch:rememberBackupsFolder', folder),
+  onSettingsChanged: (callback: (settings: AppSettings) => void) => window.epoch.on('epoch:settingsChanged', callback),
 };

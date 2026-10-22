@@ -185,13 +185,14 @@ const answers: Record<string, unknown> = {
 };
 
 // Every other call answers as an idle main process does; a subscription returns its unsubscribe.
-vi.stubGlobal(
-  'epoch',
-  new Proxy(answers, {
-    get: (target, name: string) =>
-      name in target ? target[name] : name.startsWith('on') ? () => () => undefined : async () => null,
-  })
-);
+vi.stubGlobal('epoch', {
+  invoke: async (channel: string, ...args: unknown[]) => {
+    const name = channel.slice('epoch:'.length);
+    const answer = answers[name];
+    return typeof answer === 'function' ? answer(...args) : (answer ?? null);
+  },
+  on: () => () => undefined,
+});
 
 beforeAll(() => {
   // jsdom has no layout: give the virtualized table a size so it renders rows.

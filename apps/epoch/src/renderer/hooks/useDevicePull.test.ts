@@ -32,6 +32,9 @@ const toasts: string[] = [];
 vi.mock('../components/ui/Toast', () => ({ useToast: () => ({ show: (message: string) => toasts.push(message) }) }));
 vi.mock('../api/devices', () => ({
   devicesApi: {
+    listDeviceBackupSources: async () => [{ id: 'ios', label: 'iPhone' }],
+    checkDeviceBackupToolAvailable: async () => ({ available: true }),
+    listConnectedDevices: async () => [IPHONE],
     getDevicePullState: async () => null,
     getToolSetupStatus: async () => null,
     selectDeviceBackupDestination: async () => '/pulls',
@@ -45,17 +48,11 @@ vi.mock('../api/devices', () => ({
     onDeviceBackupProgress: (cb: (p: BackupProgress) => void) => ((progress = cb), () => undefined),
     onDeviceBackupStats: () => () => undefined,
     onToolAcquisitionOutput: () => () => undefined,
+    onToolAcquisitionStepStarted: () => () => undefined,
     onToolAcquisitionFinished: () => () => undefined,
     onToolSetupEvent: () => () => undefined,
   },
 }));
-
-vi.stubGlobal('epoch', {
-  listDeviceBackupSources: async () => [{ id: 'ios', label: 'iPhone' }],
-  checkDeviceBackupToolAvailable: async () => ({ available: true }),
-  listConnectedDevices: async () => [IPHONE],
-  onToolAcquisitionStepStarted: () => () => undefined,
-});
 
 import { useDevicePull } from './useDevicePull';
 

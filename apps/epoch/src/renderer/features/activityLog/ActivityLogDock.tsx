@@ -1,6 +1,7 @@
 import { useToast } from '../../components/ui/Toast';
 import { ActivityLog } from './ActivityLog';
 import { useActivityLog } from './useActivityLog';
+import { pipelineApi } from '../../api/pipeline';
 
 /** The Activity Log docked at the bottom of the content area, for the task New Investigation runs (EPOCH-570). */
 export function ActivityLogDock() {
@@ -20,7 +21,7 @@ function ActivityLogFor({ source, mode }: { source: ReturnType<typeof useActivit
   const saveAs =
     workspace && file
       ? () =>
-          window.epoch.saveTaskLogAs(workspace, file).then(
+          pipelineApi.saveTaskLogAs(workspace, file).then(
             ({ saved }) => saved && show(`Activity Log saved to ${saved}`, 'success'),
             (err: unknown) =>
               show(`The Activity Log could not be saved: ${err instanceof Error ? err.message : String(err)}`, 'danger')
@@ -33,7 +34,7 @@ function ActivityLogFor({ source, mode }: { source: ReturnType<typeof useActivit
       error={source.error}
       mode={mode}
       onSaveAs={saveAs}
-      onPopOut={mode === 'docked' ? () => void window.epoch.popOutActivityLog() : undefined}
+      onPopOut={mode === 'docked' ? () => void pipelineApi.popOutActivityLog() : undefined}
     />
   );
 }

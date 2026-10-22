@@ -11,44 +11,47 @@ import type {
   BackupProgress,
   CrashReportsRetryLookup,
 } from '../../shared/types/tools';
+import { invokeIpc } from './ipc';
 
 export const devicesApi = {
-  listDeviceBackupSources: () => window.epoch.listDeviceBackupSources(),
-  checkDeviceBackupToolAvailable: (sourceId: string) => window.epoch.checkDeviceBackupToolAvailable(sourceId),
-  listConnectedDevices: (sourceId: string) => window.epoch.listConnectedDevices(sourceId),
+  listDeviceBackupSources: () => invokeIpc('epoch:listDeviceBackupSources'),
+  checkDeviceBackupToolAvailable: (sourceId: string) => invokeIpc('epoch:checkDeviceBackupToolAvailable', sourceId),
+  listConnectedDevices: (sourceId: string) => invokeIpc('epoch:listConnectedDevices', sourceId),
   getToolAcquisitionActions: (sourceId: string): Promise<ToolAcquisitionAction[]> =>
-    window.epoch.getToolAcquisitionActions(sourceId),
-  selectDeviceBackupDestination: () => window.epoch.selectDeviceBackupDestination(),
-  getDevicePullState: () => window.epoch.getDevicePullState(),
-  getBackupEncryption: (sourceId: string, device: DeviceInfo) => window.epoch.getBackupEncryption(sourceId, device),
+    invokeIpc('epoch:getToolAcquisitionActions', sourceId),
+  selectDeviceBackupDestination: () => invokeIpc('epoch:selectDeviceBackupDestination'),
+  getDevicePullState: () => invokeIpc('epoch:getDevicePullState'),
+  getBackupEncryption: (sourceId: string, device: DeviceInfo) =>
+    invokeIpc('epoch:getBackupEncryption', sourceId, device),
   pullDeviceBackup: (sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) =>
-    window.epoch.pullDeviceBackup(sourceId, device, destDir, options),
-  cancelDeviceBackup: (sourceId: string) => window.epoch.cancelDeviceBackup(sourceId),
+    invokeIpc('epoch:pullDeviceBackup', sourceId, device, destDir, options),
+  cancelDeviceBackup: (sourceId: string) => invokeIpc('epoch:cancelDeviceBackup', sourceId),
   listIncompleteBackups: (sourceId: string, device: DeviceInfo, destDir: string | null) =>
-    window.epoch.listIncompleteBackups(sourceId, device, destDir),
+    invokeIpc('epoch:listIncompleteBackups', sourceId, device, destDir),
   deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) =>
-    window.epoch.deleteIncompleteBackup(sourceId, destDir, device),
+    invokeIpc('epoch:deleteIncompleteBackup', sourceId, destDir, device),
   copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string) =>
-    window.epoch.copyDeviceCrashReports(sourceId, device, backupDir),
+    invokeIpc('epoch:copyDeviceCrashReports', sourceId, device, backupDir),
   copyDeviceCrashReportsByReference: (sourceId: string, deviceRef: string, backupDir: string) =>
-    window.epoch.copyDeviceCrashReportsByReference(sourceId, deviceRef, backupDir),
+    invokeIpc('epoch:copyDeviceCrashReportsByReference', sourceId, deviceRef, backupDir),
   findCrashReportsRetryTargets: (sourceId: string, backupDirs: string[]): Promise<CrashReportsRetryLookup> =>
-    window.epoch.findCrashReportsRetryTargets(sourceId, backupDirs),
-  onDeviceBackupStats: (callback: (stats: BackupStats) => void) => window.epoch.onDeviceBackupStats(callback),
+    invokeIpc('epoch:findCrashReportsRetryTargets', sourceId, backupDirs),
+  onDeviceBackupStats: (callback: (stats: BackupStats) => void) => window.epoch.on('epoch:deviceBackupStats', callback),
   runToolAcquisitionSteps: (steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> =>
-    window.epoch.runToolAcquisitionSteps(steps, installPrefix),
-  getToolSetupStatus: (sourceId: string): Promise<ToolSetupStatus | null> => window.epoch.getToolSetupStatus(sourceId),
+    invokeIpc('epoch:runToolAcquisitionSteps', steps, installPrefix),
+  getToolSetupStatus: (sourceId: string): Promise<ToolSetupStatus | null> =>
+    invokeIpc('epoch:getToolSetupStatus', sourceId),
   installToolSetupRequirements: (sourceId: string): Promise<ToolSetupResult> =>
-    window.epoch.installToolSetupRequirements(sourceId),
-  buildToolSetup: (sourceId: string): Promise<ToolSetupResult> => window.epoch.buildToolSetup(sourceId),
-  onToolSetupEvent: (callback: (event: ToolSetupEvent) => void) => window.epoch.onToolSetupEvent(callback),
+    invokeIpc('epoch:installToolSetupRequirements', sourceId),
+  buildToolSetup: (sourceId: string): Promise<ToolSetupResult> => invokeIpc('epoch:buildToolSetup', sourceId),
+  onToolSetupEvent: (callback: (event: ToolSetupEvent) => void) => window.epoch.on('epoch:toolSetupEvent', callback),
 
   onDeviceBackupProgress: (callback: (progress: BackupProgress) => void) =>
-    window.epoch.onDeviceBackupProgress(callback),
+    window.epoch.on('epoch:deviceBackupProgress', callback),
   onToolAcquisitionStepStarted: (callback: (label: string) => void) =>
-    window.epoch.onToolAcquisitionStepStarted(callback),
+    window.epoch.on('epoch:toolAcquisitionStepStarted', callback),
   onToolAcquisitionOutput: (callback: (entry: { step: string; line: string }) => void) =>
-    window.epoch.onToolAcquisitionOutput(callback),
+    window.epoch.on('epoch:toolAcquisitionOutput', callback),
   onToolAcquisitionFinished: (callback: (result: ToolAcquisitionResult) => void) =>
-    window.epoch.onToolAcquisitionFinished(callback),
+    window.epoch.on('epoch:toolAcquisitionFinished', callback),
 };

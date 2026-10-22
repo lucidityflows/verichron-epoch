@@ -1,4 +1,4 @@
-import { app, ipcMain, dialog, BrowserWindow } from 'electron';
+import { app, dialog, BrowserWindow } from 'electron';
 import {
   addPullDestination,
   pullFolderName,
@@ -32,6 +32,8 @@ import type {
   ToolSetupResult,
   ToolSetupStatus,
 } from '../../shared/types/tools';
+import { handleIpc, sendIpcEvent } from './typedIpc';
+import type { EventChannel, EventPayload } from '../../shared/ipc/channels';
 
 export function registerDeviceHandlers(
   getMainWindow: () => BrowserWindow | null,
@@ -47,12 +49,14 @@ export function registerDeviceHandlers(
 
   // To the main window and every pop-out, as Prepare and Analyze do, so a
   // popped-out Activity Log follows a pull too (EPOCH-436).
-  function sendToRenderer(channel: string, ...args: unknown[]) {
+  function sendToRenderer<Channel extends EventChannel>(channel: Channel, payload: EventPayload<Channel>): void {
     const win = getMainWindow();
-    for (const target of [...(win ? [win] : []), ...popOutWindows()]) target.webContents.send(channel, ...args);
+    for (const target of [...(win ? [win] : []), ...popOutWindows()]) {
+      sendIpcEvent(target.webContents, channel, payload);
+    }
   }
 
-  ipcMain.handle('epoch:selectDeviceBackupDestination', async () => {
+  handleIpc('epoch:selectDeviceBackupDestination', async () => {
     const mainWindow = getMainWindow();
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -63,17 +67,17 @@ export function registerDeviceHandlers(
     return result.filePaths[0];
   });
 
-  ipcMain.handle('epoch:listDeviceBackupSources', async () => {
+  handleIpc('epoch:listDeviceBackupSources', async () => {
     return listDeviceBackupSources().map((source) => ({ id: source.id, label: source.label }));
   });
 
-  ipcMain.handle('epoch:checkDeviceBackupToolAvailable', async (_event, sourceId: string) => {
+  handleIpc('epoch:checkDeviceBackupToolAvailable', async (_event, sourceId: string) => {
     const source = getDeviceBackupSource(sourceId);
     if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
     return source.checkToolAvailable();
   });
 
-  ipcMain.handle('epoch:listConnectedDevices', async (_event, sourceId: string) => {
+  handleIpc('epoch:listConnectedDevices', async (_event, sourceId: string) => {
     const source = getDeviceBackupSource(sourceId);
     if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
     // No device queries during a pull (EPOCH-467): the device being backed up is the one listed.
@@ -82,16 +86,16 @@ export function registerDeviceHandlers(
     return source.listConnectedDevices();
   });
 
-  ipcMain.handle('epoch:getToolAcquisitionActions', async (_event, sourceId: string) => {
+  handleIpc('epoch:getToolAcquisitionActions', async (_event, sourceId: string) => {
     const strategy = getAcquisitionStrategy(sourceId);
     if (!strategy) throw new Error(`Unknown device backup source: ${sourceId}`);
     return strategy.availableActions();
   });
 
-  ipcMain.handle('epoch:getDevicePullState', async (): Promise<DevicePullState | null> => pull.current());
-  ipcMain.handle('epoch:getPullLogState', async () => pullLog.snapshot());
+  handleIpc('epoch:getDevicePullState', async (): Promise<DevicePullState | null> => pull.current());
+  handleIpc('epoch:getPullLogState', async () => pullLog.snapshot());
 
-  ipcMain.handle('epoch:getBackupEncryption', async (_event, sourceId: string, device: DeviceInfo) => {
+  handleIpc('epoch:getBackupEncryption', async (_event, sourceId: string, device: DeviceInfo) => {
     // A device query during a backup would compete with it for the device.
     if (pull.running()) throw new Error('A device backup is running. Wait for it to finish or cancel it first.');
     const source = getDeviceBackupSource(sourceId);
@@ -99,7 +103,7 @@ export function registerDeviceHandlers(
     return source.backupEncryptionEnabled(device);
   });
 
-  ipcMain.handle('epoch:cancelDeviceBackup', async (_event, sourceId: string) => {
+  handleIpc('epoch:cancelDeviceBackup', async (_event, sourceId: string) => {
     const source = getDeviceBackupSource(sourceId);
     if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
     // Only a stop that happened makes the pull's outcome "cancelled"; a refused
@@ -111,7 +115,7 @@ export function registerDeviceHandlers(
 
   // Incomplete backups in every folder pulls have written to, plus the
   // chosen one, so leftovers are found after the user picks another folder.
-  ipcMain.handle(
+  handleIpc(
     'epoch:listIncompleteBackups',
     async (_event, sourceId: string, device: DeviceInfo, destDir: string | null): Promise<IncompleteBackup[]> => {
       const source = getDeviceBackupSource(sourceId);
@@ -129,31 +133,25 @@ export function registerDeviceHandlers(
     }
   );
 
-  ipcMain.handle(
-    'epoch:deleteIncompleteBackup',
-    async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
-      if (pull.running()) throw new Error('A device backup is running; cancel it before deleting.');
-      const source = getDeviceBackupSource(sourceId);
-      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
-      // Only a folder an earlier pull wrote to, so the renderer can't name an arbitrary one.
-      const known = await readPullDestinations(app.getPath('userData'));
-      if (!known.includes(destDir)) throw new Error(`${destDir} isn't a folder Epoch has pulled a backup to.`);
-      return source.deleteIncompleteBackup(destDir, device);
-    }
-  );
+  handleIpc('epoch:deleteIncompleteBackup', async (_event, sourceId: string, destDir: string, device: DeviceInfo) => {
+    if (pull.running()) throw new Error('A device backup is running; cancel it before deleting.');
+    const source = getDeviceBackupSource(sourceId);
+    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    // Only a folder an earlier pull wrote to, so the renderer can't name an arbitrary one.
+    const known = await readPullDestinations(app.getPath('userData'));
+    if (!known.includes(destDir)) throw new Error(`${destDir} isn't a folder Epoch has pulled a backup to.`);
+    return source.deleteIncompleteBackup(destDir, device);
+  });
 
   // EPOCH-519: crash logs copied again for a finished backup after a failed copy.
-  ipcMain.handle(
-    'epoch:copyDeviceCrashReports',
-    async (_event, sourceId: string, device: DeviceInfo, backupDir: string) => {
-      if (pull.running()) throw new Error('A device backup is running; wait for it to finish.');
-      const source = getDeviceBackupSource(sourceId);
-      if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
-      return source.copyCrashReportsAgain(device, backupDir);
-    }
-  );
+  handleIpc('epoch:copyDeviceCrashReports', async (_event, sourceId: string, device: DeviceInfo, backupDir: string) => {
+    if (pull.running()) throw new Error('A device backup is running; wait for it to finish.');
+    const source = getDeviceBackupSource(sourceId);
+    if (!source) throw new Error(`Unknown device backup source: ${sourceId}`);
+    return source.copyCrashReportsAgain(device, backupDir);
+  });
 
-  ipcMain.handle(
+  handleIpc(
     'epoch:copyDeviceCrashReportsByReference',
     async (_event, sourceId: string, deviceRef: string, backupDir: string) => {
       if (pull.running()) throw new Error('A device backup is running; wait for it to finish.');
@@ -163,7 +161,7 @@ export function registerDeviceHandlers(
     }
   );
 
-  ipcMain.handle('epoch:findCrashReportsRetryTargets', async (_event, sourceId: string, backupDirs: unknown) => {
+  handleIpc('epoch:findCrashReportsRetryTargets', async (_event, sourceId: string, backupDirs: unknown) => {
     if (!Array.isArray(backupDirs) || !backupDirs.every((backupDir) => typeof backupDir === 'string')) {
       throw new Error('Backup paths must be a list of strings.');
     }
@@ -173,7 +171,7 @@ export function registerDeviceHandlers(
     return source.findCrashReportsRetryTargets(backupDirs);
   });
 
-  ipcMain.handle(
+  handleIpc(
     'epoch:pullDeviceBackup',
     async (_event, sourceId: string, device: DeviceInfo, destDir: string, options: PullOptions) => {
       if (!options?.password || options.password.trim() === '') {
@@ -308,7 +306,7 @@ export function registerDeviceHandlers(
 
   let acquisitionInFlight = false;
 
-  ipcMain.handle(
+  handleIpc(
     'epoch:runToolAcquisitionSteps',
     async (_event, steps: ToolAcquisitionCommand[], installPrefix: string): Promise<ToolAcquisitionResult> => {
       if (acquisitionInFlight) {
@@ -378,16 +376,16 @@ export function registerDeviceHandlers(
     }
   }
 
-  ipcMain.handle('epoch:getToolSetupStatus', async (_event, sourceId: string): Promise<ToolSetupStatus | null> => {
+  handleIpc('epoch:getToolSetupStatus', async (_event, sourceId: string): Promise<ToolSetupStatus | null> => {
     const guided = getAcquisitionStrategy(sourceId)?.guided;
     return guided ? guided.status() : null;
   });
 
-  ipcMain.handle('epoch:installToolSetupRequirements', async (_event, sourceId: string): Promise<ToolSetupResult> =>
+  handleIpc('epoch:installToolSetupRequirements', async (_event, sourceId: string): Promise<ToolSetupResult> =>
     runGuided((emit) => guidedFor(sourceId).installRequirements(emit))
   );
 
-  ipcMain.handle('epoch:buildToolSetup', async (_event, sourceId: string): Promise<ToolSetupResult> =>
+  handleIpc('epoch:buildToolSetup', async (_event, sourceId: string): Promise<ToolSetupResult> =>
     runGuided((emit) => guidedFor(sourceId).build(emit))
   );
 }

@@ -10,6 +10,10 @@ const sent: unknown[][] = [];
 let userData: string;
 
 vi.mock('electron', () => ({
+  ipcMain: {
+    handle: (channel: string, handler: (event: unknown, ...args: unknown[]) => unknown) =>
+      handlers.set(channel, handler),
+  },
   default: {
     app: { getPath: () => userData },
     ipcMain: {

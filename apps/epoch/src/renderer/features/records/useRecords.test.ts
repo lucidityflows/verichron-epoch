@@ -10,12 +10,16 @@ describe('useRecords', () => {
   it('stops reading further pages after one fails, until the filters change', async () => {
     let reads = 0;
     vi.stubGlobal('epoch', {
-      getRecordFacets: async () => ({ total: 2, untimed: 0, facets: {} }),
-      getForensicRecords: async (_run: string, query: { cursor?: string }) => {
-        reads += 1;
-        if (query.cursor) throw new Error('connection refused');
-        return { rows: [{ id: '1' }], total: 2, nextCursor: 'next' };
+      invoke: async (channel: string, _run: string, query: { cursor?: string }) => {
+        if (channel === 'epoch:getRecordFacets') return { total: 2, untimed: 0, facets: {} };
+        if (channel === 'epoch:getForensicRecords') {
+          reads += 1;
+          if (query.cursor) throw new Error('connection refused');
+          return { rows: [{ id: '1' }], total: 2, nextCursor: 'next' };
+        }
+        throw new Error(`Unexpected IPC invoke: ${channel}`);
       },
+      on: () => () => undefined,
     });
     const { result, rerender } = renderHook(({ filters }) => useRecords('run', filters), {
       initialProps: { filters: {} },

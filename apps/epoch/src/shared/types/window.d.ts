@@ -1,5 +1,4 @@
 import type {
-  Backup,
   IndicatorResultsConfig,
   PrepareStep,
   ReadTaskLog,
@@ -7,44 +6,9 @@ import type {
   TaskLogEntry,
   TaskOutcome,
 } from '@verichron/contracts';
-import type {
-  ForensicRecordPage,
-  ForensicRecordQuery,
-  IndicatorCheckRow,
-  InterruptedStageRow,
-  ItemFailurePage,
-  PipelineRunRow,
-  StageStatusRow,
-  RecordFacets,
-  EvidenceCompleteness,
-  RecordDetail,
-  TimelineOverview,
-  ContextWindow,
-  TimelineDensity,
-  TimelineRecord,
-  EntityKindCount,
-  EntityCoverage,
-  EntityValueQuery,
-  EntityValuePage,
-} from '@verichron/etl-db-reader';
-import type {
-  BackupProgress,
-  CrashReportsResult,
-  CrashReportsRetryLookup,
-  DeviceInfo,
-  PullOptions,
-  BackupStats,
-  DevicePullState,
-  IncompleteBackup,
-  ToolAcquisitionAction,
-  ToolAcquisitionCommand,
-  ToolAcquisitionResult,
-  ToolSetupEvent,
-  ToolSetupResult,
-  ToolSetupStatus,
-  ToolAvailabilityStatus,
-} from './tools';
+import type { IndicatorCheckRow, EntityKindCount, EntityCoverage } from '@verichron/etl-db-reader';
 import type { PrepareRunProgress } from '../prepareProgress';
+import type { EpochBridge } from '../ipc/channels';
 
 /** The examiner's settings (EPOCH-560), kept by the main process in the app's settings folder. */
 export interface AppSettings {
@@ -283,118 +247,7 @@ export interface EntityOverview {
 
 declare global {
   interface Window {
-    epoch: {
-      platform: string;
-      selectBackupDirectory: () => Promise<string | null>;
-      selectDeviceBackupDestination: () => Promise<string | null>;
-      discoverBackups: (source: string) => Promise<Backup[]>;
-      describeBackups: (paths: string[]) => Promise<BackupDescription[]>;
-      displayPath: (folder: string) => Promise<string>;
-      getPreparedBackups: (workspace?: string) => Promise<{ workspace: string; backups: PreparedBackup[] }>;
-      startPipeline: (
-        source: string,
-        options?: StartPipelineOptions
-      ) => Promise<{ started: boolean; workspace: string }>;
-      submitBackupPassword: (password: string) => Promise<void>;
-      onPrepareLog: (callback: (entry: PipelineLogEntry) => void) => () => void;
-      getPrepareState: () => Promise<PrepareState>;
-      onPrepareState: (callback: (state: PrepareState) => void) => () => void;
-      getPipelineRuns: () => Promise<PipelineRunRow[]>;
-      getStageStatus: (runId: string) => Promise<StageStatusRow[]>;
-      // EPOCH-432
-      getStageFailures: (runId: string, stageName: string) => Promise<ItemFailurePage>;
-      getStillFailing: (runId: string) => Promise<ItemFailurePage>;
-      // EPOCH-561
-      getInterruptedStages: (runId: string) => Promise<InterruptedStageRow[]>;
-      getForensicRecords: (runId: string, query?: ForensicRecordQuery) => Promise<ForensicRecordPage>;
-      // EPOCH-411, EPOCH-556: null when the run has no registered evidence.
-      getRecordFacets: (runId: string, query?: ForensicRecordQuery) => Promise<RecordFacets | null>;
-      getEvidenceCompleteness: (runId: string) => Promise<EvidenceCompleteness | null>;
-      getRecordDetail: (runId: string, recordId: string) => Promise<RecordDetail | null>;
-      // EPOCH-581: null when the run has no registered evidence.
-      getEntityOverview: (runId: string) => Promise<EntityOverview | null>;
-      getTimelineOverview: (runId: string) => Promise<TimelineOverview | null>;
-      getRecordContextWindow: (runId: string, recordId: string) => Promise<ContextWindow | null>;
-      getTimelineDensity: (runId: string, boundaries: string[]) => Promise<TimelineDensity | null>;
-      getTimelineRecords: (
-        runId: string,
-        from: string,
-        before: string
-      ) => Promise<{ total: number; rows: TimelineRecord[] } | null>;
-      getEntityValues: (runId: string, kind: string, query?: EntityValueQuery) => Promise<EntityValuePage>;
-      getIndicatorResults: (runId: string) => Promise<IndicatorResults>;
-      getReport: (runId: string) => Promise<ReportResult>;
-      openReport: (runId: string) => Promise<boolean>;
-      // Stage 3 (orchestrator) -- see main.ts's epoch:startAnalysis handler.
-      // Reuses PipelineLogEntry/PipelineFinishedResult since the shape is identical;
-      // no need for a second pair of structurally-equal types.
-      startAnalysis: (workspace: string, labels: string[]) => Promise<{ started: boolean }>;
-      // EPOCH-308
-      retryRun: (runId: string) => Promise<{ started: boolean }>;
-      checkIndicators: (runId: string) => Promise<{ started: boolean }>;
-      // EPOCH-305
-      cancelAnalysis: () => Promise<{ cancelled: boolean }>;
-      cancelPrepare: () => Promise<{ cancelled: boolean }>;
-      getAnalysisRunStatus: (workspace: string) => Promise<AnalysisRunStatus>;
-      onOrchestratorLog: (callback: (entry: PipelineLogEntry) => void) => () => void;
-      getAnalysisState: () => Promise<AnalysisState>;
-      onAnalysisState: (callback: (state: AnalysisState) => void) => () => void;
-      // EPOCH-436: the iPhone pull's task log.
-      getPullLogState: () => Promise<PullLogState>;
-      onPullLogState: (callback: (state: PullLogState) => void) => () => void;
-      onPullLog: (callback: (entry: PipelineLogEntry) => void) => () => void;
-      // EPOCH-570: the workspace's saved task logs, read back after a restart.
-      listTaskLogs: (workspace: string) => Promise<TaskLogSummary[]>;
-      readTaskLog: (workspace: string, file: string) => Promise<ReadTaskLog>;
-      saveTaskLogAs: (workspace: string, file: string) => Promise<{ saved: string | null }>;
-      popOutActivityLog: () => Promise<void>;
-      // EPOCH-560: the examiner's settings, the same in every window.
-      getSettings: () => Promise<AppSettings>;
-      getDisplayZones: () => Promise<string[]>;
-      setDisplayZone: (zone: string) => Promise<AppSettings>;
-      rememberBackupsFolder: (folder: string) => Promise<AppSettings>;
-      onSettingsChanged: (callback: (settings: AppSettings) => void) => () => void;
-      listDeviceBackupSources: () => Promise<Array<{ id: string; label: string }>>;
-      checkDeviceBackupToolAvailable: (sourceId: string) => Promise<ToolAvailabilityStatus>;
-      listConnectedDevices: (sourceId: string) => Promise<DeviceInfo[]>;
-      getToolAcquisitionActions: (sourceId: string) => Promise<ToolAcquisitionAction[]>;
-      /** The running device pull, or null (EPOCH-467). */
-      getDevicePullState: () => Promise<DevicePullState | null>;
-      getBackupEncryption: (sourceId: string, device: DeviceInfo) => Promise<boolean>;
-      pullDeviceBackup: (
-        sourceId: string,
-        device: DeviceInfo,
-        destDir: string,
-        options: PullOptions
-      ) => Promise<string>;
-      cancelDeviceBackup: (sourceId: string) => Promise<boolean>;
-      listIncompleteBackups: (
-        sourceId: string,
-        device: DeviceInfo,
-        destDir: string | null
-      ) => Promise<IncompleteBackup[]>;
-      deleteIncompleteBackup: (sourceId: string, destDir: string, device: DeviceInfo) => Promise<void>;
-      copyDeviceCrashReports: (sourceId: string, device: DeviceInfo, backupDir: string) => Promise<CrashReportsResult>;
-      copyDeviceCrashReportsByReference: (
-        sourceId: string,
-        deviceRef: string,
-        backupDir: string
-      ) => Promise<CrashReportsResult>;
-      findCrashReportsRetryTargets: (sourceId: string, backupDirs: string[]) => Promise<CrashReportsRetryLookup>;
-      onDeviceBackupStats: (callback: (stats: BackupStats) => void) => () => void;
-      runToolAcquisitionSteps: (
-        steps: ToolAcquisitionCommand[],
-        installPrefix: string
-      ) => Promise<ToolAcquisitionResult>;
-      getToolSetupStatus: (sourceId: string) => Promise<ToolSetupStatus | null>;
-      installToolSetupRequirements: (sourceId: string) => Promise<ToolSetupResult>;
-      buildToolSetup: (sourceId: string) => Promise<ToolSetupResult>;
-      onToolSetupEvent: (callback: (event: ToolSetupEvent) => void) => () => void;
-      onDeviceBackupProgress: (callback: (progress: BackupProgress) => void) => () => void;
-      onToolAcquisitionStepStarted: (callback: (label: string) => void) => () => void;
-      onToolAcquisitionOutput: (callback: (entry: { step: string; line: string }) => void) => () => void;
-      onToolAcquisitionFinished: (callback: (result: ToolAcquisitionResult) => void) => () => void;
-    };
+    epoch: EpochBridge;
   }
 }
 
