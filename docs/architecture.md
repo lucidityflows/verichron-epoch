@@ -282,6 +282,49 @@ imported from media and recorded (EPOCH-438, EPOCH-439). A Personal build comes
 later from the same core. Lab and Personal are separate builds, not a runtime
 switch ([decisions](decisions.md#product-and-builds)).
 
+### The Lab bundle
+
+**Designed, being built (EPOCH-478, 439, 477, 472, 535, 585).** The Lab build
+ships as one tarball for Debian 13 on amd64. It unpacks anywhere and runs
+without root; the decisions behind it are in
+[decisions](decisions.md#product-and-builds).
+
+| Path in the bundle | Holds | Built by |
+|---|---|---|
+| `app/` | The packaged Electron app | Electron Forge, packaging only |
+| `node/` | Node 24, the version `mise.toml` pins | Assembly |
+| `services/` | The orchestrator and processor, each compiled to one JavaScript file | Assembly |
+| `python/` | The interpreter `.python-version` pins | `tools/runtime/build.sh` |
+| `runtime-venv/` | The Python environment that runs: no dependency groups | `tools/runtime/build.sh` |
+| `source/` | Our Python stages, writer, report and the contract files they read | Assembly, from the commit |
+| `tools/decrypt/`, `tools/ileapp/` | The decrypt and iLEAPP, each with its own environment | Assembly |
+| `bin/` | The iPhone tools (EPOCH-472) and `sqlite3` | Assembly |
+| `postgresql/` | PostgreSQL 17, socket-only | `tools/postgres/build.sh` |
+| `MANIFEST`, `MANIFEST.sig` | Every file's SHA-256, and the owner's signature over it | Assembly; signed on the owner's machine |
+
+**Finding its parts.** The app finds the bundle root from its own executable's
+path (`<root>/app/`), and knows it runs from a bundle because `MANIFEST` sits
+at that root. Every other part is found relative to the root, as the bundled
+libraries find each other (`$ORIGIN`). Nothing is found through `PATH`, a
+repository checkout, or `.env`.
+
+**Running the pipeline.** The app runs the orchestrator and processor with the
+bundled Node, as separate processes, exactly as development runs them through
+pnpm. The stages run with `runtime-venv/`, from `source/`.
+
+**Configuration.** The bundle has no `.env`. The app manages its own PostgreSQL
+over a unix socket (EPOCH-477), with its data directory under
+`$XDG_DATA_HOME/verichron-epoch/` (by default `~/.local/share/verichron-epoch/`).
+The app's settings stay where Electron keeps them, and evidence workspaces stay
+where the examiner chooses.
+
+**Development is unchanged.** A repository checkout, with no `MANIFEST` beside
+the app, keeps pnpm, `tsx`, Docker and `.env`. CI tests both: the development
+paths in its test jobs, and the bundle's parts in `postgres-build.yml`.
+
+Built so far: `postgresql/` and its check, and `python/` with `runtime-venv/`
+and theirs ([development](development.md#the-lab-bundles-postgresql)).
+
 ## Database configuration
 
 **Built — R28 (EPOCH-424):** database configuration fails closed unless
