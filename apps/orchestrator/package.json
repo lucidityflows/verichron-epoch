@@ -18,12 +18,12 @@
     "@verichron/contracts": "workspace:*",
     "@verichron/workspace-lock": "workspace:*",
     "ajv": "^8.20.0",
-    "pg": "^8.23.0"
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
     "@types/pg": "^8.23.1",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3"
   }
 }
