@@ -4,6 +4,7 @@ import { backupDeviceId, backupFinishedAt, deviceListed, incompleteReason } from
 import { copyCrashReports, crashReportsCopyExists, discardCrashReportsCopy } from './crashReports';
 import { IosBackupSource } from './iosBackupSource';
 import { appendPullRecord } from './pullRecord';
+import { BUNDLED_TOOLS } from './toolchain/bundled';
 
 vi.mock('../detection', () => ({
   bundledToolPath: (_prefix: string, name: string) => `/tools/${name}`,
@@ -147,6 +148,17 @@ describe('Lab bundle availability and pull refusal', () => {
       bin: '/opt/epoch/bin',
     });
 
+    const hostFiles = new Set([...BUNDLED_TOOLS.map((tool) => `/opt/epoch/bin/${tool}`), '/usr/sbin/usbmuxd']);
+    const pullCtx = {
+      ...customCtx,
+      run: async () => ({ code: 0, output: 'usbmuxd 1.1.1\n' }),
+      exists: (file: string) => hostFiles.has(file),
+    };
+    const checkToolAvailable = source.checkToolAvailable.bind(source);
+    const availabilityCheck = vi
+      .spyOn(source, 'checkToolAvailable')
+      .mockImplementation((ctx = pullCtx) => checkToolAvailable(ctx));
+
     try {
       const bundleStatus = await source.checkToolAvailable(customCtx);
       expect(bundleStatus.available).toBe(false);
@@ -164,8 +176,10 @@ describe('Lab bundle availability and pull refusal', () => {
           () => {},
           { password: 'secret', enableEncryption: false }
         )
-      ).rejects.toThrow(/Not ready for iPhone import:/);
+      ).rejects.toThrow('Not ready for iPhone import: usbmuxd udev rules.');
+      expectNoWrites();
     } finally {
+      availabilityCheck.mockRestore();
       vi.mocked(contracts.layout).mockRestore();
     }
   });
