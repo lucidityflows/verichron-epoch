@@ -266,25 +266,32 @@ build's own libpq, that the server loads nothing beyond libc, libm and zlib
 (Debian 13's base system), that it listens on no TCP port, and that every
 migration applies, leaving exactly the extensions the schema uses (`pg_trgm`).
 
-### The Lab bundle's Python environment
+### The Lab bundle's Python parts
 
-The bundle's Python environment is built beside that PostgreSQL, in the same
-container, with `psycopg2` built against the bundle's own `pg_config`
-(EPOCH-439). The uv release is mise.toml's version, refused unless its SHA-256
-is the one in `tools/runtime/versions.env`; the source built is the commit
-checked out.
+The bundle's Python parts are built beside that PostgreSQL, in the same
+container (EPOCH-439), laid out as [architecture](architecture.md#the-lab-bundle)
+describes: the interpreter (`python/`), our source (`source/`), the runtime
+environment (`runtime-venv/`), and the decrypt and iLEAPP, each with its own
+environment (`tools/`). The uv release is mise.toml's version, refused unless
+its SHA-256 is the one in `tools/runtime/versions.env`. The source is the commit
+checked out, and iLEAPP the submodule commit it records; a different iLEAPP
+checkout is refused.
 
 ```bash
 tools/postgres/build.sh <bundle>    # <bundle>/postgresql
-tools/runtime/build.sh <bundle>     # <bundle>/python and <bundle>/runtime-venv
-tools/runtime/check.sh <bundle>     # moved, psycopg2 loads the bundle's libpq and connects
+tools/runtime/build.sh <bundle>     # <bundle>/python, source, runtime-venv and tools
+tools/runtime/check.sh <bundle>     # moved, with a decoy at the old path; everything runs
 ```
 
-`psycopg2` finds libpq at `$ORIGIN/../../../../../postgresql/lib`, so
-`runtime-venv/` and `postgresql/` must stay side by side in the bundle. Two parts
-of the environment still record absolute paths, the venv's `python` link and the
-editable installs' source paths; making them movable is the bundle's packaging
-(EPOCH-478).
+`psycopg2` is built against the bundle's `pg_config` and finds libpq at
+`$ORIGIN/../../../../../postgresql/lib`, so `runtime-venv/` and `postgresql/`
+stay side by side. uv writes absolute paths into each environment;
+`tools/runtime/relocate.py` makes them relative (the interpreter link, the
+editable installs' paths to `source/`) or removes them (`pyvenv.cfg`'s `home`),
+and refuses an environment that still names the build path. The check moves the
+bundle, leaves a decoy interpreter where it was built, and runs every
+environment, every entry point, `psycopg2` against the bundled server, the
+decrypt and iLEAPP's plugins.
 
 ### Real-device checks for iPhone pulls
 
@@ -312,7 +319,7 @@ New device behaviour seen during these checks is added to the verified list in
 | Workflow | Runs |
 |---|---|
 | `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 17, pytest on both tiers, the runtime environment and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
-| `.github/workflows/postgres-build.yml` | Only when `tools/postgres/`, `tools/runtime/`, the migrations, the Python dependencies, `mise.toml` (uv's version) or `.python-version` change: the Lab bundle's PostgreSQL built from source and its Python environment built against it, each then checked as below |
+| `.github/workflows/postgres-build.yml` | Only when `tools/` (the builds, the decrypt or iLEAPP), the migrations, the Python dependencies, `mise.toml` (uv's version) or `.python-version` change: the Lab bundle's PostgreSQL built from source and its Python parts built beside it, each then checked as below |
 | `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, lint (`pnpm --filter @verichron/epoch lint`: errors fail the job, EPOCH-571), Vite build and tests |
 
 The Python and TypeScript workflows install the toolchain from `mise.toml` and Python from

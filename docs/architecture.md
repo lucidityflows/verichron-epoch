@@ -296,8 +296,8 @@ without root; the decisions behind it are in
 | `services/` | The orchestrator and processor, each compiled to one JavaScript file | Assembly |
 | `python/` | The interpreter `.python-version` pins | `tools/runtime/build.sh` |
 | `runtime-venv/` | The Python environment that runs: no dependency groups | `tools/runtime/build.sh` |
-| `source/` | Our Python stages, writer, report and the contract files they read | Assembly, from the commit |
-| `tools/decrypt/`, `tools/ileapp/` | The decrypt and iLEAPP, each with its own environment | Assembly |
+| `source/` | Our Python stages, writer, report and the contract files they read | `tools/runtime/build.sh`, from the commit |
+| `tools/decrypt/`, `tools/ileapp/` | The decrypt and iLEAPP, each with its own environment | `tools/runtime/build.sh` |
 | `bin/` | The iPhone tools (EPOCH-472) and `sqlite3` | Assembly |
 | `postgresql/` | PostgreSQL 17, socket-only | `tools/postgres/build.sh` |
 | `MANIFEST`, `MANIFEST.sig` | Every file's SHA-256, and the owner's signature over it | Assembly; signed on the owner's machine |
@@ -322,8 +322,10 @@ where the examiner chooses.
 the app, keeps pnpm, `tsx`, Docker and `.env`. CI tests both: the development
 paths in its test jobs, and the bundle's parts in `postgres-build.yml`.
 
-Built so far: `postgresql/` and its check, and `python/` with `runtime-venv/`
-and theirs ([development](development.md#the-lab-bundles-postgresql)).
+Built so far, each with its check: `postgresql/`, and the Python parts
+(`python/`, `source/`, `runtime-venv/`, `tools/`), all movable
+([PostgreSQL](development.md#the-lab-bundles-postgresql),
+[Python parts](development.md#the-lab-bundles-python-parts)).
 
 ## Database configuration
 
