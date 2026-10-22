@@ -322,8 +322,9 @@ where the examiner chooses.
 the app, keeps pnpm, `tsx`, Docker and `.env`. CI tests both: the development
 paths in its test jobs, and the bundle's parts in `postgres-build.yml`.
 
-Built so far: `postgresql/` and its check, and `python/` with `runtime-venv/`
-and theirs ([development](development.md#the-lab-bundles-postgresql)).
+Built so far, each with its check: `postgresql/`, and the Python parts
+(`python/`, `source/`, `runtime-venv/`, `tools/`), all movable
+([development](development.md#the-lab-bundles-postgresql)).
 
 ## Database configuration
 

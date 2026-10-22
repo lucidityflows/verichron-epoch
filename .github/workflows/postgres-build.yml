@@ -2,8 +2,9 @@ name: Lab PostgreSQL and Python build
 
 # The Lab bundle's PostgreSQL (EPOCH-477): built from the pinned source in the
 # pinned Debian 13 container, then checked moved, socket-only, and with every
-# migration applied. Then the bundle's Python environment, with psycopg2 built
-# against that PostgreSQL's libpq (EPOCH-439), checked moved and connected. It
+# migration applied. Then the bundle's Python parts (EPOCH-439): the runtime
+# environment with psycopg2 built against that libpq, our source, and the
+# decrypt and iLEAPP each in its own environment, all checked moved. It
 # compiles PostgreSQL, so it runs only when the builds, the migrations, the
 # Python dependencies, or the uv and Python versions (mise.toml,
 # .python-version) change.
@@ -14,6 +15,8 @@ on:
     paths:
       - "tools/postgres/**"
       - "tools/runtime/**"
+      - "tools/decrypt/**"
+      - "tools/ileapp/**"
       - "mise.toml"
       - ".python-version"
       - "pyproject.toml"
@@ -25,6 +28,8 @@ on:
     paths:
       - "tools/postgres/**"
       - "tools/runtime/**"
+      - "tools/decrypt/**"
+      - "tools/ileapp/**"
       - "mise.toml"
       - ".python-version"
       - "pyproject.toml"
@@ -39,6 +44,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # iLEAPP, at the commit this one records, goes into the bundle.
+          submodules: recursive
 
       - name: Build PostgreSQL from source
         run: tools/postgres/build.sh "$RUNNER_TEMP/pg"
@@ -46,8 +54,8 @@ jobs:
       - name: Check it moved, socket-only, with every migration
         run: tools/postgres/check.sh "$RUNNER_TEMP/pg"
 
-      - name: Build the Python environment against it
+      - name: Build the Python environments, source and tools beside it
         run: tools/runtime/build.sh "$RUNNER_TEMP/pg"
 
-      - name: Check psycopg2 loads the bundle's libpq, moved, and connects
+      - name: Check them moved, with a decoy at the old path
         run: tools/runtime/check.sh "$RUNNER_TEMP/pg"

@@ -6,17 +6,27 @@
 #   tools/runtime/build.sh <bundle directory>
 #
 # <bundle directory> holds the PostgreSQL that tools/postgres/build.sh made
-# (<bundle>/postgresql). This adds, beside it:
+# (<bundle>/postgresql). This adds, beside it (docs/architecture.md, "The Lab
+# bundle"):
 #   <bundle>/python        the interpreter .python-version pins, installed by uv
+#   <bundle>/source        our Python stages, writer, report and contract files
 #   <bundle>/runtime-venv  the lockfile with no dependency groups: what runs
+#   <bundle>/tools/decrypt, <bundle>/tools/ileapp
+#                          each tool with its own environment; iLEAPP at the
+#                          submodule commit this commit records
+#
+# Every environment is made movable (relocate.py): it works wherever the
+# bundle is unpacked.
 #
 # psycopg2 is built from source against <bundle>/postgresql's pg_config, and
 # finds libpq at $ORIGIN/../../../../../postgresql/lib: from
 # runtime-venv/lib/python3.14/site-packages/psycopg2 up to the bundle root, so
 # it loads the bundle's libpq wherever the bundle is moved. The source built is
-# the commit checked out (git archive HEAD), not uncommitted changes.
+# the commit checked out (git archive HEAD), not uncommitted changes, and
+# iLEAPP is refused unless its checkout is the commit this one records.
 #
-# Needs Docker and git. Runs for a few minutes.
+# Needs Docker and git. Runs for several minutes: iLEAPP's environment
+# compiles two native packages.
 
 set -euo pipefail
 
@@ -38,7 +48,7 @@ BUNDLE="$(cd "$1" && pwd)"
   echo "[runtime] no PostgreSQL at $BUNDLE/postgresql; run tools/postgres/build.sh $1 first" >&2
   exit 1
 }
-for d in python runtime-venv; do
+for d in python source runtime-venv tools; do
   if [ -e "$BUNDLE/$d" ]; then
     echo "[runtime] $BUNDLE/$d already exists; start from a bundle holding only postgresql/" >&2
     exit 1
@@ -62,6 +72,16 @@ echo "$UV_SHA256  $CACHE/$UV_VERSION/$UV_TARBALL" | sha256sum -c --quiet - || {
 SOURCE="$(mktemp -d)"
 trap 'rm -rf "$SOURCE"' EXIT
 git -C "$REPO_ROOT" archive HEAD | tar -x -C "$SOURCE"
+# git archive leaves submodules out: iLEAPP is added at the commit HEAD records.
+ILEAPP=tools/ileapp/iLEAPP
+recorded="$(git -C "$REPO_ROOT" ls-tree HEAD "$ILEAPP" | awk '{print $3}')"
+checked_out="$(git -C "$REPO_ROOT/$ILEAPP" rev-parse HEAD 2> /dev/null || true)"
+[ -n "$recorded" ] && [ "$recorded" = "$checked_out" ] || {
+  echo "[runtime] $ILEAPP is at ${checked_out:-nothing}, not the recorded $recorded; run git submodule update --init" >&2
+  exit 1
+}
+mkdir -p "$SOURCE/$ILEAPP"
+git -C "$REPO_ROOT/$ILEAPP" archive HEAD | tar -x -C "$SOURCE/$ILEAPP"
 
 echo "[runtime] building the Python environment in $BUILD_IMAGE"
 docker run --rm \
@@ -69,7 +89,8 @@ docker run --rm \
   -v "$CACHE/$UV_VERSION/$UV_TARBALL:/uv.tar.gz:ro" \
   -v "$SOURCE:/source:ro" \
   -v "$HERE/in-container.sh:/in-container.sh:ro" \
+  -v "$HERE/relocate.py:/relocate.py:ro" \
   -v "$BUNDLE:/bundle" \
   "$BUILD_IMAGE" /in-container.sh
 
-echo "[runtime] built: $BUNDLE/python, $BUNDLE/runtime-venv"
+echo "[runtime] built: $BUNDLE/python, source, runtime-venv, tools"
