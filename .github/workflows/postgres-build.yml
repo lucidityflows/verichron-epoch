@@ -6,7 +6,8 @@ name: Lab bundle parts build
 # environment with psycopg2 built against that libpq, our source, and the
 # decrypt and iLEAPP each in its own environment, all checked moved. Then the
 # services (EPOCH-478): the orchestrator and processor compiled and run by the
-# bundled Node, checked moved with nothing on PATH but the base system. It
+# bundled Node, checked moved with nothing on PATH but the base system. Then
+# the iPhone tools and sqlite3 (EPOCH-472), checked the same way. It
 # compiles PostgreSQL, so it runs only when a part's build or what it includes
 # changes: the migrations, the Python or Node dependencies, the services and
 # packages they include, or the uv, Python and Node versions (mise.toml,
@@ -18,6 +19,8 @@ on:
     paths:
       - "tools/postgres/**"
       - "tools/runtime/**"
+      - "tools/iphone/**"
+      - "apps/epoch/src/main/tools/device-backup/ios/toolchain/pins.ts"
       - "tools/services/**"
       - "apps/orchestrator/**"
       - "apps/processor/**"
@@ -38,6 +41,8 @@ on:
     paths:
       - "tools/postgres/**"
       - "tools/runtime/**"
+      - "tools/iphone/**"
+      - "apps/epoch/src/main/tools/device-backup/ios/toolchain/pins.ts"
       - "tools/services/**"
       - "apps/orchestrator/**"
       - "apps/processor/**"
@@ -91,3 +96,10 @@ jobs:
 
       - name: Check them moved, with nothing on PATH but the base system
         run: tools/services/check.sh "$RUNNER_TEMP/pg"
+
+      # The iPhone tools a pull runs and sqlite3, from their pinned sources (EPOCH-472).
+      - name: Build the iPhone tools and sqlite3
+        run: tools/iphone/build.sh "$RUNNER_TEMP/pg"
+
+      - name: Check them moved, loading only the base system from outside the bundle
+        run: tools/iphone/check.sh "$RUNNER_TEMP/pg"

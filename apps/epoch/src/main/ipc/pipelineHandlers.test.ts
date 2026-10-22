@@ -49,6 +49,7 @@ const CHECKOUT: Layout = {
   ileappPython: '/repo/tools/ileapp/.venv/bin/python',
   ileappCommitFile: null,
   postgresql: null,
+  bin: null,
 };
 
 function childProcess() {

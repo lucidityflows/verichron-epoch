@@ -2,7 +2,12 @@ import { app } from 'electron';
 import path from 'path';
 import type { ToolAcquisitionAction, ToolAcquisitionStrategy } from '../../../../shared/types/tools';
 import { compileFromSourceStepsViaWsl, systemPackageInstallCommand } from './buildSteps';
+import { layout } from '@verichron/contracts';
 import { guidedSetup } from './toolchain';
+import { bundledSetup } from './toolchain/bundled';
+
+/** The Lab bundle's bin/, or null outside the bundle (layout.ts). */
+const labBin = (): string | null => layout().bin;
 
 /** Where a self-compiled or downloaded idevicebackup2 ends up, and where
  * detectBinary()'s bundled-path check should look. One app-owned location
@@ -17,9 +22,13 @@ function buildScratchDir(): string {
 }
 
 export class IosToolAcquisitionStrategy implements ToolAcquisitionStrategy {
-  /** Linux and macOS: the guided, verified setup (EPOCH-465). */
-  readonly guided =
-    process.platform === 'linux' || process.platform === 'darwin'
+  /**
+   * The Lab bundle: its own tools, found and never installed (EPOCH-472).
+   * Elsewhere, on Linux and macOS: the guided, verified setup (EPOCH-465).
+   */
+  readonly guided = labBin()
+    ? bundledSetup(labBin()!)
+    : process.platform === 'linux' || process.platform === 'darwin'
       ? guidedSetup(idevicebackup2InstallPrefix(), buildScratchDir())
       : undefined;
 

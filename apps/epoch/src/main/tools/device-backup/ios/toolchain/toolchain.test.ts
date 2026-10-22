@@ -21,7 +21,7 @@ import type { Run, RunOptions } from './process';
 import { APT_PACKAGES, checkRequirements, type SetupContext } from './requirements';
 
 const DEBIAN = 'PRETTY_NAME="Debian GNU/Linux 13 (trixie)"\nID=debian\n';
-const ALL_TOOLS = ['cc', 'make', 'pkg-config', 'openssl', 'libcurl', 'tar', 'bzip2', 'pkexec'];
+const ALL_TOOLS = ['cc', 'make', 'pkg-config', 'openssl', 'libcurl', 'tar', 'bzip2', 'pkexec', 'usbmuxd'];
 
 interface Call {
   command: string;
@@ -53,8 +53,9 @@ function machine(
         ? { code: 0, output: '3.5.0\n' }
         : { code: 1, output: `Package ${args[1]} was not found` };
     }
-    if (['cc', 'make', 'pkg-config'].includes(command)) {
-      return has(command) ? { code: 0, output: `${command} 1.0\n` } : { code: 127, output: `${command}: not found\n` };
+    const tool = path.basename(command);
+    if (['cc', 'make', 'pkg-config', 'usbmuxd'].includes(tool)) {
+      return has(tool) ? { code: 0, output: `${tool} 1.0\n` } : { code: 127, output: `${tool}: not found\n` };
     }
     return { code: 127, output: `${command}: not found\n` };
   };
@@ -145,6 +146,32 @@ describe('requirements', () => {
     assert.equal(noPkexec.install?.automatic, false);
   });
 
+  it('requires usbmuxd even when every build tool is available', async () => {
+    const { run, calls } = machine(ALL_TOOLS);
+    const status = await checkRequirements(context(run, { exists: () => false }));
+    assert.equal(status.systemReady, false);
+    assert.deepEqual(
+      status.requirements.filter((r) => !r.ok).map((r) => r.id),
+      ['usbmuxd']
+    );
+    assert.equal(status.install?.automatic, true);
+    assert.ok(!calls.some((c) => c.command.endsWith('/usbmuxd')), 'a missing executable is not probed');
+  });
+
+  it('rejects an existing usbmuxd executable when its version probe fails', async () => {
+    const { run, calls } = machine(ALL_TOOLS, (call) =>
+      call.command === '/usr/sbin/usbmuxd' ? { code: 1, output: 'failed to load a shared library\n' } : undefined
+    );
+    const status = await checkRequirements(context(run));
+    const service = status.requirements.find((r) => r.id === 'usbmuxd');
+    assert.equal(status.systemReady, false);
+    assert.equal(service?.ok, false);
+    assert.equal(service?.version, undefined);
+    assert.equal(service?.detail, 'Failed to run usbmuxd --version.');
+    assert.equal(status.install?.automatic, true);
+    assert.deepEqual(calls.find((c) => c.command === '/usr/sbin/usbmuxd')?.args, ['--version']);
+  });
+
   it('is ready to build when every system requirement is met, and installed only with a matching manifest', async () => {
     const components = [component('libplist')];
     const ctx = context(machine(ALL_TOOLS).run, { components });
@@ -152,6 +179,7 @@ describe('requirements', () => {
     assert.equal(ready.systemReady, true);
     assert.equal(ready.install, null);
     assert.equal(ready.installed, false);
+    assert.equal(ready.requirements.find((r) => r.id === 'usbmuxd')?.version, 'usbmuxd 1.0');
 
     fs.mkdirSync(ctx.prefix, { recursive: true });
     fs.writeFileSync(

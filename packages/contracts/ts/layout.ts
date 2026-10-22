@@ -31,6 +31,8 @@ export interface Layout {
   ileappCommitFile: string | null;
   /** The bundle's own PostgreSQL, which the app manages (EPOCH-477); null in a checkout, which uses Docker's. */
   postgresql: string | null;
+  /** The bundle's iPhone tools and sqlite3 (EPOCH-472); null in a checkout, which uses its own (guided setup, PATH). */
+  bin: string | null;
 }
 
 /** The layout whose root holds `dir`, or null when `dir` is no root. */
@@ -49,6 +51,7 @@ export function layoutAt(dir: string): Layout | null {
       ...tools(dir),
       ileappCommitFile: path.join(dir, 'tools', 'ileapp', 'iLEAPP.commit'),
       postgresql: path.join(dir, 'postgresql'),
+      bin: path.join(dir, 'bin'),
     };
   }
   if (existsSync(path.join(dir, 'pnpm-workspace.yaml')) && existsSync(path.join(dir, 'packages', 'contracts'))) {
@@ -61,6 +64,7 @@ export function layoutAt(dir: string): Layout | null {
       ...tools(dir),
       ileappCommitFile: null,
       postgresql: null,
+      bin: null,
     };
   }
   return null;

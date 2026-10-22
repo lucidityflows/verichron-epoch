@@ -176,7 +176,11 @@ async function systemRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): Pr
   return reqs;
 }
 
-async function serviceRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): Promise<ToolSetupRequirement[]> {
+/**
+ * Reports whether a known usbmuxd executable passes its version probe.
+ * macOS needs no check because it supplies its own device service.
+ */
+export async function serviceRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): Promise<ToolSetupRequirement[]> {
   if (ctx.platform === 'darwin') return []; // macOS runs its own usbmuxd
   const found = USBMUXD_PATHS.find((p) => ctx.exists(p));
   if (!found) {
@@ -191,14 +195,15 @@ async function serviceRequirements(ctx: SetupContext, env: NodeJS.ProcessEnv): P
     ];
   }
   const version = await ctx.run(found, ['--version'], { env });
+  const ok = version.code === 0;
   return [
     {
       id: 'usbmuxd',
       group: 'service',
       label: 'usbmuxd',
-      ok: true,
-      version: version.code === 0 ? firstLine(version.output) : undefined,
-      detail: 'Connects to the iPhone over USB.',
+      ok,
+      version: ok ? firstLine(version.output) : undefined,
+      detail: ok ? 'Connects to the iPhone over USB.' : 'Failed to run usbmuxd --version.',
     },
   ];
 }
