@@ -34,7 +34,7 @@ catalog:
   '@typescript-eslint/parser': ^8.68.0
   '@vitejs/plugin-react': ^4.7.0
   node-linker: ^1.0.1
-  electron: ^44.0.0
+  electron: ^44.9.0
   # Lint stack — must move together (eslint9+ flat config <-> typescript-eslint8)
   eslint: ^10.9.1
   pg: ^8.23.0
