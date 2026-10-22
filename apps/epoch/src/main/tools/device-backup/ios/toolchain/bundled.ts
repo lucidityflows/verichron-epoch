@@ -1,11 +1,14 @@
+import fs from 'fs';
 import path from 'path';
 import type {
   GuidedToolSetup,
+  ToolAvailabilityStatus,
   ToolSetupRequirement,
   ToolSetupResult,
   ToolSetupStatus,
 } from '../../../../../shared/types/tools';
 import { serviceRequirements, type SetupContext } from './requirements';
+import { run as defaultRun } from './process';
 
 /** The tools a pull runs (iosBackupSource.ts), all of them in the Lab bundle's bin/. */
 export const BUNDLED_TOOLS = ['idevicebackup2', 'idevicecrashreport', 'idevice_id', 'ideviceinfo'] as const;
@@ -15,6 +18,15 @@ export const USBMUXD_UDEV_RULES = '/usr/lib/udev/rules.d/39-usbmuxd.rules';
 
 /** In the Lab bundle the tools are never installed by the app, only found. */
 const NOT_IN_LAB = 'The Lab build installs nothing: its iPhone tools are part of the bundle.';
+
+export function defaultBundledContext(): Pick<SetupContext, 'platform' | 'run' | 'exists' | 'env'> {
+  return {
+    platform: process.platform,
+    run: defaultRun,
+    exists: (file: string) => fs.existsSync(file),
+    env: process.env,
+  };
+}
 
 /**
  * iPhone import in the Lab bundle (EPOCH-472). The tools ship prebuilt in the
@@ -26,7 +38,7 @@ const NOT_IN_LAB = 'The Lab build installs nothing: its iPhone tools are part of
  */
 export function bundledSetup(
   bin: string,
-  ctx: Pick<SetupContext, 'platform' | 'run' | 'exists' | 'env'>
+  ctx: Pick<SetupContext, 'platform' | 'run' | 'exists' | 'env'> = defaultBundledContext()
 ): GuidedToolSetup {
   const status = async (): Promise<ToolSetupStatus> => {
     const service = await serviceRequirements(ctx as SetupContext, ctx.env);
@@ -73,4 +85,25 @@ export function bundledSetup(
     throw new Error(NOT_IN_LAB);
   };
   return { status, installRequirements: refuse, build: refuse };
+}
+
+/**
+ * Whether a pull may start in the Lab bundle: every tool a pull runs is in the
+ * bundle, and both host steps are met. Otherwise unavailable, naming what is
+ * not, so the app shows the checklist (with the administrator's command)
+ * instead of the device picker, and no pull starts without a tool it needs.
+ */
+export function labAvailability(status: ToolSetupStatus, bin: string): ToolAvailabilityStatus {
+  const unmet = status.requirements.filter((r) => !r.ok).map((r) => r.label);
+  if (unmet.length > 0) return { available: false, reason: `Not ready for iPhone import: ${unmet.join(', ')}.` };
+  return { available: true, path: path.join(bin, 'idevicebackup2') };
+}
+
+export async function bundledAvailability(
+  bin: string,
+  ctx: Pick<SetupContext, 'platform' | 'run' | 'exists' | 'env'> = defaultBundledContext()
+): Promise<ToolAvailabilityStatus> {
+  const setup = bundledSetup(bin, ctx);
+  const status = await setup.status();
+  return labAvailability(status, bin);
 }

@@ -2,11 +2,9 @@ import { app } from 'electron';
 import path from 'path';
 import type { ToolAcquisitionAction, ToolAcquisitionStrategy } from '../../../../shared/types/tools';
 import { compileFromSourceStepsViaWsl, systemPackageInstallCommand } from './buildSteps';
-import fs from 'fs';
 import { layout } from '@verichron/contracts';
 import { guidedSetup } from './toolchain';
 import { bundledSetup } from './toolchain/bundled';
-import { run } from './toolchain/process';
 
 /** The Lab bundle's bin/, or null outside the bundle (layout.ts). */
 const labBin = (): string | null => layout().bin;
@@ -29,12 +27,7 @@ export class IosToolAcquisitionStrategy implements ToolAcquisitionStrategy {
    * Elsewhere, on Linux and macOS: the guided, verified setup (EPOCH-465).
    */
   readonly guided = labBin()
-    ? bundledSetup(labBin()!, {
-        platform: process.platform,
-        run,
-        exists: (file) => fs.existsSync(file),
-        env: process.env,
-      })
+    ? bundledSetup(labBin()!)
     : process.platform === 'linux' || process.platform === 'darwin'
       ? guidedSetup(idevicebackup2InstallPrefix(), buildScratchDir())
       : undefined;

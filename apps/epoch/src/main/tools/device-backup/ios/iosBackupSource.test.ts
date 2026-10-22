@@ -117,3 +117,56 @@ describe('crash-log retry target references', () => {
     expect(discardCrashReportsCopy).toHaveBeenCalledWith(firstBackup);
   });
 });
+
+describe('Lab bundle availability and pull refusal', () => {
+  it('refuses availability and pull when host requirements or bundled tools are unmet', async () => {
+    const customCtx = {
+      platform: 'linux' as const,
+      run: async () => ({ code: 1, output: '' }),
+      exists: (file: string) => !file.includes('usbmuxd') && file !== '/opt/epoch/bin/idevicecrashreport',
+      env: {},
+    };
+    const status = await source.checkToolAvailable(customCtx);
+    // In checkout layout (default in test env), checkToolAvailable delegates to findTool('idevicebackup2')
+    expect(status.available).toBe(true);
+
+    // Now test with layout returning bundle layout
+    const contracts = await import('@verichron/contracts');
+    vi.spyOn(contracts, 'layout').mockReturnValue({
+      kind: 'bundle',
+      root: '/opt/epoch',
+      source: '/opt/epoch/source',
+      python: '/opt/epoch/runtime-venv/bin/python',
+      pythonVersionFile: '/opt/epoch/source/.python-version',
+      decryptPython: '/opt/epoch/tools/decrypt/python',
+      decryptScript: '/opt/epoch/tools/decrypt/script.py',
+      ileappDir: '/opt/epoch/tools/ileapp',
+      ileappPython: '/opt/epoch/tools/ileapp/python',
+      ileappCommitFile: null,
+      postgresql: '/opt/epoch/postgresql',
+      bin: '/opt/epoch/bin',
+    });
+
+    try {
+      const bundleStatus = await source.checkToolAvailable(customCtx);
+      expect(bundleStatus.available).toBe(false);
+      if (!bundleStatus.available) {
+        expect(bundleStatus.reason).toMatch(/Not ready for iPhone import:/);
+        expect(bundleStatus.reason).toContain('usbmuxd');
+        expect(bundleStatus.reason).toContain('idevicecrashreport');
+      }
+
+      await expect(
+        source.pullBackup(
+          device,
+          '/dest',
+          () => {},
+          () => {},
+          { password: 'secret', enableEncryption: false }
+        )
+      ).rejects.toThrow(/Not ready for iPhone import:/);
+    } finally {
+      vi.mocked(contracts.layout).mockRestore();
+    }
+  });
+});

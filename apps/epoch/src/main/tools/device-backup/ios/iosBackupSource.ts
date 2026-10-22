@@ -21,6 +21,8 @@ import { existsSync } from 'node:fs';
 import { layout } from '@verichron/contracts';
 import * as path from 'node:path';
 import { manifestMatchesPins, readManifest } from './toolchain';
+import { bundledAvailability } from './toolchain/bundled';
+import type { SetupContext } from './toolchain/requirements';
 import { enableBackupEncryption, PASSCODE_TIMEOUT_MS } from './encryption';
 import { failureMessage } from './deviceErrors';
 import { lastLines, StreamLines } from './toolchain/process';
@@ -98,9 +100,13 @@ function toolBinaryPath(): { available: boolean; idevicebackup2?: string; idevic
   const backup2 = findTool('idevicebackup2');
   const idTool = findTool('idevice_id');
   const infoTool = findTool('ideviceinfo');
+  const crashTool = findTool('idevicecrashreport');
+
+  const lay = layout();
+  const allBundled = !lay.bin || (backup2.available && idTool.available && infoTool.available && crashTool.available);
 
   return {
-    available: backup2.available,
+    available: backup2.available && allBundled,
     idevicebackup2: backup2.available ? backup2.path : undefined,
     idevice_id: idTool.available ? idTool.path : undefined,
     ideviceinfo: infoTool.available ? infoTool.path : undefined,
@@ -326,7 +332,13 @@ export class IosBackupSource implements DeviceBackupSource {
     return reference;
   }
 
-  async checkToolAvailable(): Promise<ToolAvailabilityStatus> {
+  async checkToolAvailable(
+    ctx?: Pick<SetupContext, 'platform' | 'run' | 'exists' | 'env'>
+  ): Promise<ToolAvailabilityStatus> {
+    const lay = layout();
+    if (lay.bin) {
+      return bundledAvailability(lay.bin, ctx);
+    }
     return findTool('idevicebackup2');
   }
 
@@ -397,6 +409,13 @@ export class IosBackupSource implements DeviceBackupSource {
   ): Promise<string> {
     const { password, enableEncryption } = options;
     if (password.trim() === '') throw new Error('A backup password is required.');
+
+    const available = await this.checkToolAvailable();
+    if (!available.available) {
+      throw new Error(
+        available.reason ?? 'idevicebackup2 and ideviceinfo are not available -- call checkToolAvailable() first.'
+      );
+    }
 
     const tools = toolBinaryPath();
     if (!tools.available || !tools.idevicebackup2 || !tools.ideviceinfo) {
