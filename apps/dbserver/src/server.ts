@@ -155,28 +155,29 @@ export async function ensure(lay: Layout, paths: ServerPaths, osUser = os.userIn
   }
 
   let socketDir = paths.socketDir;
-  // Set when this call started the server: a later failure stops it again, so a
-  // failed start leaves no server behind (R14) and the next start begins clean.
+  // Set from the moment this call launches the server: a later failure stops it
+  // again, so a failed start leaves no server behind (R14) and the next start
+  // begins clean. That includes pg_ctl start itself failing, or timing out
+  // while the server goes on starting: stop() checks whether one runs.
   let started = false;
-  if (running(lay, paths.dataDir)) {
-    socketDir = runningSocketDir(paths.dataDir);
-  } else {
-    run(bin(lay, 'pg_ctl'), [
-      'start',
-      '-D',
-      paths.dataDir,
-      '-w',
-      '-t',
-      '60',
-      '-l',
-      paths.logFile,
-      '-o',
-      `-c listen_addresses='' -c unix_socket_directories='${socketDir}'`,
-    ]);
-    started = true;
-  }
-
   try {
+    if (running(lay, paths.dataDir)) {
+      socketDir = runningSocketDir(paths.dataDir);
+    } else {
+      started = true;
+      run(bin(lay, 'pg_ctl'), [
+        'start',
+        '-D',
+        paths.dataDir,
+        '-w',
+        '-t',
+        '60',
+        '-l',
+        paths.logFile,
+        '-o',
+        `-c listen_addresses='' -c unix_socket_directories='${socketDir}'`,
+      ]);
+    }
     return await prepare(lay, paths, socketDir, created);
   } catch (err) {
     if (started) {
