@@ -27,6 +27,43 @@ on `http://localhost:11434` with the configured model pulled.
 `forensics_benchmark.py` is a developer script that compares two models on a
 hand-written chunk. The evaluation set (EPOCH-441) replaces it.
 
+## Private ground-truth labels (EPOCH-588)
+
+Ground-truth labels are case material. Keep the label JSON, the backup and
+lead-output files in an access-controlled private location outside this
+repository. Do not put their contents in source control, Linear, logs, or
+external services. This tool prints aggregate counts and scores only; its
+validation errors omit field values.
+
+The version 1 label format is specified by
+[`scripts/eval/ground_truth.schema.json`](../../scripts/eval/ground_truth.schema.json).
+Each label names an exact UTC timestamp, process, anomaly category and
+description, the source record it identifies, and how the compromise was
+originally verified. The format records the examiner's ground truth; it does
+not independently establish that a backup is compromised.
+
+Validate and score locally from the repository root:
+
+```bash
+uv run python scripts/eval/ground_truth.py validate --labels /private/path/labels.json
+uv run python scripts/eval/ground_truth.py score --labels /private/path/labels.json --leads /private/path/leads.json
+```
+
+The score input adapter contains a `leads` array; each lead has a unique
+`lead_id` and one or more `cited_record_refs`, as EPOCH-442 requires citations
+to source records. A lead is matched if it cites at least one labeled record.
+Precision is matched leads divided by all leads; recall is distinct labeled
+records cited by any lead divided by all labeled records. No leads means
+precision is undefined and is reported as `null`; recall is zero. This
+measures only citation overlap with this reviewed dataset: it is not a
+compromise verdict, a clean-device claim, or a measure of AI performance beyond
+those labels.
+
+The AI analysis is not yet integrated (EPOCH-442), so scoring production leads
+waits for its cited-record output. The real-backup review and its labels remain
+examiner-owned; synthetic unit fixtures verify only the validator and scorer,
+not detection accuracy.
+
 **Known issues:**
 
 | Issue | Ticket |
