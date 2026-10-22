@@ -74,9 +74,13 @@ const density = vi.fn(async (_run: string, boundaries: string[]) => ({
 }));
 
 vi.stubGlobal('epoch', {
-  getTimelineOverview: async () => overview,
-  getTimelineDensity: density,
-  getTimelineRecords: async () => ({ total: 17, rows: [] }),
+  invoke: async (channel: string, ...args: unknown[]) => {
+    if (channel === 'epoch:getTimelineOverview') return overview;
+    if (channel === 'epoch:getTimelineDensity') return density(args[0] as string, args[1] as string[]);
+    if (channel === 'epoch:getTimelineRecords') return { total: 17, rows: [] };
+    throw new Error(`Unexpected IPC invoke: ${channel}`);
+  },
+  on: () => () => undefined,
 });
 
 beforeAll(() => {

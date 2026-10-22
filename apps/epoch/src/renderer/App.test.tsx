@@ -79,7 +79,14 @@ vi.stubGlobal(
     {
       get: (_target, name: string) => {
         if (name === 'platform') return 'linux';
-        if (name.startsWith('on')) return () => () => undefined;
+        if (name === 'on') return () => () => undefined;
+        if (name === 'invoke') {
+          return async (channel: string, ...args: unknown[]) => {
+            const method = channel.slice('epoch:'.length);
+            calls.push([method, ...args]);
+            return method in answers ? answers[method] : [];
+          };
+        }
         return async (...args: unknown[]) => {
           calls.push([name, ...args]);
           return name in answers ? answers[name] : [];

@@ -79,23 +79,36 @@ const skipped = (run: string, finished: string): IndicatorCheckRow => ({
 });
 
 let checks: IndicatorCheckRow[] = [check];
-const checkIndicators = vi.fn(async () => ({ started: true }));
-const contextWindow = vi.fn(async () => ({
-  record_time: '2026-03-01T12:00:00.000Z',
-  from: '2026-03-01T11:45:00.000Z',
-  before: '2026-03-01T12:15:01.000Z',
-  half_width_seconds: 900,
-}));
+const checkIndicators = vi.fn(async (runId: string) => {
+  assert.ok(runId);
+  return { started: true };
+});
+const contextWindow = vi.fn(async (runId: string, recordId: string) => {
+  assert.ok(runId);
+  assert.ok(recordId);
+  return {
+    record_time: '2026-03-01T12:00:00.000Z',
+    from: '2026-03-01T11:45:00.000Z',
+    before: '2026-03-01T12:15:01.000Z',
+    half_width_seconds: 900,
+  };
+});
 vi.stubGlobal('epoch', {
-  getRecordContextWindow: contextWindow,
-  checkIndicators,
-  getIndicatorResults: async () => ({
-    evidenceRegistered: true,
-    checks,
-    staleAfterDays: 90,
-    limit: 'Indicators find only what is already known.',
-    nothingChecked: 'Nothing was checked.',
-  }),
+  invoke: async (channel: string, ...args: unknown[]) => {
+    if (channel === 'epoch:getRecordContextWindow') return contextWindow(args[0] as string, args[1] as string);
+    if (channel === 'epoch:checkIndicators') return checkIndicators(args[0] as string);
+    if (channel === 'epoch:getIndicatorResults') {
+      return {
+        evidenceRegistered: true,
+        checks,
+        staleAfterDays: 90,
+        limit: 'Indicators find only what is already known.',
+        nothingChecked: 'Nothing was checked.',
+      };
+    }
+    throw new Error(`Unexpected IPC invoke: ${channel}`);
+  },
+  on: () => () => undefined,
 });
 
 afterEach(() => {

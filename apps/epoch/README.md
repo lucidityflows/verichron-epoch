@@ -28,10 +28,14 @@ The app loads the repository's `.env` for the database connection.
 | `src/renderer/` | React UI: `views/`, `features/`, `components/ui/` (shared primitives), `store/` (Zustand), `hooks/`, `api/` |
 | `src/shared/` | Types shared by the main process and the renderer |
 
+IPC invoke arguments and results, event payloads, and the exposed bridge are
+defined together in `src/shared/ipc/channels.ts` (R2). Main-process handlers
+and event sends use the typed helpers in `src/main/ipc/typedIpc.ts`; the
+preload exposes only the generic `invoke` and `on` bridge, which renderer APIs
+wrap for application features.
+
 Visual design follows [DESIGN.md](DESIGN.md).
 
 **Known issues:**
 
-| Issue | Ticket |
-|---|---|
-| The IPC bridge is hand-written in three places | EPOCH-453 |
+None currently tracked here.

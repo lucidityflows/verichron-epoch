@@ -1,4 +1,4 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { dialog, BrowserWindow } from 'electron';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { randomUUID } from 'node:crypto';
 import os from 'node:os';
@@ -21,7 +21,12 @@ import {
   type TaskOutcome,
 } from '@verichron/contracts';
 import { getInterruptedEvidence, getRunDecryptedPath } from '@verichron/etl-db-reader';
-import type { AnalysisState, PipelineFinishedResult, AnalysisRunStatus } from '../../shared/types/window';
+import type {
+  AnalysisState,
+  PipelineFinishedResult,
+  AnalysisRunStatus,
+  StartPipelineOptions,
+} from '../../shared/types/window';
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
 import { PipelineSingleFlight } from './pipelineSingleFlight';
 import { analysisTargets, orchestratorArgs } from './analysisTargets';
@@ -33,12 +38,8 @@ import { TaskLog, lastPrepareFailures, listTaskLogs, readSavedTaskLog, type Task
 import { popOutWindows } from '../windows';
 import { signalTask } from './processGroup';
 import { logFileText } from '../../shared/activityLog';
-
-interface StartPipelineOptions {
-  workspace?: string;
-  forceDecrypt?: boolean;
-  only?: string[];
-}
+import { handleIpc, sendIpcEvent } from './typedIpc';
+import type { EventChannel, EventPayload } from '../../shared/ipc/channels';
 
 const OUTSIDE_STAGE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -98,9 +99,11 @@ export function registerPipelineHandlers(
   let pendingPasswordResolve: ((password: string) => void) | null = null;
 
   /** To the main window and any Activity Log pop-out (EPOCH-570). */
-  function sendToRenderer(channel: string, ...args: unknown[]) {
+  function sendToRenderer<Channel extends EventChannel>(channel: Channel, payload: EventPayload<Channel>): void {
     const win = getMainWindow();
-    for (const target of [...(win ? [win] : []), ...popOutWindows()]) target.webContents.send(channel, ...args);
+    for (const target of [...(win ? [win] : []), ...popOutWindows()]) {
+      sendIpcEvent(target.webContents, channel, payload);
+    }
   }
 
   // EPOCH-487: each run's state outlives New Investigation, which unmounts
@@ -246,7 +249,7 @@ export function registerPipelineHandlers(
     }, KILL_GRACE_MS);
   }
 
-  ipcMain.handle('epoch:selectBackupDirectory', async () => {
+  handleIpc('epoch:selectBackupDirectory', async () => {
     const mainWindow = getMainWindow();
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -259,27 +262,27 @@ export function registerPipelineHandlers(
 
   // EPOCH-554: a folder as the page shows it, with the home folder as ~, so
   // the examiner's account name isn't on screen (docs/event-log.md §2.6).
-  ipcMain.handle('epoch:displayPath', async (_event, folder: string) => {
+  handleIpc('epoch:displayPath', async (_event, folder: string) => {
     const home = os.homedir();
     return folder === home || folder.startsWith(home + path.sep) ? `~${folder.slice(home.length)}` : folder;
   });
 
   // EPOCH-554: each discovered backup's model, iOS version, backup date and size, for its row.
-  ipcMain.handle('epoch:describeBackups', async (_event, paths: unknown) => {
+  handleIpc('epoch:describeBackups', async (_event, paths: unknown) => {
     if (!Array.isArray(paths) || !paths.every((p) => typeof p === 'string')) {
       throw new Error('Backup paths must be a list of strings.');
     }
     return Promise.all(paths.map((p) => describeBackup(p)));
   });
 
-  ipcMain.handle('epoch:discoverBackups', async (_event, source: string): Promise<Backup[]> => {
+  handleIpc('epoch:discoverBackups', async (_event, source: string): Promise<Backup[]> => {
     if (!source || !source.trim()) {
       throw new Error('A source directory is required.');
     }
     return discoverBackups(source);
   });
 
-  ipcMain.handle('epoch:getPreparedBackups', async (_event, workspace?: string) => {
+  handleIpc('epoch:getPreparedBackups', async (_event, workspace?: string) => {
     const resolved = workspace?.trim() || defaultWorkspace();
     const backups = readPreparedBackups(resolved);
     // A partly prepared backup says why, from its last Prepare's log (EPOCH-570).
@@ -290,7 +293,7 @@ export function registerPipelineHandlers(
     return { workspace: resolved, backups: backups.map((b) => ({ ...b, reason: reasons.get(b.label) ?? null })) };
   });
 
-  ipcMain.handle('epoch:startPipeline', async (_event, source: string, options?: StartPipelineOptions) => {
+  handleIpc('epoch:startPipeline', async (_event, source: string, options?: StartPipelineOptions) => {
     if (runningProcessor) {
       throw new Error('The processor is already running -- wait for it to finish before starting another.');
     }
@@ -492,7 +495,7 @@ export function registerPipelineHandlers(
     return { started: true, workspace: workspacePath };
   });
 
-  ipcMain.handle('epoch:submitBackupPassword', async (_event, password: string) => {
+  handleIpc('epoch:submitBackupPassword', async (_event, password: string) => {
     if (!runningProcessor || !pendingPasswordResolve) {
       throw new Error('No password prompt is currently pending.');
     }
@@ -502,8 +505,8 @@ export function registerPipelineHandlers(
     prepareSession.passwordSubmitted();
   });
 
-  ipcMain.handle('epoch:getPrepareState', () => prepareSession.snapshot());
-  ipcMain.handle('epoch:getAnalysisState', () => analysisSession.snapshot());
+  handleIpc('epoch:getPrepareState', () => prepareSession.snapshot());
+  handleIpc('epoch:getAnalysisState', () => analysisSession.snapshot());
 
   /** One orchestrator call: a whole Analyze from New Investigation, or one run retried from Investigations. */
   interface OrchestratorCall {
@@ -729,7 +732,7 @@ export function registerPipelineHandlers(
 
   // Analyze reads the backups the examiner selected, each checked to be
   // prepared in this workspace, never every prepared backup there (EPOCH-530).
-  ipcMain.handle('epoch:startAnalysis', async (_event, workspace: string, labels: unknown) => {
+  handleIpc('epoch:startAnalysis', async (_event, workspace: string, labels: unknown) => {
     if (runningOrchestratorProcess) {
       throw new Error('The orchestrator is already running -- wait for analysis to finish before starting another.');
     }
@@ -804,21 +807,19 @@ export function registerPipelineHandlers(
     return { started: true };
   }
 
-  ipcMain.handle('epoch:retryRun', async (_event, runId: string) => rerunEvidenceOf(runId, 'retry'));
-  ipcMain.handle('epoch:checkIndicators', async (_event, runId: string) => rerunEvidenceOf(runId, 'check'));
+  handleIpc('epoch:retryRun', async (_event, runId: string) => rerunEvidenceOf(runId, 'retry'));
+  handleIpc('epoch:checkIndicators', async (_event, runId: string) => rerunEvidenceOf(runId, 'check'));
 
   // EPOCH-570: the workspace's saved task logs, read back after a restart.
-  ipcMain.handle('epoch:listTaskLogs', async (_event, workspace: string) => listTaskLogs(workspace));
-  ipcMain.handle('epoch:readTaskLog', async (_event, workspace: string, file: string) =>
-    readSavedTaskLog(workspace, file)
-  );
+  handleIpc('epoch:listTaskLogs', async (_event, workspace: string) => listTaskLogs(workspace));
+  handleIpc('epoch:readTaskLog', async (_event, workspace: string, file: string) => readSavedTaskLog(workspace, file));
 
   /**
    * Save As… (EPOCH-570): the saved log, sanitized as it was written, as text
    * (the Full log under a header) or as its own NDJSON. The copy is private
    * to the examiner (0600): it is case material, like the log.
    */
-  ipcMain.handle(
+  handleIpc(
     'epoch:saveTaskLogAs',
     async (_event, workspace: string, file: string): Promise<{ saved: string | null }> => {
       const read = await readSavedTaskLog(workspace, file);
@@ -847,7 +848,7 @@ export function registerPipelineHandlers(
 
   // EPOCH-554: Stop on Preparing. The processor's whole process group is
   // signalled, as for Analyze, so the decrypt and iLEAPP stop with it.
-  ipcMain.handle('epoch:cancelPrepare', async (): Promise<{ cancelled: boolean }> => {
+  handleIpc('epoch:cancelPrepare', async (): Promise<{ cancelled: boolean }> => {
     if (!runningProcessor || prepareStopRequested) return { cancelled: false };
     prepareStopRequested = true;
     pendingPasswordResolve = null;
@@ -860,7 +861,7 @@ export function registerPipelineHandlers(
     return { cancelled: true };
   });
 
-  ipcMain.handle('epoch:cancelAnalysis', async (): Promise<{ cancelled: boolean }> => {
+  handleIpc('epoch:cancelAnalysis', async (): Promise<{ cancelled: boolean }> => {
     if (!runningOrchestratorProcess) {
       return { cancelled: false };
     }
@@ -876,7 +877,7 @@ export function registerPipelineHandlers(
    * by a process that is gone are closed as abandoned first. The evidence is
    * found by its content root from the backups' sidecars, never by path.
    */
-  ipcMain.handle('epoch:getAnalysisRunStatus', async (_event, workspace: string): Promise<AnalysisRunStatus> => {
+  handleIpc('epoch:getAnalysisRunStatus', async (_event, workspace: string): Promise<AnalysisRunStatus> => {
     const trimmedWorkspace = (workspace ?? '').trim();
     if (!trimmedWorkspace) return { status: 'idle' };
 

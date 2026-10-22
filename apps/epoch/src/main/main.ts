@@ -13,8 +13,9 @@ import { registerSettingsHandlers } from './ipc/settingsHandlers';
 import { readSettings } from './settings';
 import { addPopOut } from './windows';
 import { startBundleDatabase, stopBundleDatabase } from './bundleDatabase';
+import { handleIpc } from './ipc/typedIpc';
 
-const { app, BrowserWindow, dialog, ipcMain } = electron;
+const { app, BrowserWindow, dialog } = electron;
 
 console.log('\n=======================================');
 console.log('MAIN PROCESS IS EXECUTING!');
@@ -119,7 +120,7 @@ function startApp(): void {
 
   // EPOCH-570: the Activity Log in its own window, for a second monitor. It
   // follows the same task as the drawer; one is open at a time.
-  ipcMain.handle('epoch:popOutActivityLog', () => {
+  handleIpc('epoch:popOutActivityLog', () => {
     if (activityLogWindow && !activityLogWindow.isDestroyed()) {
       activityLogWindow.focus();
       return;

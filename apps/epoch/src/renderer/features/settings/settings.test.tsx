@@ -21,16 +21,20 @@ let readGate: Promise<void> | null;
 const setDisplayZone = vi.fn(async (zone: string) => (stored = { ...stored, displayZone: zone }));
 
 vi.stubGlobal('epoch', {
-  getSettings: async () => {
-    const answer = stored;
-    if (readGate) await readGate;
-    if (readError) throw readError;
-    if (readGate) return answer;
-    return stored;
+  invoke: async (channel: string, zone?: string) => {
+    if (channel === 'epoch:getSettings') {
+      const answer = stored;
+      if (readGate) await readGate;
+      if (readError) throw readError;
+      if (readGate) return answer;
+      return stored;
+    }
+    if (channel === 'epoch:getDisplayZones') return ['UTC', 'America/Chicago', 'Asia/Kolkata'];
+    if (channel === 'epoch:setDisplayZone') return setDisplayZone(zone!);
+    throw new Error(`Unexpected IPC invoke: ${channel}`);
   },
-  getDisplayZones: async () => ['UTC', 'America/Chicago', 'Asia/Kolkata'],
-  setDisplayZone,
-  onSettingsChanged: (callback: (settings: AppSettings) => void) => {
+  on: (channel: string, callback: (settings: AppSettings) => void) => {
+    if (channel !== 'epoch:settingsChanged') throw new Error(`Unexpected IPC event: ${channel}`);
     changed = callback;
     return () => (changed = null);
   },

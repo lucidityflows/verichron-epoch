@@ -106,7 +106,7 @@ export function useDevicePull() {
   }, [destDir]);
 
   useEffect(() => {
-    window.epoch.listDeviceBackupSources().then((found) => {
+    devicesApi.listDeviceBackupSources().then((found) => {
       setSources(found);
       if (found.length > 0) setSourceId(found[0].id);
     });
@@ -149,7 +149,7 @@ export function useDevicePull() {
       setActions([]);
 
       try {
-        const status = await window.epoch.checkDeviceBackupToolAvailable(id);
+        const status = await devicesApi.checkDeviceBackupToolAvailable(id);
         setToolStatus(status);
         if (status.available) {
           // A pull already running owns the device: show it, and don't query the device.
@@ -160,12 +160,12 @@ export function useDevicePull() {
             return;
           }
           setPhase('available');
-          const found = await window.epoch.listConnectedDevices(id);
+          const found = await devicesApi.listConnectedDevices(id);
           setDevices(found);
         } else {
           const guided = await devicesApi.getToolSetupStatus(id);
           setSetupStatus(guided);
-          if (!guided) setActions(await window.epoch.getToolAcquisitionActions(id));
+          if (!guided) setActions(await devicesApi.getToolAcquisitionActions(id));
           setPhase('unavailable');
         }
       } catch (error: unknown) {
@@ -201,7 +201,7 @@ export function useDevicePull() {
       outputRafId = null;
     };
 
-    const unsubStep = window.epoch.onToolAcquisitionStepStarted((label) => {
+    const unsubStep = devicesApi.onToolAcquisitionStepStarted((label) => {
       setAcquisitionStep(label);
       outputBuffer.push(`\n--- ${label} ---`);
       if (outputRafId === null) {
