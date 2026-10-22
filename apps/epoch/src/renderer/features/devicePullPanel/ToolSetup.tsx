@@ -114,7 +114,8 @@ export function ToolSetup({
         </ActionCard>
       )}
 
-      {!running && status.systemReady && !status.installed && (
+      {/* Only where there is a setup to run: the Lab bundle's tools are never built (EPOCH-472). */}
+      {!running && status.supported && status.systemReady && !status.installed && (
         <ActionCard
           title="Install iPhone Libraries"
           description={`Builds ${libraryCount} libraries from verified releases into Epoch's own tools folder. This takes a few minutes.`}

@@ -17,8 +17,12 @@ import { bundledToolPath, detectBinary } from '../detection';
 import { idevicebackup2InstallPrefix } from './iosAcquisitionStrategy';
 
 import * as fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { layout } from '@verichron/contracts';
 import * as path from 'node:path';
 import { manifestMatchesPins, readManifest } from './toolchain';
+import { bundledAvailability } from './toolchain/bundled';
+import type { SetupContext } from './toolchain/requirements';
 import { enableBackupEncryption, PASSCODE_TIMEOUT_MS } from './encryption';
 import { failureMessage } from './deviceErrors';
 import { lastLines, StreamLines } from './toolchain/process';
@@ -72,13 +76,38 @@ function trustedToolPath(name: string): string | undefined {
   return bundledToolPath(installPrefix, name);
 }
 
+/**
+ * A tool a pull runs. In the Lab bundle, only the bundle's own copy counts
+ * (EPOCH-472): never PATH, never a guided setup's folder, so a missing tool
+ * reads as missing and the pull is refused naming it. In a checkout, the
+ * guided setup's verified copy, then PATH.
+ */
+function findTool(name: string): ToolAvailabilityStatus {
+  const lay = layout();
+  if (lay.bin) {
+    const bundled = path.join(lay.bin, name);
+    return existsSync(bundled)
+      ? { available: true, path: bundled }
+      : {
+          available: false,
+          reason: `${name} is missing from the Lab bundle (${bundled}), so the bundle is incomplete.`,
+        };
+  }
+  return detectBinary(name, trustedToolPath(name));
+}
+
+/** Resolves pull tools, requiring all four bundled tools for Lab availability. */
 function toolBinaryPath(): { available: boolean; idevicebackup2?: string; idevice_id?: string; ideviceinfo?: string } {
-  const backup2 = detectBinary('idevicebackup2', trustedToolPath('idevicebackup2'));
-  const idTool = detectBinary('idevice_id', trustedToolPath('idevice_id'));
-  const infoTool = detectBinary('ideviceinfo', trustedToolPath('ideviceinfo'));
+  const backup2 = findTool('idevicebackup2');
+  const idTool = findTool('idevice_id');
+  const infoTool = findTool('ideviceinfo');
+  const crashTool = findTool('idevicecrashreport');
+
+  const lay = layout();
+  const allBundled = !lay.bin || (backup2.available && idTool.available && infoTool.available && crashTool.available);
 
   return {
-    available: backup2.available,
+    available: backup2.available && allBundled,
     idevicebackup2: backup2.available ? backup2.path : undefined,
     idevice_id: idTool.available ? idTool.path : undefined,
     ideviceinfo: infoTool.available ? infoTool.path : undefined,
@@ -304,8 +333,15 @@ export class IosBackupSource implements DeviceBackupSource {
     return reference;
   }
 
-  async checkToolAvailable(): Promise<ToolAvailabilityStatus> {
-    return detectBinary('idevicebackup2', trustedToolPath('idevicebackup2'));
+  /** Checks all bundled tools and host requirements in Lab, or locates idevicebackup2 in a checkout. */
+  async checkToolAvailable(
+    ctx?: Pick<SetupContext, 'platform' | 'run' | 'exists' | 'env'>
+  ): Promise<ToolAvailabilityStatus> {
+    const lay = layout();
+    if (lay.bin) {
+      return bundledAvailability(lay.bin, ctx);
+    }
+    return findTool('idevicebackup2');
   }
 
   async listConnectedDevices(): Promise<DeviceInfo[]> {
@@ -375,6 +411,13 @@ export class IosBackupSource implements DeviceBackupSource {
   ): Promise<string> {
     const { password, enableEncryption } = options;
     if (password.trim() === '') throw new Error('A backup password is required.');
+
+    const available = await this.checkToolAvailable();
+    if (!available.available) {
+      throw new Error(
+        available.reason ?? 'idevicebackup2 and ideviceinfo are not available -- call checkToolAvailable() first.'
+      );
+    }
 
     const tools = toolBinaryPath();
     if (!tools.available || !tools.idevicebackup2 || !tools.ideviceinfo) {
@@ -609,7 +652,7 @@ async function removeOwnLeftover(destDir: string, device: DeviceInfo): Promise<v
  */
 async function copyCrashLogs(plistutil: string, device: DeviceInfo, backupDir: string): Promise<CrashReportCopy> {
   try {
-    const crashTool = detectBinary('idevicecrashreport', trustedToolPath('idevicecrashreport'));
+    const crashTool = findTool('idevicecrashreport');
     return await copyCrashReports(
       crashTool.available ? crashTool.path : undefined,
       device.id,

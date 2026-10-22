@@ -298,7 +298,8 @@ without root; the decisions behind it are in
 | `runtime-venv/` | The Python environment that runs: no dependency groups | `tools/runtime/build.sh` |
 | `source/` | Our Python stages, writer, report and the contract files they read | `tools/runtime/build.sh`, from the commit |
 | `tools/decrypt/`, `tools/ileapp/` | The decrypt and iLEAPP, each with its own environment | `tools/runtime/build.sh` |
-| `bin/` | The iPhone tools (EPOCH-472) and `sqlite3` | Assembly |
+| `bin/` | The iPhone tools a pull runs (`idevicebackup2`, `idevicecrashreport`, `idevice_id`, `ideviceinfo`; EPOCH-472) and `sqlite3` | `tools/iphone/build.sh` |
+| `lib/` | The iPhone libraries those tools load, and nothing else | `tools/iphone/build.sh` |
 | `postgresql/` | PostgreSQL 17, socket-only | `tools/postgres/build.sh` |
 | `COMMIT` | The commit the bundle is built from; every part's build must match it | `tools/runtime/build.sh` |
 | `MANIFEST`, `MANIFEST.sig` | Every file's SHA-256, and the owner's signature over it | Assembly; signed on the owner's machine |
@@ -336,9 +337,19 @@ paths in its test jobs, and the bundle's parts in `postgres-build.yml`.
 
 Built so far, each with its check: `postgresql/`, the Python parts
 (`python/`, `source/`, `runtime-venv/`, `tools/`), and `node/` with `services/`,
-the database server among them, all movable ([PostgreSQL](development.md#the-lab-bundles-postgresql),
+the database server among them, and `bin/` with `lib/`, all movable
+([PostgreSQL](development.md#the-lab-bundles-postgresql),
 [Python parts](development.md#the-lab-bundles-python-parts),
-[services](development.md#the-lab-bundles-services)).
+[services](development.md#the-lab-bundles-services),
+[iPhone tools](development.md#the-lab-bundles-iphone-tools-and-sqlite3)).
+
+**On the Lab machine.** The bundle needs nothing installed but what Debian 13's
+base system has, and the `usbmuxd` package, which an administrator installs from
+the lab's own package media: it runs the service that reaches the iPhone over
+USB, and its udev rules start it when one is plugged in. These are the only steps
+that need administrator rights. The app shows their status and the command, and
+installs nothing itself; it never offers the guided setup, and runs the iPhone
+tools only from `bin/`.
 
 ## Database configuration
 

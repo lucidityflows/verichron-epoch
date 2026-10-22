@@ -4,6 +4,7 @@ import { backupDeviceId, backupFinishedAt, deviceListed, incompleteReason } from
 import { copyCrashReports, crashReportsCopyExists, discardCrashReportsCopy } from './crashReports';
 import { IosBackupSource } from './iosBackupSource';
 import { appendPullRecord } from './pullRecord';
+import { BUNDLED_TOOLS } from './toolchain/bundled';
 
 vi.mock('../detection', () => ({
   bundledToolPath: (_prefix: string, name: string) => `/tools/${name}`,
@@ -115,5 +116,71 @@ describe('crash-log retry target references', () => {
     );
     expect(discardCrashReportsCopy).toHaveBeenCalledTimes(1);
     expect(discardCrashReportsCopy).toHaveBeenCalledWith(firstBackup);
+  });
+});
+
+describe('Lab bundle availability and pull refusal', () => {
+  it('refuses availability and pull when host requirements or bundled tools are unmet', async () => {
+    const customCtx = {
+      platform: 'linux' as const,
+      run: async () => ({ code: 1, output: '' }),
+      exists: (file: string) => !file.includes('usbmuxd') && file !== '/opt/epoch/bin/idevicecrashreport',
+      env: {},
+    };
+    const status = await source.checkToolAvailable(customCtx);
+    // In checkout layout (default in test env), checkToolAvailable delegates to findTool('idevicebackup2')
+    expect(status.available).toBe(true);
+
+    // Now test with layout returning bundle layout
+    const contracts = await import('@verichron/contracts');
+    vi.spyOn(contracts, 'layout').mockReturnValue({
+      kind: 'bundle',
+      root: '/opt/epoch',
+      source: '/opt/epoch/source',
+      python: '/opt/epoch/runtime-venv/bin/python',
+      pythonVersionFile: '/opt/epoch/source/.python-version',
+      decryptPython: '/opt/epoch/tools/decrypt/python',
+      decryptScript: '/opt/epoch/tools/decrypt/script.py',
+      ileappDir: '/opt/epoch/tools/ileapp',
+      ileappPython: '/opt/epoch/tools/ileapp/python',
+      ileappCommitFile: null,
+      postgresql: '/opt/epoch/postgresql',
+      bin: '/opt/epoch/bin',
+    });
+
+    const hostFiles = new Set([...BUNDLED_TOOLS.map((tool) => `/opt/epoch/bin/${tool}`), '/usr/sbin/usbmuxd']);
+    const pullCtx = {
+      ...customCtx,
+      run: async () => ({ code: 0, output: 'usbmuxd 1.1.1\n' }),
+      exists: (file: string) => hostFiles.has(file),
+    };
+    const checkToolAvailable = source.checkToolAvailable.bind(source);
+    const availabilityCheck = vi
+      .spyOn(source, 'checkToolAvailable')
+      .mockImplementation((ctx = pullCtx) => checkToolAvailable(ctx));
+
+    try {
+      const bundleStatus = await source.checkToolAvailable(customCtx);
+      expect(bundleStatus.available).toBe(false);
+      if (!bundleStatus.available) {
+        expect(bundleStatus.reason).toMatch(/Not ready for iPhone import:/);
+        expect(bundleStatus.reason).toContain('usbmuxd');
+        expect(bundleStatus.reason).toContain('idevicecrashreport');
+      }
+
+      await expect(
+        source.pullBackup(
+          device,
+          '/dest',
+          () => {},
+          () => {},
+          { password: 'secret', enableEncryption: false }
+        )
+      ).rejects.toThrow('Not ready for iPhone import: usbmuxd udev rules.');
+      expectNoWrites();
+    } finally {
+      availabilityCheck.mockRestore();
+      vi.mocked(contracts.layout).mockRestore();
+    }
   });
 });

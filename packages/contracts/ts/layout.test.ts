@@ -28,6 +28,7 @@ describe('layout (EPOCH-478)', () => {
     assert.equal(lay.ileappDir, path.join(root, 'tools', 'ileapp', 'iLEAPP'));
     assert.equal(lay.ileappCommitFile, null, 'a checkout asks git');
     assert.equal(lay.postgresql, null, "a checkout uses Docker's PostgreSQL");
+    assert.equal(lay.bin, null);
   });
 
   it('finds the Lab bundle from its services and its packaged app, with source/ and runtime-venv/', () => {
@@ -48,6 +49,7 @@ describe('layout (EPOCH-478)', () => {
     assert.equal(lay.decryptScript, path.join(root, 'tools', 'decrypt', 'decrypt_backup.py'));
     assert.equal(lay.ileappCommitFile, path.join(root, 'tools', 'ileapp', 'iLEAPP.commit'));
     assert.equal(lay.postgresql, path.join(root, 'postgresql'));
+    assert.equal(lay.bin, path.join(root, 'bin'));
   });
 
   it('is no bundle without its MANIFEST, and fails where there is no root at all', () => {

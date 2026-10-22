@@ -321,6 +321,27 @@ starts again on the same database, takes two overlapping starts without one
 stopping the other's server, and refuses one behind this version or whose first
 start never finished, leaving no server running ([the database server](../apps/dbserver/README.md)).
 
+### The Lab bundle's iPhone tools and sqlite3
+
+The tools a pull runs, and `sqlite3` for the repair pass, are built in the same
+container (EPOCH-472). The iPhone libraries are the guided setup's own pins
+(`apps/epoch/src/main/tools/device-backup/ios/toolchain/pins.ts`, read by
+`tools/iphone/list-pins.ts`), each refused unless its SHA-256 matches; `sqlite3`
+is pinned in `tools/iphone/versions.env` by the SHA3-256 sqlite.org publishes.
+Sources are downloaded first, then built offline. Only the four tools and the
+libraries they load ship, each finding its libraries at `$ORIGIN/../lib`; libtool's
+absolute build path is removed with `patchelf`. `sqlite3` is built without
+readline (GPL).
+
+```bash
+tools/iphone/build.sh <bundle>    # <bundle>/bin and <bundle>/lib
+tools/iphone/check.sh <bundle>    # moved: they run, and load only the base system from outside the bundle
+```
+
+The check requires every library path to be relative, and nothing to be loaded
+from outside the bundle but libc, libm, OpenSSL, zlib and zstd; it runs each
+tool, checks `sqlite3`'s version, and rebuilds a database with its `.recover`.
+
 ### Real-device checks for iPhone pulls
 
 Stub tools can't show what an iPhone does. A ticket that changes the iPhone
@@ -347,7 +368,7 @@ New device behaviour seen during these checks is added to the verified list in
 | Workflow | Runs |
 |---|---|
 | `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 17, pytest on both tiers, the runtime environment and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
-| `.github/workflows/postgres-build.yml` | Only when `tools/` (the builds, the decrypt or iLEAPP), the services and packages they include, the Python dependencies, `mise.toml` (uv's version) or `.python-version` change: the Lab bundle's PostgreSQL built from source, its Python parts and its services built beside it, each then checked as below |
+| `.github/workflows/postgres-build.yml` | Only when `tools/` (the builds, the decrypt or iLEAPP), the iPhone tools' pins, the services and packages they include, the Python dependencies, `mise.toml` (uv's version) or `.python-version` change: the Lab bundle's PostgreSQL built from source, its Python parts, its services and its iPhone tools built beside it, each then checked as below |
 | `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, lint (`pnpm --filter @verichron/epoch lint`: errors fail the job, EPOCH-571), Vite build and tests |
 
 The Python and TypeScript workflows install the toolchain from `mise.toml` and Python from
