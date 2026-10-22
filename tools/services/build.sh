@@ -7,8 +7,9 @@
 # Adds, beside the bundle's other parts (docs/architecture.md, "The Lab
 # bundle"):
 #   <bundle>/node      Node, mise.toml's version: bin/node and its LICENSE only
-#   <bundle>/services  the orchestrator and processor, each compiled to one file
-#                      (orchestrator.mjs, processor.mjs), with the licence
+#   <bundle>/services  the orchestrator, the processor and the database server,
+#                      each compiled to one file (orchestrator.mjs,
+#                      processor.mjs, dbserver.mjs), with the licence
 #                      comments of what they include beside them (*.LEGAL.txt)
 #
 # The services are compiled from this checkout, which must be at the commit
@@ -52,7 +53,7 @@ fi
 
 # What the services are built from: their own sources, the workspace packages,
 # the dependencies, and this build itself. None may differ from the commit.
-changed="$(git -C "$REPO_ROOT" status --porcelain -- apps/orchestrator apps/processor packages \
+changed="$(git -C "$REPO_ROOT" status --porcelain -- apps/orchestrator apps/processor apps/dbserver packages \
   package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json mise.toml tools/services)"
 if [ -n "$changed" ]; then
   echo "[services] uncommitted changes to what the services are built from; commit them first:" >&2

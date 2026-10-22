@@ -72,6 +72,27 @@ def test_present_venv_passes(tmp_path, monkeypatch):
     runtime_env.fatal_if_missing_venv()
 
 
+def test_the_bundle_needs_its_runtime_venv_not_a_repo_venv(tmp_path, monkeypatch, capsys):
+    """In the Lab bundle the source is source/, and its interpreter is runtime-venv/ beside it (EPOCH-478)."""
+    bundle = tmp_path / "bundle"
+    (bundle / "source").mkdir(parents=True)
+    (bundle / "MANIFEST").touch()
+    (bundle / "runtime-venv" / "bin").mkdir(parents=True)
+    monkeypatch.setattr(runtime_env, "repo_root", lambda: bundle / "source")
+    assert runtime_env.bundle_root() == bundle
+    with pytest.raises(SystemExit):
+        runtime_env.fatal_if_missing_venv()
+    assert "the bundle is incomplete" in capsys.readouterr().err
+    (bundle / "runtime-venv" / "bin" / "python").touch()
+    assert runtime_env.ensure_repo_venv() == bundle / "runtime-venv" / "bin" / "python"
+
+
+def test_a_folder_named_source_without_a_bundle_around_it_is_a_checkout(tmp_path, monkeypatch):
+    (tmp_path / "source").mkdir()
+    monkeypatch.setattr(runtime_env, "repo_root", lambda: tmp_path / "source")
+    assert runtime_env.bundle_root() is None
+
+
 REPO = Path(__file__).resolve().parents[1]
 
 # The stages the orchestrator spawns: each gets DATABASE_URL in its

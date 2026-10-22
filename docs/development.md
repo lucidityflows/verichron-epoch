@@ -295,8 +295,9 @@ decrypt and iLEAPP's plugins.
 
 ### The Lab bundle's services
 
-The orchestrator and processor are compiled into one file each
-(`services/orchestrator.mjs`, `services/processor.mjs`) with esbuild, and run by
+The orchestrator, the processor and the database server are compiled into one
+file each (`services/orchestrator.mjs`, `services/processor.mjs`,
+`services/dbserver.mjs`) with esbuild, and run by
 the bundled Node, `mise.toml`'s version, from the official tarball refused unless
 its SHA-256 is the one in `tools/services/versions.env` (EPOCH-478). Only
 `bin/node` and Node's `LICENSE` ship. The services are compiled from this
@@ -311,11 +312,13 @@ tools/services/build.sh <bundle>    # <bundle>/node and <bundle>/services
 tools/services/check.sh <bundle>    # moved, nothing on PATH but the base system
 ```
 
-The check runs both services from the moved bundle: the orchestrator validates
+The check runs the services from the moved bundle: the orchestrator validates
 the bundle's Python and finds every stage, the processor identifies the decrypt
 and reads iLEAPP's recorded commit, and each stops where it should, at an empty
-workspace and an empty source. The database is not reached; the app-managed
-server is EPOCH-477.
+workspace and an empty source. The database server creates the database
+(socket only, every migration, a runtime login that cannot TRUNCATE), stops,
+starts again on the same database, and refuses one behind this version or
+whose first start never finished ([the database server](../apps/dbserver/README.md)).
 
 ### Real-device checks for iPhone pulls
 

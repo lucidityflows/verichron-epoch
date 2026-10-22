@@ -49,7 +49,7 @@ jobs:
       - name: Install dependencies
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-        run: pnpm install --frozen-lockfile --filter verichron-epoch --filter "@verichron/processor..." --filter "@verichron/etl-db-reader..." --filter "@verichron/orchestrator..." --filter "@verichron/epoch..."
+        run: pnpm install --frozen-lockfile --filter verichron-epoch --filter "@verichron/processor..." --filter "@verichron/etl-db-reader..." --filter "@verichron/orchestrator..." --filter "@verichron/dbserver..." --filter "@verichron/epoch..."
 
       # EPOCH-469: every TypeScript file in the repo, the desktop app included,
       # in the layout .prettierrc.json gives it.
@@ -106,6 +106,17 @@ jobs:
       # completeness predicate, against a throwaway database on this server.
       - name: Test orchestrator (real Postgres)
         run: pnpm --filter @verichron/orchestrator test
+
+      # The Lab bundle's database server (EPOCH-477); its server runs are
+      # checked from a built bundle in postgres-build.yml.
+      - name: Typecheck database server
+        run: pnpm --filter @verichron/dbserver typecheck
+
+      - name: Typecheck database server tests
+        run: pnpm --filter @verichron/dbserver typecheck:tests
+
+      - name: Test database server
+        run: pnpm --filter @verichron/dbserver test
 
       # EPOCH-454: the desktop app reads the reader through its built dist/.
       - name: Build etl-db-reader

@@ -12,8 +12,9 @@ import { registerDeviceHandlers } from './ipc/deviceHandlers';
 import { registerSettingsHandlers } from './ipc/settingsHandlers';
 import { readSettings } from './settings';
 import { addPopOut } from './windows';
+import { startBundleDatabase, stopBundleDatabase } from './bundleDatabase';
 
-const { app, BrowserWindow, ipcMain } = electron;
+const { app, BrowserWindow, dialog, ipcMain } = electron;
 
 console.log('\n=======================================');
 console.log('MAIN PROCESS IS EXECUTING!');
@@ -21,8 +22,26 @@ console.log('=======================================\n');
 
 // A checkout, or the Lab bundle: found from where this code runs (layout.ts).
 const LAYOUT = layout();
-// A checkout's .env; the Lab bundle has none (its database is the app's own, EPOCH-477).
-if (LAYOUT.kind === 'checkout') loadRootEnv(LAYOUT.root);
+if (LAYOUT.kind === 'checkout') {
+  // A checkout's .env and its development database (Docker).
+  loadRootEnv(LAYOUT.root);
+} else {
+  // One app per bundle: a second would share the database server, and stop it when it quit.
+  if (!app.requestSingleInstanceLock()) {
+    app.exit(0);
+  }
+  // The bundle's own database (EPOCH-477): started, or created, before anything opens it.
+  // Every service the app starts inherits the address.
+  try {
+    process.env.DATABASE_URL = startBundleDatabase(LAYOUT);
+  } catch (err) {
+    dialog.showErrorBox(
+      'Verichron Epoch could not start its database',
+      err instanceof Error ? err.message : String(err)
+    );
+    app.exit(1);
+  }
+}
 
 // Missing database configuration is fatal startup input, not a recoverable runtime exception.
 const dbPool = new Pool({
@@ -145,4 +164,21 @@ app.on('before-quit', () => {
   // A running task is in a process group of its own and would outlive the app (EPOCH-570).
   pipeline.stopAll();
   dbPool.end().catch((err) => console.error('Error closing DB pool:', err));
+});
+
+app.on('will-quit', () => {
+  // The bundle's database server stops with the app (EPOCH-477).
+  if (LAYOUT.kind === 'bundle') {
+    try {
+      stopBundleDatabase(LAYOUT);
+    } catch (err) {
+      console.error('Error stopping the database server:', err);
+    }
+  }
+});
+
+// A second launch of the bundle brings this window forward instead.
+app.on('second-instance', () => {
+  if (mainWindow?.isMinimized()) mainWindow.restore();
+  mainWindow?.focus();
 });
