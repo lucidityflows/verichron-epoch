@@ -8,7 +8,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 
-import { acquireWorkspaceLocks, WORKSPACE_LOCK_FILE } from './index.js';
+import { acquireWorkspaceLocks, WORKSPACE_LOCK_FILE, WorkspaceLockedError } from './index.js';
 
 const temporaryWorkspaces: string[] = [];
 
@@ -57,6 +57,17 @@ describe('workspace locks', () => {
     await release();
     const releaseOrchestrator = await acquireWorkspaceLocks([workspace], 'orchestrator');
     await releaseOrchestrator();
+  });
+
+  it("holds the database server's lock like any tool's, refusing with an error a caller can wait on (EPOCH-477)", async () => {
+    const workspace = await makeWorkspace();
+    const release = await acquireWorkspaceLocks([workspace], 'dbserver');
+    await assert.rejects(
+      acquireWorkspaceLocks([workspace], 'dbserver'),
+      (err: unknown) => err instanceof WorkspaceLockedError && /locked by dbserver \(pid \d+/.test(err.message)
+    );
+    await release();
+    assert.deepEqual(await readdir(workspace), [], 'released, with nothing left behind');
   });
 
   it('replaces a lock whose owning process has exited', async () => {

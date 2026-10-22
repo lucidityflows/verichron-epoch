@@ -118,6 +118,14 @@ jobs:
       - name: Test database server
         run: pnpm --filter @verichron/dbserver test
 
+      # The workspace lock, which the processor, the orchestrator and the
+      # database server take (EPOCH-415, EPOCH-477).
+      - name: Typecheck workspace lock tests
+        run: pnpm --filter @verichron/workspace-lock typecheck:tests
+
+      - name: Test workspace lock
+        run: pnpm --filter @verichron/workspace-lock test
+
       # EPOCH-454: the desktop app reads the reader through its built dist/.
       - name: Build etl-db-reader
         run: pnpm --filter @verichron/etl-db-reader build

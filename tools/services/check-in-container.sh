@@ -74,6 +74,18 @@ if [ "${1:-}" = run ]; then
     || fail "the second start did not reuse the database: $again"
   echo "[services] ok: stopped, and started again on the same database"
 
+  # Two overlapping starts: one waits for the other's lock and finds its
+  # server, so neither stops the server the other started.
+  dbserver stop
+  dbserver ensure > "$HOME/first.json" 2> "$HOME/first.err" &
+  one=$!
+  dbserver ensure > "$HOME/second.json" 2> "$HOME/second.err" &
+  two=$!
+  wait "$one" || fail "the first of two overlapping starts failed: $(cat "$HOME/first.err")"
+  wait "$two" || fail "the second of two overlapping starts failed: $(cat "$HOME/second.err")"
+  psql "$admin" -c 'SELECT 1' > /dev/null || fail "the server stopped after two overlapping starts"
+  echo "[services] ok: two overlapping starts both succeeded, and the server stayed up"
+
   psql "$admin" -c "DELETE FROM schema_migrations WHERE filename = (SELECT max(filename) FROM schema_migrations)"
   dbserver stop
   set +e

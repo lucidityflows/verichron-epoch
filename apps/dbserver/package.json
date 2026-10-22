@@ -4,17 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prebuild": "pnpm --filter @verichron/contracts build && pnpm --filter @verichron/etl-db-reader build",
+    "prebuild": "pnpm --filter @verichron/contracts build && pnpm --filter @verichron/etl-db-reader build && pnpm --filter @verichron/workspace-lock build",
     "build": "tsc",
-    "pretypecheck": "pnpm --filter @verichron/contracts build && pnpm --filter @verichron/etl-db-reader build",
+    "pretypecheck": "pnpm --filter @verichron/contracts build && pnpm --filter @verichron/etl-db-reader build && pnpm --filter @verichron/workspace-lock build",
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc --project tsconfig.test.json",
-    "pretest": "pnpm --filter @verichron/contracts build && pnpm --filter @verichron/etl-db-reader build",
+    "pretest": "pnpm --filter @verichron/contracts build && pnpm --filter @verichron/etl-db-reader build && pnpm --filter @verichron/workspace-lock build",
     "test": "tsx --test 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@verichron/contracts": "workspace:*",
     "@verichron/etl-db-reader": "workspace:*",
+    "@verichron/workspace-lock": "workspace:*",
     "pg": "^8.23.0"
   },
   "devDependencies": {

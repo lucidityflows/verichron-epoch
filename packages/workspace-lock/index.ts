@@ -5,7 +5,16 @@ import { setTimeout } from 'node:timers/promises';
 
 export const WORKSPACE_LOCK_FILE = '.verichron.lock';
 
-export type WorkspaceLockTool = 'processor' | 'orchestrator';
+/** The tools that take a workspace lock; the type and the lock's validation both come from this list. */
+const WORKSPACE_LOCK_TOOLS = ['processor', 'orchestrator', 'dbserver'] as const;
+export type WorkspaceLockTool = (typeof WORKSPACE_LOCK_TOOLS)[number];
+
+function isWorkspaceLockTool(value: unknown): value is WorkspaceLockTool {
+  return (WORKSPACE_LOCK_TOOLS as readonly unknown[]).includes(value);
+}
+
+/** The lock is held by another live process; a caller may wait and try again. */
+export class WorkspaceLockedError extends Error {}
 
 interface WorkspaceLockRecord {
   id: string;
@@ -115,7 +124,7 @@ async function acquireGuardedWorkspaceLock(
     const existing = await readLockRecord(lockPath);
     if (!existing) continue;
     if (isProcessAlive(existing.pid)) {
-      throw new Error(
+      throw new WorkspaceLockedError(
         `Workspace is locked by ${existing.tool} (pid ${existing.pid}, started ${existing.startedAt}): ${workspace}`
       );
     }
@@ -224,7 +233,7 @@ async function readLockRecord(lockPath: string): Promise<WorkspaceLockRecord | n
     !Number.isSafeInteger(value.pid) ||
     value.pid <= 0 ||
     !('tool' in value) ||
-    (value.tool !== 'processor' && value.tool !== 'orchestrator') ||
+    !isWorkspaceLockTool(value.tool) ||
     !('startedAt' in value) ||
     typeof value.startedAt !== 'string' ||
     !Number.isFinite(Date.parse(value.startedAt))

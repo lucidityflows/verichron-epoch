@@ -317,8 +317,9 @@ the bundle's Python and finds every stage, the processor identifies the decrypt
 and reads iLEAPP's recorded commit, and each stops where it should, at an empty
 workspace and an empty source. The database server creates the database
 (socket only, every migration, a runtime login that cannot TRUNCATE), stops,
-starts again on the same database, and refuses one behind this version or
-whose first start never finished ([the database server](../apps/dbserver/README.md)).
+starts again on the same database, takes two overlapping starts without one
+stopping the other's server, and refuses one behind this version or whose first
+start never finished, leaving no server running ([the database server](../apps/dbserver/README.md)).
 
 ### Real-device checks for iPhone pulls
 

@@ -68,6 +68,7 @@ run = [
   "pnpm --filter @verichron/etl-db-reader test",
   "pnpm --filter @verichron/orchestrator test",
   "pnpm --filter @verichron/dbserver test",
+  "pnpm --filter @verichron/workspace-lock test",
   "pnpm --filter @verichron/etl-db-reader build",
   "pnpm --filter @verichron/epoch test",
 ]
