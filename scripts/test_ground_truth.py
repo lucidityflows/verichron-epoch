@@ -38,6 +38,8 @@ def test_accepts_complete_utc_labels() -> None:
     [
         {"timestamp_utc": "2026-01-02T03:04:05+00:00"},
         {"timestamp_utc": "2026-01-02T03:04:05"},
+        {"timestamp_utc": "2026-13-45T03:04:05Z"},
+        {"timestamp_utc": "2025-02-29T03:04:05Z"},
         {"process": "  "},
         {"category": "unknown"},
         {"verification": ""},

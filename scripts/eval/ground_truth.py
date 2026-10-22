@@ -7,6 +7,7 @@ import argparse
 import json
 import sys
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +58,14 @@ def validate_labels(document: Any) -> list[dict[str, str]]:
     label_ids = [label["label_id"] for label in labels]
     if len(set(label_ids)) != len(label_ids):
         raise ValueError("Ground-truth labels contain duplicate label IDs; values are omitted to protect case data.")
+    for index, label in enumerate(labels):
+        try:
+            datetime.fromisoformat(label["timestamp_utc"][:-1] + "+00:00")
+        except ValueError:
+            raise ValueError(
+                f"Ground-truth labels are invalid at labels.{index}.timestamp_utc; "
+                "values are omitted to protect case data."
+            ) from None
     return labels
 
 
