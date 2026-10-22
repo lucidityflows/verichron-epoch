@@ -293,6 +293,27 @@ bundle, leaves a decoy interpreter where it was built, and runs every
 environment, every entry point, `psycopg2` against the bundled server, the
 decrypt and iLEAPP's plugins.
 
+### The Lab bundle's services
+
+The orchestrator and processor are compiled into one file each
+(`services/orchestrator.mjs`, `services/processor.mjs`) with esbuild, and run by
+the bundled Node, `mise.toml`'s version, from the official tarball refused unless
+its SHA-256 is the one in `tools/services/versions.env` (EPOCH-478). Only
+`bin/node` and Node's `LICENSE` ship. The services are compiled from this
+checkout, which must have no uncommitted changes to what they include.
+
+```bash
+tools/runtime/build.sh <bundle>     # the Python parts the services run
+tools/services/build.sh <bundle>    # <bundle>/node and <bundle>/services
+tools/services/check.sh <bundle>    # moved, nothing on PATH but the base system
+```
+
+The check runs both services from the moved bundle: the orchestrator validates
+the bundle's Python and finds every stage, the processor identifies the decrypt
+and reads iLEAPP's recorded commit, and each stops where it should, at an empty
+workspace and an empty source. The database is not reached; the app-managed
+server is EPOCH-477.
+
 ### Real-device checks for iPhone pulls
 
 Stub tools can't show what an iPhone does. A ticket that changes the iPhone
@@ -319,7 +340,7 @@ New device behaviour seen during these checks is added to the verified list in
 | Workflow | Runs |
 |---|---|
 | `.github/workflows/python-tests.yml` | Ruff lint and format checks, Pyright (the decrypt against its own environment), migrations applied twice to a fresh PostgreSQL 17, pytest on both tiers, the runtime environment and the tool environments built from their lockfiles (which fails if a lockfile doesn't match its manifest) |
-| `.github/workflows/postgres-build.yml` | Only when `tools/` (the builds, the decrypt or iLEAPP), the migrations, the Python dependencies, `mise.toml` (uv's version) or `.python-version` change: the Lab bundle's PostgreSQL built from source and its Python parts built beside it, each then checked as below |
+| `.github/workflows/postgres-build.yml` | Only when `tools/` (the builds, the decrypt or iLEAPP), the services and packages they include, the Python dependencies, `mise.toml` (uv's version) or `.python-version` change: the Lab bundle's PostgreSQL built from source, its Python parts and its services built beside it, each then checked as below |
 | `.github/workflows/ts-tests.yml` | The formatting check, then typecheck, test-file typecheck and tests for the processor, the writer, the reader and the orchestrator (with the Python environment its CLI validates), with real PostgreSQL, and the desktop app's typecheck, lint (`pnpm --filter @verichron/epoch lint`: errors fail the job, EPOCH-571), Vite build and tests |
 
 The Python and TypeScript workflows install the toolchain from `mise.toml` and Python from

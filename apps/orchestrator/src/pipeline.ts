@@ -1,6 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { Client } from 'pg';
@@ -12,6 +11,8 @@ import {
   DEFAULT_DISPLAY_ZONE,
   contractVersion,
   displayZone,
+  layout,
+  packageVersion,
   resolveRunSummaryPath,
   type ResolvedWorkspaceBackup,
   type DerivativeKind,
@@ -257,10 +258,8 @@ export function runStage(
   });
 }
 
-/** ../package.json resolves from both src/ (tsx) and dist/. */
-const ORCHESTRATOR_VERSION: string = JSON.parse(
-  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
-).version;
+/** Read from the source's package.json, in a checkout and in the Lab bundle alike (layout.ts). */
+const ORCHESTRATOR_VERSION: string = packageVersion(layout(), path.join('apps', 'orchestrator'));
 
 /**
  * Provenance recorded on every run (R35). Tool versions here are the

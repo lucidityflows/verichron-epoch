@@ -22,29 +22,48 @@ const run = promisify(execFile);
 /**
  * iLEAPP's identity is the submodule commit, not its self-reported version
  * (version_info.py says 2026.3.0 at tag v2026.3.1), together with the
- * environment its interpreter runs in (EPOCH-439). A checkout with local
- * changes is refused: its commit would not describe the code that ran.
+ * environment its interpreter runs in (EPOCH-439). In a checkout, git says the
+ * commit, and a checkout with local changes is refused: its commit would not
+ * describe the code that ran. The Lab bundle has no git: its build recorded the
+ * commit in `recordedCommitFile`, and the bundle's signed manifest covers the
+ * files (EPOCH-478).
  */
-export async function ileappToolVersion(ileappDir: string, python: string): Promise<ToolVersion> {
+export async function ileappToolVersion(
+  ileappDir: string,
+  python: string,
+  recordedCommitFile: string | null = null
+): Promise<ToolVersion> {
   let commit: string;
-  let changes: string;
-  try {
-    commit = (await run('git', ['-C', ileappDir, 'rev-parse', 'HEAD'])).stdout.trim();
-    changes = (await run('git', ['-C', ileappDir, 'status', '--porcelain'])).stdout.trim();
-  } catch (err) {
-    throw new Error(
-      `could not read the iLEAPP commit from ${ileappDir} (${err instanceof Error ? err.message : err}); ` +
-        'run `mise run setup` to initialize the submodule'
-    );
+  if (recordedCommitFile) {
+    try {
+      commit = (await fsp.readFile(recordedCommitFile, 'utf8')).trim();
+    } catch (err) {
+      throw new Error(
+        `could not read iLEAPP's recorded commit from ${recordedCommitFile} (${err instanceof Error ? err.message : err}); ` +
+          'the bundle is incomplete',
+        { cause: err }
+      );
+    }
+  } else {
+    let changes: string;
+    try {
+      commit = (await run('git', ['-C', ileappDir, 'rev-parse', 'HEAD'])).stdout.trim();
+      changes = (await run('git', ['-C', ileappDir, 'status', '--porcelain'])).stdout.trim();
+    } catch (err) {
+      throw new Error(
+        `could not read the iLEAPP commit from ${ileappDir} (${err instanceof Error ? err.message : err}); ` +
+          'run `mise run setup` to initialize the submodule'
+      );
+    }
+    if (changes) {
+      throw new Error(
+        `${ileappDir} has local changes, so its commit does not describe the code that would run; ` +
+          `restore it with \`git -C ${ileappDir} checkout -- . && git -C ${ileappDir} clean -fd\``
+      );
+    }
   }
   if (!/^[0-9a-f]{40}$/.test(commit)) {
     throw new Error(`${ileappDir} reports "${commit}" as its commit; expected a 40-character git hash`);
-  }
-  if (changes) {
-    throw new Error(
-      `${ileappDir} has local changes, so its commit does not describe the code that would run; ` +
-        `restore it with \`git -C ${ileappDir} checkout -- . && git -C ${ileappDir} clean -fd\``
-    );
   }
   return { name: 'iLEAPP', version: commit, environment: await pythonEnvironmentDigest(python) };
 }

@@ -15,6 +15,7 @@ import {
   readWorkspaceManifestSync,
   resolveWorkspaceBackup,
   safeTestDatabaseUrl,
+  type Layout,
 } from '@verichron/contracts';
 
 const { handlers, spawnMock } = vi.hoisted(() => ({
@@ -34,6 +35,20 @@ vi.mock('electron', () => ({
 vi.mock('child_process', () => ({ spawn: spawnMock }));
 
 import { closeAbandonedRunsOnStartup, registerPipelineHandlers } from './pipelineHandlers';
+
+/** A checkout at /repo: the app starts its services through pnpm. */
+const CHECKOUT: Layout = {
+  kind: 'checkout',
+  root: '/repo',
+  source: '/repo',
+  python: '/repo/.venv/bin/python',
+  pythonVersionFile: '/repo/.python-version',
+  decryptPython: '/repo/tools/decrypt/.venv/bin/python',
+  decryptScript: '/repo/tools/decrypt/decrypt_backup.py',
+  ileappDir: '/repo/tools/ileapp/iLEAPP',
+  ileappPython: '/repo/tools/ileapp/.venv/bin/python',
+  ileappCommitFile: null,
+};
 
 function childProcess() {
   return Object.assign(new EventEmitter(), {
@@ -90,7 +105,7 @@ describe('pipeline IPC single-flight', () => {
     pool = { query: async () => ({ rows: [{ path: decryptPath }] }) };
     registerPipelineHandlers(
       () => null,
-      '/repo',
+      CHECKOUT,
       pool as unknown as Pool,
       '0.1.0',
       async () => 'America/Chicago'
@@ -148,7 +163,7 @@ describe('Prepare and its task log', () => {
     writeFileSync(path.join(workspace, 'workspace.json'), JSON.stringify(emptyWorkspaceManifest()));
     registerPipelineHandlers(
       () => null,
-      '/repo',
+      CHECKOUT,
       { query: async () => ({ rows: [] }) } as unknown as Pool,
       '0.1.0',
       async () => 'UTC'
@@ -335,7 +350,7 @@ describe.skipIf(!DSN && !process.env.CI)('cancelling a run retry', () => {
     spawnMock.mockReset();
     registerPipelineHandlers(
       () => null,
-      '/repo',
+      CHECKOUT,
       db as unknown as Pool,
       '0.1.0',
       async () => 'UTC'

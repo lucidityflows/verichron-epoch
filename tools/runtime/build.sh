@@ -13,7 +13,8 @@
 #   <bundle>/runtime-venv  the lockfile with no dependency groups: what runs
 #   <bundle>/tools/decrypt, <bundle>/tools/ileapp
 #                          each tool with its own environment; iLEAPP at the
-#                          submodule commit this commit records
+#                          submodule commit this commit records, which is
+#                          written to tools/ileapp/iLEAPP.commit
 #
 # Every environment is made movable (relocate.py): it works wherever the
 # bundle is unpacked.
@@ -92,5 +93,8 @@ docker run --rm \
   -v "$HERE/relocate.py:/relocate.py:ro" \
   -v "$BUNDLE:/bundle" \
   "$BUILD_IMAGE" /in-container.sh
+
+# The bundle has no git: the processor reads iLEAPP's identity from here (layout.ts).
+echo "$recorded" > "$BUNDLE/tools/ileapp/iLEAPP.commit"
 
 echo "[runtime] built: $BUNDLE/python, source, runtime-venv, tools"

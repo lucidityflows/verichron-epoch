@@ -27,10 +27,12 @@ import {
   type RepairProvenance,
   type ToolVersion,
   type WorkspaceManifest,
+  layout,
+  packageVersion,
   workspaceManifestPath,
 } from '@verichron/contracts';
 
-import { parseFlags, REPO_ROOT, type Config } from './utils/cli.js';
+import { parseFlags, type Config } from './utils/cli.js';
 import { pathExists, writeFileAtomic, writeMarker } from './utils/fs.js';
 import { PROGRESS_INTERVAL_MS, throttled, withDecryptProgress } from './utils/progress.js';
 import { ileappInputType, ileappToolVersion, readModuleOutcomes, runIleapp } from './utils/ileapp.js';
@@ -50,8 +52,11 @@ import {
 } from './utils/workspaceSpace.js';
 import { acquireWorkspaceLocks } from '@verichron/workspace-lock';
 
-/** Recorded in each evidence sidecar. ../package.json resolves from both src/ (tsx) and dist/. */
-const TOOL_VERSION: string = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+/** Where this processor runs: a checkout, or the Lab bundle (layout.ts). */
+const LAYOUT = layout();
+
+/** Recorded in each evidence sidecar, from the source's package.json (layout.ts). */
+const TOOL_VERSION: string = packageVersion(LAYOUT, path.join('apps', 'processor'));
 
 // How many times we'll re-prompt for a password before giving up on a
 // backup. Only wrong-password failures consume an attempt -- any other
@@ -99,7 +104,9 @@ async function run(cfg: Config, report: Reporter): Promise<void> {
       `no ileapp.py in ${cfg.ileappDir}. Run \`mise run setup\` to initialize the iLEAPP submodule, or pass --ileapp-dir`
     );
   }
-  const ileappTool = await ileappToolVersion(cfg.ileappDir, cfg.ileappPython);
+  // In the Lab bundle there is no git: the build recorded iLEAPP's commit beside it.
+  const recordedCommit = cfg.ileappDir === LAYOUT.ileappDir ? LAYOUT.ileappCommitFile : null;
+  const ileappTool = await ileappToolVersion(cfg.ileappDir, cfg.ileappPython, recordedCommit);
   // Its version identifies it; its folder is not the log's business (docs/event-log.md §6.6).
   report.log('debug', `iLEAPP: ${ileappTool.version.slice(0, 12)}`);
 
@@ -507,7 +514,7 @@ async function runBackups(
   const sanitizer = Sanitizer.create(deviceIdentifierSources(backups), {
     workspace: path.resolve(cfg.workspace),
     source: path.resolve(cfg.source),
-    app: REPO_ROOT,
+    app: LAYOUT.root,
     temp: os.tmpdir(),
     home: os.homedir(),
     user: os.userInfo().username,

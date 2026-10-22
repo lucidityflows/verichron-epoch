@@ -9,9 +9,15 @@ import { parseArgs } from 'node:util';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { CliConfig } from './types.js';
-import { REPO_ROOT } from './discovery.js';
 import { log, setOutputMode } from './events.js';
-import { DEFAULT_DISPLAY_ZONE, displayZone, loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
+import {
+  DEFAULT_DISPLAY_ZONE,
+  displayZone,
+  layout,
+  loadRootEnv,
+  resolveDatabaseUrl,
+  type Layout,
+} from '@verichron/contracts';
 
 export function printUsage() {
   console.error(
@@ -23,19 +29,21 @@ const PYTHON_PREFLIGHT = `
 import importlib
 import sys
 
-for module in ("runtime_env", "etl_run", "db_writer", "normalized_record", "tool_defects", "psycopg2", "requests"):
+for module in ("runtime_env", "etl_run", "db_writer", "normalized_record", "tool_defects", "psycopg2"):
     importlib.import_module(module)
 
 print(".".join(str(part) for part in sys.version_info[:3]))
 `;
 
-export async function resolvePythonBin(repoRoot = REPO_ROOT): Promise<string> {
-  const venvPython = path.join(repoRoot, '.venv', 'bin', 'python');
+export async function resolvePythonBin(lay: Layout = layout()): Promise<string> {
+  const venvPython = lay.python;
   try {
     await fsp.access(venvPython);
   } catch (error) {
     throw new Error(
-      `Python environment is missing at ${venvPython}; run "uv sync" from ${repoRoot} before investigating.`,
+      lay.kind === 'checkout'
+        ? `Python environment is missing at ${venvPython}; run "uv sync" from ${lay.root} before investigating.`
+        : `The bundle's Python environment is missing at ${venvPython}; the bundle is incomplete.`,
       { cause: error }
     );
   }
@@ -43,7 +51,7 @@ export async function resolvePythonBin(repoRoot = REPO_ROOT): Promise<string> {
   let version: string;
   try {
     version = execFileSync(venvPython, ['-c', PYTHON_PREFLIGHT], {
-      cwd: repoRoot,
+      cwd: lay.source,
       encoding: 'utf8',
       timeout: 10_000,
     }).trim();
@@ -59,7 +67,7 @@ export async function resolvePythonBin(repoRoot = REPO_ROOT): Promise<string> {
   }
 
   // The version is declared once, in .python-version (docs/development.md).
-  const pinned = (await fsp.readFile(path.join(repoRoot, '.python-version'), 'utf8')).trim();
+  const pinned = (await fsp.readFile(lay.pythonVersionFile, 'utf8')).trim();
   if (version !== pinned && !version.startsWith(`${pinned}.`)) {
     throw new Error(
       `Python preflight requires Python ${pinned} (.python-version) from ${venvPython}; found ${version || 'no version output'}.`
@@ -72,7 +80,8 @@ export async function resolvePythonBin(repoRoot = REPO_ROOT): Promise<string> {
 }
 
 export async function parseCliConfig(): Promise<CliConfig> {
-  loadRootEnv(REPO_ROOT);
+  // A checkout's .env; the Lab bundle has none (its database is the app's own, EPOCH-477).
+  if (layout().kind === 'checkout') loadRootEnv(layout().root);
 
   // Filter out standalone '--' tokens injected by pnpm script forwarding
   const cleanArgs = process.argv.slice(2).filter((arg) => arg !== '--');
