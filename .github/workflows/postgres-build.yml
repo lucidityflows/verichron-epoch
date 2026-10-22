@@ -1,13 +1,16 @@
-name: Lab PostgreSQL and Python build
+name: Lab bundle parts build
 
 # The Lab bundle's PostgreSQL (EPOCH-477): built from the pinned source in the
 # pinned Debian 13 container, then checked moved, socket-only, and with every
 # migration applied. Then the bundle's Python parts (EPOCH-439): the runtime
 # environment with psycopg2 built against that libpq, our source, and the
-# decrypt and iLEAPP each in its own environment, all checked moved. It
-# compiles PostgreSQL, so it runs only when the builds, the migrations, the
-# Python dependencies, or the uv and Python versions (mise.toml,
-# .python-version) change.
+# decrypt and iLEAPP each in its own environment, all checked moved. Then the
+# services (EPOCH-478): the orchestrator and processor compiled and run by the
+# bundled Node, checked moved with nothing on PATH but the base system. It
+# compiles PostgreSQL, so it runs only when a part's build or what it includes
+# changes: the migrations, the Python or Node dependencies, the services and
+# packages they include, or the uv, Python and Node versions (mise.toml,
+# .python-version).
 
 on:
   push:
@@ -15,6 +18,12 @@ on:
     paths:
       - "tools/postgres/**"
       - "tools/runtime/**"
+      - "tools/services/**"
+      - "apps/orchestrator/**"
+      - "apps/processor/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
       - "tools/decrypt/**"
       - "tools/ileapp/**"
       - "mise.toml"
@@ -28,6 +37,12 @@ on:
     paths:
       - "tools/postgres/**"
       - "tools/runtime/**"
+      - "tools/services/**"
+      - "apps/orchestrator/**"
+      - "apps/processor/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
       - "tools/decrypt/**"
       - "tools/ileapp/**"
       - "mise.toml"
@@ -59,3 +74,18 @@ jobs:
 
       - name: Check them moved, with a decoy at the old path
         run: tools/runtime/check.sh "$RUNNER_TEMP/pg"
+
+      # Node and pnpm at mise.toml's versions, for compiling the services.
+      - name: Install toolchain
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          version: 2026.10.4
+
+      - name: Install the workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the services and the Node that runs them
+        run: tools/services/build.sh "$RUNNER_TEMP/pg"
+
+      - name: Check them moved, with nothing on PATH but the base system
+        run: tools/services/check.sh "$RUNNER_TEMP/pg"

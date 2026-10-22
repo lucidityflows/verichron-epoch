@@ -160,3 +160,6 @@ tools/postgres/.cache/
 
 # The uv release tools/runtime/build.sh downloads (EPOCH-439)
 tools/runtime/.cache/
+
+# The Node release tools/services/build.sh downloads (EPOCH-478)
+tools/services/.cache/

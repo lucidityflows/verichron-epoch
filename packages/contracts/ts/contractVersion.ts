@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
+import { layout } from './layout.js';
 
 /**
  * The contract version every run records (R35): sha256 over the canonical
@@ -17,21 +18,10 @@ export const CONTRACT_SCHEMAS = [
   'workspace-manifest.schema.json',
 ] as const;
 
-/** The package root, found by walking up from this file: it runs from ts/ under
- * tsx and from dist/ts/ once built, so a fixed relative path would be wrong in
- * one of the two. */
+/** The contracts package root: under the layout's source, in a checkout and in
+ * the Lab bundle alike (layout.ts). */
 export function packageRoot(): string {
-  // This package compiles to CommonJS, so __dirname (not import.meta) is available.
-  let dir = __dirname;
-  for (;;) {
-    const manifest = path.join(dir, 'package.json');
-    if (existsSync(manifest) && JSON.parse(readFileSync(manifest, 'utf8')).name === '@verichron/contracts') {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) throw new Error('could not locate the @verichron/contracts package root');
-    dir = parent;
-  }
+  return path.join(layout().source, 'packages', 'contracts');
 }
 
 export function contractVersion(): string {

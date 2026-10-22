@@ -292,25 +292,33 @@ without root; the decisions behind it are in
 | Path in the bundle | Holds | Built by |
 |---|---|---|
 | `app/` | The packaged Electron app | Electron Forge, packaging only |
-| `node/` | Node 24, the version `mise.toml` pins | Assembly |
-| `services/` | The orchestrator and processor, each compiled to one JavaScript file | Assembly |
+| `node/` | Node 24, the version `mise.toml` pins: `bin/node` and its licence | `tools/services/build.sh` |
+| `services/` | The orchestrator and processor, each compiled to one JavaScript file | `tools/services/build.sh` |
 | `python/` | The interpreter `.python-version` pins | `tools/runtime/build.sh` |
 | `runtime-venv/` | The Python environment that runs: no dependency groups | `tools/runtime/build.sh` |
 | `source/` | Our Python stages, writer, report and the contract files they read | `tools/runtime/build.sh`, from the commit |
 | `tools/decrypt/`, `tools/ileapp/` | The decrypt and iLEAPP, each with its own environment | `tools/runtime/build.sh` |
 | `bin/` | The iPhone tools (EPOCH-472) and `sqlite3` | Assembly |
 | `postgresql/` | PostgreSQL 17, socket-only | `tools/postgres/build.sh` |
+| `COMMIT` | The commit the bundle is built from; every part's build must match it | `tools/runtime/build.sh` |
 | `MANIFEST`, `MANIFEST.sig` | Every file's SHA-256, and the owner's signature over it | Assembly; signed on the owner's machine |
 
-**Finding its parts.** The app finds the bundle root from its own executable's
-path (`<root>/app/`), and knows it runs from a bundle because `MANIFEST` sits
-at that root. Every other part is found relative to the root, as the bundled
-libraries find each other (`$ORIGIN`). Nothing is found through `PATH`, a
-repository checkout, or `.env`.
+**Finding its parts.** One module, `packages/contracts/ts/layout.ts`, knows
+both layouts (R2). The app and both services find their root by walking up
+from where their own code sits: a root with `MANIFEST`, `source/` and
+`runtime-venv/` is the bundle; one with `pnpm-workspace.yaml` and
+`packages/contracts/` is a checkout. Every other part is found relative to the
+root, as the bundled libraries find each other (`$ORIGIN`). Nothing is found
+through `PATH`, a repository checkout, or `.env`. `source/` keeps the
+repository's layout, so the stages, schemas, migrations and package versions sit
+at the same paths under either root; only the interpreter differs (`.venv` in a
+checkout, `runtime-venv` in the bundle). The bundle has no git, so the build
+records iLEAPP's commit in `tools/ileapp/iLEAPP.commit` for the processor.
 
 **Running the pipeline.** The app runs the orchestrator and processor with the
-bundled Node, as separate processes, exactly as development runs them through
-pnpm. The stages run with `runtime-venv/`, from `source/`.
+bundled Node (`node/bin/node services/<service>.mjs`), as separate processes,
+exactly as development runs them through pnpm (`apps/epoch/src/main/ipc/serviceCommand.ts`).
+The stages run with `runtime-venv/`, from `source/`.
 
 **Configuration.** The bundle has no `.env`. The app manages its own PostgreSQL
 over a unix socket (EPOCH-477), with its data directory under
@@ -322,10 +330,11 @@ where the examiner chooses.
 the app, keeps pnpm, `tsx`, Docker and `.env`. CI tests both: the development
 paths in its test jobs, and the bundle's parts in `postgres-build.yml`.
 
-Built so far, each with its check: `postgresql/`, and the Python parts
-(`python/`, `source/`, `runtime-venv/`, `tools/`), all movable
-([PostgreSQL](development.md#the-lab-bundles-postgresql),
-[Python parts](development.md#the-lab-bundles-python-parts)).
+Built so far, each with its check: `postgresql/`, the Python parts
+(`python/`, `source/`, `runtime-venv/`, `tools/`), and `node/` with `services/`,
+all movable ([PostgreSQL](development.md#the-lab-bundles-postgresql),
+[Python parts](development.md#the-lab-bundles-python-parts),
+[services](development.md#the-lab-bundles-services)).
 
 ## Database configuration
 

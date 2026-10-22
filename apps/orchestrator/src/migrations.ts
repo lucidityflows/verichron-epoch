@@ -1,10 +1,10 @@
 import { readdirSync } from 'node:fs';
 import * as path from 'node:path';
 import type { Client } from 'pg';
-import { REPO_ROOT } from './discovery.js';
+import { layout } from '@verichron/contracts';
 
 /** The migrations migrate.py applies, in the order it applies them. */
-export const MIGRATIONS_DIR = path.join(REPO_ROOT, 'packages', 'etl-db-writer', 'migrations');
+export const MIGRATIONS_DIR = path.join(layout().source, 'packages', 'etl-db-writer', 'migrations');
 
 /** The command docs/development.md gives for applying migrations. */
 const MIGRATE_COMMAND = 'uv run python packages/etl-db-writer/migrate.py';

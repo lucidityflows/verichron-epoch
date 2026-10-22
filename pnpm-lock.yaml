@@ -48,6 +48,9 @@ importers:
       dotenv:
         specifier: ^18.0.3
         version: 18.0.6
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       prettier:
         specifier: 3.9.6
         version: 3.9.6
@@ -129,7 +132,7 @@ importers:
     devDependencies:
       '@electron-forge/cli':
         specifier: ^7.11.2
-        version: 7.11.2(encoding@0.1.13)(lightningcss@1.32.0)
+        version: 7.11.2(encoding@0.1.13)(esbuild@0.28.2)(lightningcss@1.32.0)
       '@electron-forge/maker-deb':
         specifier: ^7.11.2
         version: 7.11.2
@@ -5218,9 +5221,9 @@ snapshots:
 
   '@csstools/css-tokenizer@3.0.4': {}
 
-  '@electron-forge/cli@7.11.2(encoding@0.1.13)(lightningcss@1.32.0)':
+  '@electron-forge/cli@7.11.2(encoding@0.1.13)(esbuild@0.28.2)(lightningcss@1.32.0)':
     dependencies:
-      '@electron-forge/core': 7.11.2(encoding@0.1.13)(lightningcss@1.32.0)
+      '@electron-forge/core': 7.11.2(encoding@0.1.13)(esbuild@0.28.2)(lightningcss@1.32.0)
       '@electron-forge/core-utils': 7.11.2
       '@electron-forge/shared-types': 7.11.2
       '@electron/get': 3.1.0
@@ -5267,7 +5270,7 @@ snapshots:
       - bluebird
       - supports-color
 
-  '@electron-forge/core@7.11.2(encoding@0.1.13)(lightningcss@1.32.0)':
+  '@electron-forge/core@7.11.2(encoding@0.1.13)(esbuild@0.28.2)(lightningcss@1.32.0)':
     dependencies:
       '@electron-forge/core-utils': 7.11.2
       '@electron-forge/maker-base': 7.11.2
@@ -5278,7 +5281,7 @@ snapshots:
       '@electron-forge/template-vite': 7.11.2
       '@electron-forge/template-vite-typescript': 7.11.2
       '@electron-forge/template-webpack': 7.11.2
-      '@electron-forge/template-webpack-typescript': 7.11.2(lightningcss@1.32.0)
+      '@electron-forge/template-webpack-typescript': 7.11.2(esbuild@0.28.2)(lightningcss@1.32.0)
       '@electron-forge/tracer': 7.11.2
       '@electron/get': 3.1.0
       '@electron/packager': 18.4.4
@@ -5456,13 +5459,13 @@ snapshots:
       - bluebird
       - supports-color
 
-  '@electron-forge/template-webpack-typescript@7.11.2(lightningcss@1.32.0)':
+  '@electron-forge/template-webpack-typescript@7.11.2(esbuild@0.28.2)(lightningcss@1.32.0)':
     dependencies:
       '@electron-forge/shared-types': 7.11.2
       '@electron-forge/template-base': 7.11.2
       fs-extra: 10.1.0
       typescript: 5.4.5
-      webpack: 5.110.2(lightningcss@1.32.0)
+      webpack: 5.110.2(esbuild@0.28.2)(lightningcss@1.32.0)
     transitivePeerDependencies:
       - '@minify-html/node'
       - '@swc/core'
@@ -8922,14 +8925,15 @@ snapshots:
 
   minimist@1.2.8: {}
 
-  minimizer-webpack-plugin@5.8.0(lightningcss@1.32.0)(webpack@5.110.2(lightningcss@1.32.0)):
+  minimizer-webpack-plugin@5.8.0(esbuild@0.28.2)(lightningcss@1.32.0)(webpack@5.110.2(esbuild@0.28.2)(lightningcss@1.32.0)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.3.3
       terser: 5.51.2
-      webpack: 5.110.2(lightningcss@1.32.0)
+      webpack: 5.110.2(esbuild@0.28.2)(lightningcss@1.32.0)
     optionalDependencies:
+      esbuild: 0.28.2
       lightningcss: 1.32.0
 
   minipass-collect@1.0.2:
@@ -9985,7 +9989,7 @@ snapshots:
 
   webpack-sources@3.5.1: {}
 
-  webpack@5.110.2(lightningcss@1.32.0):
+  webpack@5.110.2(esbuild@0.28.2)(lightningcss@1.32.0):
     dependencies:
       '@types/estree': 1.0.9
       '@types/json-schema': 7.0.15
@@ -10000,7 +10004,7 @@ snapshots:
       events: 3.3.0
       graceful-fs: 4.2.11
       mime-db: 1.54.0
-      minimizer-webpack-plugin: 5.8.0(lightningcss@1.32.0)(webpack@5.110.2(lightningcss@1.32.0))
+      minimizer-webpack-plugin: 5.8.0(esbuild@0.28.2)(lightningcss@1.32.0)(webpack@5.110.2(esbuild@0.28.2)(lightningcss@1.32.0))
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.3

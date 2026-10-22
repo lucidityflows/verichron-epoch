@@ -1,24 +1,24 @@
 import { parseArgs } from 'node:util';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { layout } from '@verichron/contracts';
 
 import type { OutputMode } from './report.js';
 
-// src/utils/ and dist/utils/ are both four levels below the repository root.
-export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
+/** Where this processor runs: a checkout, or the Lab bundle (layout.ts). */
+const LAYOUT = layout();
 
 /**
  * The backup decrypt, from its own pinned environment, tools/decrypt
  * (EPOCH-489). It is never looked up anywhere else, so every machine runs the
  * same decrypt library.
  */
-export const DEFAULT_DECRYPT_PYTHON = path.join(REPO_ROOT, 'tools', 'decrypt', '.venv', 'bin', 'python');
-export const DEFAULT_DECRYPT_SCRIPT = path.join(REPO_ROOT, 'tools', 'decrypt', 'decrypt_backup.py');
+export const DEFAULT_DECRYPT_PYTHON = LAYOUT.decryptPython;
+export const DEFAULT_DECRYPT_SCRIPT = LAYOUT.decryptScript;
 
 /** iLEAPP: the submodule, and the interpreter of its own pinned environment, tools/ileapp. */
-export const DEFAULT_ILEAPP_DIR = path.join(REPO_ROOT, 'tools', 'ileapp', 'iLEAPP');
-export const DEFAULT_ILEAPP_PYTHON = path.join(REPO_ROOT, 'tools', 'ileapp', '.venv', 'bin', 'python');
+export const DEFAULT_ILEAPP_DIR = LAYOUT.ileappDir;
+export const DEFAULT_ILEAPP_PYTHON = LAYOUT.ileappPython;
 
 export interface Config {
   source: string;

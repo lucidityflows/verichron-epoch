@@ -3,7 +3,7 @@ import electron from 'electron';
 import path from 'path';
 import { Pool } from 'pg';
 import type { BrowserWindowConstructorOptions, BrowserWindow as BrowserWindowType } from 'electron';
-import { loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
+import { layout, loadRootEnv, resolveDatabaseUrl } from '@verichron/contracts';
 import { readerTypes } from '@verichron/etl-db-reader';
 import { registerDbHandlers } from './ipc/dbHandlers';
 import { registerReportHandlers } from './ipc/reportHandlers';
@@ -19,8 +19,10 @@ console.log('\n=======================================');
 console.log('MAIN PROCESS IS EXECUTING!');
 console.log('=======================================\n');
 
-const REPO_ROOT = path.resolve(__dirname, '../../../..');
-loadRootEnv(REPO_ROOT);
+// A checkout, or the Lab bundle: found from where this code runs (layout.ts).
+const LAYOUT = layout();
+// A checkout's .env; the Lab bundle has none (its database is the app's own, EPOCH-477).
+if (LAYOUT.kind === 'checkout') loadRootEnv(LAYOUT.root);
 
 // Missing database configuration is fatal startup input, not a recoverable runtime exception.
 const dbPool = new Pool({
@@ -53,12 +55,12 @@ registerReportHandlers(dbPool);
 // rather than leaving them running forever.
 const pipeline = registerPipelineHandlers(
   getMainWindow,
-  REPO_ROOT,
+  LAYOUT,
   dbPool,
   app.getVersion(),
   async () => (await readSettings(app.getPath('userData'))).displayZone
 );
-registerDeviceHandlers(getMainWindow, REPO_ROOT, app.getVersion());
+registerDeviceHandlers(getMainWindow, LAYOUT.root, app.getVersion());
 registerSettingsHandlers(getMainWindow);
 
 const webPreferences: BrowserWindowConstructorOptions['webPreferences'] = {

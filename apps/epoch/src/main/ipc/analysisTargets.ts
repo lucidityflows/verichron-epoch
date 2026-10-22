@@ -31,7 +31,8 @@ export function analysisTargets(workspace: string, labels: unknown[]): string[] 
 }
 
 /**
- * The orchestrator receives the workspace and selected manifest labels
+ * The orchestrator's own arguments (serviceCommand adds how it is started). It
+ * receives the workspace and selected manifest labels
  * (EPOCH-427, EPOCH-530), and the zone the report shows times in, which the
  * run records (EPOCH-560).
  */
@@ -43,10 +44,6 @@ export function orchestratorArgs(
   checkIndicators = false
 ): string[] {
   return [
-    '--filter',
-    '@verichron/orchestrator',
-    'investigate',
-    '--',
     '--workspace',
     workspace,
     ...labels.flatMap((label) => ['--label', label]),

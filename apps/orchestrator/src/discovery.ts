@@ -2,14 +2,12 @@ import * as fsp from 'node:fs/promises';
 import { log } from './events.js';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Ajv, type ErrorObject } from 'ajv';
+import { layout } from '@verichron/contracts';
 import { StageDefinition, StageManifest, StageSet } from './types.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-export const REPO_ROOT = path.resolve(__dirname, '../../..');
+/** The repository's layout: a checkout's root, or the Lab bundle's source/ (layout.ts). */
+const SOURCE = layout().source;
 
 /** Where discovery looks for stages: every directory under `extractors`, and `reporting`. */
 export interface StageRoots {
@@ -17,9 +15,9 @@ export interface StageRoots {
   reportingDir: string;
 }
 
-const REPO_ROOTS: StageRoots = {
-  extractorsDir: path.join(REPO_ROOT, 'apps', 'extractors'),
-  reportingDir: path.join(REPO_ROOT, 'apps', 'reporting'),
+const SOURCE_ROOTS: StageRoots = {
+  extractorsDir: path.join(SOURCE, 'apps', 'extractors'),
+  reportingDir: path.join(SOURCE, 'apps', 'reporting'),
 };
 
 /**
@@ -27,7 +25,7 @@ const REPO_ROOTS: StageRoots = {
  * compiled once, so a new field is added in one place and a misspelled one is
  * refused (the schema sets additionalProperties: false).
  */
-const SCHEMA_PATH = path.join(REPO_ROOT, 'packages', 'contracts', 'stage-manifest.schema.json');
+const SCHEMA_PATH = path.join(SOURCE, 'packages', 'contracts', 'stage-manifest.schema.json');
 const validate = new Ajv({ allErrors: true }).compile<StageManifest>(JSON.parse(readFileSync(SCHEMA_PATH, 'utf8')));
 
 /** Each failing field, as the schema validator reports it. */
@@ -60,7 +58,7 @@ async function loadStageFromDir(dir: string, name: string): Promise<StageDefinit
   try {
     raw = await fsp.readFile(manifestPath, 'utf-8');
   } catch {
-    log('warn', `${path.relative(REPO_ROOT, dir)} has no stage.json — skipping, not treated as a stage.`);
+    log('warn', `${path.relative(SOURCE, dir)} has no stage.json — skipping, not treated as a stage.`);
     return null;
   }
 
@@ -86,7 +84,7 @@ async function loadStageFromDir(dir: string, name: string): Promise<StageDefinit
   return { name, dir, manifest };
 }
 
-export async function discoverStages(roots: StageRoots = REPO_ROOTS): Promise<StageSet> {
+export async function discoverStages(roots: StageRoots = SOURCE_ROOTS): Promise<StageSet> {
   const { extractorsDir, reportingDir } = roots;
   const extractorEntries = await fsp.readdir(extractorsDir, { withFileTypes: true });
   const candidateDirs = extractorEntries

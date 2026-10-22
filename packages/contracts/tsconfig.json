@@ -19,6 +19,7 @@
     "ts/normalizedRecord.ts",
     "ts/normalizedRecord.d.ts",
     "ts/env.ts",
+    "ts/layout.ts",
     "ts/pipelineEvent.ts",
     "ts/taskLog.ts",
     "ts/sanitize.ts",

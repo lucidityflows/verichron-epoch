@@ -16,6 +16,7 @@ import {
   resolveWorkspaceBackup,
   type Backup,
   type EventProducer,
+  type Layout,
   type PipelineEvent,
   type TaskOutcome,
 } from '@verichron/contracts';
@@ -24,6 +25,7 @@ import type { AnalysisState, PipelineFinishedResult, AnalysisRunStatus } from '.
 import { AnalysisSession, LineSplitter, PrepareSession } from './pipelineSessions';
 import { PipelineSingleFlight } from './pipelineSingleFlight';
 import { analysisTargets, orchestratorArgs } from './analysisTargets';
+import { serviceCommand } from './serviceCommand';
 import { defaultWorkspace, readPreparedBackups } from './preparedBackups';
 import { describeBackup } from './backupDescription';
 import { closeAbandonedRuns, closeRuns, type AppEndedReason } from './runCloseOut';
@@ -68,7 +70,8 @@ export async function closeAbandonedRunsOnStartup(dbPool: Pool): Promise<void> {
 
 export function registerPipelineHandlers(
   getMainWindow: () => BrowserWindow | null,
-  repoRoot: string,
+  /** Where the app runs: a checkout, or the Lab bundle (layout.ts). */
+  lay: Layout,
   dbPool: Pool,
   /** Recorded in each task log's header (EPOCH-570). */
   appVersion: string,
@@ -327,7 +330,7 @@ export function registerPipelineHandlers(
           options: { force_decrypt: Boolean(options?.forceDecrypt) },
           backups,
           source,
-          appRoot: repoRoot,
+          appRoot: lay.root,
           appVersion,
           message: `Prepare Evidence started for ${labels.length} backup${labels.length === 1 ? '' : 's'}`,
           notes,
@@ -348,9 +351,7 @@ export function registerPipelineHandlers(
     }
     prepareSession.logFile(token, log.file);
 
-    // pnpm --silent: its script banners would print the repository's path (docs/event-log.md §6.6).
-    const args = ['--silent', '--filter', '@verichron/processor', 'dev', '--', '--source', source];
-    args.push('--workspace', workspacePath, '--output', 'events');
+    const args = ['--source', source, '--workspace', workspacePath, '--output', 'events'];
     if (options?.forceDecrypt) args.push('--force-decrypt');
     if (only.length > 0) args.push('--only', only.join(','));
 
@@ -371,7 +372,12 @@ export function registerPipelineHandlers(
     let child: ChildProcessWithoutNullStreams;
     try {
       // Its own process group, so a stop reaches the processor, not only pnpm.
-      child = spawn('pnpm', args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+      const processor = serviceCommand(lay, 'processor', args);
+      child = spawn(processor.command, processor.args, {
+        cwd: processor.cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        detached: true,
+      });
     } catch (err) {
       releasePipeline();
       const error = `could not start the processor: ${err instanceof Error ? err.message : String(err)}`;
@@ -533,7 +539,7 @@ export function registerPipelineHandlers(
           options: call.kind === 'retry' ? { retry: true } : call.kind === 'check' ? { check_indicators: true } : {},
           backups: call.backups,
           source: null,
-          appRoot: repoRoot,
+          appRoot: lay.root,
           appVersion,
           message: `${task} started for ${call.labels.length} backup${call.labels.length === 1 ? '' : 's'}`,
         },
@@ -568,18 +574,18 @@ export function registerPipelineHandlers(
     const summaryPath = newSummaryPath();
     let child: ChildProcessWithoutNullStreams;
     try {
-      // pnpm --silent: its script banners would print the repository's path (docs/event-log.md §6.6).
       // Its own process group, so Cancel reaches the orchestrator, not only pnpm.
       const zone = await displayZoneSetting();
-      child = spawn(
-        'pnpm',
-        ['--silent', ...orchestratorArgs(call.workspace, call.labels, summaryPath, zone, call.kind === 'check')],
-        {
-          cwd: repoRoot,
-          stdio: ['pipe', 'pipe', 'pipe'],
-          detached: true,
-        }
+      const orchestrator = serviceCommand(
+        lay,
+        'orchestrator',
+        orchestratorArgs(call.workspace, call.labels, summaryPath, zone, call.kind === 'check')
       );
+      child = spawn(orchestrator.command, orchestrator.args, {
+        cwd: orchestrator.cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        detached: true,
+      });
     } catch (err) {
       releasePipeline();
       const error = `could not start the orchestrator: ${err instanceof Error ? err.message : String(err)}`;
