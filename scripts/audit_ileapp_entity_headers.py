@@ -208,7 +208,7 @@ def _header_declaration(
     names = copy.deepcopy(constants)
     if bindings is not None:
         names.update(copy.deepcopy(bindings))
-    declarations: list[list[Any]] = []
+    declarations: list[tuple[Any, list[Any]]] = []
     for node in _assignments(function.body):
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
             call = node.value
@@ -232,11 +232,13 @@ def _header_declaration(
                         target.insert(arguments[0], arguments[1])
                     else:
                         _invalidate_bindings(names, {target_name})
-                        if target_name == "data_headers":
+                        if updates_headers:
                             return None, "data_headers is mutated dynamically"
                         continue
                     if updates_headers:
-                        for declaration in declarations:
+                        for source, declaration in declarations:
+                            if source is not target:
+                                continue
                             if call.func.attr == "append" and len(arguments) == 1:
                                 declaration.append(arguments[0])
                             elif (
@@ -258,7 +260,15 @@ def _header_declaration(
                 try:
                     value = _resolve(node.value, names)
                     if isinstance(node.op, ast.Add):
-                        names[node.target.id] = names[node.target.id] + value
+                        source = names[node.target.id]
+                        if isinstance(source, list):
+                            additions = list(value)
+                            source.extend(additions)
+                            for declaration_source, declaration in declarations:
+                                if declaration_source is source:
+                                    declaration.extend(additions)
+                        else:
+                            names[node.target.id] = source + value
                 except IndexError, KeyError, TypeError, ValueError:
                     updates_headers = names[node.target.id] is names.get("data_headers")
                     _invalidate_bindings(names, {node.target.id})
@@ -286,19 +296,23 @@ def _header_declaration(
                                 return None, "data_headers is mutated dynamically"
                             continue
                         updates_headers = current is names.get("data_headers")
-                        updated = list(current)
+                        updated = current if isinstance(current, list) else list(current)
                         index = _resolve(target.slice, names)
                         updated[index] = value
                         names[target_name] = updated
                         if updates_headers:
                             names["data_headers"] = updated
-                            for declaration in declarations:
-                                declaration[index] = value
+                            for position, (source, declaration) in enumerate(declarations):
+                                if source is current:
+                                    declaration[index] = value
+                                    declarations[position] = (updated, declaration)
                 except IndexError, KeyError, TypeError, ValueError:
                     target_names = {
                         target.value.id for target in subscript_targets if isinstance(target.value, ast.Name)
                     }
-                    updates_headers = any(names.get(name) is names.get("data_headers") for name in target_names)
+                    updates_headers = "data_headers" in names and any(
+                        names[name] is names["data_headers"] for name in target_names if name in names
+                    )
                     _invalidate_bindings(names, target_names)
                     if updates_headers or "data_headers" in target_names:
                         return None, "data_headers is mutated dynamically"
@@ -320,7 +334,7 @@ def _header_declaration(
             and value.func.id == "remove_unused_rows"
             and "data_headers" in names
         ):
-            declarations.append(list(names["data_headers"]))
+            declarations.append((names["data_headers"], list(names["data_headers"])))
             continue
         target_values: dict[str, Any] = {}
         try:
@@ -342,7 +356,7 @@ def _header_declaration(
                 if not isinstance(resolved, (list, tuple)):
                     return None, "data_headers is not a list or tuple"
                 names[name] = resolved
-                declarations.append(list(resolved))
+                declarations.append((resolved, list(resolved)))
             else:
                 names[name] = resolved
 
@@ -354,7 +368,7 @@ def _header_declaration(
                 except IndexError, KeyError, TypeError, ValueError:
                     continue
                 if isinstance(returned_headers, (list, tuple)):
-                    declarations.append(list(returned_headers))
+                    declarations.append((returned_headers, list(returned_headers)))
                     continue
             if isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name):
                 helper = functions.get(node.value.func.id)
@@ -379,12 +393,12 @@ def _header_declaration(
                     if error is not None:
                         return None, error
                     if helper_headers is not None:
-                        declarations.append(list(helper_headers))
+                        declarations.append((helper_headers, list(helper_headers)))
         if not declarations:
             return None, "artifact processor does not declare data_headers"
     headers: list[Any] = []
     seen_headers: set[str] = set()
-    for declaration in declarations:
+    for _, declaration in declarations:
         for header in declaration:
             identity = json.dumps(_json_value(header), sort_keys=True, ensure_ascii=False)
             if identity not in seen_headers:

@@ -204,7 +204,11 @@ def test_dynamic_header_reassignment_does_not_reuse_previous_value(tmp_path: Pat
     assert "data_headers is not a supported static expression" in errors[0]
 
 
-def test_dynamic_mutation_through_header_alias_is_unresolved(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "mutation",
+    ["append(context)", "append('One', 'Two')", "extend(42)", "insert('index', 'One')"],
+)
+def test_dynamic_mutation_through_header_alias_is_unresolved(tmp_path: Path, mutation: str) -> None:
     artifacts = tmp_path / "scripts" / "artifacts"
     artifacts.mkdir(parents=True)
     (artifacts / "sample.py").write_text(
@@ -213,7 +217,7 @@ def test_dynamic_mutation_through_header_alias_is_unresolved(tmp_path: Path) -> 
         "    headers = ['Old']\n"
         "    data_headers = headers\n"
         "    alias = headers\n"
-        "    alias.append(context)\n"
+        f"    alias.{mutation}\n"
         "    return data_headers, [], ''\n",
         encoding="utf-8",
     )
@@ -222,6 +226,80 @@ def test_dynamic_mutation_through_header_alias_is_unresolved(tmp_path: Path) -> 
 
     assert inventory == {}
     assert errors == ["scripts/artifacts/sample.py::sample: data_headers is mutated dynamically"]
+
+
+@pytest.mark.parametrize("declare_before_mutation", [True, False])
+@pytest.mark.parametrize("assignment", ["", "    headers[0] = 'Updated'\n"])
+def test_augmented_header_alias_assignment_preserves_source_list(
+    tmp_path: Path, declare_before_mutation: bool, assignment: str
+) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    declaration = "    data_headers = headers\n"
+    (artifacts / "sample.py").write_text(
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    headers = ['Original']\n"
+        "    alias = headers\n"
+        + (declaration if declare_before_mutation else "")
+        + assignment
+        + "    alias += ['Added']\n"
+        + ("" if declare_before_mutation else declaration)
+        + "    return data_headers, [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    expected_header = "Updated" if assignment else "Original"
+    assert inventory == {"scripts/artifacts/sample.py": {"sample": [expected_header, "Added"]}}
+    assert errors == []
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "headers += ['Added']",
+        "headers.append('Added')",
+        "headers.extend(['Added'])",
+        "headers.insert(1, 'Added')",
+        "headers[1:] = ['Added']",
+    ],
+)
+def test_header_mutation_preserves_other_conditional_declarations(tmp_path: Path, mutation: str) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    if context:\n"
+        "        data_headers = ['Older field']\n"
+        "    else:\n"
+        "        headers = ['Newer field']\n"
+        "        data_headers = headers\n"
+        f"        {mutation}\n"
+        "    return data_headers, [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {"scripts/artifacts/sample.py": {"sample": ["Older field", "Newer field", "Added"]}}
+    assert errors == []
+
+
+def test_unresolved_untracked_assignment_does_not_invalidate_returned_headers(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "@artifact_processor\ndef sample(context):\n    untracked[0] = context\n    return ['Sample header'], [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {"scripts/artifacts/sample.py": {"sample": ["Sample header"]}}
+    assert errors == []
 
 
 def test_resolves_static_header_comprehensions_and_list_mutations(tmp_path: Path) -> None:
