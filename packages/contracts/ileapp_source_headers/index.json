@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "ileapp_commit": "24ba13daf37d8ef3c63c959768e31aae8e630c03",
   "shards": {
     "a-01.json": "a-01.json",

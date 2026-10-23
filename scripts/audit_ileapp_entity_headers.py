@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import ast
 import copy
+import hashlib
 import json
 import re
 import subprocess
@@ -21,6 +22,11 @@ BASELINE_DIR = REPOSITORY_ROOT / "packages" / "contracts" / "ileapp_source_heade
 INDEX_PATH = BASELINE_DIR / "index.json"
 SHARD_MODULE_LIMIT = 12
 SHARD_MAX_BYTES = 250_000
+HEADER_CONSUMER_CALLS = {
+    "write_artifact_data_table",
+    "lava_process_artifact",
+    "lava_insert_sqlite_data",
+}
 
 
 def _resolve(expression: ast.expr, names: dict[str, Any]) -> Any:
@@ -200,10 +206,49 @@ def _invalidate_bindings(names: dict[str, Any], targets: set[str]) -> None:
             names.pop(name)
 
 
+def _nested_calls(call: ast.Call) -> list[ast.Call]:
+    calls: list[ast.Call] = []
+
+    class Visitor(ast.NodeVisitor):
+        def visit_Call(self, node: ast.Call) -> None:
+            calls.append(node)
+
+    visitor = Visitor()
+    for child in ast.iter_child_nodes(call):
+        visitor.visit(child)
+    return calls
+
+
+def _invalidate_call_bindings(call: ast.Call, names: dict[str, Any]) -> bool:
+    function = call.func
+    function_name = (
+        function.id
+        if isinstance(function, ast.Name)
+        else function.attr
+        if isinstance(function, ast.Attribute)
+        else None
+    )
+    nested_updates_headers = any(_invalidate_call_bindings(nested, names) for nested in _nested_calls(call))
+    if function_name in HEADER_CONSUMER_CALLS:
+        return nested_updates_headers
+    targets = {
+        node.id
+        for node in ast.walk(call)
+        if isinstance(node, ast.Name) and node.id in names and _container_ids(names[node.id], mutable_only=True)
+    }
+    header_ids = _container_ids(names.get("data_headers"), mutable_only=True)
+    updates_headers = any(
+        _container_ids(names[name], mutable_only=True) & header_ids for name in targets if name in names
+    )
+    _invalidate_bindings(names, targets)
+    return nested_updates_headers or updates_headers
+
+
 def _is_artifact_processor(function: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     for decorator in function.decorator_list:
         target = decorator.func if isinstance(decorator, ast.Call) else decorator
-        if isinstance(target, ast.Name) and target.id == "artifact_processor":
+        name = target.id if isinstance(target, ast.Name) else target.attr if isinstance(target, ast.Attribute) else None
+        if name in {"artifact_processor", "artifact_processor_streaming"}:
             return True
     return False
 
@@ -245,10 +290,12 @@ def _header_declaration(
             return None, "data_headers is mutated dynamically"
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
             call = node.value
+            handled = False
             if isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name):
                 target_name = call.func.value.id
                 target = names.get(target_name)
                 if isinstance(target, list) and call.func.attr in {"append", "extend", "insert"}:
+                    handled = True
                     updates_headers = target is names.get("data_headers")
                     try:
                         arguments = [_resolve(argument, names) for argument in call.args]
@@ -282,8 +329,14 @@ def _header_declaration(
                                 declaration.extend(arguments[0])
                             elif call.func.attr == "insert" and len(arguments) == 2 and isinstance(arguments[0], int):
                                 declaration.insert(arguments[0], arguments[1])
-                elif target_name == "data_headers":
-                    return None, "data_headers is mutated dynamically"
+                elif isinstance(target, (dict, list, set)):
+                    handled = True
+                    updates_headers = target is names.get("data_headers")
+                    _invalidate_bindings(names, {target_name})
+                    if updates_headers:
+                        return None, "data_headers is mutated dynamically"
+            if not handled and _invalidate_call_bindings(call, names):
+                return None, "data_headers is mutated dynamically"
             continue
 
         if isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
@@ -478,29 +531,33 @@ def _json_value(value: Any) -> Any:
     return value
 
 
-def _no_output_artifacts(tree: ast.Module, constants: dict[str, Any]) -> set[str]:
-    declaration = next(
-        (
-            node.value
-            for node in tree.body
-            if isinstance(node, ast.Assign)
-            and any(isinstance(target, ast.Name) and target.id == "__artifacts_v2__" for target in node.targets)
-        ),
-        None,
-    )
-    if declaration is None:
-        return set()
-    try:
-        artifacts = _resolve(declaration, constants)
-    except TypeError, ValueError:
-        return set()
+def _artifact_metadata(tree: ast.Module, constants: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    declarations = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        and any(
+            isinstance(target, ast.Name) and target.id == "__artifacts_v2__"
+            for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        )
+    ]
+    if len(declarations) != 1:
+        if not declarations:
+            processors = {
+                node.name
+                for node in tree.body
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and _is_artifact_processor(node)
+            }
+            if processors:
+                return {name: {} for name in processors}, None
+        return {}, "module must declare __artifacts_v2__ exactly once"
+    artifacts = constants.get("__artifacts_v2__")
     if not isinstance(artifacts, dict):
-        return set()
-    return {
-        name
-        for name, metadata in artifacts.items()
-        if isinstance(metadata, dict) and metadata.get("output_types") == "none"
-    }
+        return {}, "__artifacts_v2__ is not a supported static dictionary"
+    for name, metadata in artifacts.items():
+        if not isinstance(name, str) or not isinstance(metadata, dict):
+            return {}, "__artifacts_v2__ contains a non-static artifact declaration"
+    return artifacts, None
 
 
 def scan_source(
@@ -522,23 +579,40 @@ def scan_source(
             continue
 
         constants = _module_constants(tree)
-        no_output = _no_output_artifacts(tree, constants)
+        metadata, metadata_error = _artifact_metadata(tree, constants)
+        if metadata_error is not None:
+            errors.append(f"{relative_path}::__artifacts_v2__: {metadata_error}")
+            continue
+        no_output = {name for name, entry in metadata.items() if entry.get("output_types") == "none"}
         if no_output:
             no_output_artifacts[relative_path] = sorted(no_output)
         functions = {node.name: node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
         module_artifacts: dict[str, list[Any]] = {}
-        for node in tree.body:
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or not _is_artifact_processor(node):
+        for node in functions.values():
+            artifact_name = node.name
+            if artifact_name not in metadata:
+                if _is_artifact_processor(node):
+                    errors.append(f"{relative_path}::{artifact_name}: processor is missing from __artifacts_v2__")
                 continue
             headers, error = _header_declaration(node, constants, functions, set())
             if error is not None:
-                if node.name not in no_output:
-                    errors.append(f"{relative_path}::{node.name}: {error}")
+                if artifact_name in no_output:
+                    continue
+                errors.append(f"{relative_path}::{artifact_name}: {error} [source-sha256:{_source_fingerprint(tree)}]")
                 continue
             if headers is None:
-                errors.append(f"{relative_path}::{node.name}: no static header declaration was resolved")
+                if artifact_name in no_output:
+                    continue
+                errors.append(
+                    f"{relative_path}::{artifact_name}: no static header declaration was resolved "
+                    f"[source-sha256:{_source_fingerprint(tree)}]"
+                )
                 continue
-            module_artifacts[node.name] = headers
+            module_artifacts[artifact_name] = headers
+
+        for artifact_name in metadata:
+            if artifact_name not in functions and artifact_name not in no_output:
+                errors.append(f"{relative_path}::{artifact_name}: declared artifact has no processor function")
 
         if module_artifacts:
             artifacts[relative_path] = module_artifacts
@@ -564,6 +638,11 @@ def _source_commit() -> str:
         text=True,
     )
     return result.stdout.strip()
+
+
+def _source_fingerprint(tree: ast.Module) -> str:
+    source = ast.dump(tree, include_attributes=False)
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
 def _source_tree_changes() -> list[str]:
@@ -607,15 +686,36 @@ def _baseline(
     artifacts: dict[str, dict[str, list[Any]]],
     no_output_artifacts: dict[str, list[str]],
     unresolved: list[str],
+    reviewed_exceptions: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "ileapp_commit": commit,
         "modules": modules,
         "artifacts": artifacts,
         "no_output_artifacts": no_output_artifacts,
-        "unresolved": unresolved,
+        "unresolved": sorted(unresolved),
+        "reviewed_exceptions": reviewed_exceptions or [],
     }
+
+
+def _apply_reviewed_exceptions(current: dict[str, Any], previous: dict[str, Any] | None) -> None:
+    if previous is None:
+        current["reviewed_exceptions"] = []
+        return
+
+    unresolved = set(current["unresolved"])
+    retained = [
+        exception for exception in previous.get("reviewed_exceptions", []) if exception["declaration"] in unresolved
+    ]
+    current["reviewed_exceptions"] = retained
+    for exception in retained:
+        module, artifact_declaration = exception["declaration"].split("::", 1)
+        artifact = artifact_declaration.split(":", 1)[0]
+        headers = current["artifacts"].setdefault(module, {}).setdefault(artifact, [])
+        for header in exception["headers"]:
+            if header not in headers:
+                headers.append(header)
 
 
 def _shards(
@@ -623,6 +723,7 @@ def _shards(
     artifacts: dict[str, dict[str, list[Any]]],
     no_output_artifacts: dict[str, list[str]],
     unresolved: list[str],
+    reviewed_exceptions: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
     shards: dict[str, dict[str, Any]] = {}
     modules_by_initial: dict[str, list[str]] = {}
@@ -640,6 +741,10 @@ def _shards(
     for item in unresolved:
         module, _ = item.split("::", 1)
         module_entries[module]["unresolved"].append(item)
+
+    for exception in sorted(reviewed_exceptions, key=lambda entry: entry["declaration"]):
+        module, _ = exception["declaration"].split("::", 1)
+        module_entries[module].setdefault("reviewed_exceptions", []).append(exception)
 
     for initial, initial_modules in sorted(modules_by_initial.items()):
         chunks: list[dict[str, dict[str, Any]]] = []
@@ -672,6 +777,8 @@ def _header_name(header: Any) -> str:
 
 def compare_baselines(previous: dict[str, Any], current: dict[str, Any]) -> list[str]:
     changes: list[str] = []
+    if previous.get("schema_version") != current.get("schema_version"):
+        changes.append(f"baseline schema changed: {previous.get('schema_version')} -> {current.get('schema_version')}")
     if previous["ileapp_commit"] != current["ileapp_commit"]:
         changes.append(f"reviewed pin changed: {previous['ileapp_commit']} -> {current['ileapp_commit']}")
     old_modules = set(previous["modules"])
@@ -728,6 +835,16 @@ def compare_baselines(previous: dict[str, Any], current: dict[str, Any]) -> list
         changes.append(f"unresolved declaration added: {item}")
     for item in sorted(old_unresolved - new_unresolved):
         changes.append(f"unresolved declaration removed: {item}")
+
+    old_exceptions = {entry["declaration"]: entry for entry in previous.get("reviewed_exceptions", [])}
+    new_exceptions = {entry["declaration"]: entry for entry in current.get("reviewed_exceptions", [])}
+    for declaration in sorted(new_exceptions.keys() - old_exceptions.keys()):
+        changes.append(f"reviewed exception added: {declaration}")
+    for declaration in sorted(old_exceptions.keys() - new_exceptions.keys()):
+        changes.append(f"reviewed exception removed: {declaration}")
+    for declaration in sorted(old_exceptions.keys() & new_exceptions.keys()):
+        if old_exceptions[declaration] != new_exceptions[declaration]:
+            changes.append(f"reviewed exception changed: {declaration}")
     return changes
 
 
@@ -738,7 +855,7 @@ def _load_baseline(index_path: Path) -> dict[str, Any]:
         raise ValueError("Could not read the reviewed iLEAPP source-header baseline.") from None
     if (
         not isinstance(index, dict)
-        or index.get("schema_version") != 1
+        or index.get("schema_version") not in {1, 2}
         or not isinstance(index.get("ileapp_commit"), str)
         or not isinstance(index.get("shards"), dict)
     ):
@@ -748,6 +865,7 @@ def _load_baseline(index_path: Path) -> dict[str, Any]:
     artifacts: dict[str, dict[str, list[Any]]] = {}
     no_output_artifacts: dict[str, list[str]] = {}
     unresolved: list[str] = []
+    reviewed_exceptions: list[dict[str, Any]] = []
     for shard_name, relative_path in sorted(index["shards"].items()):
         if (
             not isinstance(shard_name, str)
@@ -768,10 +886,12 @@ def _load_baseline(index_path: Path) -> dict[str, Any]:
             module_artifacts = entry.get("artifacts")
             module_no_output = entry.get("no_output_artifacts")
             module_unresolved = entry.get("unresolved")
+            module_exceptions = entry.get("reviewed_exceptions", [])
             if (
                 not isinstance(module_artifacts, dict)
                 or not isinstance(module_no_output, list)
                 or not isinstance(module_unresolved, list)
+                or not isinstance(module_exceptions, list)
             ):
                 raise ValueError(f"The iLEAPP source-header shard {shard_name} has an invalid module entry.")
             modules.append(module)
@@ -780,6 +900,29 @@ def _load_baseline(index_path: Path) -> dict[str, Any]:
             if module_no_output:
                 no_output_artifacts[module] = module_no_output
             unresolved.extend(module_unresolved)
+            for exception in module_exceptions:
+                if (
+                    not isinstance(exception, dict)
+                    or not isinstance(exception.get("declaration"), str)
+                    or not exception["declaration"].startswith(f"{module}::")
+                    or not isinstance(exception.get("reason"), str)
+                    or not exception["reason"].strip()
+                    or not isinstance(exception.get("headers"), list)
+                    or any(
+                        not (
+                            isinstance(header, str)
+                            or isinstance(header, list)
+                            and header
+                            and all(isinstance(part, str) for part in header)
+                        )
+                        for header in exception["headers"]
+                    )
+                ):
+                    raise ValueError(f"The iLEAPP source-header shard {shard_name} has an invalid reviewed exception.")
+                reviewed_exceptions.append(exception)
+    declarations = [entry["declaration"] for entry in reviewed_exceptions]
+    if len(declarations) != len(set(declarations)):
+        raise ValueError("The reviewed iLEAPP source-header baseline repeats a reviewed exception.")
     return {
         "schema_version": index["schema_version"],
         "ileapp_commit": index["ileapp_commit"],
@@ -787,6 +930,7 @@ def _load_baseline(index_path: Path) -> dict[str, Any]:
         "artifacts": artifacts,
         "no_output_artifacts": no_output_artifacts,
         "unresolved": sorted(unresolved),
+        "reviewed_exceptions": sorted(reviewed_exceptions, key=lambda entry: entry["declaration"]),
     }
 
 
@@ -796,6 +940,7 @@ def _write_baseline(current: dict[str, Any], directory: Path = BASELINE_DIR) -> 
         current["artifacts"],
         current["no_output_artifacts"],
         current["unresolved"],
+        current.get("reviewed_exceptions", []),
     )
     directory.mkdir(parents=True, exist_ok=True)
     index_path = directory / "index.json"
@@ -841,19 +986,32 @@ def main() -> int:
             raise ValueError(f"The iLEAPP artifact source tree has local changes; refusing to audit it:\n{details}")
         modules, artifacts, no_output_artifacts, unresolved = scan_source(ARTIFACTS_ROOT)
         current = _baseline(pinned_commit, modules, artifacts, no_output_artifacts, unresolved)
+        previous = _load_baseline(INDEX_PATH) if INDEX_PATH.exists() else None
+        _apply_reviewed_exceptions(current, previous)
+        reviewed_declarations = {exception["declaration"] for exception in current["reviewed_exceptions"]}
+        unreviewed = [item for item in current["unresolved"] if item not in reviewed_declarations]
         if args.update_baseline:
-            index_path = _write_baseline(current)
-            print(
-                f"Updated {index_path.relative_to(REPOSITORY_ROOT)} "
-                f"and {len(_shards(modules, artifacts, no_output_artifacts, unresolved))} shards"
+            shard_count = len(
+                _shards(
+                    modules,
+                    artifacts,
+                    no_output_artifacts,
+                    unresolved,
+                    current["reviewed_exceptions"],
+                )
             )
-            if unresolved:
-                print(f"{len(unresolved)} unresolved header declarations require review:")
-                print("\n".join(unresolved))
+            index_path = _write_baseline(current)
+            print(f"Updated {index_path.relative_to(REPOSITORY_ROOT)} and {shard_count} shards")
+            if unreviewed:
+                print(f"{len(unreviewed)} unreviewed declarations require an explicit source resolution:")
+                print("\n".join(unreviewed))
                 return 1
             return 0
 
-        previous = _load_baseline(INDEX_PATH)
+        if previous is None:
+            raise ValueError(
+                "The reviewed iLEAPP source-header baseline is missing; use --update-baseline after review."
+            )
         changes = compare_baselines(previous, current)
         artifact_count = sum(len(entries) for entries in artifacts.values()) + sum(
             len(entries) for entries in no_output_artifacts.values()
@@ -864,11 +1022,11 @@ def main() -> int:
             f"{sum(len(headers) for entries in artifacts.values() for headers in entries.values())} headers"
         )
         print(f"Reviewed pin: {previous['ileapp_commit']}; current pin: {pinned_commit}")
-        if unresolved:
-            print(f"{len(unresolved)} unresolved header declarations require review:")
-            print("\n".join(unresolved))
+        if unreviewed:
+            print(f"{len(unreviewed)} unreviewed declarations require an explicit source resolution:")
+            print("\n".join(unreviewed))
         if not changes:
-            if unresolved:
+            if unreviewed:
                 return 1
             print("No source-header changes.")
             return 0

@@ -710,6 +710,19 @@
     },
     "scripts/artifacts/logarchive.py": {
       "artifacts": {
+        "logarchive": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
         "logarchive_artifacts": [
           [
             "Timestamp",
