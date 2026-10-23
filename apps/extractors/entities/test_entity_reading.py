@@ -73,6 +73,32 @@ def test_apple_podcasts_reads_feed_and_episode_urls():
     }
 
 
+def test_notes_shared_participant_phone_is_a_named_phone_entity():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Notes - Shared Note Participants",
+        {},
+        [ileapp(7, "Notes - Shared Note Participants", **{"Phone Number": "+1 (555) 555-0199"})],
+    )
+
+    assert reading.mentions == [Mention(7, "phone", "Phone Number", "+15555550199")]
+    assert any(rule.kind == "phone" and rule.field == "Phone Number" for rule in reading.rules)
+
+
+def test_calendar_name_is_not_an_email_entity_just_because_it_has_email_shape():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Calendar List",
+        {},
+        [ileapp(8, "Calendar List", **{"Calendar Name": "person@example.com"})],
+    )
+
+    assert reading.mentions == []
+    assert reading.unread == {"Calendar Name": {"records": 1, "shaped": {"email": 1}}}
+
+
 def test_wifi_known_networks_reads_portal_urls_and_bundle_ids():
     reading = read_unit(
         RULES,

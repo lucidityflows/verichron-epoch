@@ -8,6 +8,10 @@ named field by a rule in
 from its shape alone. How entities are stored and read is in
 [evidence-model.md](../../../docs/evidence-model.md#entities).
 
+The rules contract also records reviewed iLEAPP headers that deliberately have
+no entity rule. Those exclusions do not suppress field-coverage reporting: a
+populated excluded field remains visible as unread in the unit summary.
+
 It reads the evidence's facts, not a derivative (`"reads": "facts"`): one
 unit of its own per current crash-report and iLEAPP unit. Its parser version
 is the rules' version; a change to the rules bumps both.

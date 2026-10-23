@@ -24,7 +24,7 @@ from functools import cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 RULES_PATH = Path(__file__).resolve().parent.parent / "entity_rules.json"
 SCHEMA_DIR = Path(__file__).resolve().parent.parent / "ileapp_schema"
@@ -107,16 +107,30 @@ class Rule(_Strict):
         return (self.kind, self.source_type, self.artifact, self.field)
 
 
+class HeaderExclusion(_Strict):
+    """A pinned iLEAPP artifact header reviewed and deliberately left unruled."""
+
+    artifact: str = Field(min_length=1)
+    field: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return (self.artifact, self.field)
+
+
 class EntityRules(_Strict):
     description: str
-    #: Bumped whenever a rule or a normalization changes, so every unit is extracted again (R8).
+    #: Bumped whenever the rule, normalization or reviewed header classification changes (R8).
     version: int
     kinds: dict[str, Kind]
     #: iLEAPP's declared column types that make a column hold one kind. A rule
     #: naming the same kind, artifact and field takes its place, to read the field differently.
     declared_types: dict[str, str]
-    #: What the rules deliberately leave out, with the reason.
+    #: General entity kinds or value forms deliberately left out, with the reason.
     not_covered: dict[str, str]
+    #: Pinned iLEAPP artifact headers reviewed and deliberately left unruled.
+    excluded_headers: tuple[HeaderExclusion, ...]
     #: What each shape hint is called (entity_normalize.SHAPE_HINTS): shapes
     #: that rank a field no rule reads for review, never a value's kind.
     shape_hints: dict[str, str]
@@ -132,6 +146,19 @@ class EntityRules(_Strict):
         repeated = [key for key, n in Counter(rule.key for rule in self.rules).items() if n > 1]
         if repeated:
             raise ValueError(f"rules repeated: {repeated}")
+        repeated_exclusions = [
+            key for key, n in Counter(exclusion.key for exclusion in self.excluded_headers).items() if n > 1
+        ]
+        if repeated_exclusions:
+            raise ValueError(f"header exclusions repeated: {repeated_exclusions}")
+        ruled_headers = {
+            (rule.artifact, rule.field)
+            for rule in self.rules
+            if rule.source_type == "ileapp_record" and rule.artifact is not None
+        }
+        excluded_and_ruled = ruled_headers & {exclusion.key for exclusion in self.excluded_headers}
+        if excluded_and_ruled:
+            raise ValueError(f"headers are both ruled and excluded: {sorted(excluded_and_ruled)}")
         for rule in self.rules:
             required = _EXTRACT_KIND.get(rule.extract)
             if required and rule.kind != required:

@@ -312,8 +312,10 @@ devices. One value of one kind is an **entity**; it always names its record.
   iLEAPP's own: a column it declares `phonenumber` holds phone numbers. Free
   text (SMS, Notes, page titles) is read for URLs with a scheme, email
   addresses and IPv4 addresses only, shapes nothing else has; numbers in text
-  are not read as phone numbers. What the rules leave out on purpose is in the
-  file's `not_covered`, with the reason.
+  are not read as phone numbers. General limitations are in the file's
+  `not_covered`; reviewed iLEAPP artifact/header pairs deliberately left
+  unruled are in `excluded_headers`, each with its reason. An exclusion does
+  not hide a populated field: it remains in the unit's unread-field summary.
 - **The field is the role.** An entity keeps the field it was read from
   ("Imported by Bundle ID"), so "the app that imported this photo" and "the app
   whose state this is" stay apart without a second taxonomy.
