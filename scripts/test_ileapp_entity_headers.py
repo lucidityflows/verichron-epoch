@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 
 import scripts.audit_ileapp_entity_headers as audit
-from scripts.audit_ileapp_entity_headers import _load_baseline, _write_baseline, compare_baselines, scan_source
+from scripts.audit_ileapp_entity_headers import (
+    _apply_reviewed_exceptions,
+    _load_baseline,
+    _write_baseline,
+    compare_baselines,
+    scan_source,
+)
 
 
 def test_scans_decorated_artifact_headers_without_executing_source(tmp_path: Path) -> None:
@@ -28,6 +34,24 @@ def test_scans_decorated_artifact_headers_without_executing_source(tmp_path: Pat
 
     assert modules == ["scripts/artifacts/sample.py"]
     assert inventory == {"scripts/artifacts/sample.py": {"sample": ["Timestamp", ["URL", "url"]]}}
+    assert no_output == {}
+    assert errors == []
+
+
+def test_scans_streaming_artifact_headers(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "__artifacts_v2__ = {'sample': {'output_types': 'standard'}}\n"
+        "@artifact_processor_streaming\n"
+        "def sample(context):\n"
+        "    return ('Timestamp', 'Message'), [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, no_output, errors = scan_source(artifacts)
+
+    assert inventory == {"scripts/artifacts/sample.py": {"sample": ["Timestamp", "Message"]}}
     assert no_output == {}
     assert errors == []
 
@@ -305,7 +329,34 @@ def test_dynamic_mutation_through_header_alias_is_unresolved(tmp_path: Path, mut
     _, inventory, _, errors = scan_source(artifacts)
 
     assert inventory == {}
-    assert errors == ["scripts/artifacts/sample.py::sample: data_headers is mutated dynamically"]
+    assert len(errors) == 1
+    assert errors[0].startswith(
+        "scripts/artifacts/sample.py::sample: data_headers is mutated dynamically [source-sha256:"
+    )
+
+
+def test_unresolved_helper_call_cannot_mutate_a_header_alias_silently(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "def mutate(values):\n"
+        "    values.append('Runtime field')\n"
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    data_headers = ['Known field']\n"
+        "    alias = data_headers\n"
+        "    mutate(alias)\n"
+        "    return data_headers, [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {}
+    assert len(errors) == 1
+    assert errors[0].startswith(
+        "scripts/artifacts/sample.py::sample: data_headers is mutated dynamically [source-sha256:"
+    )
 
 
 @pytest.mark.parametrize("declare_before_mutation", [True, False])
@@ -334,6 +385,69 @@ def test_augmented_header_alias_assignment_preserves_source_list(
     expected_header = "Updated" if assignment else "Original"
     assert inventory == {"scripts/artifacts/sample.py": {"sample": [expected_header, "Added"]}}
     assert errors == []
+
+
+def test_dynamic_set_mutation_in_returned_headers_is_not_silently_omitted(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "__artifacts_v2__ = {'sample': {'output_types': 'standard'}}\n"
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    keys = set()\n"
+        "    for row in context:\n"
+        "        keys.update(row.keys())\n"
+        "    headers = ['eventTime'] + list(keys)\n"
+        "    return headers, [], ''\n",
+        encoding="utf-8",
+    )
+
+    modules, inventory, no_output, errors = scan_source(artifacts)
+
+    assert modules == ["scripts/artifacts/sample.py"]
+    assert inventory == {}
+    assert no_output == {}
+    assert len(errors) == 1
+    assert errors[0].startswith(
+        "scripts/artifacts/sample.py::sample: artifact processor does not declare data_headers [source-sha256:"
+    )
+
+
+def test_non_literal_module_metadata_is_reported_as_unresolved(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "__artifacts_v2__ = build_metadata()\n"
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    return ('Timestamp',), [], ''\n",
+        encoding="utf-8",
+    )
+
+    modules, inventory, no_output, errors = scan_source(artifacts)
+
+    assert modules == ["scripts/artifacts/sample.py"]
+    assert inventory == {}
+    assert no_output == {}
+    assert errors == [
+        "scripts/artifacts/sample.py::__artifacts_v2__: __artifacts_v2__ is not a supported static dictionary"
+    ]
+
+
+def test_metadata_artifact_without_a_processor_is_reported(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "__artifacts_v2__ = {'sample': {'output_types': 'standard'}}\n",
+        encoding="utf-8",
+    )
+
+    modules, inventory, no_output, errors = scan_source(artifacts)
+
+    assert modules == ["scripts/artifacts/sample.py"]
+    assert inventory == {}
+    assert no_output == {}
+    assert errors == ["scripts/artifacts/sample.py::sample: declared artifact has no processor function"]
 
 
 @pytest.mark.parametrize(
@@ -461,9 +575,68 @@ def test_reports_pin_only_changes() -> None:
     assert compare_baselines(previous, current) == [f"reviewed pin changed: {'a' * 40} -> {'b' * 40}"]
 
 
-def test_writes_reproducible_alphabetical_shards_and_index(tmp_path: Path) -> None:
-    baseline = {
+def test_reports_baseline_schema_changes() -> None:
+    previous = {
         "schema_version": 1,
+        "ileapp_commit": "a" * 40,
+        "modules": [],
+        "artifacts": {},
+    }
+    current = {
+        "schema_version": 2,
+        "ileapp_commit": "a" * 40,
+        "modules": [],
+        "artifacts": {},
+    }
+
+    assert compare_baselines(previous, current) == ["baseline schema changed: 1 -> 2"]
+
+
+def test_reviewed_dynamic_exception_preserves_known_headers_only_for_the_same_source() -> None:
+    declaration = "scripts/artifacts/sample.py::sample: dynamic headers [source-sha256:abc123]"
+    exception = {
+        "declaration": declaration,
+        "headers": [["Timestamp", "datetime"]],
+        "reason": "The remaining keys come from runtime plist records and cannot be enumerated statically.",
+    }
+    previous = {
+        "ileapp_commit": "a" * 40,
+        "modules": ["scripts/artifacts/sample.py"],
+        "artifacts": {"scripts/artifacts/sample.py": {"sample": [["Timestamp", "datetime"]]}},
+        "no_output_artifacts": {},
+        "unresolved": [declaration],
+        "reviewed_exceptions": [exception],
+    }
+    current = {
+        "ileapp_commit": "a" * 40,
+        "modules": ["scripts/artifacts/sample.py"],
+        "artifacts": {},
+        "no_output_artifacts": {},
+        "unresolved": [declaration],
+        "reviewed_exceptions": [],
+    }
+
+    _apply_reviewed_exceptions(current, previous)
+
+    assert current["reviewed_exceptions"] == [exception]
+    assert current["artifacts"] == {"scripts/artifacts/sample.py": {"sample": [["Timestamp", "datetime"]]}}
+    assert compare_baselines(previous, current) == []
+
+    changed = {**current, "unresolved": [declaration.replace("abc123", "def456")]}
+    _apply_reviewed_exceptions(changed, previous)
+
+    assert changed["reviewed_exceptions"] == []
+    assert compare_baselines(previous, changed) == [
+        f"unresolved declaration added: {declaration.replace('abc123', 'def456')}",
+        f"unresolved declaration removed: {declaration}",
+        f"reviewed exception removed: {declaration}",
+    ]
+
+
+def test_writes_reproducible_alphabetical_shards_and_index(tmp_path: Path) -> None:
+    declaration = "scripts/artifacts/beta.py::dynamic: unresolved [source-sha256:abc123]"
+    baseline = {
+        "schema_version": 2,
         "ileapp_commit": "a" * 40,
         "modules": ["scripts/artifacts/alpha.py", "scripts/artifacts/beta.py"],
         "artifacts": {
@@ -471,7 +644,14 @@ def test_writes_reproducible_alphabetical_shards_and_index(tmp_path: Path) -> No
             "scripts/artifacts/beta.py": {"beta": ["B"]},
         },
         "no_output_artifacts": {},
-        "unresolved": ["scripts/artifacts/beta.py::dynamic"],
+        "unresolved": [declaration],
+        "reviewed_exceptions": [
+            {
+                "declaration": declaration,
+                "headers": ["Timestamp"],
+                "reason": "A reviewed source-level exception.",
+            }
+        ],
     }
 
     index_path = _write_baseline(baseline, tmp_path)
@@ -484,12 +664,13 @@ def test_writes_reproducible_alphabetical_shards_and_index(tmp_path: Path) -> No
 def test_splits_large_initial_groups_into_bounded_shards(tmp_path: Path) -> None:
     modules = [f"scripts/artifacts/alpha{index:02}.py" for index in range(13)]
     baseline = {
-        "schema_version": 1,
+        "schema_version": 2,
         "ileapp_commit": "a" * 40,
         "modules": modules,
         "artifacts": {module: {"sample": ["Header"]} for module in modules},
         "no_output_artifacts": {},
         "unresolved": [],
+        "reviewed_exceptions": [],
     }
 
     index_path = _write_baseline(baseline, tmp_path)
@@ -504,12 +685,13 @@ def test_splits_large_initial_groups_into_bounded_shards(tmp_path: Path) -> None
 def test_rejects_single_module_exceeding_shard_byte_limit(tmp_path: Path) -> None:
     module = "scripts/artifacts/large.py"
     baseline = {
-        "schema_version": 1,
+        "schema_version": 2,
         "ileapp_commit": "a" * 40,
         "modules": [module],
         "artifacts": {module: {"large": ["H" * audit.SHARD_MAX_BYTES]}},
         "no_output_artifacts": {},
         "unresolved": [],
+        "reviewed_exceptions": [],
     }
 
     with pytest.raises(ValueError, match="scripts/artifacts/large.py.*shard limit"):
@@ -523,12 +705,13 @@ def test_parse_errors_are_saved_as_module_unresolved_entries(tmp_path: Path) -> 
 
     modules, inventory, no_output, errors = scan_source(artifacts)
     baseline = {
-        "schema_version": 1,
+        "schema_version": 2,
         "ileapp_commit": "a" * 40,
         "modules": modules,
         "artifacts": inventory,
         "no_output_artifacts": no_output,
         "unresolved": errors,
+        "reviewed_exceptions": [],
     }
 
     index_path = _write_baseline(baseline, tmp_path / "baseline")
@@ -550,6 +733,7 @@ def test_refuses_modified_and_ignored_pinned_source(tmp_path: Path, monkeypatch:
         ["git", "-C", str(repository), "config", "user.email", "test@example.invalid"],
         check=True,
     )
+    subprocess.run(["git", "-C", str(repository), "config", "commit.gpgsign", "false"], check=True)
     subprocess.run(["git", "-C", str(repository), "add", "."], check=True)
     subprocess.run(["git", "-C", str(repository), "commit", "-qm", "source"], check=True)
     monkeypatch.setattr(audit, "SOURCE_ROOT", repository)
@@ -608,10 +792,7 @@ def test_does_not_require_headers_for_declared_no_output_artifact(tmp_path: Path
     artifacts = tmp_path / "scripts" / "artifacts"
     artifacts.mkdir(parents=True)
     (artifacts / "sample.py").write_text(
-        "__artifacts_v2__ = {'sample': {'output_types': 'none'}}\n"
-        "@artifact_processor\n"
-        "def sample(context):\n"
-        "    return None\n",
+        "__artifacts_v2__ = {'sample': {'output_types': 'none'}}\n",
         encoding="utf-8",
     )
 

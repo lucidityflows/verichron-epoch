@@ -3,11 +3,28 @@
     "scripts/artifacts/coreAccessoriesUserEvent.py": {
       "artifacts": {
         "get_coreAccessoriesUserEvent": [
-          "eventTime"
+          [
+            "eventTime",
+            "datetime"
+          ]
         ]
       },
       "no_output_artifacts": [],
-      "unresolved": []
+      "reviewed_exceptions": [
+        {
+          "declaration": "scripts/artifacts/coreAccessoriesUserEvent.py::get_coreAccessoriesUserEvent: artifact processor does not declare data_headers [source-sha256:e8ac57a19f6b48c0b9662ce8eed7bff47584ebeeca980aaa5ec328b636ea3ea8]",
+          "headers": [
+            [
+              "eventTime",
+              "datetime"
+            ]
+          ],
+          "reason": "The processor derives remaining column names from keys in decoded plist rows, so they depend on case data and cannot be enumerated statically. The source explicitly declares eventTime as a datetime."
+        }
+      ],
+      "unresolved": [
+        "scripts/artifacts/coreAccessoriesUserEvent.py::get_coreAccessoriesUserEvent: artifact processor does not declare data_headers [source-sha256:e8ac57a19f6b48c0b9662ce8eed7bff47584ebeeca980aaa5ec328b636ea3ea8]"
+      ]
     }
   }
 }
