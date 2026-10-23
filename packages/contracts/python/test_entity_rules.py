@@ -103,6 +103,16 @@ def test_every_ileapp_rule_names_a_header_declared_by_the_pinned_source():
         )
 
 
+def test_every_excluded_header_is_declared_by_the_pinned_source():
+    declared = declared_pinned_ileapp_columns()
+    for exclusion in load().excluded_headers:
+        assert exclusion.artifact in declared, f"{exclusion.key}: pinned iLEAPP declares no artifact"
+        assert exclusion.field in declared[exclusion.artifact], (
+            f"{exclusion.key}: pinned iLEAPP does not declare this header; "
+            f"it declares {sorted(declared[exclusion.artifact])}"
+        )
+
+
 def test_every_crash_report_rule_is_a_record_column():
     columns = set(NormalizedRecord.model_fields)
     for rule in load().rules:
@@ -137,4 +147,19 @@ def test_an_ileapp_rule_must_name_its_artifact():
     rule = next(r for r in raw["rules"] if r["source_type"] == "ileapp_record")
     rule["artifact"] = None
     with pytest.raises(ValueError, match="names its artifact"):
+        EntityRules.model_validate(raw)
+
+
+def test_a_header_cannot_be_both_ruled_and_excluded():
+    raw = load().model_dump()
+    rule = next(rule for rule in raw["rules"] if rule["source_type"] == "ileapp_record")
+    raw["excluded_headers"] = [{"artifact": rule["artifact"], "field": rule["field"], "reason": "reviewed"}]
+    with pytest.raises(ValueError, match="both ruled and excluded"):
+        EntityRules.model_validate(raw)
+
+
+def test_a_header_exclusion_cannot_be_repeated():
+    raw = load().model_dump()
+    raw["excluded_headers"] = [*raw["excluded_headers"], raw["excluded_headers"][0]]
+    with pytest.raises(ValueError, match="header exclusions repeated"):
         EntityRules.model_validate(raw)
