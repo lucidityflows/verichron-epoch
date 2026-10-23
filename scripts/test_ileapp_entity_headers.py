@@ -56,6 +56,31 @@ def test_scans_streaming_artifact_headers(tmp_path: Path) -> None:
     assert errors == []
 
 
+def test_nested_helper_call_invalidates_headers_inside_known_consumer(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "__artifacts_v2__ = {'sample': {'output_types': 'standard'}}\n"
+        "def prepare_rows(rows, headers):\n"
+        "    headers.append('Runtime field')\n"
+        "    return rows\n"
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    data_headers = ['Timestamp']\n"
+        "    write_artifact_data_table('sample', prepare_rows([], data_headers))\n"
+        "    return data_headers, [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {}
+    assert len(errors) == 1
+    assert errors[0].startswith(
+        "scripts/artifacts/sample.py::sample: data_headers is mutated dynamically [source-sha256:"
+    )
+
+
 def test_unions_headers_from_static_conditional_variants(tmp_path: Path) -> None:
     artifacts = tmp_path / "scripts" / "artifacts"
     artifacts.mkdir(parents=True)
@@ -622,15 +647,75 @@ def test_reviewed_dynamic_exception_preserves_known_headers_only_for_the_same_so
     assert current["artifacts"] == {"scripts/artifacts/sample.py": {"sample": [["Timestamp", "datetime"]]}}
     assert compare_baselines(previous, current) == []
 
-    changed = {**current, "unresolved": [declaration.replace("abc123", "def456")]}
+    changed = {
+        **current,
+        "artifacts": {},
+        "unresolved": [declaration.replace("abc123", "def456")],
+    }
     _apply_reviewed_exceptions(changed, previous)
 
     assert changed["reviewed_exceptions"] == []
+    assert changed["artifacts"] == {}
     assert compare_baselines(previous, changed) == [
+        "removed artifact: scripts/artifacts/sample.py::sample",
         f"unresolved declaration added: {declaration.replace('abc123', 'def456')}",
         f"unresolved declaration removed: {declaration}",
         f"reviewed exception removed: {declaration}",
     ]
+
+
+def test_helper_only_source_change_invalidates_reviewed_exception(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    source_path = artifacts / "sample.py"
+
+    def write_source(known_header: str) -> None:
+        source_path.write_text(
+            f"HEADERS = ['{known_header}']\n"
+            "def shared(context):\n"
+            "    data_headers = HEADERS\n"
+            "    data_headers.extend(runtime_headers(context))\n"
+            "    return data_headers, [], ''\n"
+            "__artifacts_v2__ = {'sample': {'output_types': 'standard'}}\n"
+            "@artifact_processor\n"
+            "def sample(context):\n"
+            "    return shared(context)\n",
+            encoding="utf-8",
+        )
+
+    write_source("Known field")
+    modules, _, no_output, first_errors = scan_source(artifacts)
+    assert len(first_errors) == 1
+    previous = {
+        "ileapp_commit": "a" * 40,
+        "modules": modules,
+        "artifacts": {"scripts/artifacts/sample.py": {"sample": [["Known field", "datetime"]]}},
+        "no_output_artifacts": no_output,
+        "unresolved": first_errors,
+        "reviewed_exceptions": [
+            {
+                "declaration": first_errors[0],
+                "headers": [["Known field", "datetime"]],
+                "reason": "The dynamic helper output cannot be enumerated statically.",
+            }
+        ],
+    }
+
+    write_source("Changed field")
+    current_modules, current_artifacts, current_no_output, current_errors = scan_source(artifacts)
+    current = {
+        "ileapp_commit": "a" * 40,
+        "modules": current_modules,
+        "artifacts": current_artifacts,
+        "no_output_artifacts": current_no_output,
+        "unresolved": current_errors,
+        "reviewed_exceptions": [],
+    }
+    _apply_reviewed_exceptions(current, previous)
+
+    assert current_errors[0] != first_errors[0]
+    assert current["reviewed_exceptions"] == []
+    assert current["artifacts"] == {}
 
 
 def test_writes_reproducible_alphabetical_shards_and_index(tmp_path: Path) -> None:

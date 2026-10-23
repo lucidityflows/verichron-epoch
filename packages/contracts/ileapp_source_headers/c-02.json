@@ -500,7 +500,7 @@
       "no_output_artifacts": [],
       "reviewed_exceptions": [
         {
-          "declaration": "scripts/artifacts/coreAccessoriesAcc.py::get_coreAccessories: artifact processor does not declare data_headers [source-sha256:db3cd6f0ef6799218db8b2819ce01ca0d1c492987ba250627fd4c0abe17c52ab]",
+          "declaration": "scripts/artifacts/coreAccessoriesAcc.py::get_coreAccessories: artifact processor does not declare data_headers [source-sha256:968f35f5a7d3c8ea8af1c0e21512c662826e23f1fbe1bbd6f1a946594a3bcf1c]",
           "headers": [
             [
               "eventTime",
@@ -511,7 +511,7 @@
         }
       ],
       "unresolved": [
-        "scripts/artifacts/coreAccessoriesAcc.py::get_coreAccessories: artifact processor does not declare data_headers [source-sha256:db3cd6f0ef6799218db8b2819ce01ca0d1c492987ba250627fd4c0abe17c52ab]"
+        "scripts/artifacts/coreAccessoriesAcc.py::get_coreAccessories: artifact processor does not declare data_headers [source-sha256:968f35f5a7d3c8ea8af1c0e21512c662826e23f1fbe1bbd6f1a946594a3bcf1c]"
       ]
     }
   }

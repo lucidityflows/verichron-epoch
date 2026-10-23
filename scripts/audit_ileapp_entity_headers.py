@@ -206,6 +206,19 @@ def _invalidate_bindings(names: dict[str, Any], targets: set[str]) -> None:
             names.pop(name)
 
 
+def _nested_calls(call: ast.Call) -> list[ast.Call]:
+    calls: list[ast.Call] = []
+
+    class Visitor(ast.NodeVisitor):
+        def visit_Call(self, node: ast.Call) -> None:
+            calls.append(node)
+
+    visitor = Visitor()
+    for child in ast.iter_child_nodes(call):
+        visitor.visit(child)
+    return calls
+
+
 def _invalidate_call_bindings(call: ast.Call, names: dict[str, Any]) -> bool:
     function = call.func
     function_name = (
@@ -215,8 +228,9 @@ def _invalidate_call_bindings(call: ast.Call, names: dict[str, Any]) -> bool:
         if isinstance(function, ast.Attribute)
         else None
     )
+    nested_updates_headers = any(_invalidate_call_bindings(nested, names) for nested in _nested_calls(call))
     if function_name in HEADER_CONSUMER_CALLS:
-        return False
+        return nested_updates_headers
     targets = {
         node.id
         for node in ast.walk(call)
@@ -227,7 +241,7 @@ def _invalidate_call_bindings(call: ast.Call, names: dict[str, Any]) -> bool:
         _container_ids(names[name], mutable_only=True) & header_ids for name in targets if name in names
     )
     _invalidate_bindings(names, targets)
-    return updates_headers
+    return nested_updates_headers or updates_headers
 
 
 def _is_artifact_processor(function: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
@@ -584,14 +598,14 @@ def scan_source(
             if error is not None:
                 if artifact_name in no_output:
                     continue
-                errors.append(f"{relative_path}::{artifact_name}: {error} [source-sha256:{_source_fingerprint(node)}]")
+                errors.append(f"{relative_path}::{artifact_name}: {error} [source-sha256:{_source_fingerprint(tree)}]")
                 continue
             if headers is None:
                 if artifact_name in no_output:
                     continue
                 errors.append(
                     f"{relative_path}::{artifact_name}: no static header declaration was resolved "
-                    f"[source-sha256:{_source_fingerprint(node)}]"
+                    f"[source-sha256:{_source_fingerprint(tree)}]"
                 )
                 continue
             module_artifacts[artifact_name] = headers
@@ -626,8 +640,8 @@ def _source_commit() -> str:
     return result.stdout.strip()
 
 
-def _source_fingerprint(function: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
-    source = ast.dump(function, include_attributes=False)
+def _source_fingerprint(tree: ast.Module) -> str:
+    source = ast.dump(tree, include_attributes=False)
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
