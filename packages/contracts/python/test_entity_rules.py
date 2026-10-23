@@ -1,6 +1,7 @@
 """The entity rules name only fields that exist (EPOCH-581): a crash report's
 own columns, and the headers the pinned iLEAPP declares."""
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -34,6 +35,11 @@ def test_the_rules_load_with_their_kinds():
     }
     assert rules.kinds["url"].also == "domain"
     assert rules.declared_types == {"phonenumber": "phone"}
+
+
+def test_entities_stage_parser_version_matches_the_rule_contract():
+    stage = json.loads((REPO / "apps" / "extractors" / "entities" / "stage.json").read_text(encoding="utf-8"))
+    assert stage["parserVersion"] == load().version
 
 
 def test_every_ileapp_rule_names_a_header_the_pinned_ileapp_declares():

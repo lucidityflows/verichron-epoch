@@ -1,6 +1,6 @@
 {
   "description": "Which values a record mentions, by kind, and where they are (EPOCH-581). Each rule names one field of one source and what it holds; a value's shape never decides its kind (measured 2026-10-20 on a real backup: 129 columns had a phone number's shape, most of them coordinates, byte counts and scores). The field's name is the entity's role. Shapes only check a rule: a value that doesn't fit its kind is counted as unreadable, never stored. The Python reader is entity_rules.py; scripts/check_entity_rules.py runs every rule against a real iLEAPP output.",
-  "version": 1,
+  "version": 2,
   "kinds": {
     "url": {
       "title": "URL",
@@ -136,6 +136,36 @@
       "source_type": "ileapp_record",
       "artifact": "iOS Screens",
       "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zShare-Share URL-CMM-366"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "SPLzShare-Share URL-SPL-367"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zGenAlbum-Public URL-596"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "SWYConverszGenAlbum-Public URL-598"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zEdIPTCAttr-CiURLWork-1005"
     },
     {
       "kind": "domain",
@@ -274,6 +304,12 @@
       "source_type": "ileapp_record",
       "artifact": "Photos.sqlite Metadata",
       "field": "Editor Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Photos.sqlite Metadata",
+      "field": "Creator Bundle ID"
     },
     {
       "kind": "app",
@@ -420,6 +456,24 @@
       "field": "zGenAlbum-Imported by Bundle Identifier- 4QueryStart-111"
     },
     {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "SWYzGenAlbum-Imported by Bundle Identifier-495"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zShare-Client BundleID-CMM-368"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "SPLzShare-Client BundleID-SPL-369"
+    },
+    {
       "kind": "process",
       "source_type": "crash_report",
       "field": "process_name"
@@ -501,6 +555,24 @@
       "extract": "email_only"
     },
     {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zSharePartic-Email Address-462"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "SPLzSharePartic-Email Address-463"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zEdIPTCAttr-CiEmailWork-1003"
+    },
+    {
       "kind": "phone",
       "source_type": "ileapp_record",
       "artifact": "SMS",
@@ -543,6 +615,24 @@
       "extract": "phone_only"
     },
     {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zSharePartic-Phone Number-464"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "SPLzSharePartic-Phone Number-465"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql",
+      "field": "zEdIPTCAttr-CiTeLWork-1004"
+    },
+    {
       "kind": "wifi_network",
       "source_type": "ileapp_record",
       "artifact": "WiFi BSS List",
@@ -565,6 +655,18 @@
       "source_type": "ileapp_record",
       "artifact": "WiFi Known Networks Info",
       "field": "BSSID"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "WiFi Known Networks Info",
+      "field": "User Portal URL"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "WiFi Known Networks Info",
+      "field": "Bundle ID"
     },
     {
       "kind": "wifi_network",
