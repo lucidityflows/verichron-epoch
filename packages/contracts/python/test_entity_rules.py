@@ -66,7 +66,7 @@ def pinned_ileapp_commit() -> str:
     ).stdout.strip()
 
 
-def declared_pinned_ileapp_columns() -> dict[str, set[str]]:
+def declared_pinned_ileapp_columns() -> tuple[dict[str, set[str]], dict[tuple[str, str], set[str]]]:
     index = json.loads((REPO / "packages" / "contracts" / "ileapp_source_headers" / "index.json").read_text())
     assert index["ileapp_commit"] == pinned_ileapp_commit()
     source_headers: dict[str, object] = {}
@@ -76,6 +76,7 @@ def declared_pinned_ileapp_columns() -> dict[str, set[str]]:
         source_headers.update(shard["modules"])
 
     declared: dict[str, set[str]] = {}
+    declared_types: dict[tuple[str, str], set[str]] = {}
     for module, module_data in source_headers.items():
         if not isinstance(module_data, dict):
             continue
@@ -110,7 +111,15 @@ def declared_pinned_ileapp_columns() -> dict[str, set[str]]:
                 continue
             names = {header[0] if isinstance(header, list) else header for header in headers}
             declared.setdefault(artifact, set()).update(name for name in names if isinstance(name, str))
-    return declared
+            for header in headers:
+                if (
+                    isinstance(header, list)
+                    and len(header) > 1
+                    and isinstance(header[0], str)
+                    and isinstance(header[1], str)
+                ):
+                    declared_types.setdefault((artifact, header[0]), set()).add(header[1])
+    return declared, declared_types
 
 
 def test_the_rules_load_with_their_kinds():
@@ -137,7 +146,7 @@ def test_entities_stage_parser_version_matches_the_rule_contract():
 
 
 def test_every_ileapp_rule_names_a_header_declared_by_the_pinned_source():
-    declared = declared_pinned_ileapp_columns()
+    declared, _ = declared_pinned_ileapp_columns()
     for rule in load().rules:
         if rule.source_type != "ileapp_record":
             continue
@@ -149,7 +158,7 @@ def test_every_ileapp_rule_names_a_header_declared_by_the_pinned_source():
 
 
 def test_every_excluded_header_is_declared_by_the_pinned_source():
-    declared = declared_pinned_ileapp_columns()
+    declared, _ = declared_pinned_ileapp_columns()
     for exclusion in load().excluded_headers:
         assert exclusion.artifact in declared, f"{exclusion.key}: pinned iLEAPP declares no artifact"
         assert exclusion.field in declared[exclusion.artifact], (
@@ -160,19 +169,19 @@ def test_every_excluded_header_is_declared_by_the_pinned_source():
 
 def test_every_ver_291_header_has_exactly_one_coverage_decision():
     rules = load()
-    declared = declared_pinned_ileapp_columns()
+    declared, declared_types = declared_pinned_ileapp_columns()
     assert set(rules.reviewed_artifacts) == VER_291_ARTIFACTS
-    ileapp_rules = {
-        (rule.artifact, rule.field)
-        for rule in rules.rules
-        if rule.source_type == "ileapp_record"
-    }
+    ileapp_rules = {(rule.artifact, rule.field) for rule in rules.rules if rule.source_type == "ileapp_record"}
     exclusions = {exclusion.key for exclusion in rules.excluded_headers}
+    implicit_rules = {key for key, types in declared_types.items() if types & set(rules.declared_types)}
     for artifact in rules.reviewed_artifacts:
         assert artifact in declared, f"pinned iLEAPP declares no artifact {artifact!r}"
         for field in declared[artifact]:
-            assert ((artifact, field) in ileapp_rules) != ((artifact, field) in exclusions), (
-                f"{artifact!r} / {field!r} must have exactly one rule or exclusion"
+            key = (artifact, field)
+            explicit_rule = key in ileapp_rules
+            implicit_rule = key in implicit_rules and not explicit_rule
+            assert int(explicit_rule) + int(key in exclusions) + int(implicit_rule) == 1, (
+                f"{artifact!r} / {field!r} must have exactly one explicit rule, declared-type rule, or exclusion"
             )
 
 
