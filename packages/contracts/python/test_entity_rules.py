@@ -183,6 +183,21 @@ def test_every_ver_291_header_has_exactly_one_coverage_decision():
             )
 
 
+def test_address_book_url_and_note_rules_allow_columns_dropped_when_empty():
+    rules = [
+        rule
+        for rule in load().rules
+        if rule.source_type == "ileapp_record" and rule.artifact == "Address Book" and rule.field in {"URL", "Notes"}
+    ]
+    assert {(rule.kind, rule.field) for rule in rules} == {
+        ("url", "URL"),
+        ("url", "Notes"),
+        ("email", "Notes"),
+        ("ip", "Notes"),
+    }
+    assert all(rule.dropped_when_empty for rule in rules)
+
+
 def test_every_crash_report_rule_is_a_record_column():
     columns = set(NormalizedRecord.model_fields)
     for rule in load().rules:

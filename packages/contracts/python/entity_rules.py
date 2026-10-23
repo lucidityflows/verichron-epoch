@@ -142,9 +142,7 @@ class EntityRules(_Strict):
     def _consistent(self) -> EntityRules:
         if any(not artifact for artifact in self.reviewed_artifacts):
             raise ValueError("reviewed artifacts must be non-empty")
-        repeated_artifacts = [
-            artifact for artifact, n in Counter(self.reviewed_artifacts).items() if n > 1
-        ]
+        repeated_artifacts = [artifact for artifact, n in Counter(self.reviewed_artifacts).items() if n > 1]
         if repeated_artifacts:
             raise ValueError(f"reviewed artifacts repeated: {sorted(repeated_artifacts)}")
         named = {rule.kind for rule in self.rules} | set(self.declared_types.values())

@@ -2992,28 +2992,32 @@
       "source_type": "ileapp_record",
       "artifact": "Address Book",
       "field": "URL",
-      "extract": "labelled_list"
+      "extract": "labelled_list",
+      "dropped_when_empty": true
     },
     {
       "kind": "url",
       "source_type": "ileapp_record",
       "artifact": "Address Book",
       "field": "Notes",
-      "extract": "urls_in_text"
+      "extract": "urls_in_text",
+      "dropped_when_empty": true
     },
     {
       "kind": "email",
       "source_type": "ileapp_record",
       "artifact": "Address Book",
       "field": "Notes",
-      "extract": "emails_in_text"
+      "extract": "emails_in_text",
+      "dropped_when_empty": true
     },
     {
       "kind": "ip",
       "source_type": "ileapp_record",
       "artifact": "Address Book",
       "field": "Notes",
-      "extract": "ips_in_text"
+      "extract": "ips_in_text",
+      "dropped_when_empty": true
     },
     {
       "kind": "phone",
