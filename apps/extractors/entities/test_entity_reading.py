@@ -86,6 +86,107 @@ def test_notes_shared_participant_phone_is_a_named_phone_entity():
     assert any(rule.kind == "phone" and rule.field == "Phone Number" for rule in reading.rules)
 
 
+def test_address_book_reads_labeled_contact_urls():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Address Book",
+        {},
+        [ileapp(9, "Address Book", URL="home: https://home.example/profile\r\nwork: https://work.example/")],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(9, "url", "URL", "https://home.example/profile"),
+        Mention(9, "domain", "URL", "home.example"),
+        Mention(9, "url", "URL", "https://work.example/"),
+        Mention(9, "domain", "URL", "work.example"),
+    }
+
+
+def test_calendar_invitation_contacts_and_conference_url_are_read():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Calendar Events",
+        {},
+        [
+            ileapp(
+                10,
+                "Calendar Events",
+                **{
+                    "Invitation From": "Organizer - organizer@example.com",
+                    "Invitees": "Guest - guest@example.net",
+                    "Conference URL": "https://meet.example/room",
+                },
+            )
+        ],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(10, "email", "Invitation From", "organizer@example.com"),
+        Mention(10, "email", "Invitees", "guest@example.net"),
+        Mention(10, "url", "Conference URL", "https://meet.example/room"),
+        Mention(10, "domain", "Conference URL", "meet.example"),
+    }
+
+
+def test_apple_mail_reads_addresses_and_unsubscribe_links():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Apple Email - Message Headers",
+        {},
+        [
+            ileapp(
+                11,
+                "Apple Email - Message Headers",
+                **{
+                    "From Address": "Sender <sender@example.com>",
+                    "To Address": "recipient@example.net",
+                    "List Unsubscribe": "<mailto:leave@example.org>, <https://mail.example/unsubscribe>",
+                },
+            )
+        ],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(11, "email", "From Address", "sender@example.com"),
+        Mention(11, "email", "To Address", "recipient@example.net"),
+        Mention(11, "email", "List Unsubscribe", "leave@example.org"),
+        Mention(11, "url", "List Unsubscribe", "https://mail.example/unsubscribe"),
+        Mention(11, "domain", "List Unsubscribe", "mail.example"),
+    }
+
+
+def test_reminder_title_and_notes_are_read_as_free_text():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Reminders",
+        {},
+        [ileapp(12, "Reminders", Title="Visit https://clinic.example", Notes="Contact care@example.org")],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(12, "url", "Title", "https://clinic.example"),
+        Mention(12, "domain", "Title", "clinic.example"),
+        Mention(12, "email", "Notes", "care@example.org"),
+    }
+
+
+def test_account_username_is_not_read_as_an_email_from_its_shape():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Account Data",
+        {},
+        [ileapp(13, "Account Data", Username="person@example.com")],
+    )
+
+    assert reading.mentions == []
+    assert reading.unread == {"Username": {"records": 1, "shaped": {"email": 1}}}
+
+
 def test_calendar_name_is_not_an_email_entity_just_because_it_has_email_shape():
     reading = read_unit(
         RULES,

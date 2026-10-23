@@ -131,6 +131,8 @@ class EntityRules(_Strict):
     not_covered: dict[str, str]
     #: Pinned iLEAPP artifact headers reviewed and deliberately left unruled.
     excluded_headers: tuple[HeaderExclusion, ...]
+    #: Pinned iLEAPP artifacts whose headers were exhaustively reviewed for VER-291.
+    reviewed_artifacts: tuple[str, ...]
     #: What each shape hint is called (entity_normalize.SHAPE_HINTS): shapes
     #: that rank a field no rule reads for review, never a value's kind.
     shape_hints: dict[str, str]
@@ -138,6 +140,13 @@ class EntityRules(_Strict):
 
     @model_validator(mode="after")
     def _consistent(self) -> EntityRules:
+        if any(not artifact for artifact in self.reviewed_artifacts):
+            raise ValueError("reviewed artifacts must be non-empty")
+        repeated_artifacts = [
+            artifact for artifact, n in Counter(self.reviewed_artifacts).items() if n > 1
+        ]
+        if repeated_artifacts:
+            raise ValueError(f"reviewed artifacts repeated: {sorted(repeated_artifacts)}")
         named = {rule.kind for rule in self.rules} | set(self.declared_types.values())
         named |= {kind.also for kind in self.kinds.values() if kind.also}
         unknown = named - set(self.kinds)

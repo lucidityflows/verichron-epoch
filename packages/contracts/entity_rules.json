@@ -1,6 +1,6 @@
 {
   "description": "Which values a record mentions, by kind, and where they are (EPOCH-581). Each rule names one field of one source and what it holds; a value's shape never decides its kind (measured 2026-10-20 on a real backup: 129 columns had a phone number's shape, most of them coordinates, byte counts and scores). The field's name is the entity's role. Shapes only check a rule: a value that doesn't fit its kind is counted as unreadable, never stored. The Python reader is entity_rules.py; scripts/check_entity_rules.py runs every rule against a real iLEAPP output.",
-  "version": 3,
+  "version": 4,
   "kinds": {
     "url": {
       "title": "URL",
@@ -144,7 +144,1962 @@
       "artifact": "Calendar List",
       "field": "Calendar Name",
       "reason": "The pinned parser copies Calendar.title as a display label; an email-shaped calendar name alone does not make it an account email address."
+    },
+    {
+      "artifact": "Account Data",
+      "field": "Account Desc.",
+      "reason": "The parser copies account-provider metadata from the Accounts database; this field is not a value in any defined entity kind."
+    },
+    {
+      "artifact": "Account Data",
+      "field": "Description",
+      "reason": "The parser copies account-provider metadata from the Accounts database; this field is not a value in any defined entity kind."
+    },
+    {
+      "artifact": "Account Data",
+      "field": "Timestamp",
+      "reason": "The parser copies account-provider metadata from the Accounts database; this field is not a value in any defined entity kind."
+    },
+    {
+      "artifact": "Account Data",
+      "field": "Username",
+      "reason": "The parser copies zaccount.zusername without a provider-specific declaration that it is an email address; an email-shaped value alone does not establish that meaning."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Addresses",
+      "reason": "The parser joins labeled ABMultiValueEntry address components as postal-address data; those values are not any of the defined entity kinds."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Birthday",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Company",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Creation Date",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Department",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Display Name",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "First Name",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "First Name Phonetic",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Full Size Image",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Group Name",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Instant Messages",
+      "reason": "The parser joins contact service usernames and service labels; it does not establish a phone, email, URL, or app identifier namespace for these handles."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Job Title",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Last Name",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Last Name Phonetic",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Middle Name",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Middle Name Phonetic",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Modification Date",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Nickname",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Prefix",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Profiles",
+      "reason": "The parser joins values from heterogeneous contact profile properties; their source keys do not establish one entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Related Names",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Storage Place",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Suffix",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Address Book",
+      "field": "Thumbnail",
+      "reason": "The parser copies this value from the Contacts record; it is contact/profile metadata rather than a value in a defined entity kind."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Alarm Enabled",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Alarm Sound",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Alarm Time",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Alarm Title",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Bedtime Do Not Disturb",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Bedtime Fire Date",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Dismiss Date",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Fire Date",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Is Sleep Alarm",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Last Modified",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Alarms",
+      "field": "Repeat Schedule",
+      "reason": "The parser decodes alarm timing, schedule, sound, and state from the Clock preferences; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Deleted Device List",
+      "field": "Deleted",
+      "reason": "The parser copies a deleted-device record from the Apple Account cache; its dates, status, and device metadata are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Deleted Device List",
+      "field": "Last Updated",
+      "reason": "The parser copies a deleted-device record from the Apple Account cache; its dates, status, and device metadata are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Deleted Device List",
+      "field": "Reason Code",
+      "reason": "The parser copies a deleted-device record from the Apple Account cache; its dates, status, and device metadata are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "Build Number",
+      "reason": "The parser copies an Apple Account device-cache record; device names, model/software details, and status are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "Circle Status",
+      "reason": "The parser copies an Apple Account device-cache record; device names, model/software details, and status are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "Device Name",
+      "reason": "The parser copies an Apple Account device-cache record; device names, model/software details, and status are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "Last Cache Updated",
+      "reason": "The parser copies an Apple Account device-cache record; device names, model/software details, and status are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "Last Updated",
+      "reason": "The parser copies an Apple Account device-cache record; device names, model/software details, and status are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "Model",
+      "reason": "The parser copies an Apple Account device-cache record; device names, model/software details, and status are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "OS",
+      "reason": "The parser copies an Apple Account device-cache record; device names, model/software details, and status are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "OS Version",
+      "reason": "The parser copies an Apple Account device-cache record; device names, model/software details, and status are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "Services",
+      "reason": "The parser copies an Apple Account device-cache record; device names, model/software details, and status are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "Trusted",
+      "reason": "The parser copies an Apple Account device-cache record; device names, model/software details, and status are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "clbg",
+      "reason": "The pinned parser reports this undocumented device-list key as stored; its identifier namespace is not established."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "clcg",
+      "reason": "The pinned parser reports this undocumented device-list key as stored; its identifier namespace is not established."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "clhs",
+      "reason": "The pinned parser reports this undocumented device-list key as stored; its identifier namespace is not established."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "dc",
+      "reason": "The pinned parser reports this undocumented device-list key as stored; its identifier namespace is not established."
+    },
+    {
+      "artifact": "Apple Account - Device List",
+      "field": "dec",
+      "reason": "The pinned parser reports this undocumented device-list key as stored; its identifier namespace is not established."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Attachment Names",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Attachment Sizes (Bytes)",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Comment",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Date Received",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Date Sent",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Deleted",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Flagged?",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Global Message ID",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Mailbox",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Read?",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Subject",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email",
+      "field": "Summary",
+      "reason": "The parser emits message dates, flags, mailbox and attachment metadata, or message text; those fields do not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email - Message Headers",
+      "field": "Attachment Filenames",
+      "reason": "The parser exposes RFC 822 header and attachment metadata; apart from explicitly parsed address and unsubscribe fields, these fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email - Message Headers",
+      "field": "Date",
+      "reason": "The parser exposes RFC 822 header and attachment metadata; apart from explicitly parsed address and unsubscribe fields, these fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email - Message Headers",
+      "field": "Date (from message Date header, UTC)",
+      "reason": "The parser exposes RFC 822 header and attachment metadata; apart from explicitly parsed address and unsubscribe fields, these fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email - Message Headers",
+      "field": "Global Message ID",
+      "reason": "The parser exposes RFC 822 header and attachment metadata; apart from explicitly parsed address and unsubscribe fields, these fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email - Message Headers",
+      "field": "Message ID",
+      "reason": "The parser exposes RFC 822 header and attachment metadata; apart from explicitly parsed address and unsubscribe fields, these fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email - Message Headers",
+      "field": "Raw Headers",
+      "reason": "The parser exposes RFC 822 header and attachment metadata; apart from explicitly parsed address and unsubscribe fields, these fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email - Message Headers",
+      "field": "Source File",
+      "reason": "The parser exposes RFC 822 header and attachment metadata; apart from explicitly parsed address and unsubscribe fields, these fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Apple Email - Message Headers",
+      "field": "Subject",
+      "reason": "The parser exposes RFC 822 header and attachment metadata; apart from explicitly parsed address and unsubscribe fields, these fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Apple Intelligence Report",
+      "field": "Event ID",
+      "reason": "The parser emits report identifiers, labels, model metadata, or user/model text; it does not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Intelligence Report",
+      "field": "Model",
+      "reason": "The parser emits report identifiers, labels, model metadata, or user/model text; it does not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Intelligence Report",
+      "field": "Request",
+      "reason": "The parser emits report identifiers, labels, model metadata, or user/model text; it does not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Intelligence Report",
+      "field": "Response",
+      "reason": "The parser emits report identifiers, labels, model metadata, or user/model text; it does not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Intelligence Report",
+      "field": "Source App",
+      "reason": "The parser emits report identifiers, labels, model metadata, or user/model text; it does not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Intelligence Report",
+      "field": "Timestamp (UTC)",
+      "reason": "The parser emits report identifiers, labels, model metadata, or user/model text; it does not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Intelligence Report",
+      "field": "Type",
+      "reason": "The parser emits report identifiers, labels, model metadata, or user/model text; it does not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Intelligence Report",
+      "field": "Use Case (Raw)",
+      "reason": "The parser emits report identifiers, labels, model metadata, or user/model text; it does not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Intelligence Report",
+      "field": "User Trigger",
+      "reason": "The parser emits report identifiers, labels, model metadata, or user/model text; it does not establish a value in a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Author",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Date Last Played",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Download Date",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Duration",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Import Date",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Metadata Timestamp",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Play Count",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Play State",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Play State Last Modified",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Size",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Source File",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Subtitle",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Episodes",
+      "field": "Title",
+      "reason": "The parser maps this field from episode metadata; except for the explicitly ruled URLs, it is playback, media, or descriptive metadata rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Shows",
+      "field": "Author",
+      "reason": "The parser maps this field from show metadata; except for the explicitly ruled URLs, it is a date, credit, title, or description rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Shows",
+      "field": "Date Added",
+      "reason": "The parser maps this field from show metadata; except for the explicitly ruled URLs, it is a date, credit, title, or description rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Shows",
+      "field": "Date Downloaded",
+      "reason": "The parser maps this field from show metadata; except for the explicitly ruled URLs, it is a date, credit, title, or description rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Shows",
+      "field": "Date Last Played",
+      "reason": "The parser maps this field from show metadata; except for the explicitly ruled URLs, it is a date, credit, title, or description rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Shows",
+      "field": "Date Last Updated",
+      "reason": "The parser maps this field from show metadata; except for the explicitly ruled URLs, it is a date, credit, title, or description rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Shows",
+      "field": "Description",
+      "reason": "The parser maps this field from show metadata; except for the explicitly ruled URLs, it is a date, credit, title, or description rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Shows",
+      "field": "Source File",
+      "reason": "The parser maps this field from show metadata; except for the explicitly ruled URLs, it is a date, credit, title, or description rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Podcasts Shows",
+      "field": "Title",
+      "reason": "The parser maps this field from show metadata; except for the explicitly ruled URLs, it is a date, credit, title, or description rather than a defined entity kind."
+    },
+    {
+      "artifact": "Apple Wallet - Nano Passes",
+      "field": "Back Fields Content",
+      "reason": "The parser decodes pass fields and transaction-specific identifiers; those values are not any of the defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet - Nano Passes",
+      "field": "Encoded Pass",
+      "reason": "The parser decodes pass fields and transaction-specific identifiers; those values are not any of the defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet - Nano Passes",
+      "field": "Front Fields Content",
+      "reason": "The parser decodes pass fields and transaction-specific identifiers; those values are not any of the defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet - Nano Passes",
+      "field": "Localized Description",
+      "reason": "The parser decodes pass fields and transaction-specific identifiers; those values are not any of the defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet - Nano Passes",
+      "field": "Organization Name",
+      "reason": "The parser decodes pass fields and transaction-specific identifiers; those values are not any of the defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet - Nano Passes",
+      "field": "Pass Added",
+      "reason": "The parser decodes pass fields and transaction-specific identifiers; those values are not any of the defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet - Nano Passes",
+      "field": "Pending Delete",
+      "reason": "The parser decodes pass fields and transaction-specific identifiers; those values are not any of the defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet - Nano Passes",
+      "field": "Source File",
+      "reason": "The parser decodes pass fields and transaction-specific identifiers; those values are not any of the defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet - Nano Passes",
+      "field": "Type",
+      "reason": "The parser decodes pass fields and transaction-specific identifiers; those values are not any of the defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet - PK Passes",
+      "field": "Items",
+      "reason": "The parser emits arbitrary pass.json keys and their serialized values; the key/value pair does not establish a defined entity kind."
+    },
+    {
+      "artifact": "Apple Wallet - PK Passes",
+      "field": "Source File",
+      "reason": "The parser emits arbitrary pass.json keys and their serialized values; the key/value pair does not establish a defined entity kind."
+    },
+    {
+      "artifact": "Apple Wallet Cards",
+      "field": "Cache Entry Timestamp",
+      "reason": "The parser pattern-matches possible payment-card values from cached responses; card numbers, expiration values, and card-type labels are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Administrative Area",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Altitude",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Currency Amount",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Currency Type",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Latitude",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Locality",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Location Date",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Longitude",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Merchant",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Payment Memo",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Transaction Date",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Transaction Status",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Apple Wallet Transactions",
+      "field": "Transaction Type",
+      "reason": "The parser maps transaction, payment, merchant, and location data; payment and location attributes are not defined entity kinds."
+    },
+    {
+      "artifact": "Blocked contacts",
+      "field": "Country Code",
+      "reason": "The parser copies the blocked-contact country code; a country calling code is not a standalone phone-number entity."
+    },
+    {
+      "artifact": "Calendar Birthdays",
+      "field": "Account Name",
+      "reason": "The parser emits a birthday date, person label, calendar label, and account label; the source fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Calendar Birthdays",
+      "field": "Calendar Name",
+      "reason": "The parser emits a birthday date, person label, calendar label, and account label; the source fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Calendar Birthdays",
+      "field": "Event Title",
+      "reason": "The parser emits a birthday date, person label, calendar label, and account label; the source fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Calendar Birthdays",
+      "field": "Source File",
+      "reason": "The parser emits a birthday date, person label, calendar label, and account label; the source fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Calendar Birthdays",
+      "field": "Start Date",
+      "reason": "The parser emits a birthday date, person label, calendar label, and account label; the source fields do not establish a defined entity kind."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Account Name",
+      "reason": "The parser emits event time, calendar/account labels, attachments, and event description; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Attachments",
+      "reason": "The parser emits event time, calendar/account labels, attachments, and event description; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Calendar Name",
+      "reason": "The parser emits event time, calendar/account labels, attachments, and event description; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Creation Time",
+      "reason": "The parser emits event time, calendar/account labels, attachments, and event description; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "End Time",
+      "reason": "The parser emits event time, calendar/account labels, attachments, and event description; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Event Title",
+      "reason": "The parser emits event time, calendar/account labels, attachments, and event description; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Last Modification Time",
+      "reason": "The parser emits event time, calendar/account labels, attachments, and event description; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Location Address",
+      "reason": "The parser copies the Calendar location address; a postal address is not a defined entity kind."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Location Coordinates",
+      "reason": "The parser combines the event location latitude and longitude as coordinates; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Location Name",
+      "reason": "The parser copies the Calendar location title; a place label is not a defined entity kind."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Source File",
+      "reason": "The parser emits event time, calendar/account labels, attachments, and event description; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Start Time",
+      "reason": "The parser emits event time, calendar/account labels, attachments, and event description; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar Events",
+      "field": "Timezone",
+      "reason": "The parser emits event time, calendar/account labels, attachments, and event description; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar List",
+      "field": "Account Name",
+      "reason": "The parser emits calendar/account labels, sharing status, and notes; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar List",
+      "field": "Owner Name",
+      "reason": "The parser emits calendar/account labels, sharing status, and notes; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar List",
+      "field": "Sharing Participants",
+      "reason": "The parser combines Identity.address with a display name and access level; the address has no declared identifier kind, so its shape alone is not treated as meaning."
+    },
+    {
+      "artifact": "Calendar List",
+      "field": "Sharing Status",
+      "reason": "The parser emits calendar/account labels, sharing status, and notes; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Calendar List",
+      "field": "Source File",
+      "reason": "The parser emits calendar/account labels, sharing status, and notes; these values are not a defined entity kind unless covered by an explicit rule."
+    },
+    {
+      "artifact": "Health - Achievements",
+      "field": "Achievement",
+      "reason": "The parser maps HealthKit achievement dates, labels, values, and device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Achievements",
+      "field": "Created Timestamp",
+      "reason": "The parser maps HealthKit achievement dates, labels, values, and device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Achievements",
+      "field": "Creator Device",
+      "reason": "The parser maps HealthKit achievement dates, labels, values, and device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Achievements",
+      "field": "Earned Date",
+      "reason": "The parser maps HealthKit achievement dates, labels, values, and device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Achievements",
+      "field": "Unit",
+      "reason": "The parser maps HealthKit achievement dates, labels, values, and device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Achievements",
+      "field": "Value",
+      "reason": "The parser maps HealthKit achievement dates, labels, values, and device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Device - Watch Worn Data",
+      "field": "Hours Off Before Next Worn Start Time",
+      "reason": "The parser maps HealthKit watch-wear times and durations; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Device - Watch Worn Data",
+      "field": "Hours Worn",
+      "reason": "The parser maps HealthKit watch-wear times and durations; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Device - Watch Worn Data",
+      "field": "Last Watch Worn Hour Time",
+      "reason": "The parser maps HealthKit watch-wear times and durations; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Device - Watch Worn Data",
+      "field": "Watch Worn Start Time",
+      "reason": "The parser maps HealthKit watch-wear times and durations; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Headphone Audio Levels",
+      "field": "Bundle Name",
+      "reason": "The parser maps HealthKit audio measurements, timestamps, and headphone metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Headphone Audio Levels",
+      "field": "Data ID",
+      "reason": "The parser maps HealthKit audio measurements, timestamps, and headphone metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Headphone Audio Levels",
+      "field": "Decibels",
+      "reason": "The parser maps HealthKit audio measurements, timestamps, and headphone metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Headphone Audio Levels",
+      "field": "Device Manufacturer",
+      "reason": "The parser maps HealthKit audio measurements, timestamps, and headphone metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Headphone Audio Levels",
+      "field": "Device Model",
+      "reason": "The parser maps HealthKit audio measurements, timestamps, and headphone metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Headphone Audio Levels",
+      "field": "Device Name",
+      "reason": "The parser maps HealthKit audio measurements, timestamps, and headphone metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Headphone Audio Levels",
+      "field": "End Timestamp",
+      "reason": "The parser maps HealthKit audio measurements, timestamps, and headphone metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Headphone Audio Levels",
+      "field": "Key",
+      "reason": "The parser maps HealthKit audio measurements, timestamps, and headphone metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Headphone Audio Levels",
+      "field": "Local Identifier",
+      "reason": "The parser maps HealthKit audio measurements, timestamps, and headphone metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Headphone Audio Levels",
+      "field": "Start Timestamp",
+      "reason": "The parser maps HealthKit audio measurements, timestamps, and headphone metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Date",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Date added to Health",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Device ID",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Device Model",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "End Date",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Hardware",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Heart Rate (BPM)",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Heart Rate Context",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Manufacturer",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Software Version",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Source",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Start Date",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Heart Rate",
+      "field": "Timezone",
+      "reason": "The parser maps HealthKit heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Height Samples",
+      "field": "Height (Feet and Inches)",
+      "reason": "The parser maps HealthKit height measurements and their timestamp; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Height Samples",
+      "field": "Height (in Centimeters)",
+      "reason": "The parser maps HealthKit height measurements and their timestamp; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Height Samples",
+      "field": "Height (in Meters)",
+      "reason": "The parser maps HealthKit height measurements and their timestamp; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Height Samples",
+      "field": "Height Value Timestamp",
+      "reason": "The parser maps HealthKit height measurements and their timestamp; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Device",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Device ID",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Local OS Build",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Local OS Version",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Local Product Model",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Local Product Type",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Origin OS Build",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Origin OS Version",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Origin Product Model",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Origin Product Type",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Row ID",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Source ID",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Source Name",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Source Version",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Provenances",
+      "field": "Timezone",
+      "reason": "The parser maps HealthKit provenance, source, device, OS, and timezone metadata; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Resting Heart Rate",
+      "field": "Date added to Health",
+      "reason": "The parser maps HealthKit resting-heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Resting Heart Rate",
+      "field": "Device Model",
+      "reason": "The parser maps HealthKit resting-heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Resting Heart Rate",
+      "field": "End Date",
+      "reason": "The parser maps HealthKit resting-heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Resting Heart Rate",
+      "field": "Hardware ID",
+      "reason": "The parser maps HealthKit resting-heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Resting Heart Rate",
+      "field": "Resting Heart Rate (BPM)",
+      "reason": "The parser maps HealthKit resting-heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Resting Heart Rate",
+      "field": "Source",
+      "reason": "The parser maps HealthKit resting-heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Resting Heart Rate",
+      "field": "Start Date",
+      "reason": "The parser maps HealthKit resting-heart-rate measurements, timestamps, and source/device metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Sleep - All Watch Sleep Data",
+      "field": "Sleep End Time",
+      "reason": "The parser maps HealthKit sleep intervals and state labels; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - All Watch Sleep Data",
+      "field": "Sleep Start Time",
+      "reason": "The parser maps HealthKit sleep intervals and state labels; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - All Watch Sleep Data",
+      "field": "Sleep State",
+      "reason": "The parser maps HealthKit sleep intervals and state labels; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - All Watch Sleep Data",
+      "field": "Sleep State (HH:MM:SS)",
+      "reason": "The parser maps HealthKit sleep intervals and state labels; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "Awake %",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "Awake Duration (HH:MM:SS)",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "Core %",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "Core Duration (HH:MM:SS)",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "Deep %",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "Deep Duration (HH:MM:SS)",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "REM %",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "REM Duration (HH:MM:SS)",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "Sleep End Time",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "Sleep Start Time",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "Time Asleep (HH:MM:SS)",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Sleep - Watch By Sleep Period",
+      "field": "Time in Bed (HH:MM:SS)",
+      "reason": "The parser maps HealthKit sleep intervals and duration/percentage measurements; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Creation Date",
+      "reason": "The parser maps HealthKit source-device metadata; the device attributes and identifiers are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Device ID",
+      "reason": "The parser maps HealthKit source-device metadata; the device attributes and identifiers are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Device Model",
+      "reason": "The parser maps HealthKit source-device metadata; the device attributes and identifiers are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Device Name",
+      "reason": "The parser maps HealthKit source-device metadata; the device attributes and identifiers are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Firmware",
+      "reason": "The parser maps HealthKit source-device metadata; the device attributes and identifiers are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Local ID",
+      "reason": "Reserved for the independent identifier research assigned to VER-282; this ticket does not classify it."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Manufacturer",
+      "reason": "The parser maps HealthKit source-device metadata; the device attributes and identifiers are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Model",
+      "reason": "The parser maps HealthKit source-device metadata; the device attributes and identifiers are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Software",
+      "reason": "The parser maps HealthKit source-device metadata; the device attributes and identifiers are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Sync ID",
+      "reason": "The parser maps HealthKit source-device metadata; the device attributes and identifiers are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Source Devices",
+      "field": "Sync Provenance",
+      "reason": "The parser maps HealthKit source-device metadata; the device attributes and identifiers are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Steps",
+      "field": "Device ID",
+      "reason": "The parser maps HealthKit step counts, durations, and intervals; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Steps",
+      "field": "Device Model",
+      "reason": "The parser maps HealthKit step counts, durations, and intervals; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Steps",
+      "field": "Duration (Seconds)",
+      "reason": "The parser maps HealthKit step counts, durations, and intervals; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Steps",
+      "field": "End Time",
+      "reason": "The parser maps HealthKit step counts, durations, and intervals; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Steps",
+      "field": "Start Time",
+      "reason": "The parser maps HealthKit step counts, durations, and intervals; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Steps",
+      "field": "Steps",
+      "reason": "The parser maps HealthKit step counts, durations, and intervals; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Weight Samples",
+      "field": "Weight (Approximate in Pounds)",
+      "reason": "The parser maps HealthKit weight measurements and their timestamp; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Weight Samples",
+      "field": "Weight (in Kilograms)",
+      "reason": "The parser maps HealthKit weight measurements and their timestamp; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Weight Samples",
+      "field": "Weight (in Stone)",
+      "reason": "The parser maps HealthKit weight measurements and their timestamp; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Weight Samples",
+      "field": "Weight Value Timestamp",
+      "reason": "The parser maps HealthKit weight measurements and their timestamp; these are not defined entity kinds."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Activity Type",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Average Heart Rate (BPM)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Average METs",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Device ID",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Device Model",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Distance (in KM)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Distance (in Miles)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Duration",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "End Timestamp",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Goal",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Goal Type",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Humidity (%)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Latitude",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Location Type",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Longitude",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Max. Heart Rate (BPM)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Max. ground elevation (in Meters)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Min. Heart Rate (BPM)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Min. ground elevation (in Meters)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Software Version",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Source",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Start Timestamp",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Timestamp added to Health",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Timezone",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Total Active Energy (kcal)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Total Resting Energy (kcal)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Total Time Duration",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Weather Temperature (assumed °F)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Workouts",
+      "field": "Weather Temperature (assumed °F, converted to °C)",
+      "reason": "The parser maps HealthKit workout measurements, intervals, activity labels, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Algorithm Version",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Date Added to Health",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "End Time",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Hardware Version",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Manufacturer",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Model",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Name",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Software Version",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Source",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Start Time",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Surface Temperature (°C)",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Surface Temperature (°F)",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Wrist Temperature (°C)",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Health - Wrist Temperature",
+      "field": "Wrist Temperature (°F)",
+      "reason": "The parser maps HealthKit temperature measurements, timestamps, and device/source metadata; none is a defined entity kind."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Account ID",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Album Artist",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Album Name",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Artwork",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Composer",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Content Rating",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Copyright",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Date Purchased",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Description",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "File",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "File Format",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "File Size",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Genre",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Item ID",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Media Type",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Movie Information",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Purchase History ID",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Title",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Total Time (ms)",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Track Number",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library",
+      "field": "Year",
+      "reason": "The parser maps media metadata, playback/file attributes, and store-specific identifiers; these are not defined entity kinds, and file locations are not network URLs."
+    },
+    {
+      "artifact": "Media Library - Database Properties",
+      "field": "Key",
+      "reason": "The parser emits values from heterogeneous media-library database property keys as stored; no single entity kind applies."
+    },
+    {
+      "artifact": "Media Library - Database Properties",
+      "field": "Value",
+      "reason": "The parser emits values from heterogeneous _MLDatabaseProperties keys as stored; no single entity kind applies."
+    },
+    {
+      "artifact": "Medical ID",
+      "field": "Key",
+      "reason": "The parser emits heterogeneous user-entered Health Medical ID key/value data; the key does not establish a defined entity kind for its value."
+    },
+    {
+      "artifact": "Medical ID",
+      "field": "Value",
+      "reason": "The parser emits heterogeneous user-entered Health Medical ID key/value data; the key does not establish a defined entity kind for its value."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Attachment",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Attachment Creation Date",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Attachment Last Modified",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Attachment Original Filename",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Attachment Size (as stored)",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Attachment Storage Folder",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Attachment Type",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Creation Date",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Folder",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Last Modified",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Marked for Deletion",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Password Hint",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Password Protected",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Pinned",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Snippet",
+      "reason": "The pinned parser emits Snippet as the start of Note Contents, which is already read by the Notes rules."
+    },
+    {
+      "artifact": "Notes",
+      "field": "Storage Place",
+      "reason": "The parser emits note metadata, attachments, or storage attributes; except for explicit note-text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Password Protected",
+      "field": "Creation Date",
+      "reason": "The parser emits note encryption, key-wrapping, and password-hint metadata; these fields are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Password Protected",
+      "field": "Encryption Scheme",
+      "reason": "The parser emits note encryption, key-wrapping, and password-hint metadata; these fields are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Password Protected",
+      "field": "KDF Iterations",
+      "reason": "The parser emits note encryption, key-wrapping, and password-hint metadata; these fields are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Password Protected",
+      "field": "Last Modified",
+      "reason": "The parser emits note encryption, key-wrapping, and password-hint metadata; these fields are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Password Protected",
+      "field": "Note Row ID",
+      "reason": "The parser emits note encryption, key-wrapping, and password-hint metadata; these fields are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Password Protected",
+      "field": "Note Title",
+      "reason": "The parser emits note encryption, key-wrapping, and password-hint metadata; these fields are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Password Protected",
+      "field": "Password Hint",
+      "reason": "The parser emits note encryption, key-wrapping, and password-hint metadata; these fields are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Password Protected",
+      "field": "Recoverability",
+      "reason": "The parser emits note encryption, key-wrapping, and password-hint metadata; these fields are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Password Protected",
+      "field": "Wrapped Key Bytes",
+      "reason": "The parser emits note encryption, key-wrapping, and password-hint metadata; these fields are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Acceptance Status",
+      "reason": "The parser emits share metadata, participant status/permissions, and source paths; except for explicit participant rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Invitation Created",
+      "reason": "The parser emits share metadata, participant status/permissions, and source paths; except for explicit participant rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Invitation Received",
+      "reason": "The parser emits share metadata, participant status/permissions, and source paths; except for explicit participant rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Last Modified",
+      "reason": "The parser emits share metadata, participant status/permissions, and source paths; except for explicit participant rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Note Snippet",
+      "reason": "The pinned parser emits Note Snippet as a snippet of note content; it is not a separate entity-bearing role."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Note Title",
+      "reason": "The parser emits share metadata, participant status/permissions, and source paths; except for explicit participant rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Participant ID",
+      "reason": "The parser emits share metadata, participant status/permissions, and source paths; except for explicit participant rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Participant Name",
+      "reason": "The parser emits share metadata, participant status/permissions, and source paths; except for explicit participant rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Permission",
+      "reason": "The parser emits share metadata, participant status/permissions, and source paths; except for explicit participant rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Role",
+      "reason": "The parser emits share metadata, participant status/permissions, and source paths; except for explicit participant rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Notes - Shared Note Participants",
+      "field": "Source File",
+      "reason": "The parser emits share metadata, participant status/permissions, and source paths; except for explicit participant rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Reminders",
+      "field": "Completed",
+      "reason": "The parser emits reminder dates, status flags, or source paths; except for explicit text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Reminders",
+      "field": "Completion Date",
+      "reason": "The parser emits reminder dates, status flags, or source paths; except for explicit text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Reminders",
+      "field": "Creation Date",
+      "reason": "The parser emits reminder dates, status flags, or source paths; except for explicit text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Reminders",
+      "field": "Due Date",
+      "reason": "The parser emits reminder dates, status flags, or source paths; except for explicit text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Reminders",
+      "field": "File Location",
+      "reason": "The parser emits reminder dates, status flags, or source paths; except for explicit text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Reminders",
+      "field": "Flagged",
+      "reason": "The parser emits reminder dates, status flags, or source paths; except for explicit text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Reminders",
+      "field": "Last Modified",
+      "reason": "The parser emits reminder dates, status flags, or source paths; except for explicit text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Reminders",
+      "field": "Marked for Deletion",
+      "reason": "The parser emits reminder dates, status flags, or source paths; except for explicit text rules, these are not defined entity kinds."
+    },
+    {
+      "artifact": "Stopwatch",
+      "field": "Stopwatch Lap",
+      "reason": "The parser decodes Clock stopwatch state, elapsed time, and lap data; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Stopwatch",
+      "field": "Stopwatch Lap Time",
+      "reason": "The parser decodes Clock stopwatch state, elapsed time, and lap data; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Stopwatch",
+      "field": "Stopwatch State",
+      "reason": "The parser decodes Clock stopwatch state, elapsed time, and lap data; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Stopwatch",
+      "field": "Stopwatch Time",
+      "reason": "The parser decodes Clock stopwatch state, elapsed time, and lap data; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Timers",
+      "field": "First Date",
+      "reason": "The parser decodes Clock timer dates, duration, title, state, and sound settings; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Timers",
+      "field": "Last Modified",
+      "reason": "The parser decodes Clock timer dates, duration, title, state, and sound settings; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Timers",
+      "field": "Timer Sound",
+      "reason": "The parser decodes Clock timer dates, duration, title, state, and sound settings; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Timers",
+      "field": "Timer State",
+      "reason": "The parser decodes Clock timer dates, duration, title, state, and sound settings; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Timers",
+      "field": "Timer Time",
+      "reason": "The parser decodes Clock timer dates, duration, title, state, and sound settings; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Timers",
+      "field": "Timer Title",
+      "reason": "The parser decodes Clock timer dates, duration, title, state, and sound settings; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "WorldClock",
+      "field": "City",
+      "reason": "The parser decodes Clock city, timezone, locale, and coordinate fields; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "WorldClock",
+      "field": "Country Name",
+      "reason": "The parser decodes Clock city, timezone, locale, and coordinate fields; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "WorldClock",
+      "field": "Identifier",
+      "reason": "The parser decodes Clock city, timezone, locale, and coordinate fields; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "WorldClock",
+      "field": "Latitude",
+      "reason": "The parser decodes Clock city, timezone, locale, and coordinate fields; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "WorldClock",
+      "field": "Locale Code",
+      "reason": "The parser decodes Clock city, timezone, locale, and coordinate fields; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "WorldClock",
+      "field": "Longitude",
+      "reason": "The parser decodes Clock city, timezone, locale, and coordinate fields; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "WorldClock",
+      "field": "Timezone",
+      "reason": "The parser decodes Clock city, timezone, locale, and coordinate fields; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "WorldClock",
+      "field": "Yahoo Code",
+      "reason": "The parser decodes Clock city, timezone, locale, and coordinate fields; these values are not defined entity kinds."
     }
+  ],
+  "reviewed_artifacts": [
+    "Account Configuration",
+    "Account Data",
+    "Address Book",
+    "Alarms",
+    "Apple Account - Deleted Device List",
+    "Apple Account - Device List",
+    "Apple Email",
+    "Apple Email - Message Headers",
+    "Apple Intelligence Report",
+    "Apple Podcasts Episodes",
+    "Apple Podcasts Shows",
+    "Apple Wallet - Nano Passes",
+    "Apple Wallet - PK Passes",
+    "Apple Wallet Cards",
+    "Apple Wallet Transactions",
+    "Blocked contacts",
+    "Calendar Birthdays",
+    "Calendar Events",
+    "Calendar List",
+    "Health - Achievements",
+    "Health - Device - Watch Worn Data",
+    "Health - Headphone Audio Levels",
+    "Health - Heart Rate",
+    "Health - Height Samples",
+    "Health - Provenances",
+    "Health - Resting Heart Rate",
+    "Health - Sleep - All Watch Sleep Data",
+    "Health - Sleep - Watch By Sleep Period",
+    "Health - Source Devices",
+    "Health - Steps",
+    "Health - Weight Samples",
+    "Health - Workouts",
+    "Health - Wrist Temperature",
+    "Media Library",
+    "Media Library - Database Properties",
+    "Medical ID",
+    "Notes",
+    "Notes - Password Protected",
+    "Notes - Shared Note Participants",
+    "Reminders",
+    "Stopwatch",
+    "Timers",
+    "WorldClock"
   ],
   "shape_hints": {
     "url": "URL",
@@ -641,13 +2596,6 @@
     {
       "kind": "email",
       "source_type": "ileapp_record",
-      "artifact": "Account Data",
-      "field": "Username",
-      "extract": "email_only"
-    },
-    {
-      "kind": "email",
-      "source_type": "ileapp_record",
       "artifact": "Calendar List",
       "field": "Account Email",
       "extract": "email_only"
@@ -1040,6 +2988,214 @@
       "artifact": "Safari - Downloads",
       "field": "Other Fields",
       "extract": "urls_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Address Book",
+      "field": "URL",
+      "extract": "labelled_list"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Address Book",
+      "field": "Notes",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Address Book",
+      "field": "Notes",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Address Book",
+      "field": "Notes",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Blocked contacts",
+      "field": "Phone Number"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar Events",
+      "field": "Conference URL"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar Events",
+      "field": "Invitation From",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar Events",
+      "field": "Invitees",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar Events",
+      "field": "Notes",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar Events",
+      "field": "Notes",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar Events",
+      "field": "Notes",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar List",
+      "field": "Notes",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar List",
+      "field": "Notes",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Calendar List",
+      "field": "Notes",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Email",
+      "field": "Address",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Email",
+      "field": "To Recipients",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Email - Message Headers",
+      "field": "From Address",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Email - Message Headers",
+      "field": "To Address",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Email - Message Headers",
+      "field": "CC",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Email - Message Headers",
+      "field": "BCC",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Email - Message Headers",
+      "field": "Reply To",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Email - Message Headers",
+      "field": "Return Path",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Email - Message Headers",
+      "field": "List Unsubscribe",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Apple Email - Message Headers",
+      "field": "List Unsubscribe",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Reminders",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Reminders",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Reminders",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Reminders",
+      "field": "Notes",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Reminders",
+      "field": "Notes",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Reminders",
+      "field": "Notes",
+      "extract": "ips_in_text"
     }
   ]
 }

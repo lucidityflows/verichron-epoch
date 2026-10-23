@@ -12,6 +12,51 @@ from normalized_record import NormalizedRecord
 
 REPO = Path(__file__).resolve().parents[3]
 ILEAPP_ROOT = REPO / "tools" / "ileapp" / "iLEAPP"
+VER_291_ARTIFACTS = {
+    "Account Configuration",
+    "Account Data",
+    "Address Book",
+    "Alarms",
+    "Apple Account - Deleted Device List",
+    "Apple Account - Device List",
+    "Apple Email",
+    "Apple Email - Message Headers",
+    "Apple Intelligence Report",
+    "Apple Podcasts Episodes",
+    "Apple Podcasts Shows",
+    "Apple Wallet - Nano Passes",
+    "Apple Wallet - PK Passes",
+    "Apple Wallet Cards",
+    "Apple Wallet Transactions",
+    "Blocked contacts",
+    "Calendar Birthdays",
+    "Calendar Events",
+    "Calendar List",
+    "Health - Achievements",
+    "Health - Device - Watch Worn Data",
+    "Health - Headphone Audio Levels",
+    "Health - Heart Rate",
+    "Health - Height Samples",
+    "Health - Provenances",
+    "Health - Resting Heart Rate",
+    "Health - Sleep - All Watch Sleep Data",
+    "Health - Sleep - Watch By Sleep Period",
+    "Health - Source Devices",
+    "Health - Steps",
+    "Health - Weight Samples",
+    "Health - Workouts",
+    "Health - Wrist Temperature",
+    "Medical ID",
+    "Media Library",
+    "Media Library - Database Properties",
+    "Notes",
+    "Notes - Password Protected",
+    "Notes - Shared Note Participants",
+    "Reminders",
+    "Stopwatch",
+    "Timers",
+    "WorldClock",
+}
 
 
 def pinned_ileapp_commit() -> str:
@@ -113,6 +158,24 @@ def test_every_excluded_header_is_declared_by_the_pinned_source():
         )
 
 
+def test_every_ver_291_header_has_exactly_one_coverage_decision():
+    rules = load()
+    declared = declared_pinned_ileapp_columns()
+    assert set(rules.reviewed_artifacts) == VER_291_ARTIFACTS
+    ileapp_rules = {
+        (rule.artifact, rule.field)
+        for rule in rules.rules
+        if rule.source_type == "ileapp_record"
+    }
+    exclusions = {exclusion.key for exclusion in rules.excluded_headers}
+    for artifact in rules.reviewed_artifacts:
+        assert artifact in declared, f"pinned iLEAPP declares no artifact {artifact!r}"
+        for field in declared[artifact]:
+            assert ((artifact, field) in ileapp_rules) != ((artifact, field) in exclusions), (
+                f"{artifact!r} / {field!r} must have exactly one rule or exclusion"
+            )
+
+
 def test_every_crash_report_rule_is_a_record_column():
     columns = set(NormalizedRecord.model_fields)
     for rule in load().rules:
@@ -162,4 +225,11 @@ def test_a_header_exclusion_cannot_be_repeated():
     raw = load().model_dump()
     raw["excluded_headers"] = [*raw["excluded_headers"], raw["excluded_headers"][0]]
     with pytest.raises(ValueError, match="header exclusions repeated"):
+        EntityRules.model_validate(raw)
+
+
+def test_a_reviewed_artifact_cannot_be_repeated():
+    raw = load().model_dump()
+    raw["reviewed_artifacts"] = [*raw["reviewed_artifacts"], raw["reviewed_artifacts"][0]]
+    with pytest.raises(ValueError, match="reviewed artifacts repeated"):
         EntityRules.model_validate(raw)
