@@ -168,6 +168,8 @@ def test_resolves_nested_header_unpacking_from_locals_and_constants(tmp_path: Pa
     ("initial", "expression"),
     [
         ("['Old']", "build_headers(context)"),
+        ("['Old']", "context.headers()"),
+        ("['Old']", "headers + build_headers(context)"),
         ("['Old']", "build_headers(headers[:])"),
         ("['Old']", "build_headers(list(headers))"),
         ("['Old']", "build_headers(tuple(headers))"),
@@ -199,6 +201,10 @@ def test_unresolved_reassignment_preserves_valid_header_alias(tmp_path: Path, in
     "statement",
     [
         "headers = mutate(headers)",
+        "headers = mutate(alias)",
+        "headers = mutate(headers=alias)",
+        "headers = alias.append(context)",
+        "headers = list(mutate(alias))",
         "unused = mutate(headers)",
         "headers = alias.pop()",
         "headers = mutate(shared=alias)",
