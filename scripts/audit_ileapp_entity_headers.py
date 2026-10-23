@@ -80,6 +80,19 @@ def _resolve(expression: ast.expr, names: dict[str, Any]) -> Any:
         if expression.func.id in constructors and len(expression.args) <= 1 and not expression.keywords:
             values = [_resolve(argument, names) for argument in expression.args]
             return constructors[expression.func.id](*values)
+        if expression.func.id in {"len", "sorted"} and len(expression.args) == 1 and not expression.keywords:
+            value = _resolve(expression.args[0], names)
+            return len(value) if expression.func.id == "len" else sorted(value)
+    if (
+        isinstance(expression, ast.Call)
+        and isinstance(expression.func, ast.Attribute)
+        and expression.func.attr == "copy"
+        and not expression.args
+        and not expression.keywords
+    ):
+        value = _resolve(expression.func.value, names)
+        if isinstance(value, list):
+            return value.copy()
     if (
         isinstance(expression, ast.Call)
         and isinstance(expression.func, ast.Attribute)

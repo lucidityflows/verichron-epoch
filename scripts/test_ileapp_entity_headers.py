@@ -173,6 +173,8 @@ def test_resolves_nested_header_unpacking_from_locals_and_constants(tmp_path: Pa
         ("['Old']", "build_headers(headers[:])"),
         ("['Old']", "build_headers(list(headers))"),
         ("['Old']", "build_headers(tuple(headers))"),
+        ("['Old']", "build_headers(sorted(headers))"),
+        ("['Old']", "build_headers(headers.copy())"),
         ("('Old',)", "build_headers(headers)"),
     ],
 )
@@ -196,6 +198,25 @@ def test_unresolved_reassignment_preserves_valid_header_alias(tmp_path: Path, in
     assert errors == []
 
 
+@pytest.mark.parametrize("expression", ["len(data_headers)", "sorted(data_headers)", "data_headers.copy()"])
+def test_read_only_assignment_preserves_declared_headers(tmp_path: Path, expression: str) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    data_headers = ['B', 'A']\n"
+        f"    unrelated = {expression}\n"
+        "    return data_headers, [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {"scripts/artifacts/sample.py": {"sample": ["B", "A"]}}
+    assert errors == []
+
+
 @pytest.mark.parametrize("declare_before_call", [True, False])
 @pytest.mark.parametrize(
     "statement",
@@ -205,6 +226,9 @@ def test_unresolved_reassignment_preserves_valid_header_alias(tmp_path: Path, in
         "headers = mutate(headers=alias)",
         "headers = alias.append(context)",
         "headers = list(mutate(alias))",
+        "unused = len(mutate(headers))",
+        "unused = sorted(mutate(headers))",
+        "unused = mutate(headers).copy()",
         "unused = mutate(headers)",
         "headers = alias.pop()",
         "headers = mutate(shared=alias)",
