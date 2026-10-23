@@ -1,14 +1,17 @@
 """The entity rules name only fields that exist (EPOCH-581): a crash report's
 own columns, and the headers the pinned iLEAPP declares."""
 
+import ast
+import json
 import subprocess
 from pathlib import Path
 
 import pytest
-from entity_rules import EntityRules, declared_ileapp_columns, load
+from entity_rules import EntityRules, load
 from normalized_record import NormalizedRecord
 
 REPO = Path(__file__).resolve().parents[3]
+ILEAPP_ROOT = REPO / "tools" / "ileapp" / "iLEAPP"
 
 
 def pinned_ileapp_commit() -> str:
@@ -16,6 +19,53 @@ def pinned_ileapp_commit() -> str:
     return subprocess.run(
         ["git", "-C", str(REPO), "rev-parse", "HEAD:tools/ileapp/iLEAPP"], check=True, capture_output=True, text=True
     ).stdout.strip()
+
+
+def declared_pinned_ileapp_columns() -> dict[str, set[str]]:
+    index = json.loads((REPO / "packages" / "contracts" / "ileapp_source_headers" / "index.json").read_text())
+    assert index["ileapp_commit"] == pinned_ileapp_commit()
+    source_headers: dict[str, object] = {}
+    inventory = REPO / "packages" / "contracts" / "ileapp_source_headers"
+    for shard_name in index["shards"].values():
+        shard = json.loads((inventory / shard_name).read_text())
+        source_headers.update(shard["modules"])
+
+    declared: dict[str, set[str]] = {}
+    for module, module_data in source_headers.items():
+        if not isinstance(module_data, dict):
+            continue
+        processor_headers = module_data.get("artifacts")
+        if not isinstance(processor_headers, dict):
+            continue
+        source_path = ILEAPP_ROOT / module
+        tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=module)
+        metadata_node = next(
+            (
+                node.value
+                for node in tree.body
+                if isinstance(node, ast.Assign)
+                and any(isinstance(target, ast.Name) and target.id == "__artifacts_v2__" for target in node.targets)
+            ),
+            None,
+        )
+        if metadata_node is None:
+            continue
+        try:
+            metadata = ast.literal_eval(metadata_node)
+        except ValueError, TypeError:
+            continue
+        if not isinstance(metadata, dict):
+            continue
+        for processor, headers in processor_headers.items():
+            metadata_entry = metadata.get(processor)
+            if not isinstance(metadata_entry, dict):
+                continue
+            artifact = metadata_entry.get("name")
+            if not isinstance(artifact, str):
+                continue
+            names = {header[0] if isinstance(header, list) else header for header in headers}
+            declared.setdefault(artifact, set()).update(name for name in names if isinstance(name, str))
+    return declared
 
 
 def test_the_rules_load_with_their_kinds():
@@ -36,17 +86,20 @@ def test_the_rules_load_with_their_kinds():
     assert rules.declared_types == {"phonenumber": "phone"}
 
 
-def test_every_ileapp_rule_names_a_header_the_pinned_ileapp_declares():
-    declared = declared_ileapp_columns(pinned_ileapp_commit())
+def test_entities_stage_parser_version_matches_the_rule_contract():
+    stage = json.loads((REPO / "apps" / "extractors" / "entities" / "stage.json").read_text(encoding="utf-8"))
+    assert stage["parserVersion"] == load().version
+
+
+def test_every_ileapp_rule_names_a_header_declared_by_the_pinned_source():
+    declared = declared_pinned_ileapp_columns()
     for rule in load().rules:
         if rule.source_type != "ileapp_record":
             continue
-        assert rule.artifact in declared, f"{rule.key}: iLEAPP declares no artifact {rule.artifact!r}"
-        if rule.dropped_when_empty and rule.field not in declared[rule.artifact]:
-            # The snapshot is taken from real outputs, which leave this column out when it is empty.
-            continue
+        assert rule.artifact in declared, f"{rule.key}: pinned iLEAPP source declares no artifact {rule.artifact!r}"
         assert rule.field in declared[rule.artifact], (
-            f"{rule.key}: {rule.artifact!r} has no header {rule.field!r}; it declares {declared[rule.artifact]}"
+            f"{rule.key}: {rule.artifact!r} has no source header {rule.field!r}; "
+            f"it declares {sorted(declared[rule.artifact])}"
         )
 
 

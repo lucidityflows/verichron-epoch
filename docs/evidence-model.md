@@ -351,7 +351,11 @@ devices. One value of one kind is an **entity**; it always names its record.
 | `entity_unread_fields` | Each field that held values and that no rule reads, per source |
 
 `scripts/check_entity_rules.py` runs every rule against a real iLEAPP output,
-counts only, before a rule changes and on every iLEAPP update.
+counts only. For the EPOCH-582 review batches, counts-only checks and authorized
+real-output schema snapshots are finalized together in VER-287 after the
+implementation reviews. Those implementation PRs do not require a prepared
+output path; EPOCH-582 remains open until verification and any evidence
+limitations are recorded.
 
 ## Time
 
