@@ -52,7 +52,7 @@ def declared_pinned_ileapp_columns() -> dict[str, set[str]]:
             continue
         try:
             metadata = ast.literal_eval(metadata_node)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             continue
         if not isinstance(metadata, dict):
             continue
