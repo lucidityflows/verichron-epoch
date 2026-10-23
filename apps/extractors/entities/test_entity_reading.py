@@ -31,6 +31,48 @@ def test_a_url_is_read_with_its_host_under_the_field_it_came_from():
     assert Mention(1, "domain", "URL", "example.com") in reading.mentions
 
 
+def test_apple_podcasts_reads_feed_and_episode_urls():
+    shows = read_unit(
+        RULES,
+        "ileapp_record",
+        "Apple Podcasts Shows",
+        {},
+        [
+            ileapp(
+                5,
+                "Apple Podcasts Shows",
+                **{"Feed URL": "https://podcasts.example/feed", "Web Page URL": "https://shows.example/page"},
+            )
+        ],
+    )
+    episodes = read_unit(
+        RULES,
+        "ileapp_record",
+        "Apple Podcasts Episodes",
+        {},
+        [
+            ileapp(
+                6,
+                "Apple Podcasts Episodes",
+                **{"Asset URL": "https://cdn.example/episode.mp3", "Web Page URL": "https://episodes.example/page"},
+            )
+        ],
+    )
+
+    assert set(shows.mentions) == {
+        Mention(5, "url", "Feed URL", "https://podcasts.example/feed"),
+        Mention(5, "domain", "Feed URL", "podcasts.example"),
+        Mention(5, "url", "Web Page URL", "https://shows.example/page"),
+        Mention(5, "domain", "Web Page URL", "shows.example"),
+    }
+    assert set(episodes.mentions) == {
+        Mention(6, "url", "Asset URL", "https://cdn.example/episode.mp3"),
+        Mention(6, "domain", "Asset URL", "cdn.example"),
+        Mention(6, "url", "Web Page URL", "https://episodes.example/page"),
+        Mention(6, "domain", "Web Page URL", "episodes.example"),
+    }
+
+
 def test_wifi_known_networks_reads_portal_urls_and_bundle_ids():
     reading = read_unit(
         RULES,
