@@ -21,7 +21,6 @@ BASELINE_DIR = REPOSITORY_ROOT / "packages" / "contracts" / "ileapp_source_heade
 INDEX_PATH = BASELINE_DIR / "index.json"
 SHARD_MODULE_LIMIT = 12
 SHARD_MAX_BYTES = 250_000
-SHARD_MODULE_LIMIT = 12
 
 
 def _resolve(expression: ast.expr, names: dict[str, Any]) -> Any:
@@ -144,11 +143,30 @@ def _bound_values(target: ast.expr, value: Any) -> dict[str, Any]:
         if len(target.elts) != len(value):
             return {}
         return {
-            name: bound_value
+            name: nested_value
             for element, bound_value in zip(target.elts, value, strict=True)
             for name, nested_value in _bound_values(element, bound_value).items()
         }
     return {}
+
+
+def _container_ids(value: Any) -> set[int]:
+    if isinstance(value, dict):
+        identities = {id(value)}
+        for key, item in value.items():
+            identities.update(_container_ids(key))
+            identities.update(_container_ids(item))
+        return identities
+    if isinstance(value, (list, tuple, set)):
+        return {id(value), *(identity for item in value for identity in _container_ids(item))}
+    return set()
+
+
+def _invalidate_bindings(names: dict[str, Any], targets: set[str]) -> None:
+    invalid_ids = set().union(*(_container_ids(names[name]) for name in targets if name in names))
+    for name, value in list(names.items()):
+        if name in targets or _container_ids(value) & invalid_ids:
+            names.pop(name)
 
 
 def _is_artifact_processor(function: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
@@ -198,10 +216,12 @@ def _header_declaration(
                 target_name = call.func.value.id
                 target = names.get(target_name)
                 if isinstance(target, list) and call.func.attr in {"append", "extend", "insert"}:
+                    updates_headers = target is names.get("data_headers")
                     try:
                         arguments = [_resolve(argument, names) for argument in call.args]
                     except IndexError, KeyError, TypeError, ValueError:
-                        if target_name == "data_headers":
+                        _invalidate_bindings(names, {target_name})
+                        if updates_headers:
                             return None, "data_headers is mutated dynamically"
                         continue
                     if call.func.attr == "append" and len(arguments) == 1:
@@ -211,10 +231,11 @@ def _header_declaration(
                     elif call.func.attr == "insert" and len(arguments) == 2 and isinstance(arguments[0], int):
                         target.insert(arguments[0], arguments[1])
                     else:
+                        _invalidate_bindings(names, {target_name})
                         if target_name == "data_headers":
                             return None, "data_headers is mutated dynamically"
                         continue
-                    if target_name == "data_headers":
+                    if updates_headers:
                         for declaration in declarations:
                             if call.func.attr == "append" and len(arguments) == 1:
                                 declaration.append(arguments[0])
@@ -239,6 +260,10 @@ def _header_declaration(
                     if isinstance(node.op, ast.Add):
                         names[node.target.id] = names[node.target.id] + value
                 except IndexError, KeyError, TypeError, ValueError:
+                    updates_headers = names[node.target.id] is names.get("data_headers")
+                    _invalidate_bindings(names, {node.target.id})
+                    if updates_headers:
+                        return None, "data_headers is updated dynamically"
                     continue
             continue
 
@@ -246,27 +271,37 @@ def _header_declaration(
             subscript_targets = [
                 target
                 for target in node.targets
-                if isinstance(target, ast.Subscript)
-                and isinstance(target.value, ast.Name)
-                and target.value.id == "data_headers"
+                if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name)
             ]
             if subscript_targets:
-                if not isinstance(node.value, (ast.List, ast.Tuple, ast.Constant, ast.Name, ast.Subscript)):
-                    return None, "data_headers is mutated dynamically"
                 try:
                     value = _resolve(node.value, names)
                     for target in subscript_targets:
-                        current = names.get("data_headers")
+                        if not isinstance(target.value, ast.Name):
+                            continue
+                        target_name = target.value.id
+                        current = names.get(target_name)
                         if not isinstance(current, (list, tuple)):
-                            return None, "data_headers is mutated dynamically"
+                            if target_name == "data_headers":
+                                return None, "data_headers is mutated dynamically"
+                            continue
+                        updates_headers = current is names.get("data_headers")
                         updated = list(current)
                         index = _resolve(target.slice, names)
                         updated[index] = value
-                        names["data_headers"] = updated
-                        for declaration in declarations:
-                            declaration[index] = value
+                        names[target_name] = updated
+                        if updates_headers:
+                            names["data_headers"] = updated
+                            for declaration in declarations:
+                                declaration[index] = value
                 except IndexError, KeyError, TypeError, ValueError:
-                    return None, "data_headers is mutated dynamically"
+                    target_names = {
+                        target.value.id for target in subscript_targets if isinstance(target.value, ast.Name)
+                    }
+                    updates_headers = any(names.get(name) is names.get("data_headers") for name in target_names)
+                    _invalidate_bindings(names, target_names)
+                    if updates_headers or "data_headers" in target_names:
+                        return None, "data_headers is mutated dynamically"
                 continue
             value = node.value
             targets = node.targets
@@ -291,18 +326,21 @@ def _header_declaration(
         try:
             resolved_value = _resolve(value, names)
         except IndexError, KeyError, TypeError, ValueError:
+            target_names = set().union(*(_target_names(target) for target in targets))
+            _invalidate_bindings(names, target_names)
             if any("data_headers" in _target_names(target) for target in targets):
                 return None, "data_headers is not a supported static expression"
             continue
         for target in targets:
             target_values.update(_bound_values(target, resolved_value))
         if any("data_headers" in _target_names(target) for target in targets) and "data_headers" not in target_values:
+            _invalidate_bindings(names, {"data_headers"})
             return None, "data_headers is not a supported static expression"
         for name, resolved in target_values.items():
             if name == "data_headers":
                 if not isinstance(resolved, (list, tuple)):
                     return None, "data_headers is not a list or tuple"
-                names[name] = copy.deepcopy(resolved)
+                names[name] = resolved
                 declarations.append(list(resolved))
             else:
                 names[name] = resolved
@@ -334,11 +372,13 @@ def _header_declaration(
                             helper_bindings[keyword.arg] = _resolve(keyword.value, names)
                         except IndexError, KeyError, TypeError, ValueError:
                             continue
-                    helper_headers, error = _header_declaration(helper, constants, functions, seen, helper_bindings)
-                    if helper_headers is not None:
-                        return helper_headers, None
+                    helper_headers, error = _header_declaration(
+                        helper, constants, functions, set(seen), helper_bindings
+                    )
                     if error is not None:
                         return None, error
+                    if helper_headers is not None:
+                        declarations.append(list(helper_headers))
         if not declarations:
             return None, "artifact processor does not declare data_headers"
     headers: list[Any] = []
@@ -428,7 +468,7 @@ def scan_source(
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative_path)
         except (OSError, UnicodeError, SyntaxError) as error:
-            errors.append(f"{relative_path}: could not parse source ({type(error).__name__})")
+            errors.append(f"{relative_path}::source: could not parse source ({type(error).__name__})")
             continue
 
         constants = _module_constants(tree)
@@ -474,6 +514,41 @@ def _source_commit() -> str:
         text=True,
     )
     return result.stdout.strip()
+
+
+def _source_tree_changes() -> list[str]:
+    status = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(SOURCE_ROOT),
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            "--",
+            ":(glob)scripts/artifacts/**/*.py",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    ignored = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(SOURCE_ROOT),
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+            "--",
+            ":(glob)scripts/artifacts/**/*.py",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    return [*status, *(f"ignored: {path}" for path in ignored)]
 
 
 def _baseline(
@@ -522,6 +597,11 @@ def _shards(
         for module in initial_modules:
             candidate = {**current_chunk, module: module_entries[module]}
             candidate_size = len(json.dumps({"modules": candidate}, indent=2, ensure_ascii=False).encode("utf-8"))
+            if candidate_size > SHARD_MAX_BYTES and not current_chunk:
+                raise ValueError(
+                    f"Source inventory for {module} exceeds the {SHARD_MAX_BYTES}-byte shard limit "
+                    f"({candidate_size} bytes)."
+                )
             if current_chunk and (len(current_chunk) >= SHARD_MODULE_LIMIT or candidate_size > SHARD_MAX_BYTES):
                 chunks.append(current_chunk)
                 current_chunk = {}
@@ -542,6 +622,8 @@ def _header_name(header: Any) -> str:
 
 def compare_baselines(previous: dict[str, Any], current: dict[str, Any]) -> list[str]:
     changes: list[str] = []
+    if previous["ileapp_commit"] != current["ileapp_commit"]:
+        changes.append(f"reviewed pin changed: {previous['ileapp_commit']} -> {current['ileapp_commit']}")
     old_modules = set(previous["modules"])
     new_modules = set(current["modules"])
     for module in sorted(new_modules - old_modules):
@@ -703,6 +785,10 @@ def main() -> int:
         pinned_commit = _pinned_commit()
         if _source_commit() != pinned_commit:
             raise ValueError("The checked-out iLEAPP source does not match the superproject's pinned commit.")
+        source_changes = _source_tree_changes()
+        if source_changes:
+            details = "\n".join(source_changes)
+            raise ValueError(f"The iLEAPP artifact source tree has local changes; refusing to audit it:\n{details}")
         modules, artifacts, no_output_artifacts, unresolved = scan_source(ARTIFACTS_ROOT)
         current = _baseline(pinned_commit, modules, artifacts, no_output_artifacts, unresolved)
         if args.update_baseline:

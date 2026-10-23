@@ -1,10 +1,12 @@
 """Tests for source-based iLEAPP header inventory mechanics only."""
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
 
+import scripts.audit_ileapp_entity_headers as audit
 from scripts.audit_ileapp_entity_headers import _load_baseline, _write_baseline, compare_baselines, scan_source
 
 
@@ -89,6 +91,26 @@ def test_resolves_static_headers_returned_from_parameterized_helpers(tmp_path: P
     assert errors == []
 
 
+def test_unions_headers_from_alternative_helper_return_paths(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "def report_rows(context, headers):\n"
+        "    return headers, [], ''\n"
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    if context:\n"
+        "        return report_rows(context, ('Older field',))\n"
+        "    return report_rows(context, ('Newer field',))\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {"scripts/artifacts/sample.py": {"sample": ["Older field", "Newer field"]}}
+    assert errors == []
+
+
 def test_resolves_static_header_tuple_with_slice_and_does_not_mutate_constants(tmp_path: Path) -> None:
     artifacts = tmp_path / "scripts" / "artifacts"
     artifacts.mkdir(parents=True)
@@ -113,6 +135,74 @@ def test_resolves_static_header_tuple_with_slice_and_does_not_mutate_constants(t
         }
     }
     assert errors == []
+
+
+def test_resolves_nested_header_unpacking_from_locals_and_constants(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "((HEADERS, UNUSED), SOURCE) = ((['Constant header'], []), 'source')\n"
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    (unused, (data_headers, rows)), source = (None, (['Nested header'], [])), ''\n"
+        "    return data_headers, rows, source\n"
+        "@artifact_processor\n"
+        "def another(context):\n"
+        "    data_headers = HEADERS\n"
+        "    return data_headers, [], SOURCE\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {
+        "scripts/artifacts/sample.py": {
+            "sample": ["Nested header"],
+            "another": ["Constant header"],
+        }
+    }
+    assert errors == []
+
+
+def test_dynamic_header_reassignment_does_not_reuse_previous_value(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    headers = ['Old']\n"
+        "    alias = headers\n"
+        "    headers = build_headers(context)\n"
+        "    data_headers = alias\n"
+        "    return data_headers, [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {}
+    assert len(errors) == 1
+    assert "data_headers is not a supported static expression" in errors[0]
+
+
+def test_dynamic_mutation_through_header_alias_is_unresolved(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    headers = ['Old']\n"
+        "    data_headers = headers\n"
+        "    alias = headers\n"
+        "    alias.append(context)\n"
+        "    return data_headers, [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {}
+    assert errors == ["scripts/artifacts/sample.py::sample: data_headers is mutated dynamically"]
 
 
 def test_resolves_static_header_comprehensions_and_list_mutations(tmp_path: Path) -> None:
@@ -142,6 +232,7 @@ def test_resolves_static_header_comprehensions_and_list_mutations(tmp_path: Path
 
 def test_reports_new_removed_and_changed_headers() -> None:
     previous = {
+        "ileapp_commit": "a" * 40,
         "modules": ["scripts/artifacts/old.py", "scripts/artifacts/sample.py"],
         "unresolved": [],
         "no_output_artifacts": {"scripts/artifacts/old.py": ["old_non_tabular"]},
@@ -151,6 +242,7 @@ def test_reports_new_removed_and_changed_headers() -> None:
         },
     }
     current = {
+        "ileapp_commit": "b" * 40,
         "modules": ["scripts/artifacts/sample.py", "scripts/artifacts/new.py"],
         "artifacts": {
             "scripts/artifacts/new.py": {"new_artifact": ["New"]},
@@ -163,6 +255,7 @@ def test_reports_new_removed_and_changed_headers() -> None:
     changes = compare_baselines(previous, current)
 
     assert changes == [
+        f"reviewed pin changed: {'a' * 40} -> {'b' * 40}",
         "new module: scripts/artifacts/new.py",
         "removed module: scripts/artifacts/old.py",
         "new non-tabular artifact: scripts/artifacts/new.py::new_non_tabular",
@@ -174,6 +267,21 @@ def test_reports_new_removed_and_changed_headers() -> None:
         "changed declaration: scripts/artifacts/sample.py::sample :: Typed",
         "unresolved declaration added: scripts/artifacts/new.py::dynamic",
     ]
+
+
+def test_reports_pin_only_changes() -> None:
+    previous = {
+        "ileapp_commit": "a" * 40,
+        "modules": ["scripts/artifacts/sample.py"],
+        "artifacts": {"scripts/artifacts/sample.py": {"sample": ["Header"]}},
+    }
+    current = {
+        "ileapp_commit": "b" * 40,
+        "modules": ["scripts/artifacts/sample.py"],
+        "artifacts": {"scripts/artifacts/sample.py": {"sample": ["Header"]}},
+    }
+
+    assert compare_baselines(previous, current) == [f"reviewed pin changed: {'a' * 40} -> {'b' * 40}"]
 
 
 def test_writes_reproducible_alphabetical_shards_and_index(tmp_path: Path) -> None:
@@ -214,6 +322,70 @@ def test_splits_large_initial_groups_into_bounded_shards(tmp_path: Path) -> None
         "a-02.json",
     }
     assert _load_baseline(index_path) == baseline
+
+
+def test_rejects_single_module_exceeding_shard_byte_limit(tmp_path: Path) -> None:
+    module = "scripts/artifacts/large.py"
+    baseline = {
+        "schema_version": 1,
+        "ileapp_commit": "a" * 40,
+        "modules": [module],
+        "artifacts": {module: {"large": ["H" * audit.SHARD_MAX_BYTES]}},
+        "no_output_artifacts": {},
+        "unresolved": [],
+    }
+
+    with pytest.raises(ValueError, match="scripts/artifacts/large.py.*shard limit"):
+        _write_baseline(baseline, tmp_path)
+
+
+def test_parse_errors_are_saved_as_module_unresolved_entries(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "malformed.py").write_text("def broken(:\n", encoding="utf-8")
+
+    modules, inventory, no_output, errors = scan_source(artifacts)
+    baseline = {
+        "schema_version": 1,
+        "ileapp_commit": "a" * 40,
+        "modules": modules,
+        "artifacts": inventory,
+        "no_output_artifacts": no_output,
+        "unresolved": errors,
+    }
+
+    index_path = _write_baseline(baseline, tmp_path / "baseline")
+
+    assert _load_baseline(index_path)["unresolved"] == [
+        "scripts/artifacts/malformed.py::source: could not parse source (SyntaxError)"
+    ]
+
+
+def test_refuses_modified_and_ignored_pinned_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repository = tmp_path / "ileapp"
+    artifacts = repository / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text("HEADERS = ['Pinned']\n", encoding="utf-8")
+    (repository / ".gitignore").write_text("scripts/artifacts/ignored.py\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(repository)], check=True)
+    subprocess.run(["git", "-C", str(repository), "config", "user.name", "Test"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.email", "test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repository), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repository), "commit", "-qm", "source"], check=True)
+    monkeypatch.setattr(audit, "SOURCE_ROOT", repository)
+
+    assert audit._source_tree_changes() == []
+
+    (artifacts / "sample.py").write_text("HEADERS = ['Modified']\n", encoding="utf-8")
+    (artifacts / "ignored.py").write_text("HEADERS = ['Ignored']\n", encoding="utf-8")
+
+    changes = audit._source_tree_changes()
+
+    assert any("sample.py" in change for change in changes)
+    assert any("ignored: scripts/artifacts/ignored.py" == change for change in changes)
 
 
 @pytest.mark.parametrize(
