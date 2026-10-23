@@ -61,6 +61,9 @@ jobs:
       - name: Sync workspace
         run: uv sync --locked --all-extras
 
+      - name: Audit pinned iLEAPP source headers
+        run: uv run python scripts/audit_ileapp_entity_headers.py
+
       # The shipped environment: the lockfile with no dependency groups
       # (EPOCH-439, B5); scripts/test_runtime_environment.py runs against it.
       - name: Build the runtime environment

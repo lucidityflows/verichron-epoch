@@ -36,18 +36,25 @@ Each version is declared once, in the file the enforcing tool reads:
 Dependabot proposes updates to the npm and uv dependencies, the CI actions and
 the iLEAPP submodule. `mise.toml` and `.python-version` are updated by hand.
 
-Before accepting an iLEAPP pin update, run
-`uv run python scripts/audit_ileapp_entity_headers.py` to compare source-declared
-artifact headers in every module with the reviewed baseline. The baseline is a
-deterministic, alphabetically grouped set of size-bounded shards, indexed by
+Every Python CI run executes
+`uv run python scripts/audit_ileapp_entity_headers.py` against the pinned
+iLEAPP submodule. Before accepting an iLEAPP pin update, run the same command
+locally to compare source-declared artifact headers in every module with the
+reviewed baseline. The baseline is a deterministic, alphabetically grouped set
+of size-bounded shards, indexed by
 `packages/contracts/ileapp_source_headers/index.json`. Review every addition,
-removal and possible rename. The check exits unsuccessfully while any
-declaration remains unresolved; resolve those declarations before accepting
-the pin. Do not run iLEAPP or use a device's output to build this source
+removal, possible rename, and declaration requiring an exception.
+
+The audit fails on unresolved declarations unless the exact declaration has a
+reviewed exception in the baseline. Exceptions record the source fingerprint,
+the statically known headers, and why the remaining headers cannot be
+enumerated from source; a source change invalidates the exception and requires
+review again. Do not guess case-data-dependent headers or silently omit dynamic
+declarations. Do not run iLEAPP or use a device's output to build this source
 inventory. It records source declarations, not observed output or entity
 meaning; verifying tool output remains separate (R36). This drift check is a
-mechanical verification (R34). After reviewing the new pin, refresh the
-baseline with
+mechanical verification (R34). After reviewing the new pin and resolving or
+explicitly reviewing every unresolved declaration, refresh the baseline with
 `uv run python scripts/audit_ileapp_entity_headers.py --update-baseline` and
 commit that source-derived baseline with the pin change. The separate
 `scripts/snapshot_ileapp_schema.py` records headers observed in real output and
