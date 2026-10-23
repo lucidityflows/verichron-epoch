@@ -210,7 +210,7 @@ def test_dynamic_mutation_through_header_alias_is_unresolved(tmp_path: Path, mut
 
 
 @pytest.mark.parametrize("declare_before_mutation", [True, False])
-@pytest.mark.parametrize("assignment", ["", "    headers[0] = 'Original'\n"])
+@pytest.mark.parametrize("assignment", ["", "    headers[0] = 'Updated'\n"])
 def test_augmented_header_alias_assignment_preserves_source_list(
     tmp_path: Path, declare_before_mutation: bool, assignment: str
 ) -> None:
@@ -232,7 +232,8 @@ def test_augmented_header_alias_assignment_preserves_source_list(
 
     _, inventory, _, errors = scan_source(artifacts)
 
-    assert inventory == {"scripts/artifacts/sample.py": {"sample": ["Original", "Added"]}}
+    expected_header = "Updated" if assignment else "Original"
+    assert inventory == {"scripts/artifacts/sample.py": {"sample": [expected_header, "Added"]}}
     assert errors == []
 
 
