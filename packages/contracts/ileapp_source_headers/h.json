@@ -1,0 +1,392 @@
+{
+  "modules": {
+    "scripts/artifacts/health.py": {
+      "artifacts": {
+        "health_workouts": [
+          [
+            "Start Timestamp",
+            "datetime"
+          ],
+          [
+            "End Timestamp",
+            "datetime"
+          ],
+          "Activity Type",
+          "Location Type",
+          "Total Time Duration",
+          "Duration",
+          "Distance (in KM)",
+          "Distance (in Miles)",
+          "Goal Type",
+          "Goal",
+          "Total Active Energy (kcal)",
+          "Total Resting Energy (kcal)",
+          "Average METs",
+          "Min. Heart Rate (BPM)",
+          "Max. Heart Rate (BPM)",
+          "Average Heart Rate (BPM)",
+          "Weather Temperature (assumed °F, converted to °C)",
+          "Weather Temperature (assumed °F)",
+          "Humidity (%)",
+          "Latitude",
+          "Longitude",
+          "Min. ground elevation (in Meters)",
+          "Max. ground elevation (in Meters)",
+          "Device ID",
+          "Device Model",
+          "Source",
+          "Software Version",
+          "Timezone",
+          [
+            "Timestamp added to Health",
+            "datetime"
+          ]
+        ],
+        "health_provenances": [
+          "Row ID",
+          "Origin Product Type",
+          "Origin Product Model",
+          "Origin OS Build",
+          "Origin OS Version",
+          "Local Product Type",
+          "Local Product Model",
+          "Local OS Build",
+          "Local OS Version",
+          "Source ID",
+          "Source Name",
+          "Source Version",
+          "Device ID",
+          "Device",
+          "Timezone"
+        ],
+        "health_headphone_audio_levels": [
+          [
+            "Start Timestamp",
+            "datetime"
+          ],
+          [
+            "End Timestamp",
+            "datetime"
+          ],
+          "Decibels",
+          "Bundle Name",
+          "Device Name",
+          "Device Manufacturer",
+          "Device Model",
+          "Local Identifier",
+          "Key",
+          "Data ID"
+        ],
+        "health_heart_rate": [
+          [
+            "Date",
+            "datetime"
+          ],
+          "Heart Rate (BPM)",
+          "Heart Rate Context",
+          [
+            "Date added to Health",
+            "datetime"
+          ],
+          "Device ID",
+          "Device Model",
+          "Manufacturer",
+          "Hardware",
+          "Source",
+          "Software Version",
+          "Timezone",
+          [
+            "Start Date",
+            "datetime"
+          ],
+          [
+            "End Date",
+            "datetime"
+          ]
+        ],
+        "health_resting_heart_rate": [
+          [
+            "Start Date",
+            "datetime"
+          ],
+          [
+            "End Date",
+            "datetime"
+          ],
+          "Resting Heart Rate (BPM)",
+          [
+            "Date added to Health",
+            "datetime"
+          ],
+          "Hardware ID",
+          "Device Model",
+          "Source"
+        ],
+        "health_achievements": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "Earned Date",
+            "date"
+          ],
+          "Achievement",
+          "Value",
+          "Unit",
+          "Creator Device"
+        ],
+        "health_steps": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          "Steps",
+          "Duration (Seconds)",
+          "Device ID",
+          "Device Model"
+        ],
+        "health_height": [
+          [
+            "Height Value Timestamp",
+            "datetime"
+          ],
+          "Height (in Meters)",
+          "Height (in Centimeters)",
+          "Height (Feet and Inches)"
+        ],
+        "health_weight": [
+          [
+            "Weight Value Timestamp",
+            "datetime"
+          ],
+          "Weight (in Kilograms)",
+          "Weight (in Stone)",
+          "Weight (Approximate in Pounds)"
+        ],
+        "health_watch_worn_data": [
+          [
+            "Watch Worn Start Time",
+            "datetime"
+          ],
+          "Hours Worn",
+          [
+            "Last Watch Worn Hour Time",
+            "datetime"
+          ],
+          "Hours Off Before Next Worn Start Time"
+        ],
+        "health_all_watch_sleep_data": [
+          [
+            "Sleep Start Time",
+            "datetime"
+          ],
+          "Sleep State",
+          [
+            "Sleep End Time",
+            "datetime"
+          ],
+          "Sleep State (HH:MM:SS)"
+        ],
+        "health_watch_by_sleep_period": [
+          [
+            "Sleep Start Time",
+            "datetime"
+          ],
+          [
+            "Sleep End Time",
+            "datetime"
+          ],
+          "Time in Bed (HH:MM:SS)",
+          "Time Asleep (HH:MM:SS)",
+          "Awake Duration (HH:MM:SS)",
+          "REM Duration (HH:MM:SS)",
+          "Core Duration (HH:MM:SS)",
+          "Deep Duration (HH:MM:SS)",
+          "Awake %",
+          "REM %",
+          "Core %",
+          "Deep %"
+        ],
+        "health_source_devices": [
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          "Device Name",
+          "Manufacturer",
+          "Model",
+          "Device ID",
+          "Device Model",
+          "Firmware",
+          "Software",
+          "Local ID",
+          "Sync Provenance",
+          "Sync ID"
+        ],
+        "health_wrist_temperature": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          [
+            "Date Added to Health",
+            "datetime"
+          ],
+          "Wrist Temperature (°C)",
+          "Wrist Temperature (°F)",
+          "Source",
+          "Algorithm Version",
+          "Surface Temperature (°C)",
+          "Surface Temperature (°F)",
+          "Name",
+          "Manufacturer",
+          "Model",
+          "Hardware Version",
+          "Software Version"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/hikvision.py": {
+      "artifacts": {
+        "hikvisionChannels": [
+          "Device ID",
+          "Channel No.",
+          "Channel Name",
+          "Status"
+        ],
+        "hikvisionInfo": [
+          "ID",
+          "Name/IP",
+          "Serial Number",
+          "Port",
+          "Channels",
+          "DDNS Address",
+          "DDNS Port"
+        ],
+        "hikvisionActivity": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Record Type",
+          "Activity"
+        ],
+        "hikvisionMedia": [
+          "File Path",
+          "File Name",
+          [
+            "File Content",
+            "media"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/home_depot.py": {
+      "artifacts": {
+        "home_depot_account": [
+          "Source",
+          "User ID",
+          "Email",
+          "First Name",
+          "Last Name",
+          [
+            "Phone",
+            "phonenumber"
+          ],
+          "Customer Type",
+          "Zip Code",
+          "Customer Account ID",
+          "Local Store ID",
+          "Preferred Store IDs"
+        ],
+        "home_depot_store": [
+          "Source",
+          "Local Store ID",
+          "Preferred Store IDs",
+          "Store Name",
+          "Store Street",
+          "Store City",
+          "Store State",
+          "Store Postal Code",
+          "Latitude",
+          "Longitude",
+          [
+            "Store Phone",
+            "phonenumber"
+          ]
+        ],
+        "home_depot_saved_searches": [
+          [
+            "Date Saved",
+            "datetime"
+          ],
+          "Search Term",
+          "In Saved List"
+        ],
+        "home_depot_search_history": [
+          [
+            "Date Accessed",
+            "datetime"
+          ],
+          "Search Term",
+          "History Type"
+        ],
+        "home_depot_products_viewed": [
+          "Item ID",
+          "Product Label",
+          "Brand",
+          "Model Number",
+          "Store SKU",
+          "Price",
+          "Product URL",
+          "Image URL"
+        ],
+        "home_depot_shopping_lists": [
+          "List Item ID",
+          "Details"
+        ],
+        "home_depot_last_location": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Horizontal Accuracy",
+          "Altitude"
+        ],
+        "home_depot_product_image_cache": [
+          [
+            "Cache Date",
+            "datetime"
+          ],
+          "Product Slug",
+          "Image URL"
+        ],
+        "home_depot_search_url_cache": [
+          "Search Term",
+          "Search URL"
+        ],
+        "home_depot_preferences": [
+          "Key Name",
+          "Value Data"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

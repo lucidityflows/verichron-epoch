@@ -1,0 +1,494 @@
+{
+  "modules": {
+    "scripts/artifacts/keyboard.py": {
+      "artifacts": {
+        "keyboardLexicon": [
+          "Found Strings",
+          "File Location"
+        ],
+        "keyboardAppUsage": [
+          [
+            "Date",
+            "datetime"
+          ],
+          "Application Name",
+          "appTime (as stored)",
+          "keyboardTimes (as stored)"
+        ],
+        "keyboardUsageStats": [
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          [
+            "Last Update Date",
+            "datetime"
+          ],
+          "Key",
+          "Data Value",
+          "Source File"
+        ],
+        "keyboardVulgarWordUsage": [
+          [
+            "Last Used",
+            "datetime"
+          ],
+          "Record ID",
+          "Application",
+          "Recipient",
+          "Vulgar Word",
+          "Word Reading",
+          "Usage Count",
+          "Journaled"
+        ],
+        "keyboardAutocorrectionRejections": [
+          [
+            "Last Hard Rejection",
+            "datetime"
+          ],
+          [
+            "Last Soft Rejection",
+            "datetime"
+          ],
+          "Record ID",
+          "Typed Text",
+          "Correction",
+          "Hard Rejections",
+          "Soft Rejections",
+          "Performed Count",
+          "Journaled (as stored)"
+        ],
+        "keyboardInlineCompletionRejections": [
+          [
+            "Last Hard Rejection",
+            "datetime"
+          ],
+          [
+            "Last Soft Rejection",
+            "datetime"
+          ],
+          "Record ID",
+          "Typed Text",
+          "Correction",
+          "Hard Rejections",
+          "Soft Rejections",
+          "Performed Count",
+          "Journaled (as stored)"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/keychain.py": {
+      "artifacts": {
+        "keychain_web_passwords": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          "Server",
+          "Account",
+          "Password",
+          "Label",
+          "Desc",
+          "Tombstoned"
+        ],
+        "keychain_wifi": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          "SSID",
+          "Password",
+          "Tombstoned"
+        ],
+        "keychain_bluetooth_info": [],
+        "keychain_bluetooth_paired": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          "Name",
+          "MAC",
+          "IRK",
+          "UUID",
+          "Tombstoned"
+        ],
+        "keychain_mail_accounts": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          "Server",
+          "Account",
+          "Password",
+          "Type",
+          "Tombstoned"
+        ]
+      },
+      "no_output_artifacts": [
+        "keychain_bluetooth_info"
+      ],
+      "unresolved": []
+    },
+    "scripts/artifacts/kijijiConversations.py": {
+      "artifacts": {
+        "kijijiConversations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Conversation ID",
+          "Ad ID",
+          "Ad Title",
+          "Message ID",
+          "Sender ID",
+          "Sender Name",
+          "Recipient ID",
+          "Recipient Name",
+          "State",
+          "Message"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/kikBplistmeta.py": {
+      "artifacts": {
+        "kikBplistmeta": [
+          "Content ID",
+          "Filename",
+          "File Size",
+          "Allow Forward",
+          "Layout",
+          "App Name",
+          "App ID",
+          "SHA1 Original",
+          "SHA1 Scaled",
+          "Blockhash Scaled",
+          [
+            "Internal Thumbnail",
+            "media"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/kikGroupadmins.py": {
+      "artifacts": {
+        "kikGroupadmins": [
+          "User ID",
+          "Display Name",
+          "Username",
+          "Profile Pic URL",
+          "Member Group ID",
+          "Group Tag",
+          "Group Name",
+          "Group ID",
+          "Group Pic URL",
+          "Blob User",
+          "Blob Description",
+          "Blob Interests",
+          "Additional Info User A",
+          "Additional Info User B",
+          "Additional Info Display",
+          "Additional Info Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/kikLocaladmin.py": {
+      "artifacts": {
+        "kikLocaladmin": [
+          "User ID",
+          "Display Name",
+          "Username",
+          "Profile Pic URL",
+          "Member Group ID",
+          "Administrator Group ID",
+          "Group Tag",
+          "Group Name",
+          "Group ID",
+          "Group Pic URL",
+          "Blob",
+          "Additional Information"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/kikMessages.py": {
+      "artifacts": {
+        "kikMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Received Time",
+            "datetime"
+          ],
+          "Type",
+          "Display Name",
+          "Message",
+          [
+            "Attachment",
+            "media"
+          ],
+          "User",
+          "User Name",
+          "Attachment Name"
+        ],
+        "kikUsers": [
+          "PK",
+          "Display Name",
+          "User Name",
+          "Email",
+          "JID",
+          "First Name",
+          "Last Name",
+          [
+            "Profile Pic Timestamp",
+            "datetime"
+          ],
+          "Profile Pic URL"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/kikPendingUploads.py": {
+      "artifacts": {
+        "kikPendingUploads": [
+          "Upload Start Time",
+          "App ID",
+          "Content ID",
+          "Progress",
+          "Retries Remaining",
+          "State",
+          [
+            "Pending File",
+            "media"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/kikUsersgroups.py": {
+      "artifacts": {
+        "kikUsersgroups": [
+          "User ID",
+          "Display Name",
+          "Username",
+          "Profile Pic URL",
+          "Member Group ID",
+          "Group Tag",
+          "Group Name",
+          "Group ID",
+          "Group Pic URL",
+          "Blob",
+          "Additional Information"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/kleinanzeigen.de.py": {
+      "artifacts": {
+        "get_kleinanzeigenmessagecache": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "From Me",
+          "From_Name",
+          "Advertisement",
+          "Message",
+          "Conversation-ID",
+          "Ad-ID",
+          "From_ID",
+          "To_Name",
+          "To_ID",
+          "Attachment",
+          "Message_ID",
+          "AD-Status"
+        ],
+        "get_kleinanzeigenlastquery": [
+          "Keywords",
+          "Category",
+          "Region",
+          "Radius (default)",
+          "Longitude",
+          "Latitude",
+          "Radius (current)"
+        ],
+        "get_kleinanzeigenuser": [
+          "Property",
+          "Property Value"
+        ],
+        "get_kleinanzeigensearchhistory": [
+          "Keyword",
+          "Timestamp"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/knowledgeC.py": {
+      "artifacts": {
+        "knowledgeC_BatteryPercentage": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          "Battery Percentage",
+          "Has Structured Metadata",
+          [
+            "Time Added",
+            "datetime"
+          ]
+        ],
+        "knowledgeC_DevicePluginStatus": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          "Device Plugin Status",
+          "Is Adapter Wireless?",
+          [
+            "Time Added",
+            "datetime"
+          ]
+        ],
+        "knowledgeC_MediaPlaying": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          "Playing State",
+          "Playing Duration",
+          "App Bundle ID",
+          "Artist",
+          "Album",
+          "Title",
+          "Genre",
+          "Media Duration",
+          "AirPlay Video",
+          "Output Device",
+          [
+            "Time Added",
+            "datetime"
+          ]
+        ],
+        "knowledgeC_DoNotDisturb": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          "Do Not Disturb?",
+          [
+            "Time Added",
+            "datetime"
+          ]
+        ],
+        "knowledgeC_AppUsage": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          [
+            "Time Added",
+            "datetime"
+          ],
+          "Application"
+        ],
+        "knowledgeC_AppUsage_EndTime": [
+          [
+            "End Time",
+            "datetime"
+          ],
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "Time Added",
+            "datetime"
+          ],
+          "Application"
+        ],
+        "knowledgeC_isLocked": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          [
+            "Time Added",
+            "datetime"
+          ],
+          "Device Lock Status"
+        ],
+        "knowledgeC_isBacklit": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          [
+            "Time Added",
+            "datetime"
+          ],
+          "Device Screen Status"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

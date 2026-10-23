@@ -1,0 +1,93 @@
+{
+  "modules": {
+    "scripts/artifacts/twitterX.py": {
+      "artifacts": {
+        "twitterDirectMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "From Me",
+          "Sender",
+          "Conversation",
+          "Message",
+          "Conversation ID",
+          "Timeline",
+          "Sender User ID",
+          "Attachment Media URL",
+          "Attachment Display URL",
+          "Marked As Spam",
+          "Marked As Abuse",
+          "In Reply To Message ID",
+          "Message ID",
+          "Account ID"
+        ],
+        "twitterDMUsers": [
+          [
+            "Updated",
+            "datetime"
+          ],
+          "Full Name",
+          "Username",
+          "User ID",
+          "Account Holder",
+          "Bio",
+          "Verified",
+          "Blue Verified",
+          "Protected",
+          "Blocking",
+          "Profile Image URL"
+        ],
+        "twitterTweets": [
+          [
+            "Posted",
+            "datetime"
+          ],
+          [
+            "Cache Updated",
+            "datetime"
+          ],
+          "Text",
+          "Author User ID",
+          "Language",
+          "Replies",
+          "Retweets",
+          "Quotes",
+          "Bookmarks",
+          "Views",
+          "Possibly Sensitive",
+          "Quoted Post URL",
+          "Conversation ID",
+          "Post ID"
+        ],
+        "twitterCachedUsers": [
+          [
+            "Cache Updated",
+            "datetime"
+          ],
+          "Username",
+          "User ID",
+          "Bio",
+          "Followers",
+          "Following",
+          "Favourites",
+          "Blue Verified",
+          "Protected",
+          "Profile Image URL"
+        ],
+        "twitterNotifications": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Text",
+          "Icon",
+          "From Users",
+          "Notification ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

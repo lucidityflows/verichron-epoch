@@ -1,0 +1,1054 @@
+{
+  "modules": {
+    "scripts/artifacts/FitnessWorkoutsLocationData.py": {
+      "artifacts": {
+        "fitnessWorkoutsAnalysis": [
+          [
+            "Workout Start Time",
+            "datetime"
+          ],
+          [
+            "Min Location Timestamp",
+            "datetime"
+          ],
+          [
+            "Workout End Time",
+            "datetime"
+          ],
+          [
+            "Max Location Timestamp",
+            "datetime"
+          ],
+          "Number of Location Points",
+          "Duration x Avg Interval (computed)",
+          "Workout Type",
+          "Elapsed Time",
+          "Workout Time",
+          "Location Data Capture Timespan",
+          "Location Data Capture Average (in Seconds)"
+        ],
+        "fitnessWorkoutsLocation": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Workout Type",
+          "Latitude",
+          "Longitude",
+          "Altitude",
+          "Speed",
+          "Course",
+          "Horizontal Accuracy",
+          "Series Identifier"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/facebookMessenger.py": {
+      "artifacts": {
+        "facebookMessengerCalls": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Sender Name",
+          "Sender ID",
+          "Call Type",
+          "Call Duration/Subtitle"
+        ],
+        "facebookMessengerChats": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Message Direction",
+          "Sender Name",
+          "Message",
+          "Sender ID",
+          "Attachment",
+          "Attachment Name",
+          "Attachment Size",
+          "Title Text",
+          "Subtitle Text",
+          "Thread ID"
+        ],
+        "facebook_messenger_client_chats": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Message Direction",
+          "Sender Name",
+          "Message",
+          [
+            "Image",
+            "media"
+          ],
+          "Thread ID",
+          "Sender ID",
+          "Attachment-Image",
+          "Attachment Name",
+          "Attachment Size",
+          "Attachment Persisted Path"
+        ],
+        "facebookMessengerSecretConversations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Thread Key",
+          "Sender Name",
+          "Message (Encrypted)",
+          "Attachment (Encrypted)"
+        ],
+        "facebookMessengerConversationGroups": [
+          [
+            "Timestamp (Last Activity)",
+            "datetime"
+          ],
+          "Thread Key",
+          "Thread Participants"
+        ],
+        "facebookMessengerContacts": [
+          "User ID",
+          "Username",
+          "Normalized Username",
+          "Profile Pic URL",
+          "Is App User"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/fileSystemEvents.py": {
+      "artifacts": {
+        "iosFileSystemEvents": [
+          "Event ID",
+          "Path",
+          "Event Flags",
+          "Event Flags (Hex)",
+          "Item Type",
+          "Node ID",
+          "Record Extra",
+          "Format Version",
+          "Source File"
+        ],
+        "iosFileSystemEventsCommunications": [
+          "Event ID",
+          "Path",
+          "Event Flags",
+          "Event Flags (Hex)",
+          "Item Type",
+          "Node ID",
+          "Record Extra",
+          "Format Version",
+          "Source File"
+        ],
+        "iosFileSystemEventsUpdates": [
+          "Event ID",
+          "Path",
+          "Event Flags",
+          "Event Flags (Hex)",
+          "Item Type",
+          "Node ID",
+          "Record Extra",
+          "Format Version",
+          "Source File"
+        ],
+        "iosFileSystemEventsAppContainers": [
+          "Event ID",
+          "Path",
+          "Event Flags",
+          "Event Flags (Hex)",
+          "Item Type",
+          "Node ID",
+          "Record Extra",
+          "Format Version",
+          "Source File"
+        ],
+        "iosFileSystemEventsLocation": [
+          "Event ID",
+          "Path",
+          "Event Flags",
+          "Event Flags (Hex)",
+          "Item Type",
+          "Node ID",
+          "Record Extra",
+          "Format Version",
+          "Source File"
+        ],
+        "iosFileSystemEventsSecurity": [
+          "Event ID",
+          "Path",
+          "Event Flags",
+          "Event Flags (Hex)",
+          "Item Type",
+          "Node ID",
+          "Record Extra",
+          "Format Version",
+          "Source File"
+        ],
+        "iosFileSystemEventsRestoreBackup": [
+          "Event ID",
+          "Path",
+          "Event Flags",
+          "Event Flags (Hex)",
+          "Item Type",
+          "Node ID",
+          "Record Extra",
+          "Format Version",
+          "Source File"
+        ],
+        "iosFileSystemEventsWeb": [
+          "Event ID",
+          "Path",
+          "Event Flags",
+          "Event Flags (Hex)",
+          "Item Type",
+          "Node ID",
+          "Record Extra",
+          "Format Version",
+          "Source File"
+        ],
+        "iosFileSystemEventsPackageManagement": [
+          "Event ID",
+          "Path",
+          "Event Flags",
+          "Event Flags (Hex)",
+          "Item Type",
+          "Node ID",
+          "Record Extra",
+          "Format Version",
+          "Source File"
+        ],
+        "iosFileSystemEventsRemoved": [
+          "Event ID",
+          "Path",
+          "Event Flags",
+          "Event Flags (Hex)",
+          "Item Type",
+          "Node ID",
+          "Record Extra",
+          "Format Version",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/filesApp.py": {
+      "artifacts": {
+        "icloud_sync_device_names": [
+          "Device Number",
+          "Device Name"
+        ],
+        "icloud_application_list": [
+          "Application Bundle ID",
+          "Number of folders",
+          "Number of files",
+          "Total size in bytes"
+        ],
+        "icloud_drive_stored_files": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          [
+            "Last opened",
+            "datetime"
+          ],
+          "Application Bundle ID",
+          "Path",
+          "Filename",
+          "Hidden extension",
+          "Size in bytes",
+          "Size",
+          "From Device Name",
+          "Shared?",
+          "Visible?",
+          "Recently Deleted"
+        ],
+        "icloud_drive_shared_files": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          [
+            "Last opened",
+            "datetime"
+          ],
+          "Application Bundle ID",
+          "Path",
+          "Filename",
+          "Hidden extension",
+          "Size in bytes",
+          "Size",
+          "From Device Name",
+          "Shared by",
+          "Permissions",
+          "Recently Deleted"
+        ],
+        "icloud_drive_tagged_files": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          [
+            "Last opened",
+            "datetime"
+          ],
+          "Application Bundle ID",
+          "Path",
+          "Filename",
+          "Hidden extension",
+          "Tags",
+          "Size in bytes",
+          "Size",
+          "From Device Name",
+          "Recently Deleted"
+        ],
+        "icloud_drive_favourite_files": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          [
+            "Last opened",
+            "datetime"
+          ],
+          "Application Bundle ID",
+          "Path",
+          "Filename",
+          "Hidden extension",
+          "Size in bytes",
+          "Size",
+          "From Device Name",
+          "Recently Deleted"
+        ],
+        "files_ios_updates": [
+          [
+            "Date and Time",
+            "datetime"
+          ],
+          "OS Build",
+          "OS Version"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/findMy.py": {
+      "artifacts": {
+        "findMy": [
+          "Key",
+          "Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/findMyItems.py": {
+      "artifacts": {
+        "findMyItemsInfo": [
+          "Name",
+          "Serial",
+          "ID",
+          "Role Name",
+          "Emoji",
+          "Role ID",
+          "Product Type",
+          "Manufacturer",
+          "Product ID",
+          "Vendor ID",
+          "Antenna Power",
+          "Group ID",
+          "Owner",
+          "Battery Status",
+          "Lost Mode",
+          "Capabilities",
+          "System Version"
+        ],
+        "findMyItemsLocations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Name",
+          "Serial",
+          "ID",
+          "Role Name",
+          "Emoji",
+          "Role ID",
+          "Product Type",
+          "Manufacturer",
+          "Product ID",
+          "Vendor ID",
+          "Antenna Power",
+          "Group ID",
+          "Owner",
+          "Battery Status",
+          "Lost Mode",
+          "Capabilities",
+          "System Version",
+          "Sub-administrative Area",
+          "Label",
+          "Street Address",
+          "Country Code",
+          "State Code",
+          "Administrative Area",
+          "Street Name",
+          "Formatted Address Line",
+          "Item Full Address",
+          "Throroughfare",
+          "Area of Interest",
+          "Locality",
+          "Type",
+          "Vertical Accuracy",
+          "Longitude",
+          "Is Inaccurate",
+          "Is Old",
+          "Horizontal Accuracy",
+          "Latitude",
+          "Altitude",
+          "Location Finished",
+          "Country"
+        ],
+        "findMyItemsSafeLocations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Item Name",
+          "Serial",
+          "ID",
+          "Role Name",
+          "Emoji",
+          "Role ID",
+          "Location Name",
+          "Type",
+          "Identifier",
+          "Vertical Accuracy",
+          "Horizontal Accuracy",
+          "Longitude",
+          "Latitude",
+          "Floor Level",
+          "Is Inaccurate",
+          "Is Old",
+          "Altitude",
+          "Sub-Administrative Area",
+          "Label",
+          "Street Address",
+          "Country Code",
+          "State Code",
+          "Administrative Area",
+          "Street Name",
+          "Formatted Address Line",
+          "Map Item Full Address",
+          "Throroughfare",
+          "Area of Interest",
+          "Locality",
+          "Country"
+        ],
+        "findMyItemsCrowdsourcedLocations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Name",
+          "Serial",
+          "ID",
+          "Role Name",
+          "Emoji",
+          "Role ID",
+          "Product Type",
+          "Manufacturer",
+          "Product ID",
+          "Vendor ID",
+          "Antenna Power",
+          "Group ID",
+          "Owner",
+          "Battery Status",
+          "Lost Mode",
+          "Capabilities",
+          "System Version",
+          "Position Type",
+          "Vertical Accuracy",
+          "Longitude",
+          "Latitude",
+          "Altitude",
+          "Floor Level",
+          "Is Inaccurate",
+          "Is Old",
+          "Horizontal Accuracy",
+          "Location Finished"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/fmfdDevices.py": {
+      "artifacts": {
+        "fmfd_notbackedup_devices": [
+          "Device Name",
+          "Device ID",
+          "Active?",
+          "This Device?",
+          "Companion Device?",
+          "Auto Me Capable?",
+          "Device FMF ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/foursquareSwarm.py": {
+      "artifacts": {
+        "foursquare_swarm_account": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Joined at",
+            "datetime"
+          ],
+          [
+            "Profile Picture",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "First Name",
+          "Last Name",
+          "Biography",
+          "Gender",
+          "Birthday",
+          "Home City",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Email",
+          "Facebook Profile",
+          "Twitter Profile",
+          "Profile Picture URL",
+          "Ping Notifications",
+          "Friends",
+          "Check-ins",
+          "Mayorships",
+          "UID",
+          "Profile Picture Path (Cached)",
+          "Location"
+        ],
+        "foursquare_swarm_contacts": [
+          [
+            "Last Mentioned",
+            "datetime"
+          ],
+          "Contact type",
+          "Relationship",
+          [
+            "Profile Picture",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "First Name",
+          "Last Name",
+          "Gender",
+          "Birthday",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Email",
+          "Profile Picture URL",
+          "Blocked",
+          "Muted",
+          "Friendship Disabled",
+          "Ping Notifications",
+          "Friends",
+          "Check-ins",
+          "Mayorships",
+          "UID",
+          "Profile Picture Path (Cached)",
+          "Location"
+        ],
+        "foursquare_swarm_address_book": [
+          [
+            "Last Mentioned",
+            "datetime"
+          ],
+          [
+            "Profile Picture",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "First Name",
+          "Last Name",
+          "Phone Numbers",
+          "Email",
+          "Facebook Profile",
+          "UID",
+          "Location"
+        ],
+        "foursquare_swarm_checkins": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Edited",
+          "Check-in Type",
+          "Check-in Status",
+          "Check-in Retries",
+          "In Activity Feed",
+          "With Friends",
+          "TZ Offset (minutes)",
+          "Relationship",
+          "Full Name",
+          "Visibility",
+          "Venue Name",
+          "Distance (meters)",
+          "Latitude",
+          "Longitude",
+          "Address",
+          "Neighborhood",
+          "Country",
+          "State",
+          "City",
+          "Cross Street",
+          "Postal Code",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Facebook Profile",
+          "Twitter Profile",
+          "Instagram Profile",
+          "Venue URL",
+          "Check-in URL",
+          "Website",
+          "Liked",
+          "Mayor",
+          "Comment",
+          "Entities",
+          "Passive Latitude",
+          "Passive Longitude",
+          "Passive Location Name",
+          "Contextual Location",
+          "Exact Context",
+          "Display Geo",
+          "Passive Stop ID",
+          "Nearby Venues",
+          "Source App",
+          "UID",
+          "Location"
+        ],
+        "foursquare_swarm_tips": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          [
+            "Photo",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "Author Type",
+          "Relationship",
+          "Full Name",
+          "Tip",
+          "Title",
+          "Agrees",
+          "Disagrees",
+          "Likes",
+          "Saves",
+          "Comments",
+          "Views",
+          "Dones",
+          "Venue Name",
+          "Distance (meters)",
+          "Latitude",
+          "Longitude",
+          "Tip URL",
+          "Short URL",
+          "Photo URL",
+          "UID",
+          "Photo Path (Cached)",
+          "Location"
+        ],
+        "foursquare_swarm_stickers": [
+          "Sticker Name",
+          "Category",
+          [
+            "Sticker",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "Unlocked",
+          "Bonus Type",
+          "Status",
+          "Multiplier",
+          "Check-ins Earned",
+          "Check-ins Required",
+          "Progress (%)",
+          "Sticker URL",
+          "UID",
+          "Sticker Path (Cached)",
+          "Location"
+        ],
+        "foursquare_swarm_venues_history": [
+          [
+            "Last Visited",
+            "datetime"
+          ],
+          "Category",
+          "Venue Name",
+          "Distance (meters)",
+          "Latitude",
+          "Longitude",
+          "Address",
+          "Neighborhood",
+          "Country",
+          "State",
+          "City",
+          "Cross Street",
+          "Postal Code",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Facebook Profile",
+          "Twitter Profile",
+          "Instagram Profile",
+          "Foursquare Profile",
+          "Website",
+          "Description",
+          "Liked",
+          "Disliked",
+          "Closed",
+          "Saved",
+          "Been Here Count",
+          "Rating",
+          "Mayor",
+          "Mayor Count",
+          "Mayor Info",
+          "Friends Visits Info",
+          "Event Info",
+          "Reason Info",
+          "Likes Count",
+          "Visitors Count",
+          "Check-ins Count",
+          "Photo Count",
+          "Tips Count",
+          "Events Count",
+          "Location"
+        ],
+        "foursquare_swarm_photos": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Photo Type",
+          [
+            "Photo",
+            "media",
+            "height: 96px; border-radius: 5%;"
+          ],
+          "User ID",
+          "Full Name",
+          "Venue Source",
+          "Venue Name",
+          "Distance (meters)",
+          "Latitude",
+          "Longitude",
+          "Address",
+          "Neighborhood",
+          "Country",
+          "State",
+          "City",
+          "Cross Street",
+          "Postal Code",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Facebook Profile",
+          "Twitter Profile",
+          "Instagram Profile",
+          "Foursquare Profile",
+          "Website",
+          "Description",
+          "Pending",
+          "Public",
+          "Has Sticker",
+          "Photo URL",
+          "Photo Size",
+          "Privacy",
+          "App Source",
+          "UID",
+          "Photo Path (Cached)",
+          "Location"
+        ],
+        "foursquare_swarm_comments": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Source Type",
+          "Source Text",
+          "Relationship",
+          "Full Name",
+          "Text",
+          "Pending",
+          "Status",
+          "Comment Type",
+          "Mention Ranges",
+          "Entities",
+          "Latitude",
+          "Longitude",
+          "Display Geo",
+          "Venue Name",
+          "Venue Latitude",
+          "Venue Longitude",
+          "Unique ID",
+          "Location"
+        ],
+        "foursquare_swarm_friend_requests": [
+          [
+            "Date Requested",
+            "datetime"
+          ],
+          "Direction",
+          "Status",
+          "Requester Name",
+          "Requester Relationship",
+          "Requester ID",
+          "Requestee Name",
+          "Requestee Relationship",
+          "Requestee ID",
+          "UID",
+          "Location"
+        ],
+        "foursquare_swarm_plans": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Last Modified",
+            "datetime"
+          ],
+          "Relationship",
+          "Author Name",
+          "Type",
+          "Participants",
+          "Text",
+          "Draft Comment",
+          "Status",
+          "Is Hidden",
+          "In Feed",
+          "Unread",
+          "Mute State",
+          "Read Marker",
+          "Read Receipt",
+          "Interested Count",
+          "Interested Summary",
+          "Comments Count",
+          "Entities",
+          "UID",
+          "Location"
+        ],
+        "foursquare_swarm_events": [
+          [
+            "Start At",
+            "datetime"
+          ],
+          [
+            "End At",
+            "datetime"
+          ],
+          [
+            "Date",
+            "datetime"
+          ],
+          "All Day",
+          "Event Name",
+          "Event Type",
+          "Summary",
+          "Here Now Count",
+          "Friends Attended",
+          "Venue Name",
+          "Category",
+          "Cast",
+          "Directors",
+          "Genres",
+          "Rating",
+          "Running Time (seconds)",
+          "Provider",
+          "Event URL",
+          "UID",
+          "Location"
+        ],
+        "foursquare_swarm_saved_lists": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Updated",
+            "datetime"
+          ],
+          [
+            "Client Updated",
+            "datetime"
+          ],
+          [
+            "Last Viewed",
+            "datetime"
+          ],
+          [
+            "Metadata Updated",
+            "datetime"
+          ],
+          "Owner",
+          "Creator",
+          "Name",
+          "Type",
+          "Description",
+          "Collaborative",
+          "Access Level",
+          "Items",
+          "Followers",
+          "Liked",
+          "Likes",
+          "List URL",
+          [
+            "Venue Added",
+            "datetime"
+          ],
+          [
+            "Venue Shared",
+            "datetime"
+          ],
+          "Venue Name",
+          "Address/City",
+          "Latitude",
+          "Longitude",
+          "Visited",
+          "Item Unread",
+          "Item Status",
+          "User Note",
+          "Source Title",
+          "Source URL",
+          "Item Source",
+          "Item Server ID",
+          "UID",
+          "Location"
+        ],
+        "foursquare_swarm_location_history": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Accuracy (meters)",
+          "Accuracy Context",
+          "Speed State",
+          "Sync Status",
+          "Location"
+        ],
+        "foursquare_swarm_plog": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Log Level",
+          "App State",
+          "Title",
+          "Details",
+          "Event Type",
+          "Latitude",
+          "Longitude",
+          "Accuracy (m)",
+          "Accuracy Context",
+          "Radius (m)",
+          "Location"
+        ],
+        "foursquare_swarm_feed": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Feed Type",
+          "Content Type",
+          "Bulletin Type",
+          "Title",
+          "Text",
+          "Action Text",
+          "Participants",
+          "Replies",
+          "Social Actors",
+          "Actor Name",
+          "Target Name",
+          "Image URL",
+          [
+            "Bulletin Image",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "Native Check-in Shout",
+          "Venue Name",
+          "Latitude",
+          "Longitude",
+          "Entities",
+          "Target",
+          "UID",
+          "Location"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/fsCachedData.py": {
+      "artifacts": {
+        "fsCachedData": [
+          [
+            "Timestamp Modified",
+            "datetime"
+          ],
+          [
+            "Media",
+            "media"
+          ],
+          "Mime Type",
+          "Filename",
+          "Bundle Name",
+          "Path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

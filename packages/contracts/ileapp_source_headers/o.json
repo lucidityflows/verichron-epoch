@@ -1,0 +1,369 @@
+{
+  "modules": {
+    "scripts/artifacts/Oops.py": {
+      "artifacts": {
+        "Oops": [
+          [
+            "Date Sent",
+            "datetime"
+          ],
+          [
+            "Date Received",
+            "datetime"
+          ],
+          "Sender Name",
+          "Message",
+          "Message Type",
+          "Sender ID",
+          "Direction (as stored)",
+          "Nickname",
+          "User ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Oura.py": {
+      "artifacts": {
+        "oura_account_identifiers": [
+          "Category",
+          "Attribute",
+          "Value",
+          "Source File"
+        ],
+        "oura_ring_hardware": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Ring (BLE MAC)",
+          "Item",
+          "Value",
+          "Details",
+          "Source File"
+        ],
+        "oura_find_my_ring_location": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Altitude (m)",
+          "Horizontal Accuracy (m)",
+          "Vertical Accuracy (m)",
+          "Speed (m/s)",
+          "Speed Accuracy (m/s)",
+          "Course",
+          "Course Accuracy",
+          "Map",
+          "Source Key"
+        ],
+        "oura_health_profile": [
+          "Category",
+          "Attribute",
+          "Value",
+          "Details",
+          "Source File"
+        ],
+        "oura_health_snapshot": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Category",
+          "Metric",
+          "Value",
+          "Details"
+        ],
+        "oura_connected_services": [
+          "Category",
+          "Item",
+          "Value",
+          "Details",
+          "Source File"
+        ],
+        "oura_app_activity": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Event",
+          "Source Key",
+          "Source File"
+        ],
+        "oura_app_environment": [
+          "Category",
+          "Attribute",
+          "Value",
+          "Details",
+          "Source File"
+        ],
+        "oura_content_campaigns": [
+          "Topic",
+          "Item",
+          "Value",
+          "Details"
+        ],
+        "oura_analytics_integrations": [
+          "Integration",
+          "Type",
+          "API Key",
+          "Version",
+          "Consent / Details"
+        ],
+        "oura_analytics_event_plan": [
+          "Section",
+          "Event Name",
+          "Enabled",
+          "Suppressed Destinations"
+        ],
+        "oura_feature_flags": [
+          "Type",
+          "Name",
+          "Value"
+        ],
+        "oura_preferences_residue": [
+          "Category",
+          "Key",
+          "Decoded Value",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/offlinePages.py": {
+      "artifacts": {
+        "offlinePages": [
+          [
+            "Timestamp Modified",
+            "datetime"
+          ],
+          [
+            "File",
+            "media"
+          ],
+          "Web Source",
+          "Subject",
+          "MIME Date",
+          "Source in Extraction"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/oneDrive.py": {
+      "artifacts": {
+        "one_drive_files": [
+          [
+            "Item Date",
+            "datetime"
+          ],
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          [
+            "Modified Date On Client",
+            "datetime"
+          ],
+          [
+            "Last Access Date",
+            "datetime"
+          ],
+          [
+            "Date Taken",
+            "datetime"
+          ],
+          [
+            "Date Shared",
+            "datetime"
+          ],
+          [
+            "Deleted Date Time",
+            "datetime"
+          ],
+          "Name",
+          "Extension",
+          "Folder Path",
+          "Size (bytes)",
+          "Item Type (as stored)",
+          "Icon Type (as stored)",
+          "Deleted State (as stored)",
+          "Sharing Level (as stored)",
+          "Vault Type (as stored)",
+          "Offline",
+          "Owner Name",
+          "Owner CID",
+          "Shared By Name",
+          "Shared By Email",
+          "File Hash",
+          "File Hash Type (as stored)",
+          "Latitude",
+          "Longitude",
+          "Altitude",
+          "Camera Make",
+          "Camera Model",
+          "Resource ID",
+          "Drive Path",
+          "Account ID",
+          "Source Path"
+        ],
+        "one_drive_accounts": [
+          [
+            "Last Sync Time",
+            "datetime"
+          ],
+          "Account ID",
+          "Drive Resource ID",
+          "Drive Path",
+          "Drive Display Name",
+          "Drive Canonical Name",
+          "Drive Type (as stored)",
+          "Server Type (as stored)",
+          "Synced File Count",
+          "Web App URL",
+          "Microsoft Graph URL",
+          "Tenant Hosts",
+          "Source Path"
+        ],
+        "one_drive_sharing_permissions": [
+          "Entity Name",
+          "Entity Email",
+          "Role (as stored)",
+          "Entity Type (as stored)",
+          "Link Type (as stored)",
+          "Link Name",
+          [
+            "Expiration",
+            "datetime"
+          ],
+          "Entity User ID",
+          "Scope Resource Name",
+          "Item Name",
+          "Item Resource ID",
+          "Source Path"
+        ],
+        "one_drive_stream_cache": [
+          [
+            "Last Access Date",
+            "datetime"
+          ],
+          [
+            "Last Sync Date",
+            "datetime"
+          ],
+          [
+            "Stream Last Modification Date",
+            "datetime"
+          ],
+          "Item Name",
+          "Item Resource ID",
+          "Stream Type (as stored)",
+          "Sync State (as stored)",
+          "Progress (as stored)",
+          "Error Code (as stored)",
+          "Stream Location",
+          "Source Path"
+        ],
+        "one_drive_offline_items": [
+          "Account ID",
+          "Owner ID",
+          "Resource ID",
+          "Item Name",
+          "Source Path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/onionBrowser.py": {
+      "artifacts": {
+        "onion_browser_bookmarks": [
+          "Name",
+          "URL",
+          [
+            "Icon",
+            "media"
+          ],
+          "Source Path"
+        ],
+        "onion_browser_hsts": [
+          [
+            "Expiration",
+            "datetime"
+          ],
+          "Host",
+          "Allow Subdomains",
+          "Preloaded",
+          "Source Path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/ooklaSpeedtestData.py": {
+      "artifacts": {
+        "ooklaSpeedtestData": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "External IP Address",
+          "Internal IP Address",
+          "Carrier Name",
+          "ISP",
+          "Wifi SSID",
+          "WAN Type",
+          "Device Model",
+          "Latitude",
+          "Longitude",
+          "Accuracy in Meters"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/ornetBrowser.py": {
+      "artifacts": {
+        "ornet_browser_tabs": [
+          "Tab Type",
+          "URL"
+        ],
+        "ornet_browser_settings": [
+          "Setting",
+          "Value"
+        ],
+        "ornet_browser_bookmarks": [
+          "Title",
+          "URL",
+          [
+            "Icon",
+            "media"
+          ]
+        ],
+        "ornet_browser_favourites": [
+          "Title",
+          "URL",
+          [
+            "Icon",
+            "media"
+          ]
+        ],
+        "ornet_browser_history": [
+          "Date (device local)",
+          "Time (device local)",
+          "Title",
+          "URL",
+          [
+            "Icon",
+            "media"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

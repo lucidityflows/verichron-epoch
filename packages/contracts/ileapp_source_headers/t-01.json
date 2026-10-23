@@ -1,0 +1,605 @@
+{
+  "modules": {
+    "scripts/artifacts/Threema.py": {
+      "artifacts": {
+        "threema_chats": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "From Me",
+          "Sender Name",
+          "Chat",
+          "Message",
+          [
+            "Attachment File",
+            "media"
+          ],
+          "Chat-ID",
+          "Message-ID",
+          "Receiver",
+          "Message Type",
+          "Latitude",
+          "Longitude",
+          "Accuracy"
+        ],
+        "threema_users": [
+          "Identity",
+          "First Name",
+          "Last Name",
+          "Nickname",
+          "Contact ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/tcc.py": {
+      "artifacts": {
+        "tcc": [
+          [
+            "Last Modified Timestamp",
+            "datetime"
+          ],
+          "Bundle ID",
+          "Service",
+          "Access",
+          "Prompt Count"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/teams.py": {
+      "artifacts": {
+        "teamsMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Sent By Me",
+          "Display Name",
+          "Thread Name",
+          "Message",
+          [
+            "Media",
+            "media"
+          ],
+          "Raw Message",
+          "Sender",
+          "Thread ID",
+          "Thread Type",
+          "Thread Topic",
+          "Thread TSID",
+          "Message Base Type",
+          "Message Content Type"
+        ],
+        "teamsContacts": [
+          "Display Name",
+          "Email",
+          [
+            "Phone Number",
+            "phonenumber"
+          ]
+        ],
+        "teamsUser": [
+          [
+            "Timestamp Last Sync",
+            "datetime"
+          ],
+          "Display Name",
+          [
+            "Phone Number",
+            "phonenumber"
+          ]
+        ],
+        "teamsCalls": [
+          [
+            "Call Start",
+            "datetime"
+          ],
+          [
+            "Call Connect",
+            "datetime"
+          ],
+          [
+            "Call End",
+            "datetime"
+          ],
+          "Call Direction",
+          "Call Type",
+          "Call State",
+          "Call Originator",
+          "Call Target",
+          "Call Originator Name",
+          "Call Participant Name"
+        ],
+        "teamsLocations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Sender",
+          "Display Name",
+          "Content",
+          "Card URL",
+          "Card Title",
+          "Card Text",
+          "Card URL2",
+          "Latitude",
+          "Longitude",
+          [
+            "Card Expires",
+            "datetime"
+          ],
+          "Device ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/teamsSegment.py": {
+      "artifacts": {
+        "teamsSegmentLocations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Longitude",
+          "Latitude",
+          "Speed",
+          "Altitude",
+          "Vertical Accuracy",
+          "Horizontal Accuracy"
+        ],
+        "teamsSegmentMotion": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Activity"
+        ],
+        "teamsSegmentTimezone": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Timezone",
+          "Timezone Offset",
+          "Timezone reason"
+        ],
+        "teamsSegmentPower": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Is plugged in?",
+          "Battery Level"
+        ],
+        "teamsSegmentStateChange": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Change"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/telegramAccounts.py": {
+      "artifacts": {
+        "telegramAccounts": [
+          [
+            "Update State Timestamp",
+            "datetime"
+          ],
+          "Account ID",
+          "Active Account",
+          "User ID",
+          "Environment",
+          "Master Datacenter",
+          "Sort Order",
+          "App Passcode Lock"
+        ],
+        "telegramContacts": [
+          "Account ID",
+          "Peer ID",
+          "Type",
+          "First Name",
+          "Last Name",
+          "Username",
+          "Phone",
+          "Title",
+          "Messages In Chat",
+          "In Contact List",
+          "In Spotlight Cache",
+          [
+            "Avatar",
+            "media"
+          ]
+        ],
+        "telegramChats": [
+          [
+            "Last Message",
+            "datetime"
+          ],
+          "Account ID",
+          "Chat ID",
+          "Chat",
+          "Type",
+          "Folder",
+          "Pinned",
+          "Messages Stored",
+          "Unread Count",
+          "Marked Unread"
+        ],
+        "telegramDeviceContacts": [
+          "Account ID",
+          "Phone Number",
+          "First Name",
+          "Last Name",
+          "Import State",
+          "Imported By Count",
+          "Telegram User ID",
+          "Device Contact Identifiers"
+        ],
+        "telegramPeerPresence": [
+          [
+            "Last Activity",
+            "datetime"
+          ],
+          "Account ID",
+          "Peer ID",
+          "Peer",
+          "Status",
+          [
+            "Status Time",
+            "datetime"
+          ],
+          "Hides Last Seen"
+        ],
+        "telegramMessageTags": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Account ID",
+          "Chat ID",
+          "Chat",
+          "Category",
+          "Message ID"
+        ],
+        "telegramCachedPeerData": [
+          "Account ID",
+          "Peer ID",
+          "Peer Name",
+          "Record Type",
+          "About / Description",
+          "Birthday",
+          "Blocked",
+          "Common Group Count",
+          "Has Scheduled Messages",
+          "Auto-Delete Timer",
+          "Invited By"
+        ],
+        "telegramSettings": [
+          "Scope",
+          "Setting",
+          "Value",
+          "Key ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/telegramMesssages.py": {
+      "artifacts": {
+        "telegramMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Forward Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Author",
+          "Chat",
+          "Text",
+          [
+            "Thumbnail",
+            "media"
+          ],
+          "Chat ID",
+          "Thread ID",
+          "Author ID",
+          "Action Data",
+          "Forward From"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/teleguard.py": {
+      "artifacts": {
+        "teleguardMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "User Time",
+            "datetime"
+          ],
+          "Direction",
+          "Sender",
+          "Content",
+          [
+            "Media",
+            "media"
+          ],
+          "Type",
+          "Receiver",
+          "Metadata",
+          "Status",
+          "Is Edited?",
+          "Chat ID"
+        ],
+        "teleguardPosts": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Channel ID",
+          "Header",
+          "Content",
+          "Type",
+          "Local Status",
+          "Views Count",
+          "Likes Count",
+          "Dislikes Count",
+          "Metadata",
+          "Media"
+        ],
+        "teleguardContacts": [
+          [
+            "Last Activity Timestamp",
+            "datetime"
+          ],
+          "Server ID",
+          "Alias",
+          "Type",
+          "Color",
+          [
+            "Avatar",
+            "media"
+          ],
+          "Options",
+          "Info",
+          [
+            "Last Visit Time",
+            "datetime"
+          ],
+          "Personal ID"
+        ],
+        "teleguardChannels": [
+          "ID",
+          "Alias",
+          "Description",
+          "Category",
+          "Color",
+          "Avatar ID",
+          "Subscribers Count",
+          "Admin",
+          "Posts Count",
+          "Is Deleted",
+          "Language",
+          "Type"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/textinputTyping.py": {
+      "artifacts": {
+        "textinputTyping": [
+          "Timestamp",
+          "Sender Identifier",
+          "Text",
+          "contextBeforeInput"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/threeBars.py": {
+      "artifacts": {
+        "threeBarsNetworks": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Network Name",
+          "Identifier",
+          "Access Point Count",
+          "Captive",
+          "Public",
+          "Moving",
+          "Suspicious",
+          "Low Quality",
+          "Quality Score",
+          "Popularity Score",
+          "Auth Mask",
+          "Type",
+          "Venue Group",
+          "Venue Type",
+          "Tile Key",
+          "Record ID"
+        ],
+        "threeBarsAccessPoints": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "BSSID",
+          "Network Name",
+          "Network Identifier",
+          "Edge",
+          "TCP Good",
+          "Quality Score",
+          "Popularity Score",
+          "Record ID"
+        ],
+        "threeBarsTiles": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Tile Key",
+          "Network Count",
+          "ETag",
+          "Record ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/tikTok.py": {
+      "artifacts": {
+        "tiktok_messages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Server Created Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Nickname",
+          "Message",
+          "Sender",
+          "Custom ID",
+          "Local Response",
+          "Content Display Name",
+          "Content URL",
+          "Profile Pic URL",
+          "Contact Table",
+          "Account ID",
+          "Source File",
+          "Conversation ID"
+        ],
+        "tiktok_contacts": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Nickname",
+          "Unique ID",
+          "Custom ID",
+          "URL",
+          "Source Table",
+          "Source File"
+        ],
+        "tiktok_account": [
+          "Key",
+          "Value",
+          "Source File"
+        ],
+        "tiktok_watch_history": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "aid (as stored)",
+          "Account ID",
+          "Source File"
+        ],
+        "tiktok_published_videos": [
+          [
+            "File Modified",
+            "datetime"
+          ],
+          [
+            "Media",
+            "media"
+          ],
+          "aid (as stored)",
+          "Video ID",
+          "File Size (bytes)",
+          "Source File"
+        ],
+        "tiktok_app_sessions": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Event Name",
+          "Is Launch",
+          "Session",
+          [
+            "Enter Timestamp",
+            "datetime"
+          ],
+          "Duration (ms, as stored)",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/tikTokReplied.py": {
+      "artifacts": {
+        "tiktok_replied": [
+          [
+            "Reply Server Created Date",
+            "datetime"
+          ],
+          "RowID",
+          "BelongingMessageID",
+          "ref_msg_type",
+          "ref_msg_id",
+          "Referenced Text",
+          "Ref Msg Sender UID",
+          "Ref Msg Sender CustomID",
+          "Ref Msg Sender Nickname",
+          "Reply Text",
+          "Deleted",
+          "Belonging Conversation ID",
+          "Reply Sender UID",
+          "Reply Sender CustomID",
+          "Reply Sender Nickname",
+          "Ref Msg Sender Contact Table",
+          "Reply Sender Contact Table",
+          "Parser Table",
+          "Account ID",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/tileApp.py": {
+      "artifacts": {
+        "tileApp": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Row Number",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

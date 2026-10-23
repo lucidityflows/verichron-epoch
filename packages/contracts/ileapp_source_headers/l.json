@@ -1,0 +1,1173 @@
+{
+  "modules": {
+    "scripts/artifacts/LinkedIn.py": {
+      "artifacts": {
+        "linkedin_account": [
+          "Member ID",
+          "Last Name",
+          "First Name",
+          "Headline",
+          "Location",
+          "Public Identifier"
+        ],
+        "linkedin_messages": [
+          [
+            "Delivery Date",
+            "datetime"
+          ],
+          "Delivery Status",
+          "Sender First Name",
+          "Sender Last Name",
+          "Sender Headline",
+          "Sender Profile Url",
+          "Sender Distance",
+          "Message",
+          "Conversation Urn"
+        ],
+        "linkedin_conversations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Sent",
+          "Sender Name",
+          "Conversation Name",
+          "Message",
+          "Conversation-ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/lastBuild.py": {
+      "artifacts": {
+        "last_build": [
+          "Property",
+          "Property Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/lidl_plus.py": {
+      "artifacts": {
+        "lidl_shopping_list": [
+          [
+            "Item Last Updated",
+            "datetime"
+          ],
+          "Item Type",
+          "Product ID",
+          "Product Name",
+          "Brand",
+          "Packaging",
+          "Quantity",
+          "Price",
+          "Discount Message",
+          "Currency",
+          "Is Purchased",
+          [
+            "Product Image",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "Image URL",
+          "Image Cache Match",
+          "Product Source",
+          "Item Position",
+          "Offer ID",
+          "Coupon ID",
+          "Pending Action",
+          "Item UUID",
+          "List Type",
+          "List Name",
+          [
+            "List Last Updated",
+            "datetime"
+          ],
+          "List UUID",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_tickets": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Cache Time",
+            "datetime"
+          ],
+          "Store Code",
+          "Total Amount",
+          "Currency",
+          "Articles Count",
+          "Coupons Used",
+          "Returns Count",
+          "Is Favorite",
+          "Has Invoice",
+          "Has HTML",
+          "Ticket ID",
+          "Request URL",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_receipt_items": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Cache Time",
+            "datetime"
+          ],
+          "Product Name",
+          "Quantity",
+          "Price",
+          "Tax Type",
+          "Promotion Description",
+          "Promotion Discount",
+          "Line Item",
+          "Store Code",
+          "Store Name",
+          "Store Address",
+          "Store Postal Code",
+          "Store City",
+          "Total Amount",
+          "Coupons Count",
+          "Is Favorite",
+          "Has Invoice",
+          "Barcode",
+          "Is Deleted",
+          "Ticket ID",
+          "Product ID",
+          "Promotion ID",
+          "Request URL",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_payment_methods": [
+          [
+            "Cache Time",
+            "datetime"
+          ],
+          "Type",
+          "Alias",
+          "Account Holder",
+          "Brand",
+          "Last 4 Digits",
+          "Bank Name",
+          "Balance",
+          "Currency",
+          "Validation Status",
+          "Is Default",
+          "Lidl Pay Active",
+          "Profile Status",
+          "Source Container",
+          "Payment ID",
+          "Request URL",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_loyalty_card": [
+          [
+            "Cache Time",
+            "datetime"
+          ],
+          "Payment QR",
+          "Card Number (Derived)",
+          "Request URL",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_promotion_details": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Cache Time",
+            "datetime"
+          ],
+          "Promotion Type",
+          "Product Name",
+          "Discount",
+          "Brand",
+          "Product",
+          [
+            "Product Image",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "Image URL",
+          "Image Cache Match",
+          "Channel",
+          [
+            "Valid From",
+            "datetime"
+          ],
+          [
+            "Valid To",
+            "datetime"
+          ],
+          "Activated",
+          "Redeemed",
+          "Processing",
+          "Special",
+          "Segmented",
+          "Tag",
+          "Promotion ID",
+          "Coupon ID",
+          "Request URL",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_product_details": [
+          [
+            "Cache Time",
+            "datetime"
+          ],
+          "Product Name",
+          "Brand",
+          "Characteristics",
+          "Packaging",
+          "Price",
+          "Currency",
+          "Price Per Unit",
+          [
+            "Product Image",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "Image URL",
+          "Image Cache Match",
+          "Product ID",
+          "Request URL",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_searched_terms": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Search Term (Raw)",
+          "Search Term (Decoded)",
+          "Store ID",
+          "Returned Results Count",
+          "Returned Products",
+          "Sequence ID",
+          "Sequence Position",
+          "Sequence Final",
+          "Request URL",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_store_searches": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Search Term (Raw)",
+          "Search Term (Decoded)",
+          "Language",
+          "Latitude",
+          "Longitude",
+          "Returned Store Count",
+          "Result Position",
+          "Store ID",
+          "Store Name",
+          "Store Address",
+          "Store Postal Code",
+          "Store Locality",
+          "Store Latitude",
+          "Store Longitude",
+          "Distance (m)",
+          "Request URL",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_offers": [
+          [
+            "Cache Time",
+            "datetime"
+          ],
+          "Offer Type",
+          "Product Name",
+          "Brand",
+          "Packaging",
+          "Original Price",
+          "Discounted Price",
+          "Discount Message",
+          "Currency",
+          "Price Per Unit",
+          "Channel",
+          [
+            "Product Image",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "Image URL",
+          "Image Cache Match",
+          [
+            "Valid From",
+            "datetime"
+          ],
+          [
+            "Valid To",
+            "datetime"
+          ],
+          "Offer ID",
+          "Request URL",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_mypoints": [
+          [
+            "Cache Time",
+            "datetime"
+          ],
+          "Type",
+          "Sub Type",
+          "Reward Name",
+          "Points Cost",
+          "Price",
+          "Discount Value",
+          "Discount Title",
+          "State",
+          "Is Disabled",
+          "Is Blocked",
+          "Is Favorite",
+          "Already Exchanged",
+          "Exchange Button Enabled",
+          "Days Until Expiration",
+          "Available Promotions",
+          "Related Online Article Number",
+          [
+            "Reward Image",
+            "media",
+            "height: 48px; border-radius: 5%;"
+          ],
+          "Image URL",
+          "Image Cache Match",
+          [
+            "Available On",
+            "datetime"
+          ],
+          "Reward ID",
+          "Account Available Points",
+          "Points To Expire",
+          [
+            "Next Expiration Date",
+            "datetime"
+          ],
+          "Total Rewards In Catalog",
+          "Request URL",
+          "Source File Name",
+          "Location"
+        ],
+        "lidl_last_known_location": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Horizontal Accuracy (m)",
+          "Altitude (m)",
+          "Ellipsoidal Altitude (m)",
+          "Vertical Accuracy (m)",
+          "Speed (m/s)",
+          "Speed Accuracy (m/s)",
+          "Course (°)",
+          "Course Accuracy (°)",
+          "Floor Level",
+          "Location"
+        ],
+        "lidl_selfscan_basket": [
+          [
+            "Scanned At",
+            "datetime"
+          ],
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Last Updated",
+            "datetime"
+          ],
+          "Status",
+          "Scan ID",
+          "Product ID",
+          "Barcode",
+          "Product Name",
+          "Quantity",
+          "Unit Price",
+          "Subtotal",
+          "Discount",
+          "Currency",
+          "Deposit (MasterData)",
+          "Restrictions (MasterData)",
+          "Location"
+        ],
+        "lidl_selfscan_journey": [
+          [
+            "Scanned At",
+            "datetime"
+          ],
+          "Product ID (MasterData)",
+          "Barcode",
+          "Product Name (MasterData)",
+          "Quantity",
+          "Unit Price (MasterData)",
+          "Deposit (MasterData)",
+          "Location"
+        ],
+        "lidl_selfscan_removed": [
+          [
+            "Removed",
+            "datetime"
+          ],
+          "Product ID (MasterData)",
+          "Barcode",
+          "Product Name (MasterData)",
+          "Quantity",
+          "Unit Price",
+          "Total Price",
+          "Savings",
+          "VAT",
+          "Weight",
+          "Item Number",
+          "Location"
+        ],
+        "lidl_grocery_pickup_cart": [
+          [
+            "Last Updated",
+            "datetime"
+          ],
+          [
+            "Created",
+            "datetime"
+          ],
+          "Product ID",
+          "Product Name",
+          "Subtitle",
+          "Image URL",
+          "Quantity",
+          "Max Quantity (Cart)",
+          "Unit Price",
+          "Deposit Amount",
+          "Deposit Name",
+          "Discount Amount",
+          "Original Amount",
+          "Total Amount",
+          "Currency",
+          "Weight Unit",
+          "Weight Value",
+          "Weight Unit Price",
+          "Allows Substitutions",
+          "Available (Cart)",
+          "Available (Server Restriction)",
+          "Max Quantity (Server Restriction)",
+          [
+            "Restriction Last Updated",
+            "datetime"
+          ],
+          "Validations",
+          "Location"
+        ],
+        "lidl_account": [
+          "Subject ID (User ID)",
+          "Name",
+          "Middle Name",
+          "Email",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Phone Prefix Number",
+          [
+            "Birthdate",
+            "date"
+          ],
+          "Authentication (AMR)",
+          "Location"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/life360.py": {
+      "artifacts": {
+        "life360Locations": [
+          "Timestamp",
+          "Latitude",
+          "Longitude",
+          "Altitude",
+          "Speed (mps)",
+          "Heading",
+          "Activity Type",
+          "Location Mode",
+          "Location Precision",
+          "Accuracy (+/- m)",
+          "Vertical Accuracy (+/- m)",
+          "Age",
+          [
+            "Timestamp",
+            "datetime"
+          ]
+        ],
+        "life360DeviceBattery": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Device Battery (%)",
+          "Charging"
+        ],
+        "life360ChatMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Sender First Name",
+          "Message",
+          "Message ID",
+          "Sender Last Name",
+          "Sent Status",
+          "Message Seen",
+          "Message Deleted (Locally)",
+          "Message Liked",
+          "Action",
+          "Location Name",
+          "Latitude",
+          "Longitude",
+          "Thread ID"
+        ],
+        "life360Members": [
+          "First Name",
+          "Last Name",
+          "Email",
+          [
+            "Phone",
+            "phonenumber"
+          ],
+          "Member ID",
+          "Avatar URL",
+          "Local User",
+          "Admin",
+          "Circle Name"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/line.py": {
+      "artifacts": {
+        "line": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Sent / Received",
+          "Username",
+          "Message"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/locServicesconfig.py": {
+      "artifacts": {
+        "locServicesConfigClients": [
+          "Value",
+          "Key"
+        ],
+        "locServicesConfigLocationd": [
+          "Value",
+          "Key"
+        ],
+        "locServicesConfigRoutined": [
+          "Value",
+          "Key"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/locationdCacheEncryptedB.py": {
+      "artifacts": {
+        "locationdWifiLocations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "ALS Query Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "BSSID",
+          "Horizontal Accuracy",
+          "Altitude",
+          "Vertical Accuracy",
+          "Speed",
+          "Course",
+          "Channel",
+          "Confidence",
+          "Score",
+          "Reach",
+          "Info Mask"
+        ],
+        "locationdWifiHarvest": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Scan Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "BSSID",
+          "RSSI",
+          "Channel",
+          "Horizontal Accuracy",
+          "Altitude",
+          "Vertical Accuracy",
+          "LOI Type"
+        ],
+        "locationdCellLocations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Radio",
+          "MCC",
+          "MNC",
+          "Area Code",
+          "Cell ID",
+          "Channel",
+          "Physical Cell ID",
+          "Additional Identifiers",
+          "Horizontal Accuracy",
+          "Altitude",
+          "Vertical Accuracy",
+          "Speed",
+          "Course",
+          "Confidence"
+        ],
+        "locationdWifiTiles": [
+          [
+            "Access Timestamp",
+            "datetime"
+          ],
+          [
+            "Generation Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Delta Latitude",
+          "Delta Longitude",
+          "Tile X",
+          "Tile Y",
+          "Altitude",
+          "Minimum Altitude",
+          "Maximum Altitude",
+          "Index Entries",
+          "Input Points",
+          "Expiration Age",
+          "Version",
+          "Flags"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/lockdownEvents.py": {
+      "artifacts": {
+        "lockdownEvents": [
+          [
+            "Timestamp (Device Local, No Offset)",
+            "datetime"
+          ],
+          "Event",
+          "PID",
+          "Log Message",
+          "Line Number",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/logarchive.py": {
+      "artifacts": {
+        "logarchive_artifacts": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_time_change": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_flashlight": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_executed_apps": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_motionstate": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_tethering": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_airplane_mode": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_lock_status": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_wifi_status": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_bluetooth_status": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_audio_status": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_navigation": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_calls": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_dialed_numbers": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_typing": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_faceid_presence": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_pocket_state": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_touch": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_usb_connections": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_camera": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_notifications": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_app_focus": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_media_playback": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_sim_cellular": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_unlock_auth": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_dictation": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_audio_routes": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_battery_state": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_ui_navigation": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_driving": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_bluetooth_pairing": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_emergency_sos": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_power_events": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_airdrop": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ],
+        "logarchive_carplay_session": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row Number",
+          "Process Image Path",
+          "Process ID",
+          "Subsystem",
+          "Category",
+          "Event Message",
+          "Trace ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

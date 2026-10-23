@@ -1,0 +1,611 @@
+{
+  "modules": {
+    "scripts/artifacts/BeReal.py": {
+      "artifacts": {
+        "bereal_accounts": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Profile type",
+          "Full name",
+          "User name",
+          "Profile picture URL",
+          "Gender",
+          [
+            "Birthday",
+            "date"
+          ],
+          "Biography",
+          "Country code",
+          "Region",
+          "Address",
+          "Timezone",
+          [
+            "Phone number",
+            "phonenumber"
+          ],
+          "Device UID",
+          "Device Model and OS",
+          "App version",
+          "Private",
+          "RealMojis",
+          "User ID",
+          "Source file name"
+        ],
+        "bereal_contacts": [
+          "Full name",
+          "Family name",
+          "Middle name",
+          "Given name",
+          "Nick name",
+          [
+            "Profile picture",
+            "media",
+            "height: 80px"
+          ],
+          "Organization name",
+          "Phone numbers",
+          "Source file name",
+          "Location"
+        ],
+        "bereal_persons": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Profile type",
+          "Full name",
+          "User name",
+          "Profile picture URL",
+          "Biography",
+          "Address",
+          "Relationship",
+          [
+            "Friended at",
+            "datetime"
+          ],
+          "Urls",
+          "Streak count",
+          "Unique ID",
+          "Source file name",
+          "Location"
+        ],
+        "bereal_friends": [
+          [
+            "Status updated at",
+            "datetime"
+          ],
+          "Status",
+          "Profile type",
+          "Full name",
+          "Username",
+          "Profile picture URL",
+          "Mutual friends",
+          "Unique ID",
+          "Source file name",
+          "Location"
+        ],
+        "bereal_blocked_users": [
+          [
+            "Blocked",
+            "datetime"
+          ],
+          "Full name",
+          "Username",
+          "Profile picture URL",
+          "Unique ID",
+          "Source file name",
+          "Location"
+        ],
+        "bereal_posts": [
+          [
+            "Taken at",
+            "datetime"
+          ],
+          [
+            "Moment day",
+            "datetime"
+          ],
+          "Post type",
+          "Author",
+          "Primary media type",
+          "Primary URL",
+          "Secondary media type",
+          "Secondary URL",
+          "Thumbnail media type",
+          "Thumbnail URL",
+          "Caption",
+          "Latitude",
+          "Longitude",
+          "Retake counter",
+          "Late time",
+          "Tagged friends",
+          "Moment ID",
+          "BeReal ID",
+          "Source file name",
+          "Location"
+        ],
+        "bereal_pinned_memories": [
+          [
+            "Pinned at",
+            "datetime"
+          ],
+          [
+            "Moment day",
+            "datetime"
+          ],
+          "Post type",
+          "Author ID",
+          "Primary media type",
+          "Primary URL",
+          "Secondary media type",
+          "Secondary URL",
+          "Moment ID",
+          "Pin ID",
+          "Source file name",
+          "Location"
+        ],
+        "bereal_realmojis": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "BeReal ID",
+          "Direction",
+          "Owner",
+          "Author",
+          "Emoji",
+          "RealMoji",
+          "Moment ID",
+          "RealMoji ID",
+          "Source file name",
+          "Location"
+        ],
+        "bereal_comments": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "BeReal ID",
+          "Direction",
+          "Owner",
+          "Author",
+          "Text",
+          "Moment ID",
+          "Comment ID",
+          "Source file name",
+          "Location"
+        ],
+        "bereal_messages": [
+          [
+            "Sent",
+            "datetime"
+          ],
+          "Owner",
+          "Direction",
+          "Sender",
+          "Recipient",
+          "Message",
+          "Message type",
+          "Source",
+          "Media URL",
+          "Thread ID",
+          "Location"
+        ],
+        "bereal_chat_list": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Owner",
+          "Type",
+          "Administrators",
+          "Participants",
+          "Last message",
+          "Total messages",
+          "Last updated",
+          "Unread messages count",
+          "ID",
+          [
+            "Location",
+            "datetime"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/backupSettings.py": {
+      "artifacts": {
+        "backupSettings": [
+          "Property",
+          "Property Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/batteryBDC.py": {
+      "artifacts": {
+        "battery_bdc": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "UI Displayed Capacity (%)",
+          "Raw Battery Capacity (%)",
+          "Is Charging",
+          "Temperature (F)",
+          "Temperature (C)",
+          "Amperage (mA)",
+          "Voltage (mV)",
+          "Watts",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAirpMode.py": {
+      "artifacts": {
+        "get_biomeAirpMode": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp2",
+            "datetime"
+          ],
+          "SEGB State",
+          "Event",
+          "GUID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAppActivity.py": {
+      "artifacts": {
+        "get_biomeAppActivity": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Expiration Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Activity Type",
+          "Payload",
+          "Item URI",
+          "Activity UUID",
+          "Session UUID",
+          "Source",
+          "Status (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAppInstallation.py": {
+      "artifacts": {
+        "get_biomeAppInstallation": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Event Timestamp",
+            "datetime"
+          ],
+          [
+            "App Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "App UUID",
+          "Version",
+          "Build Version",
+          "Event Type (raw)",
+          "Digest 1",
+          "Digest 2",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAppIntentsTranscript.py": {
+      "artifacts": {
+        "get_biomeAppIntentsTranscript": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Intent Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Intent Class",
+          "Parameters",
+          "Entity Types",
+          "Entity Titles",
+          "Phrase Template",
+          "App URL",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAppLocationActivity.py": {
+      "artifacts": {
+        "get_biomeAppLocationActivity": [
+          [
+            "SEGB Write Timestamp",
+            "datetime"
+          ],
+          [
+            "Expiration Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Activity Type",
+          "Title",
+          "Street Address",
+          "City",
+          "Postal Code",
+          "URL",
+          "Place URL",
+          "Payload",
+          "Donation Type",
+          "Activity UUID",
+          "Source",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAppRelevantShortcuts.py": {
+      "artifacts": {
+        "get_biomeAppRelevantShortcuts": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Relevance Start",
+            "datetime"
+          ],
+          [
+            "Relevance End",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Widget Kind",
+          "Shortcut Role (raw)",
+          "Shortcut Title",
+          "Intent",
+          "Watch Template",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAppWebUsage.py": {
+      "artifacts": {
+        "get_biomeAppWebUsage": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "URL",
+          "Domain",
+          "Bundle ID",
+          "GUID",
+          "pb_int_3",
+          "pb_int_8",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAppinstall.py": {
+      "artifacts": {
+        "get_biomeAppinstall": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Time End",
+            "datetime"
+          ],
+          [
+            "Time Write",
+            "datetime"
+          ],
+          "SEGB State",
+          "Activity",
+          "Bundle ID",
+          "Bundle Info",
+          "App Info",
+          "App Info2",
+          "Action GUID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAppleIntelligence.py": {
+      "artifacts": {
+        "get_biomeAppleIntelligenceAvailability": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Language",
+          "State 1 (raw)",
+          "State 2 (raw)",
+          "State 3 (raw)",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeAIAssetAvailability": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Event Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Feature or Client",
+          "Attribute",
+          "Attribute Value",
+          "Requesting Client",
+          "Asset ID",
+          "Asset Category",
+          "OS Build",
+          "User ID",
+          "Status (raw)",
+          "Result (raw)",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeAIModelCatalog": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Event Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Feature or Client",
+          "Attribute",
+          "Attribute Value",
+          "Requesting Client",
+          "Asset ID",
+          "Asset Category",
+          "OS Build",
+          "User ID",
+          "Status (raw)",
+          "Result (raw)",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeAISoftwareUpdate": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Event Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Feature or Client",
+          "Attribute",
+          "Attribute Value",
+          "Requesting Client",
+          "Asset ID",
+          "Asset Category",
+          "OS Build",
+          "User ID",
+          "Status (raw)",
+          "Result (raw)",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeAIUnifiedAsset": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Event Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Feature or Client",
+          "Attribute",
+          "Attribute Value",
+          "Requesting Client",
+          "Asset ID",
+          "Asset Category",
+          "OS Build",
+          "User ID",
+          "Status (raw)",
+          "Result (raw)",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeAISafetyOverrides": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Event Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Feature or Client",
+          "Attribute",
+          "Attribute Value",
+          "Requesting Client",
+          "Asset ID",
+          "Asset Category",
+          "OS Build",
+          "User ID",
+          "Status (raw)",
+          "Result (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

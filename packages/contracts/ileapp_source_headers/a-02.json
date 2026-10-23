@@ -1,0 +1,373 @@
+{
+  "modules": {
+    "scripts/artifacts/appItunesmeta.py": {
+      "artifacts": {
+        "get_appItunesmeta": [
+          [
+            "Installed Date",
+            "datetime"
+          ],
+          [
+            "App Purchase Date",
+            "datetime"
+          ],
+          "Bundle ID",
+          "Item Name",
+          "Artist Name",
+          "Version Number",
+          "Downloaded by",
+          "Genre",
+          "Factory Install",
+          "App Release Date",
+          "Source App",
+          "Sideloaded?",
+          "Variant ID",
+          "Source File Location"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appSnapshots.py": {
+      "artifacts": {
+        "applicationSnapshots": [
+          [
+            "File Modified Date",
+            "datetime"
+          ],
+          [
+            "Manifest Creation Date",
+            "datetime"
+          ],
+          [
+            "Manifest Last Used Date",
+            "datetime"
+          ],
+          "Bundle ID",
+          "Snapshot Group",
+          "Snapshot Identifier",
+          "Variant",
+          "Source Path",
+          [
+            "Snapshot",
+            "media"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appStoreSearches.py": {
+      "artifacts": {
+        "appStoreSearches": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Search Term",
+          "Request Kind",
+          "Storefront",
+          "Platform",
+          "Language",
+          "Request URL",
+          "Entry ID"
+        ],
+        "appStoreCachedRequests": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Host",
+          "Path",
+          "Request URL",
+          "Entry ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleAccountDeviceList.py": {
+      "artifacts": {
+        "appleAccountDeviceList": [
+          [
+            "Last Updated",
+            "datetime"
+          ],
+          [
+            "Last Cache Updated",
+            "datetime"
+          ],
+          "Device Name",
+          "Model",
+          "OS",
+          "OS Version",
+          "Build Number",
+          "Serial Number",
+          "IMEI",
+          "Trusted",
+          "Circle Status",
+          "Services",
+          "Machine ID (mid)",
+          "altDSID",
+          "dc",
+          "clcg",
+          "clbg",
+          "clhs",
+          "dec",
+          "Additional Info"
+        ],
+        "appleAccountDeletedDeviceList": [
+          [
+            "Deleted",
+            "datetime"
+          ],
+          [
+            "Last Updated",
+            "datetime"
+          ],
+          "Reason Code",
+          "Machine ID (mid)",
+          "altDSID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleAlarms.py": {
+      "artifacts": {
+        "alarms": [
+          [
+            "Fire Date",
+            "datetime"
+          ],
+          [
+            "Alarm Time",
+            "datetime"
+          ],
+          "Alarm Title",
+          "Alarm Enabled",
+          [
+            "Dismiss Date",
+            "datetime"
+          ],
+          [
+            "Last Modified",
+            "datetime"
+          ],
+          "Repeat Schedule",
+          "Alarm Sound",
+          "Is Sleep Alarm",
+          "Bedtime Do Not Disturb",
+          "Bedtime Fire Date"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleIntelligenceReport.py": {
+      "artifacts": {
+        "appleIntelligenceReport": [
+          [
+            "Timestamp (UTC)",
+            "datetime"
+          ],
+          "Event ID",
+          "User Trigger",
+          "Use Case (Raw)",
+          "Source App",
+          "Request",
+          "Response",
+          "Model",
+          "Type"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleLocationd.py": {
+      "artifacts": {
+        "appleLocationd": [
+          "Property",
+          "Property Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleMapsApplication.py": {
+      "artifacts": {
+        "appleMapsApplication": [
+          "Latitude",
+          "Longitude"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleMapsGroup.py": {
+      "artifacts": {
+        "appleMapsGroup": [
+          "Latitude",
+          "Longitude"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleMapsSearchHistory.py": {
+      "artifacts": {
+        "get_appleMapsSearchHistory": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "App",
+          "Location",
+          "Short Address",
+          "Place Name",
+          "Latitude",
+          "Longitude",
+          "Search Not in Protobuf",
+          "Search Term 1",
+          "Search Term 2",
+          "Lat1",
+          "Lon1",
+          "Lat2",
+          "Lon2",
+          "Lat3",
+          "Lon3",
+          "Record GUID",
+          "Current Location",
+          "Items",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleMapsTrips.py": {
+      "artifacts": {
+        "appleMapsTrips": [
+          [
+            "Start DateTime",
+            "datetime"
+          ],
+          [
+            "End DateTime",
+            "datetime"
+          ],
+          "Origin Latitude",
+          "Origin Longitude",
+          "Destination Latitude",
+          "Destination Longitude",
+          "ZZPREDOMINANTMOTIONACTIVITYTYPE",
+          "Google Maps Link",
+          "Source File"
+        ],
+        "appleMapsSignificantLocationsVisits": [
+          "Significant Location Name",
+          "Category",
+          "Address",
+          "City",
+          "State",
+          "State-Abbrev",
+          "Country",
+          "Zip Code",
+          "ZSUBLOCALITY",
+          "ZAREASOFINTEREST",
+          "Latitude",
+          "Longitude",
+          "Google Maps Link",
+          [
+            "Created DateTime",
+            "datetime"
+          ],
+          "Source File"
+        ],
+        "appleMapsSignificantLocations": [
+          [
+            "Vicinity Entry Datetime",
+            "datetime"
+          ],
+          [
+            "Vicinity Exit Datetime",
+            "datetime"
+          ],
+          [
+            "Created Datetime",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Uncertainty",
+          "Google Maps Link",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/applePodcasts.py": {
+      "artifacts": {
+        "get_applePodcastsShows": [
+          [
+            "Date Added",
+            "datetime"
+          ],
+          [
+            "Date Last Played",
+            "datetime"
+          ],
+          [
+            "Date Last Updated",
+            "datetime"
+          ],
+          [
+            "Date Downloaded",
+            "datetime"
+          ],
+          "Author",
+          "Title",
+          "Feed URL",
+          "Description",
+          "Web Page URL",
+          "Source File"
+        ],
+        "get_applePodcastsEpisodes": [
+          [
+            "Import Date",
+            "datetime"
+          ],
+          [
+            "Metadata Timestamp",
+            "datetime"
+          ],
+          [
+            "Date Last Played",
+            "datetime"
+          ],
+          [
+            "Play State Last Modified",
+            "datetime"
+          ],
+          [
+            "Download Date",
+            "datetime"
+          ],
+          "Play Count",
+          "Author",
+          "Title",
+          "Subtitle",
+          "Asset URL",
+          "Web Page URL",
+          "Duration",
+          "Size",
+          "Play State",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

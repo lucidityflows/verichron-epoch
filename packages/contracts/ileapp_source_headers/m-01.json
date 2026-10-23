@@ -1,0 +1,515 @@
+{
+  "modules": {
+    "scripts/artifacts/mailprotect.py": {
+      "artifacts": {
+        "mailprotect": [
+          [
+            "Date Sent",
+            "datetime"
+          ],
+          [
+            "Date Received",
+            "datetime"
+          ],
+          "Address",
+          "Comment",
+          "To Recipients",
+          "Subject",
+          "Summary",
+          "Read?",
+          "Flagged?",
+          "Deleted",
+          "Mailbox",
+          "Attachment Names",
+          "Attachment Sizes (Bytes)",
+          "Global Message ID"
+        ],
+        "mailHeaders": [
+          [
+            "Date (from message Date header, UTC)",
+            "datetime"
+          ],
+          "From Address",
+          "To Address",
+          "CC",
+          "BCC",
+          "Reply To",
+          "Subject",
+          "Date",
+          "Message ID",
+          "Return Path",
+          "List Unsubscribe",
+          "Attachment Filenames",
+          "Global Message ID",
+          "Raw Headers",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/mapsSync.py": {
+      "artifacts": {
+        "mapsSync": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Modified Time",
+            "datetime"
+          ],
+          "Item Number",
+          "Type",
+          "Location Search",
+          "Location Display",
+          "Latitude",
+          "Longitude",
+          "Latitude1",
+          "Longitude1",
+          "Journey Destination Address",
+          "Map Item Storage BLOB Address"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/mastodon.py": {
+      "artifacts": {
+        "mastodonDirectMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Edited",
+            "datetime"
+          ],
+          "From Me",
+          "Author",
+          "Conversation",
+          "Message",
+          "Conversation Key",
+          "Author Handle",
+          "Mentions",
+          "Attachment URLs",
+          "Attachment Descriptions",
+          "Content Warning",
+          "Language",
+          "In Reply To Status ID",
+          "Status ID",
+          "URL"
+        ],
+        "mastodonStatuses": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Edited",
+            "datetime"
+          ],
+          [
+            "Deleted",
+            "datetime"
+          ],
+          "Author",
+          "Author Handle",
+          "Author ID",
+          "Visibility",
+          "Content",
+          "Content Warning",
+          "Mentions",
+          "Attachment URLs",
+          "Attachment Descriptions",
+          "Sensitive",
+          "Language",
+          "Favourites",
+          "Boosts",
+          "Replies",
+          "In Reply To Status ID",
+          "In Reply To Account ID",
+          "Posted With",
+          "Domain",
+          "Status ID",
+          "URL"
+        ],
+        "mastodonUsers": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Updated",
+            "datetime"
+          ],
+          "Display Name",
+          "Handle",
+          "Username",
+          "Domain",
+          "User ID",
+          "Account Holder",
+          "Followed By Account Holder",
+          "Follows Account Holder",
+          "Bio",
+          "Followers Count",
+          "Following Count",
+          "Statuses Count",
+          "Bot",
+          "Locked",
+          "Suspended",
+          "Profile URL",
+          "Avatar URL"
+        ],
+        "mastodonNotifications": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Type",
+          "From User",
+          "From Handle",
+          "Related Status",
+          "Domain",
+          "Notification ID",
+          "Recipient User ID"
+        ],
+        "mastodonAccount": [
+          "Display Name",
+          "Handle",
+          "Username",
+          "User ID",
+          "Instance Domain",
+          "Instance Version",
+          "Bio",
+          "Followers Count",
+          "Following Count",
+          "Statuses Count",
+          "Profile URL",
+          "Avatar URL",
+          "Identified From"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/meWe.py": {
+      "artifacts": {
+        "meWeMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Edited",
+            "datetime"
+          ],
+          "From Me",
+          "Sender",
+          "Conversation",
+          "Message",
+          "Thread ID",
+          "Chat Type",
+          "Sender ID",
+          "Latitude",
+          "Longitude",
+          "Attachment Type",
+          "Attachment Name",
+          "Attachment URL",
+          "Original Text",
+          "Deleted By Sender",
+          "Disappearing Type",
+          "Event Type",
+          "Call Duration",
+          "Call Has Video",
+          "Message ID",
+          "Reply To Message ID"
+        ],
+        "meWeContacts": [
+          [
+            "Contact Created",
+            "datetime"
+          ],
+          "Name",
+          "Handle",
+          "User ID",
+          "First Name",
+          "Last Name",
+          "Account Holder",
+          "Contact Type",
+          "Invitation Type",
+          "Is Contact",
+          "Following",
+          "Follower",
+          "Muted",
+          "Verified",
+          "Premium",
+          "Public",
+          "Followers Count",
+          "Following Count",
+          "DSNP Handle"
+        ],
+        "meWePosts": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Edited",
+            "datetime"
+          ],
+          "Author",
+          "Author User ID",
+          "Text",
+          "Group Name",
+          "Group ID",
+          "Page ID",
+          "Album Name",
+          "Comments Count",
+          "Photos Count",
+          "Shares Count",
+          "Public",
+          "Everyone",
+          "Featured",
+          "Source",
+          "Post ID",
+          "Parent Post ID"
+        ],
+        "meWeGroups": [
+          "Group Name",
+          "Group ID",
+          "Description",
+          "Category",
+          "Owner ID",
+          "Role",
+          "Public Role",
+          "Members Count",
+          "Cached Post Count",
+          "Unseen Posts",
+          "Public",
+          "Confirmed",
+          "Muted",
+          "Owner Or Admin",
+          "Chat Mode",
+          "Email",
+          "Public URL ID"
+        ],
+        "meWePolls": [
+          [
+            "Post Created",
+            "datetime"
+          ],
+          [
+            "End Date",
+            "datetime"
+          ],
+          "Question",
+          "Options",
+          "Option Votes",
+          "Selected Option (client state)",
+          "Option Count",
+          "Closed",
+          "Posted By User ID",
+          "Post ID"
+        ],
+        "meWeAccount": [
+          "Name",
+          "Handle",
+          "User ID",
+          "First Name",
+          "Last Name",
+          "Primary Email",
+          [
+            "Primary Phone",
+            "phonenumber"
+          ],
+          "Contact Invite ID",
+          "Registered",
+          "DSNP Registered",
+          "DSNP Handle",
+          "Fingerprint",
+          [
+            "Jail Date",
+            "datetime"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/mediaLibrary.py": {
+      "artifacts": {
+        "mediaLibrary": [
+          "Title",
+          "Media Type",
+          "File Format",
+          "File",
+          "Total Time (ms)",
+          "File Size",
+          "Year",
+          "Album Name",
+          "Album Artist",
+          "Composer",
+          "Genre",
+          "Track Number",
+          "Artwork",
+          "Content Rating",
+          "Movie Information",
+          "Description",
+          "Account ID",
+          [
+            "Date Purchased",
+            "datetime"
+          ],
+          "Item ID",
+          "Purchase History ID",
+          "Copyright"
+        ],
+        "mediaLibraryInfo": [
+          "Key",
+          "Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/medicalID.py": {
+      "artifacts": {
+        "medicalID": [
+          "Key",
+          "Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/mega.py": {
+      "artifacts": {
+        "mega_chat_messages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Sender",
+          "Message",
+          [
+            "Location Map",
+            "media"
+          ],
+          "Latitude",
+          "Longitude",
+          "Maps URL",
+          "Chat ID",
+          "Message Type Value",
+          "Was Encrypted"
+        ],
+        "mega_chats": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Chat ID",
+          "Peer",
+          "Title",
+          "Shard",
+          "Mode"
+        ],
+        "mega_contacts": [
+          [
+            "Since",
+            "datetime"
+          ],
+          "User ID",
+          "Email",
+          "Visibility Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/messageRetention.py": {
+      "artifacts": {
+        "messageRetention": [
+          "Setting",
+          "Data Value",
+          "Path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/metamask.py": {
+      "artifacts": {
+        "metamaskWallets": [
+          [
+            "Import Timestamp",
+            "datetime"
+          ],
+          "Wallet Name",
+          "Wallet Address",
+          "Balance (In Network Currency)"
+        ],
+        "metamaskContacts": [
+          "Contact Name",
+          "Wallet Address"
+        ],
+        "metamaskTransactions": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "From Address",
+          "To Address",
+          "Value",
+          "Transaction Hash"
+        ],
+        "metamaskBrowser": [
+          "Name",
+          "URL"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/mobileActivationLogs.py": {
+      "artifacts": {
+        "mobileActivationLogs": [
+          [
+            "Datetime",
+            "datetime"
+          ],
+          "Event",
+          "Log Name"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/mobileBackupplist.py": {
+      "artifacts": {
+        "mobilebackupplist": [
+          "Key",
+          "Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/mobileContainerManager.py": {
+      "artifacts": {
+        "mobileContainerManager": [
+          [
+            "Datetime",
+            "datetime"
+          ],
+          "Removed",
+          "Line",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

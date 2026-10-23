@@ -1,0 +1,47 @@
+{
+  "modules": {
+    "scripts/artifacts/interactionCcontacts.py": {
+      "artifacts": {
+        "interactionCContacts": [
+          [
+            "Start Date",
+            "datetime"
+          ],
+          [
+            "End Date",
+            "datetime"
+          ],
+          "Bundle ID",
+          "Display Name",
+          "Identifier",
+          "Direction",
+          "Is Response",
+          "Recipient Count",
+          [
+            "Zinteractions Creation Date",
+            "datetime"
+          ],
+          [
+            "Zcontacts Creation Date",
+            "datetime"
+          ],
+          "Content URL"
+        ],
+        "interactionCAttachments": [
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          "Bundle ID",
+          "Target Bundle ID",
+          "ZUUID",
+          "Content Text",
+          "Uniform Type ID",
+          "Content URL"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

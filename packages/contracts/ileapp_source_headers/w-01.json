@@ -1,0 +1,910 @@
+{
+  "modules": {
+    "scripts/artifacts/WithingsHealthMate.py": {
+      "artifacts": {
+        "get_healthmate_accounts": [
+          [
+            "Creation Timestamp",
+            "datetime"
+          ],
+          [
+            "Last Modified Timestamp",
+            "datetime"
+          ],
+          "User ID",
+          "Last Name",
+          "First Name",
+          "Short Name",
+          [
+            "Birthdate",
+            "datetime"
+          ],
+          "E-mail"
+        ],
+        "get_healthmate_sleep_tracking": [
+          [
+            "Start Date",
+            "datetime"
+          ],
+          [
+            "End Date",
+            "datetime"
+          ],
+          [
+            "Reference Date",
+            "datetime"
+          ],
+          [
+            "Modified Date",
+            "datetime"
+          ],
+          [
+            "Manual Start Date",
+            "datetime"
+          ],
+          [
+            "Manual End Date",
+            "datetime"
+          ],
+          "Device ID",
+          "Duration Light Sleep",
+          "Duration REM Sleep",
+          "Duration Deep Sleep",
+          "Duration To Sleep",
+          "Time To Get Up",
+          "Wake up count",
+          "Duration Awake",
+          "Timezone"
+        ],
+        "get_healthmate_daily_summary": [
+          [
+            "Start Date",
+            "datetime"
+          ],
+          [
+            "End Date",
+            "datetime"
+          ],
+          [
+            "Reference Date",
+            "datetime"
+          ],
+          [
+            "Modified Date",
+            "datetime"
+          ],
+          "Duration Inactive",
+          "Duration Intense",
+          "Duration Moderate",
+          "Duration Soft",
+          "Steps",
+          "Distance",
+          "Timezone"
+        ],
+        "get_healthmate_tracked_activities": [
+          [
+            "Start Date",
+            "datetime"
+          ],
+          [
+            "End Date",
+            "datetime"
+          ],
+          [
+            "Reference Date",
+            "datetime"
+          ],
+          [
+            "Modified Date",
+            "datetime"
+          ],
+          [
+            "Manual Start Date",
+            "datetime"
+          ],
+          [
+            "Manual End Date",
+            " datetime"
+          ],
+          "Device ID",
+          "Track ID",
+          "Type",
+          "Is Removed",
+          "Pause Duration",
+          "Duration Intense",
+          "Duration Moderate",
+          "Duration Light",
+          "Heart Rate MIN",
+          "Heart Rate AVG",
+          "Heart Rate MAX",
+          "Steps",
+          "Distance (no GPS)",
+          "Speed MIN",
+          "Speed AVG",
+          "Speed MAX",
+          "Distance (GPS)",
+          "Start Latitude",
+          "Start Longitude",
+          "Region Center Latitude",
+          "Region Center Longitude",
+          "End Latitude",
+          "End Longitude",
+          "Temperature MIN",
+          "Temperature AVG",
+          "Temperature MAX",
+          "Timezone"
+        ],
+        "get_healthmate_messages": [
+          [
+            "Timestamp [Local Time]",
+            "datetime"
+          ],
+          [
+            "Timestamp Modified",
+            "datetime"
+          ],
+          [
+            "Timestamp Expiration",
+            "datetime"
+          ],
+          "Account ID",
+          "Sender ID",
+          "Receiver ID",
+          "Sender Last Name",
+          "Sender First Name",
+          "Type",
+          "Message"
+        ],
+        "get_healthmate_measurements": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Category ID",
+          "Category",
+          "Device ID",
+          "Duration",
+          "Steps",
+          "Distance",
+          "Calories",
+          "Heart Rate",
+          "Latitude",
+          "Longitude",
+          "Altitude",
+          "Direction",
+          "Radius",
+          "Speed",
+          "SPO2",
+          "Ascent",
+          "Temperature"
+        ],
+        "get_healthmate_devices": [
+          [
+            "Association Timestamp",
+            "datetime"
+          ],
+          [
+            "Last Used Timestamp",
+            "datetime"
+          ],
+          [
+            "Last Weighin Timestamp",
+            "datetime"
+          ],
+          "ID",
+          "User ID",
+          "MAC",
+          "Firmware",
+          "Latitude",
+          "Longitude",
+          "Device Timezone",
+          "Sync Disabled"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/walStrings.py": {
+      "artifacts": {
+        "walStrings": [
+          "Output File",
+          "Filename",
+          "Total Matches",
+          "Unique Strings",
+          "Source File"
+        ],
+        "walStringsDetails": [
+          "String",
+          "Length",
+          "First Byte Offset",
+          "Occurrence Count",
+          "Filename",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/waze.py": {
+      "artifacts": {
+        "waze_account": [
+          [
+            "First Use",
+            "datetime"
+          ],
+          "First Name",
+          "Last Name",
+          "User Name",
+          "Profile Picture URL",
+          "Email",
+          "Waze User ID",
+          "Invisible Mode",
+          [
+            "Dynamic Splash Screen Last Shown",
+            "datetime"
+          ],
+          "Provider First Name",
+          "Provider Last Name",
+          "Provider Name",
+          "Provider User ID",
+          "Source File Name"
+        ],
+        "waze_session_info": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Friendly Name",
+          "Field",
+          "Value",
+          "Latitude",
+          "Longitude",
+          "Location"
+        ],
+        "waze_track_gps_quality": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Timestamp (ms)",
+          "Latitude",
+          "Longitude",
+          "Sample Count",
+          "Bad Sample Count",
+          "Duplicate Sample Count",
+          "Accuracy Min (m)",
+          "Accuracy Avg (m)",
+          "Accuracy Max (m)",
+          "Position Provider",
+          "Source File Name",
+          "Location"
+        ],
+        "waze_search_history": [
+          [
+            "Updated",
+            "datetime"
+          ],
+          "Name",
+          "House Number",
+          "Street",
+          "City",
+          "State",
+          "Country",
+          "Latitude",
+          "Longitude",
+          "Residential Status",
+          [
+            "Created",
+            "datetime"
+          ],
+          "Venue ID",
+          "Location"
+        ],
+        "waze_recent_locations": [
+          [
+            "Last Access",
+            "datetime"
+          ],
+          "Type",
+          "Name",
+          "House Number",
+          "Street",
+          "City",
+          "State",
+          "Country",
+          "Latitude",
+          "Longitude",
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Last Waypoint Access",
+            "datetime"
+          ],
+          "Image ID",
+          "Venue ID",
+          "Location"
+        ],
+        "waze_favorite_locations": [
+          [
+            "Last Access",
+            "datetime"
+          ],
+          "Type",
+          "Name",
+          "Place Name",
+          "House Number",
+          "Street",
+          "City",
+          "State",
+          "Country",
+          "Latitude",
+          "Longitude",
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Possible Timestamp (field 10)",
+            "datetime"
+          ],
+          [
+            "Last Waypoint Access",
+            "datetime"
+          ],
+          "Rank",
+          "Server ID",
+          "Venue ID",
+          "Source File Name",
+          "Location"
+        ],
+        "waze_shared_locations": [
+          [
+            "Shared",
+            "datetime"
+          ],
+          "Name",
+          "House Number",
+          "Street",
+          "City",
+          "State",
+          "Country",
+          "Latitude",
+          "Longitude",
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          [
+            "Last Access",
+            "datetime"
+          ],
+          "Waze User ID",
+          "Venue ID",
+          "Location"
+        ],
+        "waze_planned_events": [
+          [
+            "Created Time",
+            "datetime"
+          ],
+          "Type",
+          "Event Name",
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          "All Day",
+          "Image URL",
+          "Place Name",
+          "House Number",
+          "Street",
+          "City",
+          "State",
+          "Country",
+          "Latitude",
+          "Longitude",
+          "Origin Place Name",
+          "Venue ID",
+          "Event ID",
+          "Location"
+        ],
+        "waze_tts": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Text Type",
+          "Text",
+          "Location"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/weatherAppLocations.py": {
+      "artifacts": {
+        "weather_app_locations": [
+          [
+            "Update Time",
+            "datetime"
+          ],
+          "Name",
+          "Country",
+          "TimeZone",
+          [
+            "City Timezone Update Key",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Type",
+          [
+            "Last Location Update",
+            "datetime"
+          ],
+          "City",
+          "Seconds from GMT"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/webClips.py": {
+      "artifacts": {
+        "web_clips": [
+          [
+            "Icon",
+            "media"
+          ],
+          "Title",
+          "URL",
+          "Unique Identifier",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/webkit.py": {
+      "artifacts": {
+        "webkit_cache_records": [
+          "Application GUID",
+          "Records GUID",
+          "File",
+          "Salt",
+          "URI",
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Content Type",
+          "Body Size",
+          "Is Body Inline",
+          "HTTP Headers",
+          "Response Code",
+          "Full File Path",
+          [
+            "Thumbnail",
+            "media"
+          ],
+          "Header",
+          "Partition",
+          "Partition Flag",
+          "Type",
+          "Type Flag",
+          "URI Flag",
+          "Marker",
+          "Filename",
+          "Foldername",
+          "Meta SHA1",
+          "Meta Size",
+          "Body SHA1",
+          "Unknown Hash",
+          "Start of Meta",
+          "Meta URI",
+          "Meta URI Flag",
+          "Marker Content Type",
+          "Content Type Flag",
+          "Body Size 2",
+          "Marker2",
+          "Encoding Type",
+          "Encoding Type Flag",
+          "Encoding Pad",
+          "Encoding Pad Flag",
+          "HTTP Type",
+          "HTTP Type Flag",
+          "HTTP Header Count",
+          "Has Cookie",
+          "U1",
+          "U2",
+          "U3",
+          "U4",
+          "U5",
+          "U6",
+          "U7",
+          "U8",
+          "Other Trailing Data",
+          "Trailing Size",
+          "Trailing Hash"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/what3words.py": {
+      "artifacts": {
+        "what3words_saved_places": [
+          [
+            "Saved Time",
+            "datetime"
+          ],
+          "Three Word Address",
+          "Label",
+          "Nearest Place",
+          "Latitude",
+          "Longitude",
+          "Country Code",
+          "Language",
+          "Shared"
+        ],
+        "what3words_search_history": [
+          [
+            "Search Time",
+            "datetime"
+          ],
+          "Three Word Address",
+          "Nearest Place",
+          "Latitude",
+          "Longitude",
+          "Country Code",
+          "Language"
+        ],
+        "what3words_account": [
+          [
+            "Account Created",
+            "datetime"
+          ],
+          [
+            "Account Updated",
+            "datetime"
+          ],
+          "Email",
+          "First Name",
+          "Last Name",
+          "Country",
+          "Sign-in Provider",
+          "Verified",
+          "Suspended",
+          "Search History Opt-out",
+          "User ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/whatsApp.py": {
+      "artifacts": {
+        "whatsAppCallHistory": [
+          [
+            "Starting Timestamp",
+            "datetime"
+          ],
+          [
+            "Ending Timestamp",
+            "datetime"
+          ],
+          "Duration H:M:S",
+          "Direction",
+          "Disconnected cause",
+          "Contact ID",
+          "Contact Fullname",
+          [
+            "Phone Number",
+            "phonenumber"
+          ]
+        ],
+        "whatsAppContacts": [
+          "Fullname",
+          "About Text",
+          [
+            "About Text Timestamp",
+            "datetime"
+          ],
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Phone Number Label",
+          "Whatsapp ID",
+          "Identifier"
+        ],
+        "whatsAppMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Sender Name",
+          "Chat Name",
+          "Message",
+          [
+            "Attachment File",
+            "media"
+          ],
+          "From ID",
+          "Receiver",
+          "To ID",
+          [
+            "Thumb",
+            "media"
+          ],
+          "Starred?",
+          "Metadata Field 17 (forward count, observed)",
+          "Metadata Field 21 (forwarder, observed)",
+          "Latitude",
+          "Longitude",
+          "Chat ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/whatsAppExtended.py": {
+      "artifacts": {
+        "whatsAppReactions": [
+          [
+            "Reaction Timestamp",
+            "datetime"
+          ],
+          "Reaction",
+          "Reactor JID",
+          "Record Shape",
+          "Chat JID",
+          "Chat Name",
+          "Message Direction",
+          [
+            "Message Timestamp",
+            "datetime"
+          ],
+          "Message",
+          "Message Key ID"
+        ],
+        "whatsAppChannelReactionTallies": [
+          [
+            "Message Timestamp",
+            "datetime"
+          ],
+          "Reaction",
+          "Count (as stored)",
+          "Chat JID",
+          "Chat Name",
+          "Message"
+        ],
+        "whatsAppGroupEvents": [
+          [
+            "Event Timestamp",
+            "datetime"
+          ],
+          "Group Event Type (as stored)",
+          "Message Type (as stored)",
+          "Text",
+          "From JID",
+          "Chat JID",
+          "Chat Name"
+        ],
+        "whatsAppGroupMembershipChanges": [
+          [
+            "Change Timestamp",
+            "datetime"
+          ],
+          "Change Type (as stored)",
+          "Group JID",
+          "Member JIDs"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/wickr.py": {
+      "artifacts": {
+        "wickr_messages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Read Timestamp",
+            "datetime"
+          ],
+          [
+            "Delivery Timestamp",
+            "datetime"
+          ],
+          "Conversation Group ID",
+          "Sender User ID Hash",
+          "Message Type",
+          "Primary Type (as stored)",
+          "Is Read",
+          "Is Starred",
+          "Is Locked",
+          "Is Synced",
+          "Read Receipt Status (as stored)",
+          [
+            "Cleanup Time",
+            "datetime"
+          ],
+          "Attached File GUIDs",
+          "Message ID"
+        ],
+        "wickr_conversations": [
+          [
+            "Last Timestamp",
+            "datetime"
+          ],
+          [
+            "Last Sync Timestamp",
+            "datetime"
+          ],
+          [
+            "Message Sync Timestamp",
+            "datetime"
+          ],
+          "Kind",
+          "Group ID",
+          "Member User ID Hashes",
+          "Administrator User ID Hashes",
+          "Is External",
+          "Is Pinned",
+          "Chat Blocked",
+          "Unread Messages",
+          "Pending Messages",
+          "Notifications Enabled",
+          "Show Notification Content",
+          "Call Status (as stored)"
+        ],
+        "wickr_users": [
+          [
+            "Last Activity Time",
+            "datetime"
+          ],
+          "User ID Hash",
+          "User Alias Hash",
+          "Source",
+          "Domain",
+          "Is Active",
+          "In Network",
+          "Is Blocked",
+          "Is Guest",
+          "Is Bot",
+          "Is Hidden",
+          "Is Starred",
+          "Is Suspended",
+          "Has No Devices",
+          "Capabilities (as stored)",
+          "Record ID"
+        ],
+        "wickr_files": [
+          [
+            "Message Timestamp",
+            "datetime"
+          ],
+          "File GUID",
+          "Status (as stored)",
+          "Conversation Group ID",
+          "Message ID"
+        ],
+        "wickr_account": [
+          [
+            "Network Timestamp",
+            "datetime"
+          ],
+          "Security Group ID",
+          "ZAFENABLE (as stored)",
+          "ZAFSPEED (as stored)",
+          "Touch ID",
+          "Notifications Enabled",
+          "Show Notification Content",
+          "Anonymous Notification",
+          "Friend Finder Enabled",
+          "Auto Unlock Messages",
+          "Was Recovered",
+          "Is New User",
+          "Needs Backup",
+          "Wants Cloud Backup",
+          "Censorship Enabled",
+          "Last Message Sequence",
+          "ZHIGHE (as stored)",
+          "Last App ID (as stored)",
+          "ID CP Count (as stored)"
+        ],
+        "wickr_devices": [
+          "App ID Hash",
+          "User ID Hash",
+          "User Alias Hash",
+          "Source",
+          "Kind",
+          "Record ID"
+        ],
+        "wickr_recent_searches": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Search Query"
+        ],
+        "wickr_keychain_account": [
+          "Item",
+          "Keychain Account",
+          "Value",
+          "Length"
+        ],
+        "wickr_app_log": [
+          "Log Timestamp",
+          "Event",
+          "Message ID",
+          "Conversation Group ID",
+          "Sender User ID Hash",
+          "Message Type (as stored)"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/widgets.py": {
+      "artifacts": {
+        "widgets": [
+          [
+            "Date Modified",
+            "datetime"
+          ],
+          "App Name",
+          "Source Path",
+          [
+            "Snapshot",
+            "media"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/wifiAnalytics.py": {
+      "artifacts": {
+        "wifiAnalyticsGeotags": [
+          [
+            "Date",
+            "datetime"
+          ],
+          [
+            "Last Seen",
+            "datetime"
+          ],
+          "Geotag ID",
+          "Entity ID",
+          [
+            "Latitude",
+            "latitude"
+          ],
+          [
+            "Longitude",
+            "longitude"
+          ],
+          "BSSID",
+          "SSID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

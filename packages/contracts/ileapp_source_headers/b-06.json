@@ -1,0 +1,520 @@
+{
+  "modules": {
+    "scripts/artifacts/biomeSystemSettingsSearchTerms.py": {
+      "artifacts": {
+        "get_biomeSystemSettingsSearchTerms": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Search Term",
+          "Result URI(s)",
+          "Result Label(s)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeTextinputses.py": {
+      "artifacts": {
+        "get_biomeTextinputses": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Time Start",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Duration",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeUseractmeta.py": {
+      "artifacts": {
+        "get_biomeUseractmeta": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Activity type",
+          "Description",
+          "Bundle ID",
+          "Title",
+          "Bplist Data",
+          "Payload Data",
+          "Container Data",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeWalletTransaction.py": {
+      "artifacts": {
+        "get_biomeWalletTransaction": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Card Name",
+          "Pass ID",
+          "Transaction UUID",
+          "Field 3 (raw)",
+          "Field 5 (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeWifi.py": {
+      "artifacts": {
+        "get_biomeWifi": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Event",
+          "Device",
+          "GUID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/blockedContacts.py": {
+      "artifacts": {
+        "blockedContacts": [
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Country Code",
+          "Email"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/bluetoothOther.py": {
+      "artifacts": {
+        "get_bluetoothOtherLE": [
+          "Name",
+          "Address",
+          "UUID",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/bluetoothPairedLE.py": {
+      "artifacts": {
+        "get_bluetoothPairedLE": [
+          "UUID",
+          "Name",
+          "Name Origin",
+          "Address",
+          "Resolved Address",
+          "Last Connection Time",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/bluetoothPairedReg.py": {
+      "artifacts": {
+        "get_bluetoothPairedReg": [
+          [
+            "Last Seen Time",
+            "datetime"
+          ],
+          "MAC Address",
+          "Name Key",
+          "Name",
+          "Device Product ID",
+          "Default Name",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/booking.py": {
+      "artifacts": {
+        "booking_account": [
+          "First Name",
+          "Last Name",
+          "Nickname",
+          "Profile Picture URL",
+          "Gender",
+          [
+            "Birth Date",
+            "date"
+          ],
+          "Street",
+          "City",
+          "Zip Code",
+          "Country",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Emails",
+          "Genius Membership",
+          "Facilities",
+          "Unique ID",
+          "Authentication Token",
+          "Source File Name",
+          "Location"
+        ],
+        "booking_travellers": [
+          "First Name",
+          "Last Name",
+          "Gender",
+          [
+            "Birth Date",
+            "date"
+          ],
+          "Unique ID",
+          "Location"
+        ],
+        "booking_payment_methods": [
+          "Unique ID",
+          "Type",
+          "Status",
+          "Valid Thru",
+          "Cardholder Name",
+          "Last Four Digits",
+          "Business",
+          "Source File Name",
+          "Location"
+        ],
+        "booking_stored_destinations": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Location Type",
+          "Unique ID",
+          "Destination Name",
+          "Address/Description",
+          "City",
+          "Region",
+          "Country",
+          "Latitude",
+          "Longitude",
+          "Time Zone",
+          "Image URL",
+          "Location"
+        ],
+        "booking_recently_searched": [
+          [
+            "Searched",
+            "datetime"
+          ],
+          "Location Type",
+          "Unique ID",
+          "Destination Name",
+          "Description",
+          "City",
+          "Region",
+          "Country",
+          "Latitude",
+          "Longitude",
+          "Time Zone",
+          "Check-In",
+          "Check-Out",
+          "Number of Rooms",
+          "Guests",
+          "Number of Nights",
+          "App Source",
+          "Location"
+        ],
+        "booking_recently_booked": [
+          "Hotel Type",
+          "Hotel ID",
+          "Hotel Name",
+          "Address",
+          "City",
+          "Region",
+          "Zip Code",
+          "Latitude",
+          "Longitude",
+          "Check-In (Hotel Time Zone)",
+          "Check-Out (Hotel Time Zone)",
+          "Image URL",
+          "Website",
+          "Location"
+        ],
+        "booking_booked": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Hotel ID",
+          "Hotel Name",
+          "Full Address",
+          "Time Zone",
+          "Check-In/Out (Hotel Time Zone)",
+          "Hotel Contacts",
+          "Confirmation Number/PIN Code",
+          "Total Price",
+          "Number of Rooms",
+          "Rooms",
+          "Booker Details",
+          "Source",
+          [
+            "Attachment",
+            "media"
+          ],
+          "Source File Name",
+          "Location"
+        ],
+        "booking_wish_lists": [
+          [
+            "Added",
+            "datetime"
+          ],
+          "Title",
+          "Hotel ID",
+          "Location"
+        ],
+        "booking_viewed": [
+          [
+            "Last Viewed",
+            "datetime"
+          ],
+          "Hotel Type",
+          "Hotel ID",
+          "Hotel Name",
+          "Address",
+          "City",
+          "Region",
+          "Zip Code",
+          "Latitude",
+          "Longitude",
+          "Image URL",
+          "Website",
+          "Location"
+        ],
+        "booking_notifications": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Identifier",
+          "Title",
+          "Message",
+          "Viewed",
+          "Deleted",
+          "Action ID",
+          "Action Arguments",
+          "Location"
+        ],
+        "booking_flights_searched": [
+          [
+            "Last Updated",
+            "datetime"
+          ],
+          "Start Date",
+          "Return Date",
+          "Direct Flight",
+          "Search Type",
+          "Cabin Class",
+          "Source Airports",
+          "Destination Airports",
+          "Routes",
+          "Travellers' Details",
+          "Location"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/box.py": {
+      "artifacts": {
+        "box_account": [
+          [
+            "Created At",
+            "datetime"
+          ],
+          "Login",
+          "Name",
+          "Has Custom Avatar",
+          "Is Enterprise Account",
+          "User ID",
+          "Timezone",
+          "Language",
+          "Total Space",
+          "Used Space",
+          "Max Upload Size"
+        ],
+        "box_all_files": [
+          [
+            "Created At",
+            "datetime"
+          ],
+          "Item ID",
+          "Type",
+          "Name",
+          "Extension",
+          "Path",
+          "URL",
+          "Description",
+          "File/Folder Size",
+          "Version ID",
+          [
+            "Content Created At",
+            "datetime"
+          ],
+          [
+            "Content Modified At",
+            "datetime"
+          ],
+          [
+            "Modified At",
+            "datetime"
+          ],
+          [
+            "Last Fetched At",
+            "datetime"
+          ],
+          "Is Offline",
+          [
+            "Download At",
+            "datetime"
+          ],
+          "Offline Source",
+          "Favorites",
+          "Collection Names",
+          "Owner Login",
+          "Owner Name",
+          "Owner ID",
+          "Creator Login",
+          "Creator Name",
+          "Creator ID",
+          "Modifier Login",
+          "Modifier Name",
+          "Modifier ID",
+          "SHA1"
+        ],
+        "box_previews": [
+          [
+            "Last Accessed At",
+            "datetime"
+          ],
+          [
+            "Preview Thumbnail",
+            "media",
+            "height: 96px; border-radius: 5%;"
+          ],
+          "Item ID",
+          "File Name",
+          "Preview Extension",
+          "Preview Resolution",
+          [
+            "Original",
+            "media",
+            "height: 96px; border-radius: 5%;"
+          ],
+          "Version ID",
+          "Original SHA1",
+          "User ID"
+        ],
+        "box_recents": [
+          [
+            "Interaction Timestamp",
+            "datetime"
+          ],
+          "Interaction Type",
+          "Item ID",
+          "Type",
+          "Name",
+          "Extension",
+          "File/Folder Size"
+        ],
+        "box_comments": [
+          [
+            "Created At",
+            "datetime"
+          ],
+          "ID",
+          "Type",
+          [
+            "Modified At",
+            "datetime"
+          ],
+          "Item ID",
+          "Name",
+          "Message",
+          "Tagged Message",
+          "Is Reply",
+          "Creator Login",
+          "Creator Name",
+          "Creator ID",
+          "Modifier Login",
+          "Modifier Name",
+          "Modifier ID",
+          [
+            "Fetched At",
+            "datetime"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/bumble.py": {
+      "artifacts": {
+        "bumbleMessages": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "Modified Timestamp",
+            "datetime"
+          ],
+          "Sender ID",
+          "Receiver ID",
+          "Message",
+          "Message Direction",
+          "Message Read"
+        ],
+        "bumbleAccount": [
+          "Key",
+          "Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

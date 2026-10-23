@@ -1,0 +1,2991 @@
+{
+  "modules": {
+    "scripts/artifacts/Ph017GenAIDetected.py": {
+      "artifacts": {
+        "Ph017_1GenAIDetectedPhDaPsql": [
+          [
+            "zAsset-Date Created-0",
+            "datetime"
+          ],
+          [
+            "zAsset- SortToken -CameraRoll-1",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-2",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-3",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-4",
+          "zAddAssetAttr-EXIF-String-5",
+          [
+            "zAsset-Modification Date-6",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-7",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-8",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-9",
+          "zAsset-Directory-Path-10",
+          "zAsset-Filename-11",
+          "zAddAssetAttr- Original Filename-12",
+          "zCldMast- Original Filename-13",
+          "zAddAssetAttr- Syndication Identifier-SWY-Files-14",
+          "zAddAssetAttr- Imported by Bundle Identifier-15",
+          "zAddAssetAttr- Imported By Display Name-16",
+          "zAsset-Is_Recently_Saved-17",
+          "zAsset-Saved Asset Type-18",
+          "zAsset-Syndication State-19",
+          "zAsset-Bundle Scope-20",
+          "zAddAssetAttr-Share Type-21",
+          "zAsset-Active Library Scope Participation State-22",
+          "zAsset-Visibility State-23",
+          "zAsset-zPK-24",
+          "zAddAssetAttr-zPK-25",
+          "zAsset-UUID = store.cloudphotodb-26",
+          "zAddAssetAttr-Original Stable Hash-27",
+          "zAddAssetAttr.Adjusted Stable Hash-28",
+          "zExtAttr-Generative_AI_Type-29",
+          "zExtAttr-Credit-30"
+        ],
+        "Ph017_2GenAIDetectedSyndPL": [
+          [
+            "zAsset-Date Created-0",
+            "datetime"
+          ],
+          [
+            "zAsset- SortToken -CameraRoll-1",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-2",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-3",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-4",
+          "zAddAssetAttr-EXIF-String-5",
+          [
+            "zAsset-Modification Date-6",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-7",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-8",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-9",
+          "zAsset-Directory-Path-10",
+          "zAsset-Filename-11",
+          "zAddAssetAttr- Original Filename-12",
+          "zCldMast- Original Filename-13",
+          "zAddAssetAttr- Syndication Identifier-SWY-Files-14",
+          "zAddAssetAttr- Imported by Bundle Identifier-15",
+          "zAddAssetAttr- Imported By Display Name-16",
+          "zAsset-Is_Recently_Saved-17",
+          "zAsset-Saved Asset Type-18",
+          "zAsset-Syndication State-19",
+          "zAsset-Bundle Scope-20",
+          "zAddAssetAttr-Share Type-21",
+          "zAsset-Active Library Scope Participation State-22",
+          "zAsset-Visibility State-23",
+          "zAsset-zPK-24",
+          "zAddAssetAttr-zPK-25",
+          "zAsset-UUID = store.cloudphotodb-26",
+          "zAddAssetAttr-Original Stable Hash-27",
+          "zAddAssetAttr.Adjusted Stable Hash-28",
+          "zExtAttr-Generative_AI_Type-29",
+          "zExtAttr-Credit-30"
+        ],
+        "Ph017_3GenAIDetectedGenPlayPsql": [
+          [
+            "zAsset-Date Created-0",
+            "datetime"
+          ],
+          [
+            "zAsset- SortToken -CameraRoll-1",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-2",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-3",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-4",
+          "zAddAssetAttr-EXIF-String-5",
+          [
+            "zAsset-Modification Date-6",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-7",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-8",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-9",
+          "zAsset-Directory-Path-10",
+          "zAsset-Filename-11",
+          "zAddAssetAttr- Original Filename-12",
+          "zCldMast- Original Filename-13",
+          "zAddAssetAttr- Syndication Identifier-SWY-Files-14",
+          "zAddAssetAttr- Imported by Bundle Identifier-15",
+          "zAddAssetAttr- Imported By Display Name-16",
+          "zAsset-Is_Recently_Saved-17",
+          "zAsset-Saved Asset Type-18",
+          "zAsset-Syndication State-19",
+          "zAsset-Bundle Scope-20",
+          "zAddAssetAttr-Share Type-21",
+          "zAsset-Active Library Scope Participation State-22",
+          "zAsset-Visibility State-23",
+          "zAsset-zPK-24",
+          "zAddAssetAttr-zPK-25",
+          "zAsset-UUID = store.cloudphotodb-26",
+          "zAddAssetAttr-Original Stable Hash-27",
+          "zAddAssetAttr.Adjusted Stable Hash-28",
+          "zExtAttr-Generative_AI_Type-29",
+          "zExtAttr-Credit-30"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph020AlbumsNAD.py": {
+      "artifacts": {
+        "Ph020_1AlbumRecordswithNADPhDaPsql": [
+          [
+            "zGenAlbum-Start Date",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date",
+            "datetime"
+          ],
+          "zGenAlbum-Album Kind",
+          "zGenAlbum-Title",
+          "zGenAlbum-Import Session ID",
+          "zGenAlbum-Cached Photos Count",
+          "zGenAlbum-Cached Videos Count",
+          "zGenAlbum-Cached Count",
+          "zGenAlbum-Trashed State",
+          [
+            "zGenAlbum-Trash Date",
+            "datetime"
+          ],
+          "zGenAlbum-UUID",
+          "zGenAlbum-Cloud GUID",
+          [
+            "zGenAlbum-Creation Date",
+            "datetime"
+          ],
+          "zGenAlbum-Creator Bundle Identifier",
+          "zGenAlbum-Imported by Bundle Identifier",
+          [
+            "zGenAlbum-Creation Date-0",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-1",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-2",
+            "datetime"
+          ],
+          "zGenAlbum-Album Kind-3",
+          "zGenAlbum-Title-4",
+          "zGenAlbum-Import Session ID-5",
+          "zGenAlbum-Imported by Bundle Identifier-6",
+          "zGenAlbum-Cached Photos Count-7",
+          "zGenAlbum-Cached Videos Count-8",
+          "zGenAlbum-Cached Count-9",
+          "zGenAlbum-Trashed State-10",
+          [
+            "zGenAlbum-Trash Date-11",
+            "datetime"
+          ],
+          "zGenAlbum-UUID-12",
+          "zGenAlbum-Cloud GUID-13"
+        ],
+        "Ph020_2AlbumRecordswithNADSyndPL": [
+          [
+            "zGenAlbum-Start Date",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date",
+            "datetime"
+          ],
+          "zGenAlbum-Album Kind",
+          "zGenAlbum-Title",
+          "zGenAlbum-Import Session ID",
+          "zGenAlbum-Cached Photos Count",
+          "zGenAlbum-Cached Videos Count",
+          "zGenAlbum-Cached Count",
+          "zGenAlbum-Trashed State",
+          [
+            "zGenAlbum-Trash Date",
+            "datetime"
+          ],
+          "zGenAlbum-UUID",
+          "zGenAlbum-Cloud GUID",
+          [
+            "zGenAlbum-Creation Date",
+            "datetime"
+          ],
+          "zGenAlbum-Creator Bundle Identifier",
+          "zGenAlbum-Imported by Bundle Identifier",
+          [
+            "zGenAlbum-Creation Date-0",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-1",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-2",
+            "datetime"
+          ],
+          "zGenAlbum-Album Kind-3",
+          "zGenAlbum-Title-4",
+          "zGenAlbum-Import Session ID-5",
+          "zGenAlbum-Imported by Bundle Identifier-6",
+          "zGenAlbum-Cached Photos Count-7",
+          "zGenAlbum-Cached Videos Count-8",
+          "zGenAlbum-Cached Count-9",
+          "zGenAlbum-Trashed State-10",
+          [
+            "zGenAlbum-Trash Date-11",
+            "datetime"
+          ],
+          "zGenAlbum-UUID-12",
+          "zGenAlbum-Cloud GUID-13"
+        ],
+        "Ph020_3AlbumRecordswithNADGenPlayPsql": [
+          [
+            "zGenAlbum-Creation Date-0",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-1",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-2",
+            "datetime"
+          ],
+          "zGenAlbum-Album Kind-3",
+          "zGenAlbum-Title-4",
+          "zGenAlbum-Import Session ID-5",
+          "zGenAlbum-Imported by Bundle Identifier-6",
+          "zGenAlbum-Cached Photos Count-7",
+          "zGenAlbum-Cached Videos Count-8",
+          "zGenAlbum-Cached Count-9",
+          "zGenAlbum-Trashed State-10",
+          [
+            "zGenAlbum-Trash Date-11",
+            "datetime"
+          ],
+          "zGenAlbum-UUID-12",
+          "zGenAlbum-Cloud GUID-13"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph021AlbumsNonSharedNAD.py": {
+      "artifacts": {
+        "Ph021NonSharedAlbumRecordswithNADPhDaPsql": [
+          [
+            "zGenAlbum-Start Date",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date",
+            "datetime"
+          ],
+          "ParentzGenAlbum-UUID",
+          "ParentzGenAlbum-Cloud GUID",
+          "ParentzGenAlbum- Title",
+          "zGenAlbum- Title-User&System Applied",
+          "zGenAlbum-UUID",
+          "zGenAlbum-Cloud GUID",
+          "ParentzGenAlbum-Pending Items Count",
+          "ParentzGenAlbum-Pending Items Type",
+          "ParentzGenAlbum-Kind",
+          "ParentzGenAlbum-Cloud-Local-State",
+          "ParentzGenAlbum-Sync Event Order Key",
+          "ParentzGenAlbum-Pinned",
+          "ParentzGenAlbum-Custom Sort Key",
+          "ParentzGenAlbum-Custom Sort Ascending",
+          "ParentzGenAlbum-Custom Query Type",
+          "ParentzGenAlbum-Trashed State",
+          [
+            "ParentzGenAlbum-Trash Date",
+            "datetime"
+          ],
+          "zGenAlbum-Pending Items Count",
+          "zGenAlbum-Pending Items Type",
+          "zGenAlbum- Cached Photos Count",
+          "zGenAlbum- Cached Videos Count",
+          "zGenAlbum- Cached Count",
+          "zGenAlbum-Has Unseen Content",
+          "zGenAlbum-Unseen Asset Count",
+          "zGenAlbum-zENT- Entity",
+          "zGenAlbum-Album Kind",
+          "zGenAlbum-Cloud_Local_State",
+          "zGenAlbum-Sync Event Order Key",
+          "zGenAlbum-Pinned",
+          "zGenAlbum-Custom Sort Key",
+          "zGenAlbum-Custom Sort Ascending",
+          "zGenAlbum-Custom Query Type",
+          "zGenAlbum-Trashed State",
+          [
+            "zGenAlbum-Trash Date",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Cloud Delete State",
+          "zGenAlbum-Cloud Delete State",
+          [
+            "zGenAlbum-Creation Date",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Project Document Type",
+          "zGenAlbum-Project Document Type",
+          "zGenAlbum-Creator Bundle Id",
+          "ParentzGenAlbum-Creation Date",
+          "ParentzGenAlbum-Is Prototype",
+          "zGenAlbum-Is Prototype",
+          "zGenAlbum-Imported by Bundle Identifier",
+          [
+            "ParentzGenAlbum-Creation Date",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Creation Date-0",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-1",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-2",
+            "datetime"
+          ],
+          "ParentzGenAlbum-UUID-3",
+          "ParentzGenAlbum-Cloud GUID-4",
+          "ParentzGenAlbum- Title-5",
+          "zGenAlbum- Title-User&System Applied-6",
+          "zGenAlbum-UUID-7",
+          "zGenAlbum-Cloud GUID-8",
+          "zGenAlbum-Imported by Bundle Identifier-9",
+          [
+            "ParentzGenAlbum-Creation Date-10",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Pending Items Count-11",
+          "ParentzGenAlbum-Pending Items Type-12",
+          "ParentzGenAlbum-Kind-13",
+          "ParentzGenAlbum-Cloud-Local-State-14",
+          "ParentzGenAlbum-Sync Event Order Key-15",
+          "ParentzGenAlbum-Pinned-16",
+          "ParentzGenAlbum-Custom Sort Key-17",
+          "ParentzGenAlbum-Custom Sort Ascending-18",
+          "ParentzGenAlbum-Is Prototype-19",
+          "ParentzGenAlbum-Project Document Type-20",
+          "ParentzGenAlbum-Custom Query Type-21",
+          "ParentzGenAlbum-Trashed State-22",
+          [
+            "ParentzGenAlbum-Trash Date-23",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Cloud Delete State-24",
+          "zGenAlbum-Pending Items Count-25",
+          "zGenAlbum-Pending Items Type-26",
+          "zGenAlbum- Cached Photos Count-27",
+          "zGenAlbum- Cached Videos Count-28",
+          "zGenAlbum- Cached Count-29",
+          "zGenAlbum-Has Unseen Content-30",
+          "zGenAlbum-Unseen Asset Count-31",
+          "zGenAlbum-zENT- Entity-32",
+          "zGenAlbum-Album Kind-33",
+          "zGenAlbum-Cloud_Local_State-34",
+          "zGenAlbum-Sync Event Order Key-35",
+          "zGenAlbum-Pinned-36",
+          "zGenAlbum-Custom Sort Key-37",
+          "zGenAlbum-Custom Sort Ascending-38",
+          "zGenAlbum-Is Prototype-39",
+          "zGenAlbum-Project Document Type-40",
+          "zGenAlbum-Custom Query Type-41",
+          "zGenAlbum-Trashed State-42",
+          [
+            "zGenAlbum-Trash Date-43",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-44",
+          "zGenAlbum-Search Index Rebuild State-45",
+          "zGenAlbum-Duplicate Type-46",
+          "zGenAlbum-Privacy State-47"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph022AssetsInNonSharedAlbums.py": {
+      "artifacts": {
+        "Ph022AssetsinNonSharedAlbumsPhDaPsql": [
+          [
+            "zAsset-Date Created-0",
+            "datetime"
+          ],
+          "zAsset-zPK-1",
+          "zAsset-Directory-Path-2",
+          "zAsset-Filename-3",
+          "zAddAssetAttr- Original Filename-4",
+          "zCldMast- Original Filename-5",
+          "zAddAssetAttr- Creator Bundle ID-6",
+          "zAsset-Visibility State-7",
+          "zAsset-Saved Asset Type-8",
+          [
+            "zAsset- SortToken -CameraRoll-9",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-10",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-11",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-12",
+          "zAddAssetAttr-EXIF-String-13",
+          [
+            "zAsset-Modification Date-14",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-15",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-16",
+            "datetime"
+          ],
+          "zAddAssetAttr-zPK-17",
+          "zAsset-UUID = store.cloudphotodb-18",
+          "zAddAssetAttr-Master Fingerprint-19",
+          [
+            "zGenAlbum-Start Date-20",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-21",
+            "datetime"
+          ],
+          "ParentzGenAlbum-UUID-22",
+          "ParentzGenAlbum-Cloud GUID-23",
+          "ParentzGenAlbum- Title-24",
+          "zGenAlbum- Title-User&System Applied-25",
+          "zGenAlbum-UUID-26",
+          "zGenAlbum-Cloud GUID-27",
+          "ParentzGenAlbum-Pending Items Count-28",
+          "ParentzGenAlbum-Pending Items Type-29",
+          "ParentzGenAlbum-Kind-30",
+          "ParentzGenAlbum-Cloud-Local-State-31",
+          "ParentzGenAlbum-Sync Event Order Key-32",
+          "ParentzGenAlbum-Pinned-33",
+          "ParentzGenAlbum-Custom Sort Key-34",
+          "ParentzGenAlbum-Custom Sort Ascending-35",
+          "ParentzGenAlbum-Custom Query Type-36",
+          "ParentzGenAlbum-Trashed State-37",
+          [
+            "ParentzGenAlbum-Trash Date-38",
+            "datetime"
+          ],
+          "zGenAlbum-Pending Items Count-39",
+          "zGenAlbum-Pending Items Type-40",
+          "zGenAlbum- Cached Photos Count-41",
+          "zGenAlbum- Cached Videos Count-42",
+          "zGenAlbum- Cached Count-43",
+          "zGenAlbum-Has Unseen Content-44",
+          "zGenAlbum-Unseen Asset Count-45",
+          "zGenAlbum-zENT- Entity-46",
+          "zGenAlbum-Album Kind-47",
+          "zGenAlbum-Cloud_Local_State-48",
+          "zGenAlbum-Sync Event Order Key-49",
+          "zGenAlbum-Pinned-50",
+          "zGenAlbum-Custom Sort Key-51",
+          "zGenAlbum-Custom Sort Ascending-52",
+          "zGenAlbum-Custom Query Type-53",
+          "zGenAlbum-Trashed State-54",
+          [
+            "zGenAlbum-Trash Date-55",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Cloud Delete State-39",
+          "zGenAlbum-Pending Items Count-40",
+          "zGenAlbum-Pending Items Type-41",
+          "zGenAlbum- Cached Photos Count-42",
+          "zGenAlbum- Cached Videos Count-43",
+          "zGenAlbum- Cached Count-44",
+          "zGenAlbum-Has Unseen Content-45",
+          "zGenAlbum-Unseen Asset Count-46",
+          "zGenAlbum-zENT- Entity-47",
+          "zGenAlbum-Album Kind-48",
+          "zGenAlbum-Cloud_Local_State-49",
+          "zGenAlbum-Sync Event Order Key-50",
+          "zGenAlbum-Pinned-51",
+          "zGenAlbum-Custom Sort Key-52",
+          "zGenAlbum-Custom Sort Ascending-53",
+          "zGenAlbum-Custom Query Type-54",
+          "zGenAlbum-Trashed State-55",
+          [
+            "zGenAlbum-Trash Date-56",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-57",
+          [
+            "zGenAlbum-Creation Date-20",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-21",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-22",
+            "datetime"
+          ],
+          "ParentzGenAlbum-UUID-23",
+          "ParentzGenAlbum-Cloud GUID-24",
+          "ParentzGenAlbum- Title-25",
+          "zGenAlbum- Title-User&System Applied-26",
+          "zGenAlbum-UUID-27",
+          "zGenAlbum-Cloud GUID-28",
+          "ParentzGenAlbum-Pending Items Count-29",
+          "ParentzGenAlbum-Pending Items Type-30",
+          "ParentzGenAlbum-Kind-31",
+          "ParentzGenAlbum-Cloud-Local-State-32",
+          "ParentzGenAlbum-Sync Event Order Key-33",
+          "ParentzGenAlbum-Pinned-34",
+          "ParentzGenAlbum-Custom Sort Key-35",
+          "ParentzGenAlbum-Custom Sort Ascending-36",
+          "ParentzGenAlbum-Project Document Type-37",
+          "ParentzGenAlbum-Custom Query Type-38",
+          "ParentzGenAlbum-Trashed State-39",
+          [
+            "ParentzGenAlbum-Trash Date-40",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Cloud Delete State-41",
+          "zGenAlbum-Pending Items Count-42",
+          "zGenAlbum-Pending Items Type-43",
+          "zGenAlbum- Cached Photos Count-44",
+          "zGenAlbum- Cached Videos Count-45",
+          "zGenAlbum- Cached Count-46",
+          "zGenAlbum-Has Unseen Content-47",
+          "zGenAlbum-Unseen Asset Count-48",
+          "zGenAlbum-zENT- Entity-49",
+          "zGenAlbum-Album Kind-50",
+          "zGenAlbum-Cloud_Local_State-51",
+          "zGenAlbum-Sync Event Order Key-52",
+          "zGenAlbum-Pinned-53",
+          "zGenAlbum-Custom Sort Key-54",
+          "zGenAlbum-Custom Sort Ascending-55",
+          "zGenAlbum-Project Document Type-56",
+          "zGenAlbum-Custom Query Type-57",
+          "zGenAlbum-Trashed State-58",
+          [
+            "zGenAlbum-Trash Date-59",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-60",
+          "zAddAssetAttr-Imported By Display Name-7",
+          "zAsset-Visibility State-8",
+          "zAsset-Saved Asset Type-9",
+          "zAddAssetAttr-Share Type-10",
+          [
+            "zAsset- SortToken -CameraRoll-11",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-12",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-13",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-14",
+          "zAddAssetAttr-EXIF-String-15",
+          [
+            "zAsset-Modification Date-16",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-17",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-18",
+            "datetime"
+          ],
+          "zAddAssetAttr-zPK-19",
+          "zAsset-UUID = store.cloudphotodb-20",
+          "zAddAssetAttr-Master Fingerprint-21",
+          [
+            "zGenAlbum-Creation Date-22",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-23",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-24",
+            "datetime"
+          ],
+          "ParentzGenAlbum-UUID-25",
+          "ParentzGenAlbum-Cloud GUID-26",
+          "ParentzGenAlbum- Title-27",
+          "zGenAlbum- Title-User&System Applied-28",
+          "zGenAlbum-UUID-29",
+          "zGenAlbum-Cloud GUID-30",
+          "zGenAlbum-Creator Bundle Id-31",
+          [
+            "ParentzGenAlbum-Creation Date-32",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Pending Items Count-33",
+          "ParentzGenAlbum-Pending Items Type-34",
+          "ParentzGenAlbum-Kind-35",
+          "ParentzGenAlbum-Cloud-Local-State-36",
+          "ParentzGenAlbum-Sync Event Order Key-37",
+          "ParentzGenAlbum-Pinned-38",
+          "ParentzGenAlbum-Custom Sort Key-39",
+          "ParentzGenAlbum-Custom Sort Ascending-40",
+          "ParentzGenAlbum-Is Prototype-41",
+          "ParentzGenAlbum-Project Document Type-42",
+          "ParentzGenAlbum-Custom Query Type-43",
+          "ParentzGenAlbum-Trashed State-44",
+          [
+            "ParentzGenAlbum-Trash Date-45",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Cloud Delete State-46",
+          "zGenAlbum-Pending Items Count-47",
+          "zGenAlbum-Pending Items Type-48",
+          "zGenAlbum- Cached Photos Count-49",
+          "zGenAlbum- Cached Videos Count-50",
+          "zGenAlbum- Cached Count-51",
+          "zGenAlbum-Has Unseen Content-52",
+          "zGenAlbum-Unseen Asset Count-53",
+          "zGenAlbum-zENT- Entity-54",
+          "zGenAlbum-Album Kind-55",
+          "zGenAlbum-Cloud_Local_State-56",
+          "zGenAlbum-Sync Event Order Key-57",
+          "zGenAlbum-Pinned-58",
+          "zGenAlbum-Custom Sort Key-59",
+          "zGenAlbum-Custom Sort Ascending-60",
+          "zGenAlbum-Is Prototype-61",
+          "zGenAlbum-Project Document Type-62",
+          "zGenAlbum-Custom Query Type-63",
+          "zGenAlbum-Trashed State-64",
+          [
+            "zGenAlbum-Trash Date-65",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-66",
+          "zAddAssetAttr- Syndication Identifier-SWY-Files-6",
+          "zAsset-Syndication State-7",
+          "zAsset-Bundle Scope-8",
+          "zAddAssetAttr- Imported by Bundle Identifier-9",
+          "zAddAssetAttr-Imported By Display Name-10",
+          "zAsset-Visibility State-11",
+          "zAsset-Saved Asset Type-12",
+          "zAddAssetAttr-Share Type-13",
+          [
+            "zAsset- SortToken -CameraRoll-14",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-15",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-16",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-17",
+          "zAddAssetAttr-EXIF-String-18",
+          [
+            "zAsset-Modification Date-19",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-20",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-21",
+            "datetime"
+          ],
+          "zAddAssetAttr-zPK-22",
+          "zAsset-UUID = store.cloudphotodb-23",
+          "zAddAssetAttr-Master Fingerprint-24",
+          [
+            "zGenAlbum-Creation Date-25",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-26",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-27",
+            "datetime"
+          ],
+          "ParentzGenAlbum-UUID-28",
+          "ParentzGenAlbum-Cloud GUID-29",
+          "ParentzGenAlbum- Title-30",
+          "zGenAlbum- Title-User&System Applied-31",
+          "zGenAlbum-UUID-32",
+          "zGenAlbum-Cloud GUID-33",
+          "zGenAlbum-Imported by Bundle Identifier-34",
+          [
+            "ParentzGenAlbum-Creation Date-35",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Pending Items Count-36",
+          "ParentzGenAlbum-Pending Items Type-37",
+          "ParentzGenAlbum-Kind-38",
+          "ParentzGenAlbum-Cloud-Local-State-39",
+          "ParentzGenAlbum-Sync Event Order Key-40",
+          "ParentzGenAlbum-Pinned-41",
+          "ParentzGenAlbum-Custom Sort Key-42",
+          "ParentzGenAlbum-Custom Sort Ascending-43",
+          "ParentzGenAlbum-Is Prototype-44",
+          "ParentzGenAlbum-Project Document Type-45",
+          "ParentzGenAlbum-Custom Query Type-46",
+          "ParentzGenAlbum-Trashed State-47",
+          [
+            "ParentzGenAlbum-Trash Date-48",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Cloud Delete State-49",
+          "zGenAlbum-Pending Items Count-50",
+          "zGenAlbum-Pending Items Type-51",
+          "zGenAlbum- Cached Photos Count-52",
+          "zGenAlbum- Cached Videos Count-53",
+          "zGenAlbum- Cached Count-54",
+          "zGenAlbum-Has Unseen Content-55",
+          "zGenAlbum-Unseen Asset Count-56",
+          "zGenAlbum-zENT- Entity-57",
+          "zGenAlbum-Album Kind-58",
+          "zGenAlbum-Cloud_Local_State-59",
+          "zGenAlbum-Sync Event Order Key-60",
+          "zGenAlbum-Pinned-61",
+          "zGenAlbum-Custom Sort Key-62",
+          "zGenAlbum-Custom Sort Ascending-63",
+          "zGenAlbum-Is Prototype-64",
+          "zGenAlbum-Project Document Type-65",
+          "zGenAlbum-Custom Query Type-66",
+          "zGenAlbum-Trashed State-67",
+          [
+            "zGenAlbum-Trash Date-68",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-69",
+          "zAddAssetAttr.Imported by Bundle Identifier-9",
+          "zAsset-Active Library Scope Participation State-14",
+          [
+            "zAsset- SortToken -CameraRoll-15",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-16",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-17",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-18",
+          "zAddAssetAttr-EXIF-String-19",
+          [
+            "zAsset-Modification Date-20",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-21",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-22",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-23",
+          "zAddAssetAttr-zPK-24",
+          "zAsset-UUID = store.cloudphotodb-25",
+          "zAddAssetAttr-Master Fingerprint-26",
+          [
+            "zGenAlbum-Creation Date-27",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-28",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-29",
+            "datetime"
+          ],
+          "ParentzGenAlbum-UUID-30",
+          "ParentzGenAlbum-Cloud GUID-31",
+          "ParentzGenAlbum- Title-32",
+          "zGenAlbum- Title-User&System Applied-33",
+          "zGenAlbum-UUID-34",
+          "zGenAlbum-Cloud GUID-35",
+          "zGenAlbum-Imported by Bundle Identifier-36",
+          [
+            "ParentzGenAlbum-Creation Date-37",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Pending Items Count-38",
+          "ParentzGenAlbum-Pending Items Type-39",
+          "ParentzGenAlbum-Kind-40",
+          "ParentzGenAlbum-Cloud-Local-State-41",
+          "ParentzGenAlbum-Sync Event Order Key-42",
+          "ParentzGenAlbum-Pinned-43",
+          "ParentzGenAlbum-Custom Sort Key-44",
+          "ParentzGenAlbum-Custom Sort Ascending-45",
+          "ParentzGenAlbum-Is Prototype-46",
+          "ParentzGenAlbum-Project Document Type-47",
+          "ParentzGenAlbum-Custom Query Type-48",
+          "ParentzGenAlbum-Trashed State-49",
+          [
+            "ParentzGenAlbum-Trash Date-50",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Cloud Delete State-51",
+          "zGenAlbum-Pending Items Count-52",
+          "zGenAlbum-Pending Items Type-53",
+          "zGenAlbum- Cached Photos Count-54",
+          "zGenAlbum- Cached Videos Count-55",
+          "zGenAlbum- Cached Count-56",
+          "zGenAlbum-Has Unseen Content-57",
+          "zGenAlbum-Unseen Asset Count-58",
+          "zGenAlbum-zENT- Entity-59",
+          "zGenAlbum-Album Kind-60",
+          "zGenAlbum-Cloud_Local_State-61",
+          "zGenAlbum-Sync Event Order Key-62",
+          "zGenAlbum-Pinned-63",
+          "zGenAlbum-Custom Sort Key-64",
+          "zGenAlbum-Custom Sort Ascending-65",
+          "zGenAlbum-Is Prototype-66",
+          "zGenAlbum-Project Document Type-67",
+          "zGenAlbum-Custom Query Type-68",
+          "zGenAlbum-Trashed State-69",
+          [
+            "zGenAlbum-Trash Date-70",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-71",
+          "zGenAlbum-Search Index Rebuild State-72",
+          "zGenAlbum-Duplicate Type-73",
+          "zGenAlbum-Privacy State-74",
+          "zAddAssetAttr- Imported By Display Name-10",
+          "zAsset-Is_Recently_Saved-12",
+          "zAsset-Saved Asset Type-13",
+          "zAddAssetAttr-Share Type-14",
+          "zAsset-Active Library Scope Participation State-15",
+          [
+            "zAsset- SortToken -CameraRoll-16",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-17",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-18",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-19",
+          "zAddAssetAttr-EXIF-String-20",
+          [
+            "zAsset-Modification Date-21",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-22",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-23",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-24",
+          "zAddAssetAttr-zPK-25",
+          "zAsset-UUID = store.cloudphotodb-26",
+          "zAddAssetAttr-Original Stable Hash-27",
+          "zAddAssetAttr.Adjusted Stable Hash-28",
+          [
+            "zGenAlbum-Creation Date-29",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-30",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-31",
+            "datetime"
+          ],
+          "ParentzGenAlbum-UUID-32",
+          "ParentzGenAlbum-Cloud GUID-33",
+          "ParentzGenAlbum- Title-34",
+          "zGenAlbum- Title-User&System Applied-35",
+          "zGenAlbum-UUID-36",
+          "zGenAlbum-Cloud GUID-37",
+          "zGenAlbum-Imported by Bundle Identifier-38",
+          [
+            "ParentzGenAlbum-Creation Date-39",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Pending Items Count-40",
+          "ParentzGenAlbum-Pending Items Type-41",
+          "ParentzGenAlbum-Kind-42",
+          "ParentzGenAlbum-Cloud-Local-State-43",
+          "ParentzGenAlbum-Sync Event Order Key-44",
+          "ParentzGenAlbum-Pinned-45",
+          "ParentzGenAlbum-Custom Sort Key-46",
+          "ParentzGenAlbum-Custom Sort Ascending-47",
+          "ParentzGenAlbum-Is Prototype-48",
+          "ParentzGenAlbum-Project Document Type-49",
+          "ParentzGenAlbum-Custom Query Type-50",
+          "ParentzGenAlbum-Trashed State-51",
+          [
+            "ParentzGenAlbum-Trash Date-52",
+            "datetime"
+          ],
+          "ParentzGenAlbum-Cloud Delete State-53",
+          "zGenAlbum-Pending Items Count-54",
+          "zGenAlbum-Pending Items Type-55",
+          "zGenAlbum- Cached Photos Count-56",
+          "zGenAlbum- Cached Videos Count-57",
+          "zGenAlbum- Cached Count-58",
+          "zGenAlbum-Has Unseen Content-59",
+          "zGenAlbum-Unseen Asset Count-60",
+          "zGenAlbum-zENT- Entity-61",
+          "zGenAlbum-Album Kind-62",
+          "zGenAlbum-Cloud_Local_State-63",
+          "zGenAlbum-Sync Event Order Key-64",
+          "zGenAlbum-Pinned-65",
+          "zGenAlbum-Custom Sort Key-66",
+          "zGenAlbum-Custom Sort Ascending-67",
+          "zGenAlbum-Is Prototype-68",
+          "zGenAlbum-Project Document Type-69",
+          "zGenAlbum-Custom Query Type-70",
+          "zGenAlbum-Trashed State-71",
+          [
+            "zGenAlbum-Trash Date-72",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-73",
+          "zGenAlbum-Search Index Rebuild State-74",
+          "zGenAlbum-Duplicate Type-75",
+          "zGenAlbum-Privacy State-76"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph023AlbumsSharedNAD.py": {
+      "artifacts": {
+        "Ph023SharedAlbumRecordsInviteswithNADPhDaPsql": [
+          [
+            "zGenAlbum-Cloud Creation Date-0",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-1",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-2",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Subscription Date-3",
+            "datetime"
+          ],
+          "zGenAlbum- Title-User&System Applied-4",
+          "zGenAlbum-UUID-5",
+          "zGenAlbum-Cloud GUID-6",
+          "zGenAlbum-Cloud Metadata-HEX NSKeyed Plist-7",
+          "zGenAlbum-Pending Items Count-8",
+          "zGenAlbum-Pending Items Type-9",
+          "zGenAlbum- Cached Photos Count-10",
+          "zGenAlbum- Cached Videos Count-11",
+          "zGenAlbum- Cached Count-12",
+          "zGenAlbum-Has Unseen Content-13",
+          "zGenAlbum-Unseen Asset Count-14",
+          "zGenAlbum-zENT- Entity-15",
+          "zGenAlbum-Album Kind-16",
+          "zGenAlbum-Cloud_Local_State-17",
+          "zGenAlbum-Sync Event Order Key-18",
+          "zGenAlbum-is Owned-19",
+          "zGenAlbum-Cloud Relationship State-20",
+          "zGenAlbum-Cloud Relationship State Local-21",
+          "zGenAlbum-Cloud Owner Mail Key-22",
+          "zGenAlbum-Cloud Owner Frist Name-23",
+          "zGenAlbum-Cloud Owner Last Name-24",
+          "zGenAlbum-Cloud Owner Full Name-25",
+          "zGenAlbum-Cloud Person ID-26",
+          "zGenAlbum-Cloud Owner Hashed Person ID-27",
+          "zGenAlbum-Local Cloud Multi-Contributors Enabled-28",
+          "zGenAlbum-Cloud Multi-Contributors Enabled-29",
+          "zGenAlbum-Cloud Album Sub Type-30",
+          [
+            "zGenAlbum-Cloud Contribution Date-31",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Last Interesting Change Date-32",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Notification Enabled-33",
+          "zGenAlbum-Pinned-34",
+          "zGenAlbum-Custom Sort Key-35",
+          "zGenAlbum-Custom Sort Ascending-36",
+          "zGenAlbum-Custom Query Type-37",
+          "zGenAlbum-Trashed State-38",
+          [
+            "zGenAlbum-Trash Date-39",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Owner Whitelisted-40",
+          "zGenAlbum-Cloud Local Public URL Enabled-41",
+          "zGenAlbum-Cloud Public URL Enabled-42",
+          "zGenAlbum-Public URL-43",
+          "zGenAlbum-Key Asset Face Thumb Index-44",
+          "zGenAlbum-Custom Query Parameters-45",
+          "zCldShareAlbumInvRec-Is My Invitation to Shared Album-46",
+          "zCldShareAlbumInvRec-Invitation State Local-47",
+          "zCldShareAlbumInvRec-Invitation State-Shared Album Invite Status-48",
+          [
+            "zCldShareAlbumInvRec-Subscription Date-49",
+            "datetime"
+          ],
+          "zCldShareAlbumInvRec-Invitee First Name-50",
+          "zCldShareAlbumInvRec-Invitee Last Name-51",
+          "zCldShareAlbumInvRec-Invitee Full Name-52",
+          "zCldShareAlbumInvRec-Invitee Hashed Person ID-53",
+          "zCldShareAlbumInvRec-Invitee Email Key-54",
+          "zCldShareAlbumInvRec-Album GUID-55",
+          "zCldShareAlbumInvRec-Cloud GUID-56",
+          "zAlbumList-Needs Reordering Number-57",
+          "zGenAlbum-Pending Items Count-7",
+          "zGenAlbum-Pending Items Type-8",
+          "zGenAlbum- Cached Photos Count-9",
+          "zGenAlbum- Cached Videos Count-10",
+          "zGenAlbum- Cached Count-11",
+          "zGenAlbum-Has Unseen Content-12",
+          "zGenAlbum-Unseen Asset Count-13",
+          "zGenAlbum-zENT- Entity-14",
+          "zGenAlbum-Album Kind-15",
+          "zGenAlbum-Cloud_Local_State-16",
+          "zGenAlbum-Sync Event Order Key-17",
+          "zGenAlbum-is Owned-18",
+          "zGenAlbum-Cloud Relationship State-19",
+          "zGenAlbum-Cloud Relationship State Local-20",
+          "zGenAlbum-Cloud Owner Mail Key-21",
+          "zGenAlbum-Cloud Owner First Name-22",
+          "zGenAlbum-Cloud Owner Last Name-23",
+          "zGenAlbum-Cloud Owner Full Name-24",
+          "zGenAlbum-Cloud Person ID-25",
+          "zGenAlbum-Cloud Owner Hashed Person ID-26",
+          "zGenAlbum-Local Cloud Multi-Contributors Enabled-27",
+          "zGenAlbum-Cloud Multi-Contributors Enabled-28",
+          "zGenAlbum-Cloud Album Sub Type-29",
+          [
+            "zGenAlbum-Cloud Contribution Date-30",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Last Interesting Change Date-31",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Notification Enabled-32",
+          "zGenAlbum-Pinned-33",
+          "zGenAlbum-Custom Sort Key-34",
+          "zGenAlbum-Custom Sort Ascending-35",
+          "zGenAlbum-Custom Query Type-36",
+          "zGenAlbum-Trashed State-37",
+          [
+            "zGenAlbum-Trash Date-38",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-39",
+          [
+            "zGenAlbum-Creation Date-1",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-2",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-3",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Subscription Date-4",
+            "datetime"
+          ],
+          "zGenAlbum- Title-User&System Applied-5",
+          "zGenAlbum-UUID-6",
+          "zGenAlbum-Cloud GUID-7",
+          "zGenAlbum-Project Document Type-37",
+          "zGenAlbum-Custom Query Type-38",
+          "zGenAlbum-Trashed State-39",
+          [
+            "zGenAlbum-Trash Date-40",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-41",
+          "zGenAlbum-Cloud Owner Whitelisted-42",
+          "zGenAlbum-Cloud Local Public URL Enabled-43",
+          "zGenAlbum-Cloud Public URL Enabled-44",
+          "zGenAlbum-Public URL-45",
+          "zGenAlbum-Key Asset Face Thumb Index-46",
+          "zGenAlbum-Project Text Extension ID-47",
+          "zGenAlbum-User Query Data-48",
+          "zGenAlbum-Custom Query Parameters-49",
+          "zGenAlbum-Project Data-50",
+          "zCldShareAlbumInvRec-Is My Invitation to Shared Album-51",
+          "zCldShareAlbumInvRec-Invitation State Local-52",
+          "zCldShareAlbumInvRec-Invitation State-Shared Album Invite Status-53",
+          [
+            "zCldShareAlbumInvRec-Subscription Date-54",
+            "datetime"
+          ],
+          "zCldShareAlbumInvRec-Invitee First Name-55",
+          "zCldShareAlbumInvRec-Invitee Last Name-56",
+          "zCldShareAlbumInvRec-Invitee Full Name-57",
+          "zCldShareAlbumInvRec-Invitee Hashed Person ID-58",
+          "zCldShareAlbumInvRec-Invitee Email Key-59",
+          "zCldShareAlbumInvRec-Album GUID-60",
+          "zCldShareAlbumInvRec-Cloud GUID-61",
+          "zGenAlbum-Project Render UUID-62",
+          "zAlbumList-Needs Reordering Number-63",
+          "zGenAlbum-Creator Bundle ID-8",
+          "zGenAlbum-Pending Items Count-9",
+          "zGenAlbum-Pending Items Type-10",
+          "zGenAlbum- Cached Photos Count-11",
+          "zGenAlbum- Cached Videos Count-12",
+          "zGenAlbum- Cached Count-13",
+          "zGenAlbum-Has Unseen Content-14",
+          "zGenAlbum-Unseen Asset Count-15",
+          "zGenAlbum-zENT- Entity-16",
+          "zGenAlbum-Album Kind-17",
+          "zGenAlbum-Cloud_Local_State-18",
+          "zGenAlbum-Sync Event Order Key-19",
+          "zGenAlbum-is Owned-20",
+          "zGenAlbum-Cloud Relationship State-21",
+          "zGenAlbum-Cloud Relationship State Local-22",
+          "zGenAlbum-Cloud Owner Mail Key-23",
+          "zGenAlbum-Cloud Owner Frist Name-24",
+          "zGenAlbum-Cloud Owner Last Name-25",
+          "zGenAlbum-Cloud Owner Full Name-26",
+          "zGenAlbum-Cloud Person ID-27",
+          "zGenAlbum-Cloud Owner Hashed Person ID-28",
+          "zGenAlbum-Local Cloud Multi-Contributors Enabled-29",
+          "zGenAlbum-Cloud Multi-Contributors Enabled-30",
+          "zGenAlbum-Cloud Album Sub Type-31",
+          [
+            "zGenAlbum-Cloud Contribution Date-32",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Last Interesting Change Date-33",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Notification Enabled-34",
+          "zGenAlbum-Pinned-35",
+          "zGenAlbum-Custom Sort Key-36",
+          "zGenAlbum-Custom Sort Ascending-37",
+          "zGenAlbum-Is Prototype-38",
+          "zGenAlbum-Project Document Type-39",
+          "zGenAlbum-Custom Query Type-40",
+          "zGenAlbum-Trashed State-41",
+          [
+            "zGenAlbum-Trash Date-42",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-43",
+          "zGenAlbum-Cloud Owner Whitelisted-44",
+          "zGenAlbum-Cloud Local Public URL Enabled-45",
+          "zGenAlbum-Cloud Public URL Enabled-46",
+          "zGenAlbum-Public URL-47",
+          "zGenAlbum-Key Asset Face Thumb Index-48",
+          "zGenAlbum-Project Text Extension ID-49",
+          "zGenAlbum-User Query Data-50",
+          "zGenAlbum-Custom Query Parameters-51",
+          "zGenAlbum-Project Data-52",
+          "zCldShareAlbumInvRec-Is My Invitation to Shared Album-53",
+          "zCldShareAlbumInvRec-Invitation State Local-54",
+          "zCldShareAlbumInvRec-Invitation State-Shared Album Invite Status-55",
+          [
+            "zCldShareAlbumInvRec-Subscription Date-56",
+            "datetime"
+          ],
+          "zCldShareAlbumInvRec-Invitee First Name-57",
+          "zCldShareAlbumInvRec-Invitee Last Name-58",
+          "zCldShareAlbumInvRec-Invitee Full Name-59",
+          "zCldShareAlbumInvRec-Invitee Hashed Person ID-60",
+          "zCldShareAlbumInvRec-Invitee Email Key-61",
+          "zCldShareAlbumInvRec-Album GUID-62",
+          "zCldShareAlbumInvRec-Cloud GUID-63",
+          "zGenAlbum-Project Render UUID-64",
+          "zAlbumList-Needs Reordering Number-65",
+          "zGenAlbum-Imported by Bundle Identifier-8",
+          "zGenAlbum-Cloud Owner First Name-24",
+          "zGenAlbum-Search Index Rebuild State-53",
+          "zGenAlbum-Duplicate Type-54",
+          "zGenAlbum-Privacy State-55",
+          "zCldShareAlbumInvRec-zUUID-56",
+          "zCldShareAlbumInvRec-Is My Invitation to Shared Album-57",
+          "zCldShareAlbumInvRec-Invitation State Local-58",
+          "zCldShareAlbumInvRec-Invitation State-Shared Album Invite Status-59",
+          [
+            "zCldShareAlbumInvRec-Subscription Date-60",
+            "datetime"
+          ],
+          "zCldShareAlbumInvRec-Invitee First Name-61",
+          "zCldShareAlbumInvRec-Invitee Last Name-62",
+          "zCldShareAlbumInvRec-Invitee Full Name-63",
+          "zCldShareAlbumInvRec-Invitee Hashed Person ID-64",
+          "zCldShareAlbumInvRec-Invitee Email Key-65",
+          "zCldShareAlbumInvRec-Album GUID-66",
+          "zCldShareAlbumInvRec-Cloud GUID-67",
+          "zGenAlbum-Project Render UUID-68",
+          "zAlbumList-Needs Reordering Number-69"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph024AssetsInSharedAlbums.py": {
+      "artifacts": {
+        "Ph024AssetinSharedAlbumsInvitesPhDaPsql": [
+          [
+            "zAsset-Date Created-0",
+            "datetime"
+          ],
+          "zAsset-zPK-1",
+          "zAsset-Directory-Path-2",
+          "zAsset-Filename-3",
+          "zAddAssetAttr- Original Filename-4",
+          "zCldMast- Original Filename-5",
+          "zAddAssetAttr- Creator Bundle ID-6",
+          "zAsset-Visibility State-7",
+          "zAsset-Saved Asset Type-8",
+          [
+            "zAsset- SortToken -CameraRoll-9",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-10",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-11",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-12",
+          "zAddAssetAttr-EXIF-String-13",
+          [
+            "zAsset-Modification Date-14",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-15",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-16",
+            "datetime"
+          ],
+          "zAddAssetAttr-zPK-17",
+          "zAsset-UUID = store.cloudphotodb-18",
+          "zAddAssetAttr-Master Fingerprint-19",
+          [
+            "zGenAlbum-Cloud Creation Date-20",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-21",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-22",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Subscription Date-23",
+            "datetime"
+          ],
+          "zGenAlbum- Title-User&System Applied-24",
+          "zGenAlbum-UUID-25",
+          "zGenAlbum-Cloud GUID-26",
+          "zGenAlbum-Cloud Metadata-HEX NSKeyed Plist-27",
+          "zGenAlbum-Pending Items Count-28",
+          "zGenAlbum-Pending Items Type-29",
+          "zGenAlbum- Cached Photos Count-30",
+          "zGenAlbum- Cached Videos Count-31",
+          "zGenAlbum- Cached Count-32",
+          "zGenAlbum-Has Unseen Content-33",
+          "zGenAlbum-Unseen Asset Count-34",
+          "zGenAlbum-zENT- Entity-35",
+          "zGenAlbum-Album Kind-36",
+          "zGenAlbum-Cloud_Local_State-37",
+          "zGenAlbum-Sync Event Order Key-38",
+          "zGenAlbum-is Owned-39",
+          "zGenAlbum-Cloud Relationship State-40",
+          "zGenAlbum-Cloud Relationship State Local-41",
+          "zGenAlbum-Cloud Owner Mail Key-42",
+          "zGenAlbum-Cloud Owner First Name-43",
+          "zGenAlbum-Cloud Owner Last Name-44",
+          "zGenAlbum-Cloud Owner Full Name-45",
+          "zGenAlbum-Cloud Person ID-46",
+          "zGenAlbum-Cloud Owner Hashed Person ID-47",
+          "zGenAlbum-Local Cloud Multi-Contributors Enabled-48",
+          "zGenAlbum-Cloud Multi-Contributors Enabled-49",
+          "zGenAlbum-Cloud Album Sub Type-50",
+          [
+            "zGenAlbum-Cloud Contribution Date-51",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Last Interesting Change Date-52",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Notification Enabled-53",
+          "zGenAlbum-Pinned-54",
+          "zGenAlbum-Custom Sort Key-55",
+          "zGenAlbum-Custom Sort Ascending-56",
+          "zGenAlbum-Custom Query Type-57",
+          "zGenAlbum-Trashed State-58",
+          [
+            "zGenAlbum-Trash Date-59",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Owner Whitelisted-60",
+          "zGenAlbum-Cloud Local Public URL Enabled-61",
+          "zGenAlbum-Cloud Public URL Enabled-62",
+          "zGenAlbum-Public URL-63",
+          "zGenAlbum-Key Asset Face Thumb Index-64",
+          "zGenAlbum-Custom Query Parameters-65",
+          "zCldShareAlbumInvRec-Is My Invitation to Shared Album-66",
+          "zCldShareAlbumInvRec-Invitation State Local-67",
+          "zCldShareAlbumInvRec-Invitation State-Shared Album Invite Status-68",
+          [
+            "zCldShareAlbumInvRec-Subscription Date-69",
+            "datetime"
+          ],
+          "zCldShareAlbumInvRec-Invitee First Name-70",
+          "zCldShareAlbumInvRec-Invitee Last Name-71",
+          "zCldShareAlbumInvRec-Invitee Full Name-72",
+          "zCldShareAlbumInvRec-Invitee Hashed Person ID-73",
+          "zCldShareAlbumInvRec-Invitee Email Key-74",
+          "zCldShareAlbumInvRec-Album GUID-75",
+          "zCldShareAlbumInvRec-Cloud GUID-76",
+          "zAlbumList-Needs Reordering Number-77",
+          "zGenAlbum-Pending Items Count-27",
+          "zGenAlbum-Pending Items Type-28",
+          "zGenAlbum- Cached Photos Count-29",
+          "zGenAlbum- Cached Videos Count-30",
+          "zGenAlbum- Cached Count-31",
+          "zGenAlbum-Has Unseen Content-32",
+          "zGenAlbum-Unseen Asset Count-33",
+          "zGenAlbum-zENT- Entity-34",
+          "zGenAlbum-Album Kind-35",
+          "zGenAlbum-Cloud_Local_State-36",
+          "zGenAlbum-Sync Event Order Key-37",
+          "zGenAlbum-is Owned-38",
+          "zGenAlbum-Cloud Relationship State-39",
+          "zGenAlbum-Cloud Relationship State Local-40",
+          "zGenAlbum-Cloud Owner Mail Key-41",
+          "zGenAlbum-Cloud Owner First Name-42",
+          "zGenAlbum-Cloud Owner Last Name-43",
+          "zGenAlbum-Cloud Owner Full Name-44",
+          "zGenAlbum-Cloud Person ID-45",
+          "zGenAlbum-Cloud Owner Hashed Person ID-46",
+          "zGenAlbum-Local Cloud Multi-Contributors Enabled-47",
+          "zGenAlbum-Cloud Multi-Contributors Enabled-48",
+          "zGenAlbum-Cloud Album Sub Type-49",
+          [
+            "zGenAlbum-Cloud Contribution Date-50",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Last Interesting Change Date-51",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Notification Enabled-52",
+          "zGenAlbum-Pinned-53",
+          "zGenAlbum-Custom Sort Key-54",
+          "zGenAlbum-Custom Sort Ascending-55",
+          "zGenAlbum-Custom Query Type-56",
+          "zGenAlbum-Trashed State-57",
+          [
+            "zGenAlbum-Trash Date-58",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-59",
+          [
+            "zGenAlbum-Creation Date-21",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-22",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-23",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Subscription Date-24",
+            "datetime"
+          ],
+          "zGenAlbum- Title-User&System Applied-25",
+          "zGenAlbum-UUID-26",
+          "zGenAlbum-Cloud GUID-27",
+          "zGenAlbum-Project Document Type-57",
+          "zGenAlbum-Custom Query Type-58",
+          "zGenAlbum-Trashed State-59",
+          [
+            "zGenAlbum-Trash Date-60",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-61",
+          "zGenAlbum-Cloud Owner Whitelisted-62",
+          "zGenAlbum-Cloud Local Public URL Enabled-63",
+          "zGenAlbum-Cloud Public URL Enabled-64",
+          "zGenAlbum-Public URL-65",
+          "zGenAlbum-Key Asset Face Thumb Index-66",
+          "zGenAlbum-Project Text Extension ID-67",
+          "zGenAlbum-User Query Data-68",
+          "zGenAlbum-Custom Query Parameters-69",
+          "zGenAlbum-Project Data-70",
+          "zCldShareAlbumInvRec-Is My Invitation to Shared Album-71",
+          "zCldShareAlbumInvRec-Invitation State Local-72",
+          "zCldShareAlbumInvRec-Invitation State-Shared Album Invite Status-73",
+          [
+            "zCldShareAlbumInvRec-Subscription Date-74",
+            "datetime"
+          ],
+          "zCldShareAlbumInvRec-Invitee First Name-75",
+          "zCldShareAlbumInvRec-Invitee Last Name-76",
+          "zCldShareAlbumInvRec-Invitee Full Name-77",
+          "zCldShareAlbumInvRec-Invitee Hashed Person ID-78",
+          "zCldShareAlbumInvRec-Invitee Email Key-79",
+          "zCldShareAlbumInvRec-Album GUID-80",
+          "zCldShareAlbumInvRec-Cloud GUID-81",
+          "zGenAlbum-Project Render UUID-82",
+          "zAlbumList-Needs Reordering Number-83",
+          "zAddAssetAttr-Imported By Display Name-7",
+          "zAsset-Visibility State-8",
+          "zAsset-Saved Asset Type-9",
+          "zAddAssetAttr-Share Type-10",
+          [
+            "zAsset- SortToken -CameraRoll-11",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-12",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-13",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-14",
+          "zAddAssetAttr-EXIF-String-15",
+          [
+            "zAsset-Modification Date-16",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-17",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-18",
+            "datetime"
+          ],
+          "zAddAssetAttr-zPK-19",
+          "zAsset-UUID = store.cloudphotodb-20",
+          "zAddAssetAttr-Master Fingerprint-21",
+          [
+            "zGenAlbum-Cloud Creation Date-22",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Creation Date-23",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-24",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-25",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Subscription Date-26",
+            "datetime"
+          ],
+          "zGenAlbum- Title-User&System Applied-27",
+          "zGenAlbum-UUID-28",
+          "zGenAlbum-Cloud GUID-29",
+          "zGenAlbum-Creator Bundle ID-30",
+          "zGenAlbum-Pending Items Count-31",
+          "zGenAlbum-Pending Items Type-32",
+          "zGenAlbum- Cached Photos Count-33",
+          "zGenAlbum- Cached Videos Count-34",
+          "zGenAlbum- Cached Count-35",
+          "zGenAlbum-Has Unseen Content-36",
+          "zGenAlbum-Unseen Asset Count-37",
+          "zGenAlbum-zENT- Entity-38",
+          "zGenAlbum-Album Kind-39",
+          "zGenAlbum-Cloud_Local_State-40",
+          "zGenAlbum-Sync Event Order Key-41",
+          "zGenAlbum-is Owned-42",
+          "zGenAlbum-Cloud Relationship State-43",
+          "zGenAlbum-Cloud Relationship State Local-44",
+          "zGenAlbum-Cloud Owner Mail Key-45",
+          "zGenAlbum-Cloud Owner Frist Name-46",
+          "zGenAlbum-Cloud Owner Last Name-47",
+          "zGenAlbum-Cloud Owner Full Name-48",
+          "zGenAlbum-Cloud Person ID-49",
+          "zGenAlbum-Cloud Owner Hashed Person ID-50",
+          "zGenAlbum-Local Cloud Multi-Contributors Enabled-51",
+          "zGenAlbum-Cloud Multi-Contributors Enabled-52",
+          "zGenAlbum-Cloud Album Sub Type-53",
+          [
+            "zGenAlbum-Cloud Contribution Date-54",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Last Interesting Change Date-55",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Notification Enabled-56",
+          "zGenAlbum-Pinned-57",
+          "zGenAlbum-Custom Sort Key-58",
+          "zGenAlbum-Custom Sort Ascending-59",
+          "zGenAlbum-Is Prototype-60",
+          "zGenAlbum-Project Document Type-61",
+          "zGenAlbum-Custom Query Type-62",
+          "zGenAlbum-Trashed State-63",
+          [
+            "zGenAlbum-Trash Date-64",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-65",
+          "zGenAlbum-Cloud Owner Whitelisted-66",
+          "zGenAlbum-Cloud Local Public URL Enabled-67",
+          "zGenAlbum-Cloud Public URL Enabled-68",
+          "zGenAlbum-Public URL-69",
+          "zGenAlbum-Key Asset Face Thumb Index-70",
+          "zGenAlbum-Project Text Extension ID-71",
+          "zGenAlbum-User Query Data-72",
+          "zGenAlbum-Custom Query Parameters-73",
+          "zGenAlbum-Project Data-74",
+          "zCldShareAlbumInvRec-Is My Invitation to Shared Album-75",
+          "zCldShareAlbumInvRec-Invitation State Local-76",
+          "zCldShareAlbumInvRec-Invitation State-Shared Album Invite Status-77",
+          [
+            "zCldShareAlbumInvRec-Subscription Date-78",
+            "datetime"
+          ],
+          "zCldShareAlbumInvRec-Invitee First Name-79",
+          "zCldShareAlbumInvRec-Invitee Last Name-80",
+          "zCldShareAlbumInvRec-Invitee Full Name-81",
+          "zCldShareAlbumInvRec-Invitee Hashed Person ID-82",
+          "zCldShareAlbumInvRec-Invitee Email Key-83",
+          "zCldShareAlbumInvRec-Album GUID-84",
+          "zCldShareAlbumInvRec-Cloud GUID-85",
+          "zGenAlbum-Project Render UUID-86",
+          "zAlbumList-Needs Reordering Number-87",
+          "zAddAssetAttr- Syndication Identifier-SWY-Files-6",
+          "zAsset-Syndication State-7",
+          "zAsset-Bundle Scope-8",
+          "zAddAssetAttr- Imported by Bundle Identifier-9",
+          "zAddAssetAttr-Imported By Display Name-10",
+          "zAsset-Visibility State-11",
+          "zAsset-Saved Asset Type-12",
+          "zAddAssetAttr-Share Type-13",
+          [
+            "zAsset- SortToken -CameraRoll-14",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-15",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-16",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-17",
+          "zAddAssetAttr-EXIF-String-18",
+          [
+            "zAsset-Modification Date-19",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-20",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-21",
+            "datetime"
+          ],
+          "zAddAssetAttr-zPK-22",
+          "zAsset-UUID = store.cloudphotodb-23",
+          "zAddAssetAttr-Master Fingerprint-24",
+          [
+            "zGenAlbum-Cloud Creation Date-25",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Creation Date-26",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-27",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-28",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Subscription Date-29",
+            "datetime"
+          ],
+          "zGenAlbum- Title-User&System Applied-30",
+          "zGenAlbum-UUID-31",
+          "zGenAlbum-Cloud GUID-32",
+          "zGenAlbum-Imported by Bundle Identifier-33",
+          "zGenAlbum-Pending Items Count-34",
+          "zGenAlbum-Pending Items Type-35",
+          "zGenAlbum- Cached Photos Count-36",
+          "zGenAlbum- Cached Videos Count-37",
+          "zGenAlbum- Cached Count-38",
+          "zGenAlbum-Has Unseen Content-39",
+          "zGenAlbum-Unseen Asset Count-40",
+          "zGenAlbum-zENT- Entity-41",
+          "zGenAlbum-Album Kind-42",
+          "zGenAlbum-Cloud_Local_State-43",
+          "zGenAlbum-Sync Event Order Key-44",
+          "zGenAlbum-is Owned-45",
+          "zGenAlbum-Cloud Relationship State-46",
+          "zGenAlbum-Cloud Relationship State Local-47",
+          "zGenAlbum-Cloud Owner Mail Key-48",
+          "zGenAlbum-Cloud Owner Frist Name-49",
+          "zGenAlbum-Cloud Owner Last Name-50",
+          "zGenAlbum-Cloud Owner Full Name-51",
+          "zGenAlbum-Cloud Person ID-52",
+          "zGenAlbum-Cloud Owner Hashed Person ID-53",
+          "zGenAlbum-Local Cloud Multi-Contributors Enabled-54",
+          "zGenAlbum-Cloud Multi-Contributors Enabled-55",
+          "zGenAlbum-Cloud Album Sub Type-56",
+          [
+            "zGenAlbum-Cloud Contribution Date-57",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Last Interesting Change Date-58",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Notification Enabled-59",
+          "zGenAlbum-Pinned-60",
+          "zGenAlbum-Custom Sort Key-61",
+          "zGenAlbum-Custom Sort Ascending-62",
+          "zGenAlbum-Is Prototype-63",
+          "zGenAlbum-Project Document Type-64",
+          "zGenAlbum-Custom Query Type-65",
+          "zGenAlbum-Trashed State-66",
+          [
+            "zGenAlbum-Trash Date-67",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-68",
+          "zGenAlbum-Cloud Owner Whitelisted-69",
+          "zGenAlbum-Cloud Local Public URL Enabled-70",
+          "zGenAlbum-Cloud Public URL Enabled-71",
+          "zGenAlbum-Public URL-72",
+          "zGenAlbum-Key Asset Face Thumb Index-73",
+          "zGenAlbum-Project Text Extension ID-74",
+          "zGenAlbum-User Query Data-75",
+          "zGenAlbum-Custom Query Parameters-76",
+          "zGenAlbum-Project Data-77",
+          "zCldShareAlbumInvRec-Is My Invitation to Shared Album-78",
+          "zCldShareAlbumInvRec-Invitation State Local-79",
+          "zCldShareAlbumInvRec-Invitation State-Shared Album Invite Status-80",
+          [
+            "zCldShareAlbumInvRec-Subscription Date-81",
+            "datetime"
+          ],
+          "zCldShareAlbumInvRec-Invitee First Name-82",
+          "zCldShareAlbumInvRec-Invitee Last Name-83",
+          "zCldShareAlbumInvRec-Invitee Full Name-84",
+          "zCldShareAlbumInvRec-Invitee Hashed Person ID-85",
+          "zCldShareAlbumInvRec-Invitee Email Key-86",
+          "zCldShareAlbumInvRec-Album GUID-87",
+          "zCldShareAlbumInvRec-Cloud GUID-88",
+          "zGenAlbum-Project Render UUID-89",
+          "zAlbumList-Needs Reordering Number-90",
+          "zAddAssetAttr.Imported by Bundle Identifier-9",
+          "zAsset-Active Library Scope Participation State-14",
+          [
+            "zAsset- SortToken -CameraRoll-15",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-16",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-17",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-18",
+          "zAddAssetAttr-EXIF-String-19",
+          [
+            "zAsset-Modification Date-20",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-21",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-22",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-23",
+          "zAddAssetAttr-zPK-24",
+          "zAsset-UUID = store.cloudphotodb-25",
+          "zAddAssetAttr-Master Fingerprint-26",
+          [
+            "zGenAlbum-Cloud Creation Date-27",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Creation Date-28",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-29",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-30",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Subscription Date-31",
+            "datetime"
+          ],
+          "zGenAlbum- Title-User&System Applied-32",
+          "zGenAlbum-UUID-33",
+          "zGenAlbum-Cloud GUID-34",
+          "zGenAlbum-Imported by Bundle Identifier-35",
+          "zGenAlbum-Pending Items Count-36",
+          "zGenAlbum-Pending Items Type-37",
+          "zGenAlbum- Cached Photos Count-38",
+          "zGenAlbum- Cached Videos Count-39",
+          "zGenAlbum- Cached Count-40",
+          "zGenAlbum-Has Unseen Content-41",
+          "zGenAlbum-Unseen Asset Count-42",
+          "zGenAlbum-zENT- Entity-43",
+          "zGenAlbum-Album Kind-44",
+          "zGenAlbum-Cloud_Local_State-45",
+          "zGenAlbum-Sync Event Order Key-46",
+          "zGenAlbum-is Owned-47",
+          "zGenAlbum-Cloud Relationship State-48",
+          "zGenAlbum-Cloud Relationship State Local-49",
+          "zGenAlbum-Cloud Owner Mail Key-50",
+          "zGenAlbum-Cloud Owner First Name-51",
+          "zGenAlbum-Cloud Owner Last Name-52",
+          "zGenAlbum-Cloud Owner Full Name-53",
+          "zGenAlbum-Cloud Person ID-54",
+          "zGenAlbum-Cloud Owner Hashed Person ID-55",
+          "zGenAlbum-Local Cloud Multi-Contributors Enabled-56",
+          "zGenAlbum-Cloud Multi-Contributors Enabled-57",
+          "zGenAlbum-Cloud Album Sub Type-58",
+          [
+            "zGenAlbum-Cloud Contribution Date-59",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Last Interesting Change Date-60",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Notification Enabled-61",
+          "zGenAlbum-Pinned-62",
+          "zGenAlbum-Custom Sort Key-63",
+          "zGenAlbum-Custom Sort Ascending-64",
+          "zGenAlbum-Is Prototype-65",
+          "zGenAlbum-Project Document Type-66",
+          "zGenAlbum-Custom Query Type-67",
+          "zGenAlbum-Trashed State-68",
+          [
+            "zGenAlbum-Trash Date-69",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-70",
+          "zGenAlbum-Cloud Owner Whitelisted-71",
+          "zGenAlbum-Cloud Local Public URL Enabled-72",
+          "zGenAlbum-Cloud Public URL Enabled-73",
+          "zGenAlbum-Public URL-74",
+          "zGenAlbum-Key Asset Face Thumb Index-75",
+          "zGenAlbum-Project Text Extension ID-76",
+          "zGenAlbum-User Query Data-77",
+          "zGenAlbum-Custom Query Parameters-78",
+          "zGenAlbum-Project Data-79",
+          "zGenAlbum-Search Index Rebuild State-80",
+          "zGenAlbum-Duplicate Type-81",
+          "zGenAlbum-Privacy State-82",
+          "zCldShareAlbumInvRec-zUUID-83",
+          "zCldShareAlbumInvRec-Is My Invitation to Shared Album-84",
+          "zCldShareAlbumInvRec-Invitation State Local-85",
+          "zCldShareAlbumInvRec-Invitation State-Shared Album Invite Status-86",
+          [
+            "zCldShareAlbumInvRec-Subscription Date-87",
+            "datetime"
+          ],
+          "zCldShareAlbumInvRec-Invitee First Name-88",
+          "zCldShareAlbumInvRec-Invitee Last Name-89",
+          "zCldShareAlbumInvRec-Invitee Full Name-90",
+          "zCldShareAlbumInvRec-Invitee Hashed Person ID-91",
+          "zCldShareAlbumInvRec-Invitee Email Key-92",
+          "zCldShareAlbumInvRec-Album GUID-93",
+          "zCldShareAlbumInvRec-Cloud GUID-94",
+          "zGenAlbum-Project Render UUID-95",
+          "zAlbumList-Needs Reordering Number-96",
+          "zAddAssetAttr-Original Stable Hash-26",
+          "zAddAssetAttr.Adjusted Stable Hash-27",
+          [
+            "zGenAlbum-Cloud Creation Date-28",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Creation Date-29",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Start Date-30",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-End Date-31",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Subscription Date-32",
+            "datetime"
+          ],
+          "zGenAlbum- Title-User&System Applied-33",
+          "zGenAlbum-UUID-34",
+          "zGenAlbum-Cloud GUID-35",
+          "zGenAlbum-Imported by Bundle Identifier-36",
+          "zGenAlbum-Pending Items Count-37",
+          "zGenAlbum-Pending Items Type-38",
+          "zGenAlbum- Cached Photos Count-39",
+          "zGenAlbum- Cached Videos Count-40",
+          "zGenAlbum- Cached Count-41",
+          "zGenAlbum-Has Unseen Content-42",
+          "zGenAlbum-Unseen Asset Count-43",
+          "zGenAlbum-zENT- Entity-44",
+          "zGenAlbum-Album Kind-45",
+          "zGenAlbum-Cloud_Local_State-46",
+          "zGenAlbum-Sync Event Order Key-47",
+          "zGenAlbum-is Owned-48",
+          "zGenAlbum-Cloud Relationship State-49",
+          "zGenAlbum-Cloud Relationship State Local-50",
+          "zGenAlbum-Cloud Owner Mail Key-51",
+          "zGenAlbum-Cloud Owner First Name-52",
+          "zGenAlbum-Cloud Owner Last Name-53",
+          "zGenAlbum-Cloud Owner Full Name-54",
+          "zGenAlbum-Cloud Person ID-55",
+          "zGenAlbum-Cloud Owner Hashed Person ID-56",
+          "zGenAlbum-Local Cloud Multi-Contributors Enabled-57",
+          "zGenAlbum-Cloud Multi-Contributors Enabled-58",
+          "zGenAlbum-Cloud Album Sub Type-59",
+          [
+            "zGenAlbum-Cloud Contribution Date-60",
+            "datetime"
+          ],
+          [
+            "zGenAlbum-Cloud Last Interesting Change Date-61",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Notification Enabled-62",
+          "zGenAlbum-Pinned-63",
+          "zGenAlbum-Custom Sort Key-64",
+          "zGenAlbum-Custom Sort Ascending-65",
+          "zGenAlbum-Is Prototype-66",
+          "zGenAlbum-Project Document Type-67",
+          "zGenAlbum-Custom Query Type-68",
+          "zGenAlbum-Trashed State-69",
+          [
+            "zGenAlbum-Trash Date-70",
+            "datetime"
+          ],
+          "zGenAlbum-Cloud Delete State-71",
+          "zGenAlbum-Cloud Owner Whitelisted-72",
+          "zGenAlbum-Cloud Local Public URL Enabled-73",
+          "zGenAlbum-Cloud Public URL Enabled-74",
+          "zGenAlbum-Public URL-75",
+          "zGenAlbum-Key Asset Face Thumb Index-76",
+          "zGenAlbum-Project Text Extension ID-77",
+          "zGenAlbum-User Query Data-78",
+          "zGenAlbum-Custom Query Parameters-79",
+          "zGenAlbum-Project Data-80",
+          "zGenAlbum-Search Index Rebuild State-81",
+          "zGenAlbum-Duplicate Type-82",
+          "zGenAlbum-Privacy State-83",
+          "zCldShareAlbumInvRec-zUUID-84",
+          "zCldShareAlbumInvRec-Is My Invitation to Shared Album-85",
+          "zCldShareAlbumInvRec-Invitation State Local-86",
+          "zCldShareAlbumInvRec-Invitation State-Shared Album Invite Status-87",
+          [
+            "zCldShareAlbumInvRec-Subscription Date-88",
+            "datetime"
+          ],
+          "zCldShareAlbumInvRec-Invitee First Name-89",
+          "zCldShareAlbumInvRec-Invitee Last Name-90",
+          "zCldShareAlbumInvRec-Invitee Full Name-91",
+          "zCldShareAlbumInvRec-Invitee Hashed Person ID-92",
+          "zCldShareAlbumInvRec-Invitee Email Key-93",
+          "zCldShareAlbumInvRec-Album GUID-94",
+          "zCldShareAlbumInvRec-Cloud GUID-95",
+          "zGenAlbum-Project Render UUID-96",
+          "zAlbumList-Needs Reordering Number-97"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph025SWYConvAlbumsNAD.py": {
+      "artifacts": {
+        "Ph025_1SWYConversationRecordswithNADPhDaPsql": [
+          [
+            "SWYConverszGenAlbum-Creation Date",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-Start Date",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-End Date",
+            "datetime"
+          ],
+          "zAsset- Conversation= zGenAlbum_zPK",
+          "SWYConverszGenAlbum- Import Session ID-SWY",
+          "SWYzGenAlbum-Imported by Bundle Identifier",
+          "SWYConverszGenAlbum-Album Kind",
+          "SWYConverszGenAlbum-Cloud_Local_State",
+          "SWYConverszGenAlbum- Syndicate",
+          "SWYConverszGenAlbum-Sync Event Order Key",
+          "SWYConverszGenAlbum-Pinned",
+          "SWYConverszGenAlbum-Custom Sort Key",
+          "SWYConverszGenAlbum-Custom Sort Ascending",
+          "SWYConverszGenAlbum-Is Prototype",
+          "SWYConverszGenAlbum-Project Document Type",
+          "SWYConverszGenAlbum-Custom Query Type",
+          "SWYConverszGenAlbum-Trashed State",
+          [
+            "SWYConverszGenAlbum-Trash Date",
+            "datetime"
+          ],
+          "SWYConverszGenAlbum-Cloud Delete State",
+          [
+            "SWYConverszGenAlbum-Creation Date-0",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-Start Date-1",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-End Date-2",
+            "datetime"
+          ],
+          "zAsset- Conversation= zGenAlbum_zPK-3",
+          "SWYConverszGenAlbum- Import Session ID-SWY-4",
+          "SWYzGenAlbum-Imported by Bundle Identifier-5",
+          "SWYConverszGenAlbum-Album Kind-6",
+          "SWYConverszGenAlbum-Cloud_Local_State-7",
+          "SWYConverszGenAlbum- Syndicate-8",
+          "SWYConverszGenAlbum-Sync Event Order Key-9",
+          "SWYConverszGenAlbum-Pinned-10",
+          "SWYConverszGenAlbum-Custom Sort Key-11",
+          "SWYConverszGenAlbum-Custom Sort Ascending-12",
+          "SWYConverszGenAlbum-Is Prototype-13",
+          "SWYConverszGenAlbum-Project Document Type-14",
+          "SWYConverszGenAlbum-Custom Query Type-15",
+          "SWYConverszGenAlbum-Trashed State-16",
+          [
+            "SWYConverszGenAlbum-Trash Date-17",
+            "datetime"
+          ],
+          "SWYConverszGenAlbum-Cloud Delete State-18",
+          "SWYConverszGenAlbum-Privacy State-19"
+        ],
+        "Ph025_2SWYConversationRecordswithNADSyndPL": [
+          [
+            "SWYConverszGenAlbum-Creation Date",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-Start Date",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-End Date",
+            "datetime"
+          ],
+          "zAsset- Conversation= zGenAlbum_zPK",
+          "SWYConverszGenAlbum- Import Session ID-SWY",
+          "SWYzGenAlbum-Imported by Bundle Identifier",
+          "SWYConverszGenAlbum-Album Kind",
+          "SWYConverszGenAlbum-Cloud_Local_State",
+          "SWYConverszGenAlbum- Syndicate",
+          "SWYConverszGenAlbum-Sync Event Order Key",
+          "SWYConverszGenAlbum-Pinned",
+          "SWYConverszGenAlbum-Custom Sort Key",
+          "SWYConverszGenAlbum-Custom Sort Ascending",
+          "SWYConverszGenAlbum-Is Prototype",
+          "SWYConverszGenAlbum-Project Document Type",
+          "SWYConverszGenAlbum-Custom Query Type",
+          "SWYConverszGenAlbum-Trashed State",
+          [
+            "SWYConverszGenAlbum-Trash Date",
+            "datetime"
+          ],
+          "SWYConverszGenAlbum-Cloud Delete State",
+          [
+            "SWYConverszGenAlbum-Creation Date-0",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-Start Date-1",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-End Date-2",
+            "datetime"
+          ],
+          "zAsset- Conversation= zGenAlbum_zPK-3",
+          "SWYConverszGenAlbum- Import Session ID-SWY-4",
+          "SWYzGenAlbum-Imported by Bundle Identifier-5",
+          "SWYConverszGenAlbum-Album Kind-6",
+          "SWYConverszGenAlbum-Cloud_Local_State-7",
+          "SWYConverszGenAlbum- Syndicate-8",
+          "SWYConverszGenAlbum-Sync Event Order Key-9",
+          "SWYConverszGenAlbum-Pinned-10",
+          "SWYConverszGenAlbum-Custom Sort Key-11",
+          "SWYConverszGenAlbum-Custom Sort Ascending-12",
+          "SWYConverszGenAlbum-Is Prototype-13",
+          "SWYConverszGenAlbum-Project Document Type-14",
+          "SWYConverszGenAlbum-Custom Query Type-15",
+          "SWYConverszGenAlbum-Trashed State-16",
+          [
+            "SWYConverszGenAlbum-Trash Date-17",
+            "datetime"
+          ],
+          "SWYConverszGenAlbum-Cloud Delete State-18",
+          "SWYConverszGenAlbum-Privacy State-19"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph026SyndicationPLAssets.py": {
+      "artifacts": {
+        "Ph026_1SyndicationIDAssetsPhDaPsql": [
+          [
+            "zAsset-Date Created-0",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-Creation Date-1",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-Start Date-2",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-End Date-3",
+            "datetime"
+          ],
+          "zAsset- Conversation= zGenAlbum_zPK-4",
+          "SWYConverszGenAlbum- Import Session ID-SWY-5",
+          "SWYzGenAlbum-Imported by Bundle Identifier-6",
+          "zAsset-zPK-7",
+          "zAsset-Directory-Path-8",
+          "zAsset-Filename-9",
+          "zAddAssetAttr- Original Filename-10",
+          "zCldMast- Original Filename-11",
+          "zAddAssetAttr- Syndication Identifier-SWY-Files-12",
+          "zAsset-Syndication State-13",
+          "zAsset-Bundle Scope-14",
+          "zAddAssetAttr- Imported by Bundle Identifier-15",
+          "zAddAssetAttr-Imported By Display Name-16",
+          "zAsset-Visibility State-17",
+          "zAsset-Saved Asset Type-18",
+          "zAddAssetAttr-Share Type-19",
+          [
+            "zAsset- SortToken -CameraRoll-20",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-21",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-22",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-23",
+          "zAddAssetAttr-EXIF-String-24",
+          [
+            "zAsset-Modification Date-25",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-26",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-27",
+            "datetime"
+          ],
+          "zAddAssetAttr-zPK-28",
+          "zAsset-UUID = store.cloudphotodb-29",
+          "zAddAssetAttr-Master Fingerprint-30",
+          "SWYConverszGenAlbum-Album Kind-31",
+          "SWYConverszGenAlbum-Cloud_Local_State-32",
+          "SWYConverszGenAlbum- Syndicate-33",
+          "SWYConverszGenAlbum-Sync Event Order Key-34",
+          "SWYConverszGenAlbum-Pinned-35",
+          "SWYConverszGenAlbum-Custom Sort Key-36",
+          "SWYConverszGenAlbum-Custom Sort Ascending-37",
+          "SWYConverszGenAlbum-Is Prototype-38",
+          "SWYConverszGenAlbum-Project Document Type-39",
+          "SWYConverszGenAlbum-Custom Query Type-40",
+          "SWYConverszGenAlbum-Trashed State-41",
+          [
+            "SWYConverszGenAlbum-Trash Date-42",
+            "datetime"
+          ],
+          "SWYConverszGenAlbum-Cloud Delete State-43",
+          "zAddAssetAttr.Imported by Bundle Identifier-15",
+          "zAsset-Active Library Scope Participation State-20",
+          [
+            "zAsset- SortToken -CameraRoll-21",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-22",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-23",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-24",
+          "zAddAssetAttr-EXIF-String-25",
+          [
+            "zAsset-Modification Date-26",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-27",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-28",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-29",
+          "zAddAssetAttr-zPK-30",
+          "zAsset-UUID = store.cloudphotodb-31",
+          "zAddAssetAttr-Master Fingerprint-32",
+          "SWYConverszGenAlbum-Album Kind-33",
+          "SWYConverszGenAlbum-Cloud_Local_State-34",
+          "SWYConverszGenAlbum- Syndicate-35",
+          "SWYConverszGenAlbum-Sync Event Order Key-36",
+          "SWYConverszGenAlbum-Pinned-37",
+          "SWYConverszGenAlbum-Custom Sort Key-38",
+          "SWYConverszGenAlbum-Custom Sort Ascending-39",
+          "SWYConverszGenAlbum-Is Prototype-40",
+          "SWYConverszGenAlbum-Project Document Type-41",
+          "SWYConverszGenAlbum-Custom Query Type-42",
+          "SWYConverszGenAlbum-Trashed State-43",
+          [
+            "SWYConverszGenAlbum-Trash Date-44",
+            "datetime"
+          ],
+          "SWYConverszGenAlbum-Cloud Delete State-45",
+          "SWYConverszGenAlbum-Privacy State-46",
+          "zAddAssetAttr-Original Stable Hash-32",
+          "zAddAssetAttr.Adjusted Stable Hash-33",
+          "SWYConverszGenAlbum-Album Kind-34",
+          "SWYConverszGenAlbum-Cloud_Local_State-35",
+          "SWYConverszGenAlbum- Syndicate-36",
+          "SWYConverszGenAlbum-Sync Event Order Key-37",
+          "SWYConverszGenAlbum-Pinned-38",
+          "SWYConverszGenAlbum-Custom Sort Key-39",
+          "SWYConverszGenAlbum-Custom Sort Ascending-40",
+          "SWYConverszGenAlbum-Is Prototype-41",
+          "SWYConverszGenAlbum-Project Document Type-42",
+          "SWYConverszGenAlbum-Custom Query Type-43",
+          "SWYConverszGenAlbum-Trashed State-44",
+          [
+            "SWYConverszGenAlbum-Trash Date-45",
+            "datetime"
+          ],
+          "SWYConverszGenAlbum-Cloud Delete State-46",
+          "SWYConverszGenAlbum-Privacy State-47"
+        ],
+        "Ph026_2SyndicationPLAssetsSyndPL": [
+          [
+            "zAsset-Date Created-0",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-Creation Date-1",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-Start Date-2",
+            "datetime"
+          ],
+          [
+            "SWYConverszGenAlbum-End Date-3",
+            "datetime"
+          ],
+          "zAsset- Conversation= zGenAlbum_zPK-4",
+          "SWYConverszGenAlbum- Import Session ID-SWY-5",
+          "SWYzGenAlbum-Imported by Bundle Identifier-6",
+          "zAsset-zPK-7",
+          "zAsset-Directory-Path-8",
+          "zAsset-Filename-9",
+          "zAddAssetAttr- Original Filename-10",
+          "zCldMast- Original Filename-11",
+          "zAddAssetAttr- Syndication Identifier-SWY-Files-12",
+          "zAsset-Syndication State-13",
+          "zAsset-Bundle Scope-14",
+          "zAddAssetAttr- Imported by Bundle Identifier-15",
+          "zAddAssetAttr-Imported By Display Name-16",
+          "zAsset-Visibility State-17",
+          "zAsset-Saved Asset Type-18",
+          "zAddAssetAttr-Share Type-19",
+          [
+            "zAsset- SortToken -CameraRoll-20",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-21",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-22",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-23",
+          "zAddAssetAttr-EXIF-String-24",
+          [
+            "zAsset-Modification Date-25",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-26",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-27",
+            "datetime"
+          ],
+          "zAddAssetAttr-zPK-28",
+          "zAsset-UUID = store.cloudphotodb-29",
+          "zAddAssetAttr-Master Fingerprint-30",
+          "SWYConverszGenAlbum-Album Kind-31",
+          "SWYConverszGenAlbum-Cloud_Local_State-32",
+          "SWYConverszGenAlbum- Syndicate-33",
+          "SWYConverszGenAlbum-Sync Event Order Key-34",
+          "SWYConverszGenAlbum-Pinned-35",
+          "SWYConverszGenAlbum-Custom Sort Key-36",
+          "SWYConverszGenAlbum-Custom Sort Ascending-37",
+          "SWYConverszGenAlbum-Is Prototype-38",
+          "SWYConverszGenAlbum-Project Document Type-39",
+          "SWYConverszGenAlbum-Custom Query Type-40",
+          "SWYConverszGenAlbum-Trashed State-41",
+          [
+            "SWYConverszGenAlbum-Trash Date-42",
+            "datetime"
+          ],
+          "SWYConverszGenAlbum-Cloud Delete State-43",
+          "zAddAssetAttr.Imported by Bundle Identifier-15",
+          "zAsset-Active Library Scope Participation State-20",
+          [
+            "zAsset- SortToken -CameraRoll-21",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-22",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-23",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-24",
+          "zAddAssetAttr-EXIF-String-25",
+          [
+            "zAsset-Modification Date-26",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-27",
+            "datetime"
+          ],
+          [
+            "zAsset-Trashed Date-28",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-29",
+          "zAddAssetAttr-zPK-30",
+          "zAsset-UUID = store.cloudphotodb-31",
+          "zAddAssetAttr-Master Fingerprint-32",
+          "SWYConverszGenAlbum-Album Kind-33",
+          "SWYConverszGenAlbum-Cloud_Local_State-34",
+          "SWYConverszGenAlbum- Syndicate-35",
+          "SWYConverszGenAlbum-Sync Event Order Key-36",
+          "SWYConverszGenAlbum-Pinned-37",
+          "SWYConverszGenAlbum-Custom Sort Key-38",
+          "SWYConverszGenAlbum-Custom Sort Ascending-39",
+          "SWYConverszGenAlbum-Is Prototype-40",
+          "SWYConverszGenAlbum-Project Document Type-41",
+          "SWYConverszGenAlbum-Custom Query Type-42",
+          "SWYConverszGenAlbum-Trashed State-43",
+          [
+            "SWYConverszGenAlbum-Trash Date-44",
+            "datetime"
+          ],
+          "SWYConverszGenAlbum-Cloud Delete State-45",
+          "SWYConverszGenAlbum-Privacy State-46",
+          "zAddAssetAttr-Original Stable Hash-32",
+          "zAddAssetAttr.Adjusted Stable Hash-33",
+          "SWYConverszGenAlbum-Album Kind-34",
+          "SWYConverszGenAlbum-Cloud_Local_State-35",
+          "SWYConverszGenAlbum- Syndicate-36",
+          "SWYConverszGenAlbum-Sync Event Order Key-37",
+          "SWYConverszGenAlbum-Pinned-38",
+          "SWYConverszGenAlbum-Custom Sort Key-39",
+          "SWYConverszGenAlbum-Custom Sort Ascending-40",
+          "SWYConverszGenAlbum-Is Prototype-41",
+          "SWYConverszGenAlbum-Project Document Type-42",
+          "SWYConverszGenAlbum-Custom Query Type-43",
+          "SWYConverszGenAlbum-Trashed State-44",
+          [
+            "SWYConverszGenAlbum-Trash Date-45",
+            "datetime"
+          ],
+          "SWYConverszGenAlbum-Cloud Delete State-46",
+          "SWYConverszGenAlbum-Privacy State-47"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph030iCloudShareMethodsNAD.py": {
+      "artifacts": {
+        "Ph030iCloudSharedMethodswithNADPhDaPsql": [
+          [
+            "zShare-Creation Date-0",
+            "datetime"
+          ],
+          [
+            "zShare-Start Date-1",
+            "datetime"
+          ],
+          [
+            "zShare-End Date-2",
+            "datetime"
+          ],
+          [
+            "zShare-Expiry Date-3",
+            "datetime"
+          ],
+          "zShare-UUID-4",
+          "zShare-Originating Scope ID-5",
+          "zShare-Status-6",
+          "zShare-Scope Type-7",
+          "zShare-Asset Count-8",
+          "zShare-Force Sync Attempted-9",
+          "zShare-Photos Count-10",
+          "zShare-Uploaded Photos Count-11",
+          "zShare-Videos Count-12",
+          "zShare-Uploaded Videos Count-13",
+          "zShare-Scope ID-14",
+          "zShare-Title-SPL-15",
+          "zShare-Share URL-16",
+          "zShare-Local Publish State-17",
+          "zShare-Public Permission-18",
+          "zSharePartic-Acceptance Status-19",
+          "zSharePartic-User ID-20",
+          "zSharePartic-zPK-21",
+          "zSharePartic-Email Address-22",
+          "zSharePartic-Phone Number-23",
+          "zSharePartic-Is Current User-24",
+          "zSharePartic-Role-25",
+          "zSharePartic-Premission-26",
+          "zShare-Should Notify On Upload Completion-27",
+          "zShare-Should Ignore Budgets-28",
+          "zShare-Trashed State-29",
+          "zShare-Cloud Delete State-30",
+          "zShare-zENT-31",
+          "zSharePartic-z54SHARE-6",
+          "zShare-Status-7",
+          "zShare-Scope Type-8",
+          "zShare-Cloud Photo Count-9",
+          "zShare-CountOfAssets AddedByCamera Smart Sharing-HomeShare-10",
+          "zShare-Cloud Video Count-11",
+          "zShare-Asset Count-12",
+          "zShare-Force Sync Attempted-13",
+          "zShare-Photos Count-14",
+          "zShare-Uploaded Photos Count-15",
+          "zShare-Videos Count-16",
+          "zShare-Uploaded Videos Count-17",
+          "zShare-Scope ID-18",
+          "zShare-Title-SPL-19",
+          "zShare-Share URL-20",
+          "zShare-Local Publish State-21",
+          "zShare-Public Permission-22",
+          "zShare-Cloud Local State-23",
+          "zShare-Scope Syncing State-24",
+          "zShare-Auto Share Policy-25",
+          "zSharePartic-Acceptance Status-26",
+          "zSharePartic-User ID-27",
+          "zSharePartic-zPK-28",
+          "zSharePartic-Email Address-29",
+          "zSharePartic-Phone Number-30",
+          "zSharePartic-Participant ID-31",
+          "zSharePartic-UUID-32",
+          "zSharePartic-Is Current User-33",
+          "zSharePartic-Role-34",
+          "zSharePartic-Permission-35",
+          "zShare-Participant Cloud Update State-36",
+          "zSharePartic-Exit State-37",
+          "zShare-Preview State-38",
+          "zShare-Should Notify On Upload Completion-39",
+          "zShare-Should Ignore Budgets-40",
+          "zShare-Exit Source-41",
+          "zShare-Exit State-42",
+          "zShare-Exit Type-43",
+          "zShare-Trashed State-44",
+          "zShare-Cloud Delete State-45",
+          [
+            "zShare-Trashed Date-46",
+            "datetime"
+          ],
+          [
+            "zShare-LastParticipant Asset Trash Notification Date-47",
+            "datetime"
+          ],
+          [
+            "zShare-Last Participant Asset Trash Notification View Date-48",
+            "datetime"
+          ],
+          "zShare-zENT-49",
+          "zSharePartic-z55SHARE-6",
+          "zSharePartic-z61SHARE-6",
+          "zSharePartic-z66SHARE-6",
+          "zShare-Videos Count-15",
+          "zShare-Unseen Assets Count-16",
+          "zShare-Scope ID-17",
+          "zShare-Title-SPL-18",
+          "zShare-Share URL-19",
+          "zShare-Local Publish State-20",
+          "zShare-Public Permission-21",
+          "zShare-Cloud Local State-22",
+          "zShare-Scope Syncing State-23",
+          "zShare-Auto Share Policy-24",
+          "zSharePartic-Acceptance Status-25",
+          "zSharePartic-User ID-26",
+          "zSharePartic-zPK-27",
+          "zSharePartic-Email Address-28",
+          "zSharePartic-Phone Number-29",
+          "zSharePartic-Participant ID-30",
+          "zSharePartic-UUID-31",
+          "zSharePartic-Is Current User-32",
+          "zSharePartic-Role-33",
+          "zSharePartic-Permission-34",
+          "zShare-Participant Cloud Update State-35",
+          "zSharePartic-Exit State-36",
+          "zShare-Preview State-37",
+          "zShare-Should Notify On Upload Completion-38",
+          "zShare-Should Ignore Budgets-38",
+          "zShare-Exit Source-40",
+          "zShare-Exit State-41",
+          "zShare-Exit Type-42",
+          "zShare-Trashed State-43",
+          "zShare-Cloud Delete State-44",
+          [
+            "zShare-Trashed Date-45",
+            "datetime"
+          ],
+          [
+            "zShare-LastParticipant Asset Trash Notification Date-46",
+            "datetime"
+          ],
+          [
+            "zShare-Last Participant Asset Trash Notification View Date-47",
+            "datetime"
+          ],
+          "zShare-zENT-48"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph031iCloudSharePhotoLibraryNAD.py": {
+      "artifacts": {
+        "Ph031iCloudSPLwithParticipantswithNADPhDaPsql": [
+          [
+            "zShare-Creation Date-0",
+            "datetime"
+          ],
+          [
+            "zShare-Start Date-1",
+            "datetime"
+          ],
+          [
+            "zShare-End Date-2",
+            "datetime"
+          ],
+          [
+            "zShare-Expiry Date-3",
+            "datetime"
+          ],
+          "zShare-UUID-4",
+          "zShare-Originating Scope ID-5",
+          "zShare-Status-6",
+          "zShare-Scope Type-7",
+          "zShare-Scope ID-8",
+          "zShare-Title-SPL-9",
+          "zShare-Share URL-10",
+          "zShare-Local Publish State-11",
+          "zShare-Public Permission-12",
+          "zSharePartic-Acceptance Status-13",
+          "zSharePartic-User ID-14",
+          "zSharePartic-zPK-15",
+          "zSharePartic-Email Address-16",
+          "zSharePartic-Phone Number-17",
+          "zSharePartic-Is Current User-18",
+          "zSharePartic-Role-19",
+          "zSharePartic-Premission-20",
+          "zShare-Should Notify On Upload Completion-21",
+          "zShare-Should Ignore Budgets-22",
+          "zShare-Trashed State-23",
+          "zShare-Cloud Delete State-24",
+          "zShare-zENT-25",
+          "zSharePartic-z54SHARE-6",
+          "zShare-Status-7",
+          "zShare-Scope Type-8",
+          "zShare-Cloud Photo Count-9",
+          "zShare-CountOfAssets AddedByCamera Smart Sharing-HomeShare-10",
+          "zShare-Cloud Video Count-11",
+          "zShare-Scope ID-12",
+          "zShare-Title-SPL-13",
+          "zShare-Share URL-14",
+          "zShare-Local Publish State-15",
+          "zShare-Public Permission-16",
+          "zShare-Cloud Local State-17",
+          "zShare-Scope Syncing State-18",
+          "zShare-Auto Share Policy-19",
+          "zSharePartic-Acceptance Status-20",
+          "zSharePartic-User ID-21",
+          "zSharePartic-zPK-22",
+          "zSharePartic-Email Address-23",
+          "zSharePartic-Phone Number-24",
+          "zSharePartic-Participant ID-25",
+          "zSharePartic-UUID-26",
+          "zSharePartic-Is Current User-27",
+          "zSharePartic-Role-28",
+          "zSharePartic-Premission-29",
+          "zShare-Participant Cloud Update State-30",
+          "zSharePartic-Exit State-31",
+          "zShare-Preview State-32",
+          "zShare-Should Notify On Upload Completion-33",
+          "zShare-Should Ignore Budgets-34",
+          "zShare-Exit Source-35",
+          "zShare-Exit State-36",
+          "zShare-Exit Type-37",
+          "zShare-Trashed State-38",
+          "zShare-Cloud Delete State-39",
+          [
+            "zShare-Trashed Date-40",
+            "datetime"
+          ],
+          [
+            "zShare-LastParticipant Asset Trash Notification Date-41",
+            "datetime"
+          ],
+          [
+            "zShare-Last Participant Asset Trash Notification View Date-42",
+            "datetime"
+          ],
+          "zShare-zENT-43",
+          "zSharePartic-z55SHARE-6",
+          "zSharePartic-z61SHARE-6"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph032AssetsIniCldSPLwContrib.py": {
+      "artifacts": {
+        "Ph032iCloudSPLAssetswithContributorPhDaPsql": [
+          [
+            "zAsset-Date Created-0",
+            "datetime"
+          ],
+          "zAsset-Active Library Scope Participation State-1",
+          "zAsset-zPK-2",
+          "zAsset-Directory-Path-3",
+          "zAsset-Filename-4",
+          "zAddAssetAttr- Original Filename-5",
+          "zCldMast- Original Filename-6",
+          "zAddAssetAttr- Syndication Identifier-SWY-Files-7",
+          "zAsset-Syndication State-8",
+          "zAsset-Bundle Scope-9",
+          "zAddAssetAttr-Imported by-10",
+          "zExtAttr-Camera Make-11",
+          "zExtAttr-Camera Model-12",
+          "zAddAssetAttr.Imported by Bundle Identifier-13",
+          "zAddAssetAttr-Imported By Display Name-14",
+          "zAsset-Visibility State-15",
+          "zAsset-Saved Asset Type-16",
+          "zAddAssetAttr-Share Type-17",
+          [
+            "zAsset- SortToken -CameraRoll-18",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-19",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-20",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-21",
+          "zAddAssetAttr-EXIF-String-22",
+          [
+            "zAsset-Modification Date-23",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-24",
+            "datetime"
+          ],
+          "zAsset-Hidden-25",
+          "zAsset-Avalanche_Pick_Type-BurstAsset-26",
+          "zAddAssetAttr-Cloud_Avalanche_Pick_Type-BurstAsset-27",
+          "zAsset-Trashed State-LocalAssetRecentlyDeleted-28",
+          [
+            "zAsset-Trashed Date-29",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-30",
+          "zAddAssetAttr-zPK-31",
+          "zAsset-UUID = store.cloudphotodb-32",
+          "zAddAssetAttr-Master Fingerprint-33",
+          "zAddAssetAttr.Adjusted Fingerprint-34",
+          "SPLzSharePartic-Is Current User-35",
+          "SPLzSharePartic-Role-36",
+          "zAsstContrib-Participant= zSharePartic-zPK-37",
+          "SPLzSharePartic-Email Address-38",
+          "SPLzSharePartic-Phone Number-39",
+          "SPLzShare-Title-SPL-40",
+          "SPLzShare-Share URL-SPL-41",
+          "SPLzShare-Scope ID-SPL-42",
+          [
+            "SPLzShare-Creation Date-SPL-43",
+            "datetime"
+          ],
+          [
+            "SPLzShare-Expiry Date-SPL-44",
+            "datetime"
+          ],
+          "SPLzShare-Cloud Photo Count-SPL-45",
+          "SPLzShare-Assets AddedByCamera SmartSharing-46",
+          "SPLzShare-Cloud Video Count-SPL-47",
+          "SPLzSharePartic-z54SHARE-48",
+          "SPLzShare-Status-49",
+          "SPLzShare-Scope Type-50",
+          "SPLzSharePartic-z55SHARE-48",
+          "zAddAssetAttr- Imported by Bundle Identifier-13",
+          "zAddAssetAttr- Imported By Display Name-14",
+          "zAsset-Is_Recently_Saved-16",
+          "zAsset-Saved Asset Type-17",
+          "zAddAssetAttr-Share Type-18",
+          [
+            "zAsset- SortToken -CameraRoll-19",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-20",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-21",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-22",
+          "zAddAssetAttr-EXIF-String-23",
+          [
+            "zAsset-Modification Date-24",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-25",
+            "datetime"
+          ],
+          "zAsset-Is_Detected_Screenshot-26",
+          "zAsset-Hidden-27",
+          "zAsset-Adjustments_State-Camera-Effects-Filters-28",
+          "zAsset-Avalanche_Kind-29",
+          "zAsset-Avalanche_Pick_Type-BurstAsset-30",
+          "zAddAssetAttr-Cloud_Avalanche_Pick_Type-BurstAsset-31",
+          "zAsset-Trashed State-LocalAssetRecentlyDeleted-32",
+          [
+            "zAsset-Trashed Date-33",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-34",
+          "zAddAssetAttr-zPK-35",
+          "zAsset-UUID = store.cloudphotodb-36",
+          "zAddAssetAttr-Original Stable Hash-37",
+          "zAddAssetAttr.Adjusted Stable Hash-38",
+          "SPLzSharePartic-Is Current User-39",
+          "SPLzSharePartic-Role-40",
+          "zAsstContrib-Participant= zSharePartic-zPK-41",
+          "SPLzSharePartic-Email Address-42",
+          "SPLzSharePartic-Phone Number-43",
+          "SPLzShare-Title-SPL-44",
+          "SPLzShare-Share URL-SPL-45",
+          "SPLzShare-Scope ID-SPL-46",
+          [
+            "SPLzShare-Creation Date-SPL-47",
+            "datetime"
+          ],
+          [
+            "SPLzShare-Expiry Date-SPL-48",
+            "datetime"
+          ],
+          "SPLzShare-Cloud Photo Count-SPL-49",
+          "SPLzShare-Assets AddedByCamera SmartSharing-50",
+          "SPLzShare-Cloud Video Count-SPL-51",
+          "zExtAttr-Generative_AI_Type-52",
+          "zExtAttr-Credit-53"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Ph033AssetsIniCldSPLfromOtherContrib.py": {
+      "artifacts": {
+        "Ph033iCldSPLAssetsfromothercontribPhDaPsql": [
+          [
+            "zAsset-Date Created-0",
+            "datetime"
+          ],
+          "zAsset-Active Library Scope Participation State-1",
+          "zAsset-zPK-2",
+          "zAsset-Directory-Path-3",
+          "zAsset-Filename-4",
+          "zAddAssetAttr- Original Filename-5",
+          "zCldMast- Original Filename-6",
+          "zAddAssetAttr- Syndication Identifier-SWY-Files-7",
+          "zAsset-Syndication State-8",
+          "zAsset-Bundle Scope-9",
+          "zAddAssetAttr-Imported by-10",
+          "zExtAttr-Camera Make-11",
+          "zExtAttr-Camera Model-12",
+          "zAddAssetAttr.Imported by Bundle Identifier-13",
+          "zAddAssetAttr-Imported By Display Name-14",
+          "zAsset-Visibility State-15",
+          "zAsset-Saved Asset Type-16",
+          "zAddAssetAttr-Share Type-17",
+          [
+            "zAsset- SortToken -CameraRoll-18",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-19",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-20",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-21",
+          "zAddAssetAttr-EXIF-String-22",
+          [
+            "zAsset-Modification Date-23",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-24",
+            "datetime"
+          ],
+          "zAsset-Hidden-25",
+          "zAsset-Avalanche_Pick_Type-BurstAsset-26",
+          "zAddAssetAttr-Cloud_Avalanche_Pick_Type-BurstAsset-27",
+          "zAsset-Trashed State-LocalAssetRecentlyDeleted-28",
+          [
+            "zAsset-Trashed Date-29",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-30",
+          "zAddAssetAttr-zPK-31",
+          "zAsset-UUID = store.cloudphotodb-32",
+          "zAddAssetAttr-Master Fingerprint-33",
+          "zAddAssetAttr.Adjusted Fingerprint-34",
+          "SPLzSharePartic-Is Current User-35",
+          "SPLzSharePartic-Role-36",
+          "zAsstContrib-Participant= zSharePartic-zPK-37",
+          "SPLzSharePartic-Email Address-38",
+          "SPLzSharePartic-Phone Number-39",
+          "SPLzShare-Title-SPL-40",
+          "SPLzShare-Share URL-SPL-41",
+          "SPLzShare-Scope ID-SPL-42",
+          [
+            "SPLzShare-Creation Date-SPL-43",
+            "datetime"
+          ],
+          [
+            "SPLzShare-Expiry Date-SPL-44",
+            "datetime"
+          ],
+          "SPLzShare-Cloud Photo Count-SPL-45",
+          "SPLzShare-Assets AddedByCamera SmartSharing-46",
+          "SPLzShare-Cloud Video Count-SPL-47",
+          "zAddAssetAttr- Imported by Bundle Identifier-13",
+          "zAddAssetAttr- Imported By Display Name-14",
+          "zAsset-Is_Recently_Saved-16",
+          "zAsset-Saved Asset Type-17",
+          "zAddAssetAttr-Share Type-18",
+          [
+            "zAsset- SortToken -CameraRoll-19",
+            "datetime"
+          ],
+          [
+            "zAsset-Added Date-20",
+            "datetime"
+          ],
+          [
+            "zCldMast-Creation Date-21",
+            "datetime"
+          ],
+          "zAddAssetAttr-Time Zone Name-22",
+          "zAddAssetAttr-EXIF-String-23",
+          [
+            "zAsset-Modification Date-24",
+            "datetime"
+          ],
+          [
+            "zAsset-Last Shared Date-25",
+            "datetime"
+          ],
+          "zAsset-Is_Detected_Screenshot-26",
+          "zAsset-Hidden-27",
+          "zAsset-Adjustments_State-Camera-Effects-Filters-28",
+          "zAsset-Avalanche_Kind-29",
+          "zAsset-Avalanche_Pick_Type-BurstAsset-30",
+          "zAddAssetAttr-Cloud_Avalanche_Pick_Type-BurstAsset-31",
+          "zAsset-Trashed State-LocalAssetRecentlyDeleted-32",
+          [
+            "zAsset-Trashed Date-33",
+            "datetime"
+          ],
+          "zAsset-Trashed by Participant= zShareParticipant_zPK-34",
+          "zAddAssetAttr-zPK-35",
+          "zAsset-UUID = store.cloudphotodb-36",
+          "zAddAssetAttr-Original Stable Hash-37",
+          "zAddAssetAttr.Adjusted Stable Hash-38",
+          "SPLzSharePartic-Is Current User-39",
+          "SPLzSharePartic-Role-40",
+          "zAsstContrib-Participant= zSharePartic-zPK-41",
+          "SPLzSharePartic-Email Address-42",
+          "SPLzSharePartic-Phone Number-43",
+          "SPLzShare-Title-SPL-44",
+          "SPLzShare-Share URL-SPL-45",
+          "SPLzShare-Scope ID-SPL-46",
+          [
+            "SPLzShare-Creation Date-SPL-47",
+            "datetime"
+          ],
+          [
+            "SPLzShare-Expiry Date-SPL-48",
+            "datetime"
+          ],
+          "SPLzShare-Cloud Photo Count-SPL-49",
+          "SPLzShare-Assets AddedByCamera SmartSharing-50",
+          "SPLzShare-Cloud Video Count-SPL-51",
+          "zExtAttr-Generative_AI_Type-52",
+          "zExtAttr-Credit-53"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

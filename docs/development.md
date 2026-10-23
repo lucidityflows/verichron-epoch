@@ -36,6 +36,23 @@ Each version is declared once, in the file the enforcing tool reads:
 Dependabot proposes updates to the npm and uv dependencies, the CI actions and
 the iLEAPP submodule. `mise.toml` and `.python-version` are updated by hand.
 
+Before accepting an iLEAPP pin update, run
+`uv run python scripts/audit_ileapp_entity_headers.py` to compare source-declared
+artifact headers in every module with the reviewed baseline. The baseline is a
+deterministic, alphabetically grouped set of size-bounded shards, indexed by
+`packages/contracts/ileapp_source_headers/index.json`. Review every addition,
+removal and possible rename. The check exits unsuccessfully while any
+declaration remains unresolved; resolve those declarations before accepting
+the pin. Do not run iLEAPP or use a device's output to build this source
+inventory. It records source declarations, not observed output or entity
+meaning; verifying tool output remains separate (R36). This drift check is a
+mechanical verification (R34). After reviewing the new pin, refresh the
+baseline with
+`uv run python scripts/audit_ileapp_entity_headers.py --update-baseline` and
+commit that source-derived baseline with the pin change. The separate
+`scripts/snapshot_ileapp_schema.py` records headers observed in real output and
+does not replace the all-module source audit.
+
 ## Environments
 
 | Environment | Holds | Used by |

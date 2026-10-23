@@ -1,0 +1,400 @@
+{
+  "modules": {
+    "scripts/artifacts/appleStopwatch.py": {
+      "artifacts": {
+        "stopwatch": [
+          "Stopwatch State",
+          "Stopwatch Time",
+          "Stopwatch Lap",
+          "Stopwatch Lap Time"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleTimers.py": {
+      "artifacts": {
+        "timer": [
+          [
+            "First Date",
+            "datetime"
+          ],
+          [
+            "Last Modified",
+            "datetime"
+          ],
+          "Timer Title",
+          "Timer State",
+          "Timer Time",
+          "Timer Sound"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleWalletCards.py": {
+      "artifacts": {
+        "applewalletcards": [
+          [
+            "Cache Entry Timestamp",
+            "datetime"
+          ],
+          "Possible Card Number (pattern match)",
+          "Possible Expiration (pattern match)",
+          "Possible Card Type (first-digit heuristic)"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleWalletPasses.py": {
+      "artifacts": {
+        "get_appleWalletPKPasses": [
+          "Identifier",
+          "Items",
+          "Source File"
+        ],
+        "get_appleWalletNanoPasses": [
+          [
+            "Pass Added",
+            "datetime"
+          ],
+          "Unique ID",
+          "Organization Name",
+          "Type",
+          "Localized Description",
+          "Pending Delete",
+          "Front Fields Content",
+          "Back Fields Content",
+          "Encoded Pass",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleWalletTransactions.py": {
+      "artifacts": {
+        "appleWalletTransactions": [
+          [
+            "Transaction Date",
+            "datetime"
+          ],
+          "Merchant",
+          "Locality",
+          "Administrative Area",
+          "Currency Amount",
+          "Currency Type",
+          [
+            "Location Date",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Altitude",
+          "Peer Payment Handle",
+          "Payment Memo",
+          "Transaction Status",
+          "Transaction Type"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleWifiPlist.py": {
+      "artifacts": {
+        "appleWifiKnownNetworks": [
+          "SSID",
+          "BSSID",
+          "Network Usage",
+          "Country Code",
+          "Device Name",
+          "Manufacturer",
+          "Serial Number",
+          "Model Name",
+          "Enabled",
+          "Carplay Network",
+          "Hidden",
+          "Captive Network",
+          "User Portal URL",
+          "Add Reason",
+          "Bundle ID",
+          "Source File"
+        ],
+        "appleWifiKnownNetworksTimes": [
+          [
+            "Last Updated",
+            "datetime"
+          ],
+          "SSID",
+          "BSSID",
+          [
+            "Last Auto Joined",
+            "datetime"
+          ],
+          [
+            "Last Joined",
+            "datetime"
+          ],
+          [
+            "System Joined",
+            "datetime"
+          ],
+          [
+            "User Joined",
+            "datetime"
+          ],
+          [
+            "WiFi Network Password Modification Date",
+            "datetime"
+          ],
+          [
+            "Last Discovered",
+            "datetime"
+          ],
+          [
+            "Added At",
+            "datetime"
+          ],
+          [
+            "Whitelisted Captive Network Probe Date",
+            "datetime"
+          ],
+          [
+            "Captive Web Sheet Login Date",
+            "datetime"
+          ],
+          [
+            "Previous Joined",
+            "datetime"
+          ],
+          "Source File"
+        ],
+        "appleWifiScannedPrivate": [
+          [
+            "Last Updated",
+            "datetime"
+          ],
+          [
+            "Added At",
+            "datetime"
+          ],
+          [
+            "Last Joined",
+            "datetime"
+          ],
+          [
+            "Link Down Timestamp",
+            "datetime"
+          ],
+          [
+            "MAC Generation Timestamp",
+            "datetime"
+          ],
+          [
+            "First Join With New MAC Timestamp",
+            "datetime"
+          ],
+          "SSID",
+          "BSSID",
+          "MAC Used For Network",
+          "Private MAC Computed For Network",
+          "MAC Valid",
+          "In Known Networks",
+          "Source File"
+        ],
+        "appleWifiBSSList": [
+          "SSID",
+          "BSSID",
+          "Channel Flags",
+          "Channel",
+          [
+            "Last Associated/Roamed At",
+            "datetime"
+          ],
+          "Location Accuracy",
+          [
+            "Location Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appleWorldClock.py": {
+      "artifacts": {
+        "worldclock": [
+          "Identifier",
+          "Country Name",
+          "Locale Code",
+          "City",
+          "Timezone",
+          "Latitude",
+          "Longitude",
+          "Yahoo Code"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/apple_atx_images.py": {
+      "artifacts": {
+        "apple_atx_images": [
+          [
+            "File Created",
+            "datetime"
+          ],
+          [
+            "File Modified",
+            "datetime"
+          ],
+          [
+            "Image",
+            "media"
+          ],
+          "Filename",
+          "Width",
+          "Height",
+          "Depth",
+          "Array Layers",
+          "Mipmaps",
+          "Pixel Format",
+          "Texture UUID",
+          "Payload",
+          "Payload Bytes",
+          "Declared Payload Bytes",
+          "Chunks",
+          "Status",
+          "Source Path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/applicationStateDB.py": {
+      "artifacts": {
+        "get_installed_apps": [
+          "Bundle ID",
+          "Bundle Path",
+          "Sandbox Path"
+        ],
+        "get_snapshot_creationDate": [
+          "Creation Date",
+          "Bundle ID",
+          "Snapshot Group",
+          "Snapshot Index",
+          "Expiration Date",
+          "Last Used Date",
+          "Launch Interface Identifier",
+          "Relative Path",
+          "Group ID",
+          "Image Scale",
+          "Fullscreen",
+          "Name",
+          "Interface Orientation",
+          "File Location",
+          "Background Style",
+          "Identifier",
+          "Reference Size",
+          "Content Type",
+          "Image Opaque",
+          "Required OS Version"
+        ],
+        "get_snapshot_lastUsedDate": [
+          [
+            "Last Used Date",
+            "datetime"
+          ],
+          "Bundle ID",
+          "Snapshot Group",
+          "Snapshot Index",
+          "Expiration Date",
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          "Launch Interface Identifier",
+          "Relative Path",
+          "Group ID",
+          "Image Scale",
+          "Fullscreen",
+          "Name",
+          "Interface Orientation",
+          "File Location",
+          "Background Style",
+          "Identifier",
+          "Reference Size",
+          "Content Type",
+          "Image Opaque",
+          "Required OS Version"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/ashHistory.py": {
+      "artifacts": {
+        "AshHistory": [
+          "Sequence",
+          "Command"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/atxDatastore.py": {
+      "artifacts": {
+        "atx_datastore": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "AppSessionStartDate",
+            "datetime"
+          ],
+          [
+            "AppSessionEndDate",
+            "datetime"
+          ],
+          "Type",
+          "Latitude",
+          "Longitude",
+          "Location",
+          "Previous Location",
+          "ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/audiTripdata.py": {
+      "artifacts": {
+        "get_audiTripdata": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Avg. Speed",
+          "Travel Time",
+          "Start Mileage",
+          "Mileage",
+          "Overall Mileage",
+          "Trip ID",
+          "Avg. Electric Consumption",
+          "Avg. Fuel Consumption",
+          "Zero Emission Distance",
+          "Trip Type",
+          "Report Reason",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

@@ -1,0 +1,389 @@
+{
+  "modules": {
+    "scripts/artifacts/biomeSafariWebPagePerformance.py": {
+      "artifacts": {
+        "get_biomeSafariWebPagePerformance": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Rounded Timestamp (30 min)",
+            "datetime"
+          ],
+          "SEGB State",
+          "Detail (raw)",
+          "Field 3 (raw)",
+          "Field 4 (raw)",
+          "Field 5 (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeSetsStores.py": {
+      "artifacts": {
+        "biomeSetsInstalledApps": [
+          [
+            "Modified",
+            "datetime"
+          ],
+          "Bundle ID",
+          "App Name",
+          "Other Fields"
+        ],
+        "biomeSetsContacts": [
+          [
+            "Modified",
+            "datetime"
+          ],
+          "Given Name",
+          "Family Name",
+          "Other Fields"
+        ],
+        "biomeSetsFindMyDevices": [
+          [
+            "Modified",
+            "datetime"
+          ],
+          "Device Name",
+          "Owner Given Name",
+          "Owner Family Name",
+          "Other Fields"
+        ],
+        "biomeSetsSignificantLocations": [
+          [
+            "Modified",
+            "datetime"
+          ],
+          "Label",
+          "Street",
+          "Area",
+          "City",
+          "Country",
+          "Other Fields"
+        ],
+        "biomeSetsShortcutPhrases": [
+          [
+            "Modified",
+            "datetime"
+          ],
+          "Source App",
+          "Phrase",
+          "Phrase Template",
+          "Intent URL",
+          "Source File"
+        ],
+        "biomeSetsShortcutEntities": [
+          [
+            "Modified",
+            "datetime"
+          ],
+          "Source App",
+          "Entity Name",
+          "Entity Identifier",
+          "Entity Type",
+          "Query Provider",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeShareSheetConversation.py": {
+      "artifacts": {
+        "get_biomeShareSheetConversation": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Interaction Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Contact Handle",
+          "Conversation ID",
+          "Field 10 (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeShareSheetFeedback.py": {
+      "artifacts": {
+        "get_biomeShareSheetFeedback": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Source App",
+          "Chosen Activity",
+          "Activity Type",
+          "Offered Candidates",
+          "Event UUID",
+          "Session ID",
+          "Field 17 (raw)",
+          "Field 20 (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeSiriRemembersAssistantSuggestions.py": {
+      "artifacts": {
+        "get_biomeSiriRemembersAssistantSuggestions": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Suggestion Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Suggestions",
+          "Suggestion Types",
+          "Bundle ID",
+          "Intent Class",
+          "Metadata",
+          "Event ID",
+          "Sync Origin",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeSiriRemembersAudioHistory.py": {
+      "artifacts": {
+        "get_biomeSiriRemembersAudioHistory": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Playback Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Title",
+          "Artist",
+          "Media Type",
+          "Bundle ID",
+          "Media ID",
+          "Item ID",
+          "Intent Class",
+          "Intent UUID",
+          "Sync Origin",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeSiriRemembersCallHistory.py": {
+      "artifacts": {
+        "get_biomeSiriRemembersCallHistory": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Call Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Direction",
+          "Bundle ID",
+          "Contacts",
+          "Contact Handles",
+          "Group Name",
+          "Is Group",
+          "Conversation ID",
+          "Call GUID",
+          "Intent Class",
+          "Sync Origin",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeSiriRemembersInteractionHistory.py": {
+      "artifacts": {
+        "get_biomeSiriRemembersInteractionHistory": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Intent Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Intent Class",
+          "Domain",
+          "Parameters",
+          "Intent UUID",
+          "Item GUID",
+          "Sync Origin",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeSiriRemembersMessageHistory.py": {
+      "artifacts": {
+        "get_biomeSiriRemembersMessageHistory": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Message Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Direction",
+          "Bundle ID",
+          "Sender",
+          "Sender Handle",
+          "Recipients",
+          "Recipient Handles",
+          "Group Name",
+          "Is Group",
+          "Chat ID",
+          "Message GUID",
+          "Intent Class",
+          "Sync Origin",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeSiriUI.py": {
+      "artifacts": {
+        "get_biomeSiriUI": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Interface State",
+          "State (raw)",
+          "Dismissal Reason",
+          "Session ID",
+          "Related ID",
+          "Presentation (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeStreams.py": {
+      "artifacts": {
+        "biomeProactiveMail": [
+          [
+            "Harvest Time",
+            "datetime"
+          ],
+          "SEGB State",
+          [
+            "Message Date",
+            "datetime"
+          ],
+          "Subject",
+          "Sender",
+          "Recipient",
+          "Message ID",
+          "Filename",
+          "Offset"
+        ],
+        "biomeProactiveMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Service and Handle",
+          "Content",
+          "Sender",
+          "GUID",
+          "Filename",
+          "Offset"
+        ],
+        "biomeMessagesRead": [
+          [
+            "Read Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Message ID",
+          "Filename",
+          "Offset"
+        ],
+        "biomeScreenTimeAppUsage": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Event (as stored)",
+          "Filename",
+          "Offset"
+        ],
+        "biomeKeyboardTokens": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Token",
+          "Frequency",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeSync.py": {
+      "artifacts": {
+        "biome_sync": [
+          [
+            "Last Sync Timestamp",
+            "datetime"
+          ],
+          "Device ID",
+          "Name",
+          "Device Type",
+          "OS Build",
+          "OS Version",
+          "Local Device"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

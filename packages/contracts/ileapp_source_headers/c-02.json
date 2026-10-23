@@ -1,0 +1,501 @@
+{
+  "modules": {
+    "scripts/artifacts/celWireless.py": {
+      "artifacts": {
+        "celWireless": [
+          "Data Key",
+          "Data Value",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/chatgpt.py": {
+      "artifacts": {
+        "chatgptConversationsMetadata": [
+          [
+            "Creation Time",
+            "datetime"
+          ],
+          [
+            "Modification Date",
+            "datetime"
+          ],
+          "Title",
+          "Conversation ID",
+          "Model",
+          "Custom Instructions (Model)",
+          "Custom Instructions (User)",
+          "Custom Instructions (Enabled)",
+          "Is Temporary",
+          "File Path"
+        ],
+        "chatgptConversations": [
+          [
+            "Creation Time",
+            "datetime"
+          ],
+          "Message ID",
+          "Conversation Title",
+          "Conversation ID",
+          "Author",
+          "Parts",
+          "Content Type",
+          "Finish Details",
+          "Voice Mode Message",
+          "Metadata",
+          "File Path"
+        ],
+        "chatgptDraftConversations": [
+          "Conversation ID",
+          "Content",
+          "File Path"
+        ],
+        "chatgptPreferences": [
+          "Account ID",
+          "User ID",
+          "Email",
+          "Plan Type",
+          "Paid Plan",
+          "Workspace ID",
+          "Device ID",
+          "Segments Events"
+        ],
+        "chatgptMediaUploads": [
+          [
+            "Media",
+            "media"
+          ],
+          "File Name",
+          "File Path"
+        ],
+        "chatgptVoicePrompts": [
+          [
+            "Voice Prompt",
+            "media"
+          ],
+          "File Name",
+          "File Path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/chrome.py": {
+      "artifacts": {
+        "chromeWebHistory": [
+          "Last Visit Time",
+          "URL",
+          "Title",
+          "Visit Count",
+          "Typed Count",
+          "ID",
+          "Hidden"
+        ],
+        "chromeWebVisits": [
+          "Visit Timestamp",
+          "URL",
+          "Title",
+          "Duration",
+          "Transition Type",
+          "Qualifier(s)",
+          "From Visit URL"
+        ],
+        "chromeWebSearch": [
+          "Last Visit Time",
+          "Search Term",
+          "URL",
+          "Title",
+          "Visit Count"
+        ],
+        "chromeDownloads": [
+          "Start Time",
+          "End Time",
+          "Last Access Time",
+          "URL",
+          "Target Path",
+          "State",
+          "Danger Type",
+          "Interrupt Reason",
+          "Opened?",
+          "Received Bytes",
+          "Total Bytes"
+        ],
+        "chromeKeywordSearchTerms": [
+          "Last Visit Time",
+          "Term",
+          "URL"
+        ],
+        "chromeAutofillEntries": [
+          "Date Created",
+          "Field",
+          "Value",
+          "Date Last Used",
+          "Count"
+        ],
+        "chromeAutofillProfiles": [
+          "Date Modified",
+          "GUID",
+          "First Name",
+          "Middle Name",
+          "Last Name",
+          "Email",
+          "Phone Number",
+          "Company Name",
+          "Address",
+          "City",
+          "State",
+          "Zip Code",
+          "Date Last Used",
+          "Use Count"
+        ],
+        "chromeBookmarks": [
+          "Added Date",
+          "URL",
+          "Name",
+          "Parent",
+          "Type"
+        ],
+        "chromeCookies": [
+          "Last Access Date",
+          "Host",
+          "Name",
+          "Value",
+          "Created Date",
+          "Expiration Date",
+          "Path"
+        ],
+        "chromeLoginData": [
+          "Created Time",
+          "Username",
+          "Password",
+          "Origin URL",
+          "Blacklisted by User"
+        ],
+        "chromeTopSites": [
+          "URL",
+          "Rank",
+          "Title",
+          "Redirects"
+        ],
+        "chromeOfflinePages": [
+          "Creation Time",
+          "Last Access Time",
+          "Online URL",
+          "File Path",
+          "Title",
+          "Access Count",
+          "File Size"
+        ],
+        "chromeMediaHistorySessions": [
+          "Last Updated",
+          "Origin ID",
+          "URL",
+          "Position",
+          "Duration",
+          "Title",
+          "Artist",
+          "Album",
+          "Source Title"
+        ],
+        "chromeMediaHistoryPlaybacks": [
+          "Last Updated",
+          "ID",
+          "Origin ID",
+          "URL",
+          "Watch Time",
+          "Has Audio",
+          "Has Video"
+        ],
+        "chromeMediaHistoryOrigins": [
+          "Last Updated",
+          "ID",
+          "Origin",
+          "Aggregate Watchtime"
+        ],
+        "chromeNetworkActionPredictor": [
+          "User Text",
+          "URL",
+          "Number of Hits",
+          "Number of Misses"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/chromeCreditCards.py": {
+      "artifacts": {
+        "get_chromeCreditCards": [
+          [
+            "Date Last Used",
+            "datetime"
+          ],
+          "Name on Card",
+          "Card Network (as stored)",
+          "Last Four Digits",
+          "Expiration Month",
+          "Expiration Year",
+          "Use Count",
+          "Bank Name",
+          "Nickname",
+          "Product Description",
+          "Card Issuer ID",
+          "Card Issuer",
+          "Virtual Card Enrollment State",
+          "Card Creation Source",
+          "Billing Address ID",
+          "Instrument ID",
+          "Card Art URL",
+          "Server ID",
+          "Browser Name",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/chromePaymentsCustomerData.py": {
+      "artifacts": {
+        "get_chromePaymentsCustomerData": [
+          "Customer ID",
+          "Browser Name",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/cloudkitSharing.py": {
+      "artifacts": {
+        "cloudkit_sharing": [
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          [
+            "Modified Date",
+            "datetime"
+          ],
+          "Source File",
+          "Source Z_PK",
+          "ZIDENTIFIER",
+          "Record ID",
+          "Root Record ID",
+          "Record Type",
+          "Creator User Record ID",
+          "Last Modified User Record ID",
+          "Modified By Device",
+          "Container Identifier",
+          "Displayed Hostname",
+          "Public Permission",
+          "Participant Visibility",
+          "Allows Anonymous Access",
+          "Known To Server"
+        ],
+        "cloudkit_participants": [
+          "Source File",
+          "Source Z_PK",
+          "ZIDENTIFIER",
+          "Share Record ID",
+          "Root Record ID",
+          "Participant ID",
+          "Participant User Record ID",
+          "Email Address",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Participant Type",
+          "Acceptance Status",
+          "Permission",
+          "Original Participant Type",
+          "Original Acceptance Status",
+          "Original Permission",
+          "Is Current User",
+          "Inviter ID",
+          "Has iCloud Account",
+          "Invitation Token Status",
+          "Wants New Invitation Token",
+          "Is Anonymous Invited Participant",
+          "Created In Process",
+          "Accepted In Process",
+          "Name Prefix",
+          "First Name",
+          "Middle Name",
+          "Last Name",
+          "Name Suffix",
+          "Nickname"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/cloudkit_cache.py": {
+      "artifacts": {
+        "cloudkit_snapshots": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "Snapshot Modification Timestamp",
+            "datetime"
+          ],
+          [
+            "Snapshot Created Timestamp",
+            "datetime"
+          ],
+          "Snapshot ID",
+          "Committed",
+          "Device UUID",
+          "Device Name",
+          "Product Version",
+          "Backup Type",
+          "Backup Reason",
+          "Is Backup Allowed On Cellular",
+          "File Count",
+          "Total File Size"
+        ],
+        "cloudkit_files": [
+          [
+            "Modified",
+            "datetime"
+          ],
+          "Snapshot ID",
+          "Relative Path",
+          "File ID",
+          "File Domain",
+          "Deleted",
+          "File Type",
+          "Size",
+          "Protection Class",
+          "ManifestID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/clubhouse.py": {
+      "artifacts": {
+        "clubhouseAccount": [
+          "Name",
+          "Username",
+          "User Server ID",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Photo URL",
+          "Device ID",
+          "Is Admin",
+          "Num Invites",
+          "Co-follows",
+          "Blind Invite User",
+          "Upgraded From V1",
+          "Has Seen Onboarding",
+          [
+            "Last Sync",
+            "datetime"
+          ],
+          "Following User IDs",
+          "Blocked User IDs"
+        ],
+        "clubhouseContacts": [
+          [
+            "Store Last Updated",
+            "datetime"
+          ],
+          "Name",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "In App",
+          "pop (score)",
+          "Address Book Identifier",
+          "Contact Hash",
+          "Image Path"
+        ],
+        "clubhouseConversations": [
+          "Participant Name",
+          "Conversation ID",
+          "Image URL"
+        ],
+        "clubhouseNotifications": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Notification ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/cnaAutocompleteFeedback.py": {
+      "artifacts": {
+        "get_cnaAutocompleteFeedback": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Report Time",
+            "datetime"
+          ],
+          "SEGB State",
+          "App",
+          "Feedback Type",
+          "Is Implicit",
+          "Suggested Name",
+          "Suggested Handle",
+          "Handle Type",
+          "Recipient Identifier",
+          "Conversation ID",
+          "Suggestion Reason",
+          "Group Name",
+          "Family Suggestion",
+          "Interaction Detail",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/connectedDevices.py": {
+      "artifacts": {
+        "conDev": [
+          "User Name",
+          "Computer Name",
+          "File Offset",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/controlCenter.py": {
+      "artifacts": {
+        "controlCenter": [
+          "Position",
+          "App Bundle",
+          "Control Type",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/coreAccessoriesAcc.py": {
+      "artifacts": {
+        "get_coreAccessories": [
+          "eventTime"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}
