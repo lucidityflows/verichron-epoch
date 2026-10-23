@@ -2059,7 +2059,6 @@
   "reviewed_artifacts": [
     "Account Configuration",
     "Account Data",
-    "Address Book",
     "Alarms",
     "Apple Account - Deleted Device List",
     "Apple Account - Device List",
@@ -2072,7 +2071,6 @@
     "Apple Wallet - PK Passes",
     "Apple Wallet Cards",
     "Apple Wallet Transactions",
-    "Blocked contacts",
     "Calendar Birthdays",
     "Calendar Events",
     "Calendar List",

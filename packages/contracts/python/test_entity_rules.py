@@ -15,7 +15,6 @@ ILEAPP_ROOT = REPO / "tools" / "ileapp" / "iLEAPP"
 VER_291_ARTIFACTS = {
     "Account Configuration",
     "Account Data",
-    "Address Book",
     "Alarms",
     "Apple Account - Deleted Device List",
     "Apple Account - Device List",
@@ -28,7 +27,6 @@ VER_291_ARTIFACTS = {
     "Apple Wallet - PK Passes",
     "Apple Wallet Cards",
     "Apple Wallet Transactions",
-    "Blocked contacts",
     "Calendar Birthdays",
     "Calendar Events",
     "Calendar List",
