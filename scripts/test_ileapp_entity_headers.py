@@ -164,15 +164,25 @@ def test_resolves_nested_header_unpacking_from_locals_and_constants(tmp_path: Pa
     assert errors == []
 
 
-def test_unresolved_reassignment_preserves_valid_header_alias(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("initial", "expression"),
+    [
+        ("['Old']", "build_headers(context)"),
+        ("['Old']", "build_headers(headers[:])"),
+        ("['Old']", "build_headers(list(headers))"),
+        ("['Old']", "build_headers(tuple(headers))"),
+        ("('Old',)", "build_headers(headers)"),
+    ],
+)
+def test_unresolved_reassignment_preserves_valid_header_alias(tmp_path: Path, initial: str, expression: str) -> None:
     artifacts = tmp_path / "scripts" / "artifacts"
     artifacts.mkdir(parents=True)
     (artifacts / "sample.py").write_text(
         "@artifact_processor\n"
         "def sample(context):\n"
-        "    headers = ['Old']\n"
+        f"    headers = {initial}\n"
         "    alias = headers\n"
-        "    headers = build_headers(context)\n"
+        f"    headers = {expression}\n"
         "    data_headers = alias\n"
         "    return data_headers, [], ''\n",
         encoding="utf-8",
@@ -182,6 +192,46 @@ def test_unresolved_reassignment_preserves_valid_header_alias(tmp_path: Path) ->
 
     assert inventory == {"scripts/artifacts/sample.py": {"sample": ["Old"]}}
     assert errors == []
+
+
+@pytest.mark.parametrize("declare_before_call", [True, False])
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "headers = mutate(headers)",
+        "unused = mutate(headers)",
+        "headers = alias.pop()",
+        "headers = mutate(shared=alias)",
+        "headers = mutate([alias])",
+        "headers = mutate({'shared': alias})",
+        "headers = mutate(alias if context else [])",
+        "headers += mutate(headers)",
+        "headers[0] = mutate(headers)",
+    ],
+)
+def test_unresolved_call_invalidates_shared_header_aliases(
+    tmp_path: Path, declare_before_call: bool, statement: str
+) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    declaration = "    data_headers = alias\n"
+    (artifacts / "sample.py").write_text(
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    headers = ['Old']\n"
+        "    alias = headers\n"
+        + (declaration if declare_before_call else "")
+        + f"    {statement}\n"
+        + ("" if declare_before_call else declaration)
+        + "    return data_headers, [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {}
+    assert len(errors) == 1
+    assert "data_headers" in errors[0]
 
 
 def test_dynamic_header_reassignment_does_not_reuse_previous_value(tmp_path: Path) -> None:

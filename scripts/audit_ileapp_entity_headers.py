@@ -90,6 +90,21 @@ def _resolve(expression: ast.expr, names: dict[str, Any]) -> Any:
         values = _resolve(expression.func.value, names)
         if isinstance(values, (list, tuple)):
             return values.index(_resolve(expression.args[0], names))
+    if isinstance(expression, ast.Call):
+        inputs = [*expression.args, *(keyword.value for keyword in expression.keywords)]
+        if isinstance(expression.func, ast.Attribute):
+            inputs.append(expression.func.value)
+        exposed_ids: set[int] = set()
+        for argument in inputs:
+            try:
+                exposed_ids.update(_container_ids(_resolve(argument, names), mutable_only=True))
+            except IndexError, KeyError, TypeError, ValueError:
+                for node in ast.walk(argument):
+                    if isinstance(node, ast.Name) and node.id in names:
+                        exposed_ids.update(_container_ids(names[node.id], mutable_only=True))
+        for name, value in list(names.items()):
+            if _container_ids(value) & exposed_ids:
+                names.pop(name)
     raise ValueError("header declaration is not a supported static expression")
 
 
@@ -150,15 +165,18 @@ def _bound_values(target: ast.expr, value: Any) -> dict[str, Any]:
     return {}
 
 
-def _container_ids(value: Any) -> set[int]:
+def _container_ids(value: Any, *, mutable_only: bool = False) -> set[int]:
     if isinstance(value, dict):
         identities = {id(value)}
         for key, item in value.items():
-            identities.update(_container_ids(key))
-            identities.update(_container_ids(item))
+            identities.update(_container_ids(key, mutable_only=mutable_only))
+            identities.update(_container_ids(item, mutable_only=mutable_only))
         return identities
     if isinstance(value, (list, tuple, set)):
-        return {id(value), *(identity for item in value for identity in _container_ids(item))}
+        identities = set() if mutable_only and isinstance(value, tuple) else {id(value)}
+        for item in value:
+            identities.update(_container_ids(item, mutable_only=mutable_only))
+        return identities
     return set()
 
 
@@ -210,6 +228,8 @@ def _header_declaration(
         names.update(copy.deepcopy(bindings))
     declarations: list[tuple[Any, list[Any]]] = []
     for node in _assignments(function.body):
+        if declarations and "data_headers" not in names:
+            return None, "data_headers is mutated dynamically"
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
             call = node.value
             if isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name):
@@ -257,10 +277,11 @@ def _header_declaration(
             if node.target.id == "data_headers":
                 return None, "data_headers is updated dynamically"
             if node.target.id in names:
+                source = names[node.target.id]
+                updates_headers = source is names.get("data_headers")
                 try:
                     value = _resolve(node.value, names)
                     if isinstance(node.op, ast.Add):
-                        source = names[node.target.id]
                         if isinstance(source, list):
                             additions = list(value)
                             source.extend(additions)
@@ -270,7 +291,6 @@ def _header_declaration(
                         else:
                             names[node.target.id] = source + value
                 except IndexError, KeyError, TypeError, ValueError:
-                    updates_headers = names[node.target.id] is names.get("data_headers")
                     _invalidate_bindings(names, {node.target.id})
                     if updates_headers:
                         return None, "data_headers is updated dynamically"
@@ -360,6 +380,8 @@ def _header_declaration(
             else:
                 names[name] = resolved
 
+    if declarations and "data_headers" not in names:
+        return None, "data_headers is mutated dynamically"
     if not declarations:
         for node in _returns(function.body):
             if isinstance(node.value, (ast.List, ast.Tuple)) and node.value.elts:
