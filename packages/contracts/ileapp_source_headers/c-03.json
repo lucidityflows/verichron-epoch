@@ -1,0 +1,13 @@
+{
+  "modules": {
+    "scripts/artifacts/coreAccessoriesUserEvent.py": {
+      "artifacts": {
+        "get_coreAccessoriesUserEvent": [
+          "eventTime"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

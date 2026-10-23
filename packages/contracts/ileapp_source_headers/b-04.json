@@ -1,0 +1,306 @@
+{
+  "modules": {
+    "scripts/artifacts/biomeIntelligenceEntity.py": {
+      "artifacts": {
+        "biomeIntelligenceEntities": [
+          "Subject ID",
+          "Predicate",
+          "Relationship ID",
+          "Relationship Predicate",
+          "Object"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeIntents.py": {
+      "artifacts": {
+        "get_biomeIntents": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "End Date",
+            "datetime"
+          ],
+          "Duration Interval",
+          "Donated by Siri",
+          "App ID",
+          "Classname",
+          "Action",
+          "Direction",
+          "Group ID",
+          "Data",
+          "Filename",
+          "Protobuf data Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeLocationVisit.py": {
+      "artifacts": {
+        "get_biomeLocationVisit": [
+          [
+            "Arrival Timestamp",
+            "datetime"
+          ],
+          [
+            "Departure Timestamp",
+            "datetime"
+          ],
+          [
+            "Detection Timestamp",
+            "datetime"
+          ],
+          [
+            "SEGB Write Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Latitude",
+          "Longitude",
+          "Horizontal Accuracy (m)",
+          "Altitude",
+          "Vertical Accuracy",
+          "Confidence",
+          "Place Name",
+          "Place Address",
+          "Place Category",
+          "Place ID",
+          "Visit ID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeLocationactivity.py": {
+      "artifacts": {
+        "get_biomeLocationactivity": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Time Start",
+            "datetime"
+          ],
+          [
+            "Time End",
+            "datetime"
+          ],
+          [
+            "Time Write",
+            "datetime"
+          ],
+          "SEGB State",
+          "Activity",
+          "Bundle ID",
+          "Bundle ID 2",
+          "Data 0",
+          "Data 1",
+          "Data 2",
+          "Data 3",
+          "Data 4",
+          "Data 5",
+          "Data 6",
+          "Action GUID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeNetworkingEdgeSelection.py": {
+      "artifacts": {
+        "get_biomeNetworkingEdgeSelection": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "IP Address (Truncated)",
+          "IP Version",
+          "Prefix Length",
+          "Interface",
+          "Radio Technology",
+          "Field 6",
+          "Country",
+          "Time Zone",
+          "Filename"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeNotes.py": {
+      "artifacts": {
+        "get_biomeNotes": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Record Num",
+          "Identifier 1",
+          "Identifier 2",
+          "Note",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeNotificationUsage.py": {
+      "artifacts": {
+        "get_biomeNotificationUsage": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Application name",
+          "Notification content",
+          "Notification content 2",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeNotificationsPub.py": {
+      "artifacts": {
+        "get_biomeNotificationsPub": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Field 1",
+          "Field 2",
+          "Field 3",
+          "Field 4",
+          "Field 5",
+          "Field 6",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeNowplaying.py": {
+      "artifacts": {
+        "get_biomeNowplaying": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Output",
+          "Media Type",
+          "Title",
+          "Artist",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomePhotosSearchInsights.py": {
+      "artifacts": {
+        "get_biomePhotosSearchInsights": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Search Term",
+          "Language",
+          "Region",
+          "Schema Version",
+          "Field 1 (raw)",
+          "Field 5 (raw)",
+          "Field 25 (raw)",
+          "Field 26 (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeSafari.py": {
+      "artifacts": {
+        "get_biomeSafari": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Activity",
+          "Title",
+          "URL",
+          "Detail",
+          "Detail 2",
+          "Detail 3",
+          "GUID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeSafariNavigations.py": {
+      "artifacts": {
+        "get_biomeSafariNavigations": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Rounded Timestamp (30 min)",
+            "datetime"
+          ],
+          "SEGB State",
+          "Host",
+          "URL",
+          "Country",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

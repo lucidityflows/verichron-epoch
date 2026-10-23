@@ -1,0 +1,473 @@
+{
+  "modules": {
+    "scripts/artifacts/uberClient.py": {
+      "artifacts": {
+        "uber_account": [
+          "First name",
+          "Last name",
+          [
+            "Mobile phone",
+            "phonenumber"
+          ],
+          "Email",
+          "Share code",
+          "Profile picture url",
+          "Profile type",
+          "Country code",
+          "City ID",
+          "City",
+          "Currency code",
+          "Timezone",
+          [
+            "Client Status Last Modified",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Last payment profile ID",
+          "User ID"
+        ],
+        "uber_vehicles": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Course",
+          "Location"
+        ],
+        "uber_user_address": [
+          "Latitude",
+          "Longitude",
+          "Address",
+          "ID",
+          "Location"
+        ],
+        "uber_payment_profiles": [
+          "Card type",
+          "Account name",
+          "Card BIN",
+          "Number",
+          "Category",
+          [
+            "Expires",
+            "datetime"
+          ],
+          "Status",
+          "Using type",
+          "Country code",
+          "ID",
+          "Location"
+        ],
+        "uber_searched_rides": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Tag",
+          "Title",
+          "Address",
+          "Latitude",
+          "Longitude",
+          "Location"
+        ],
+        "uber_cached_locations": [
+          [
+            "Last hit",
+            "datetime"
+          ],
+          "Type",
+          "Tag",
+          "Name",
+          "Address",
+          "Latitude",
+          "Longitude",
+          "Categories",
+          "Uber ID",
+          "Location"
+        ],
+        "uber_ur_locations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Type",
+          [
+            "GPS timestamp",
+            "datetime"
+          ],
+          "City",
+          "Latitude",
+          "Longitude",
+          "Horizontal acc.",
+          "Speed",
+          "Object name",
+          [
+            "UI Timestamp",
+            "datetime"
+          ],
+          "Metadata",
+          "Scene",
+          "App type value map",
+          "Active trips",
+          "Location"
+        ],
+        "uber_metadata_leveldb": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Horizontal acc.",
+          "Altitude",
+          "Vertical acc.",
+          "Course",
+          "Speed",
+          "State",
+          "Location",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/uberLeveldb.py": {
+      "artifacts": {
+        "uber_locations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Rec. Sequence",
+          "City",
+          "Speed",
+          [
+            "GPS Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Horizontal Acc.",
+          [
+            "UI Timestamp",
+            "datetime"
+          ],
+          "Metadata",
+          "Scene",
+          "App Type Value Map",
+          "Active Trips",
+          "Origin",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/uberPlaces.py": {
+      "artifacts": {
+        "uber_places": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Last Used",
+            "datetime"
+          ],
+          "Personal ID",
+          "Title",
+          "Subtitle",
+          "Latitude",
+          "Longitude",
+          "Historical",
+          "Categories",
+          "Distance (Meters)",
+          "Distance To Target",
+          "Tag",
+          "Usage",
+          "Trip Count",
+          "Provider",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/united_airlines.py": {
+      "artifacts": {
+        "united_account": [
+          "First Name",
+          "Middle Name",
+          "Last Name",
+          "Title",
+          "MileagePlus Number",
+          "Elite Status",
+          "Elite Status Code",
+          "Mileage Balance",
+          "Million Miler Indicator",
+          "Star Elite Description",
+          "Club Member",
+          "Club Description",
+          [
+            "Club Expiration",
+            "date"
+          ],
+          "Known Traveler Number",
+          [
+            "Birth Date",
+            "date"
+          ],
+          "Customer ID",
+          "Billing Country",
+          [
+            "Last Login",
+            "datetime"
+          ],
+          "Session ID",
+          "Source File"
+        ],
+        "united_saved_travelers": [
+          "First Name",
+          "Last Name",
+          "Prefix",
+          "Birth Date",
+          "Age",
+          "Passenger Type",
+          "Profile Owner",
+          "MileagePlus Number",
+          "Known Traveler Number",
+          "Traveler Key",
+          "Source File"
+        ],
+        "united_trips": [
+          "Record Type",
+          "Record Locator",
+          "Traveler / Name",
+          "Origin",
+          "Origin City",
+          "Destination",
+          "Destination City",
+          "Flight Date",
+          "Trip Dates",
+          "Carrier",
+          "Travelers",
+          "MileagePlus Account",
+          "Check-In Eligible",
+          "Irrops",
+          [
+            "Sort Flight Date",
+            "datetime"
+          ],
+          [
+            "Last Refreshed",
+            "datetime"
+          ],
+          "Flight Number",
+          "Trip Number",
+          "Display Departure",
+          "Display Arrival",
+          "Passenger Seats",
+          "Source File"
+        ],
+        "united_trip_passengers": [
+          "Trip Status",
+          "Record Locator",
+          "Passenger Name",
+          [
+            "Birth Date",
+            "date"
+          ],
+          "Traveler Type",
+          "MileagePlus ID",
+          "Known Traveler Number",
+          "Redress Number",
+          "Profile Owner",
+          "Source Type",
+          "Source File"
+        ],
+        "united_boarding_passes": [
+          "Record Locator",
+          "Passenger Name",
+          "MileagePlus Number",
+          "Birth Date",
+          "Flight",
+          "Origin",
+          "Departure City",
+          "Destination",
+          "Arrival City",
+          "Flight Date",
+          "Departure Time",
+          "Arrival Time",
+          "Gate",
+          "Terminal",
+          "Seat",
+          "Boarding Time",
+          "Boarding End Time",
+          "Leg Status",
+          "Premier Status",
+          "TSA PreCheck",
+          "OnePass",
+          "Sequence Number",
+          "Cabin / Class",
+          [
+            "Sort Flight Date",
+            "datetime"
+          ],
+          [
+            "Last Refreshed",
+            "datetime"
+          ],
+          "Source File"
+        ],
+        "united_pnr_documents": [
+          "Source Type",
+          "Record Locator",
+          "Last Name",
+          "MileagePlus Number",
+          "Created On",
+          [
+            "Reservation Creation Date",
+            "datetime"
+          ],
+          "Cancelled",
+          "Sequence Number",
+          "Bucket Type",
+          [
+            "Client TTL",
+            "datetime"
+          ],
+          "Route",
+          "Flights",
+          "Source File"
+        ],
+        "united_booking_searches": [
+          [
+            "Search Inserted",
+            "datetime"
+          ],
+          "Origin",
+          "Destination",
+          [
+            "Depart Date",
+            "datetime"
+          ],
+          [
+            "Return Date",
+            "datetime"
+          ],
+          "Award Travel",
+          "Tag",
+          "Travelers Info",
+          "Cabin Info",
+          "Point of Sale Country",
+          "Source File"
+        ],
+        "united_flight_status_searches": [
+          [
+            "Last Updated",
+            "datetime"
+          ],
+          "Carrier",
+          "Flight Number",
+          "Origin",
+          "Origin Name",
+          "Destination",
+          "Destination Name",
+          [
+            "Scheduled Departure",
+            "datetime"
+          ],
+          [
+            "Scheduled Arrival",
+            "datetime"
+          ],
+          [
+            "Expiry",
+            "datetime"
+          ],
+          "Type",
+          "Source File"
+        ],
+        "united_boarding_status_log": [
+          "Last Updated",
+          "Activation Time",
+          "Record Locator",
+          "Last Name",
+          "Flight Number",
+          "Origin",
+          "Origin City",
+          "Destination",
+          "Destination City",
+          "Scheduled Departure",
+          "Scheduled Arrival",
+          "Boarding Time",
+          "Boarding End Time",
+          "Departure Gate",
+          "Arrival Gate",
+          "Seat",
+          "Flight Status",
+          "Boarding Status",
+          "Boarding Pass Key",
+          "Trip Number",
+          "Source File"
+        ],
+        "united_ife_watch_history": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Source Type",
+          "Title",
+          "Asset / Media ID",
+          "Media ID (int)",
+          "Position (as stored)",
+          "Position (raw)",
+          "Subtitle",
+          "Source File"
+        ],
+        "united_watch_complications": [
+          "Record Locator",
+          "Flight Number",
+          "Departure",
+          "Arrival",
+          "Scheduled Departure Date",
+          "Scheduled Departure Time",
+          "Scheduled Departure DateTime",
+          "Scheduled Arrival Date",
+          "Scheduled Arrival Time",
+          "Scheduled Arrival DateTime",
+          "Status",
+          "Source File"
+        ],
+        "united_imessage_recipients": [
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Handle Types",
+          "Phone Cache ID",
+          "iMessage Cache ID",
+          "Local ID",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/userDefaults.py": {
+      "artifacts": {
+        "user_defaults": [
+          "Application Bundle ID",
+          "Application Container ID",
+          "Key Name",
+          "Item",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

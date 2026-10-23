@@ -1,0 +1,510 @@
+{
+  "modules": {
+    "scripts/artifacts/biomeApplePaySecurity.py": {
+      "artifacts": {
+        "biomeDbAppOpenings": [
+          [
+            "Event Timestamp",
+            "datetime"
+          ],
+          "Bundle ID",
+          "Starting",
+          "Launch Type"
+        ],
+        "biomeDbAppOpeningsHourly": [
+          [
+            "Hour (UTC)",
+            "datetime"
+          ],
+          "Bundle ID",
+          "Launch Type",
+          "App Open Count"
+        ],
+        "biomeDbCablePlugEvents": [
+          [
+            "Event Timestamp",
+            "datetime"
+          ],
+          "Starting"
+        ],
+        "biomeDbBacklightEvents": [
+          [
+            "Event Timestamp",
+            "datetime"
+          ],
+          "Backlight Level"
+        ],
+        "biomeDbButtonClicks": [
+          [
+            "Date (UTC)",
+            "datetime"
+          ],
+          "Button Click Count",
+          "Reason"
+        ],
+        "biomeDbMinBattery": [
+          [
+            "Date (UTC)",
+            "datetime"
+          ],
+          "Minimum Battery Percentage"
+        ],
+        "biomeDbCarPlay": [
+          [
+            "Date (UTC)",
+            "datetime"
+          ],
+          "CarPlay Activity Count"
+        ],
+        "biomeDbAudioRoute": [
+          [
+            "Date (UTC)",
+            "datetime"
+          ],
+          "Route Type",
+          "External",
+          "Route Change Reason",
+          "Audio Route Count"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAudioMediaRoutes.py": {
+      "artifacts": {
+        "get_biomeAudioRoute": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Route Name",
+          "Port Type",
+          "Port Name",
+          "Field 1 (raw)",
+          "Field 5 (raw)",
+          "Field 6 (raw)",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeMediaRoute": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Route Name",
+          "Route Identifier",
+          "Route Type (raw)",
+          "Route Subtype (raw)",
+          "Field 1 (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeAutonamingMessageIds.py": {
+      "artifacts": {
+        "get_biomeAutonamingMessageIds": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Message Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Bundle ID",
+          "Chat ID",
+          "Message GUID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeBacklight.py": {
+      "artifacts": {
+        "get_biomeBacklight": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "State",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeBattperc.py": {
+      "artifacts": {
+        "get_biomeBattperc": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Time Start",
+            "datetime"
+          ],
+          [
+            "Time End",
+            "datetime"
+          ],
+          [
+            "Time Write",
+            "datetime"
+          ],
+          "SEGB State",
+          "Activity",
+          "Battery Percentage",
+          "Action GUID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeBluetooth.py": {
+      "artifacts": {
+        "get_biomeBluetooth": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "MAC",
+          "Name",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeBootSession.py": {
+      "artifacts": {
+        "get_biomeBootSession": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Session State",
+          "Session State (raw)",
+          "Session ID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeCameraAutoFocusROI.py": {
+      "artifacts": {
+        "get_biomeCameraAutoFocusROI": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Camera Port",
+          "Field 8 (float)",
+          "Field 2 (raw)",
+          "Field 3 (raw)",
+          "Field 4 (raw)",
+          "Field 5 (raw)",
+          "Field 6 (raw)",
+          "Field 7 (raw)",
+          "Field 9 (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeCarplayisconnected.py": {
+      "artifacts": {
+        "get_biomeCarplayisconnected": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Time Start",
+            "datetime"
+          ],
+          [
+            "Time End",
+            "datetime"
+          ],
+          [
+            "Time Write",
+            "datetime"
+          ],
+          "SEGB State",
+          "Activity",
+          "Status",
+          "Action GUID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeClockAlarm.py": {
+      "artifacts": {
+        "get_biomeClockAlarm": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Alarm ID",
+          "State (raw)",
+          "Field 1 (raw)",
+          "Field 4 (raw)",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeDKEventStreams.py": {
+      "artifacts": {
+        "get_biomeDKAudioInputRoute": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Start Timestamp",
+            "datetime"
+          ],
+          [
+            "End Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Value",
+          "Value (raw)",
+          "Metadata",
+          "Event",
+          "GUID",
+          "Device UTC Offset",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeDKAudioOutputRoute": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Start Timestamp",
+            "datetime"
+          ],
+          [
+            "End Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Value",
+          "Value (raw)",
+          "Metadata",
+          "Event",
+          "GUID",
+          "Device UTC Offset",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeDKClockAlarm": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Start Timestamp",
+            "datetime"
+          ],
+          [
+            "End Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Value",
+          "Value (raw)",
+          "Metadata",
+          "Event",
+          "GUID",
+          "Device UTC Offset",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeDKDeviceIsLockedImputed": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Start Timestamp",
+            "datetime"
+          ],
+          [
+            "End Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Value",
+          "Value (raw)",
+          "Metadata",
+          "Event",
+          "GUID",
+          "Device UTC Offset",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeDKDeviceLowPowerMode": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Start Timestamp",
+            "datetime"
+          ],
+          [
+            "End Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Value",
+          "Value (raw)",
+          "Metadata",
+          "Event",
+          "GUID",
+          "Device UTC Offset",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeDKDisplayOrientation": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Start Timestamp",
+            "datetime"
+          ],
+          [
+            "End Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Value",
+          "Value (raw)",
+          "Metadata",
+          "Event",
+          "GUID",
+          "Device UTC Offset",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeDKSettingsDoNotDisturb": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Start Timestamp",
+            "datetime"
+          ],
+          [
+            "End Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Value",
+          "Value (raw)",
+          "Metadata",
+          "Event",
+          "GUID",
+          "Device UTC Offset",
+          "Filename",
+          "Offset"
+        ],
+        "get_biomeDKSiriUi": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Start Timestamp",
+            "datetime"
+          ],
+          [
+            "End Timestamp",
+            "datetime"
+          ],
+          "SEGB State",
+          "Value",
+          "Value (raw)",
+          "Metadata",
+          "Event",
+          "GUID",
+          "Device UTC Offset",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/biomeDKInfocus.py": {
+      "artifacts": {
+        "get_biomeDKInfocus": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Time Start",
+            "datetime"
+          ],
+          [
+            "Time End",
+            "datetime"
+          ],
+          [
+            "Time Write",
+            "datetime"
+          ],
+          "SEGB State",
+          "Activity",
+          "Bundle ID",
+          "Transition",
+          "Action GUID",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

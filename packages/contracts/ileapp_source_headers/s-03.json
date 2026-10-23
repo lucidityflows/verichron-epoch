@@ -1,0 +1,133 @@
+{
+  "modules": {
+    "scripts/artifacts/storeUser.py": {
+      "artifacts": {
+        "storeUser_ca": [
+          [
+            "Install Timestamp",
+            "datetime"
+          ],
+          "Bundle ID",
+          "App Name",
+          "Developer Name",
+          "App Version",
+          "App Bundle Version",
+          "App Store ID",
+          "System App",
+          "Deletion Date"
+        ],
+        "storeUser_pha": [
+          [
+            "Purchased Timestamp",
+            "datetime"
+          ],
+          "App Name",
+          "App Name (Long)",
+          "Bundle ID",
+          "Developer Name",
+          "App Store URL",
+          "App ID",
+          "Hidden from Springboard",
+          "App Category",
+          "Required Capabilities",
+          "Purchaser Apple ID",
+          "Purchaser ID",
+          "Purchase Token"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/subscriberInfo.py": {
+      "artifacts": {
+        "subscriberInfo": [
+          [
+            "Last update time",
+            "datetime"
+          ],
+          "Slot ID",
+          "ICCID",
+          "MSISDN"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/swissmeteo.py": {
+      "artifacts": {
+        "plz_interaction": [
+          [
+            "Interaction Timestamp",
+            "datetime"
+          ],
+          "Meteo of the city",
+          "Meteo of the city (lat/lon)",
+          "Coordinates (lat/lon)"
+        ],
+        "swissmeteo_plz": [
+          [
+            "Opened Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Coordinates (lat/lon)"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/sysShutdown.py": {
+      "artifacts": {
+        "sysShutdownProcesses": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Entry Number",
+          "PID",
+          "Path",
+          "Delay (s)",
+          "Location Indicator",
+          "Source File"
+        ],
+        "sysShutdownReboots": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Reboot Number",
+          "Delay Notices",
+          "Longest Delay (s)",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/sysdiagnose.py": {
+      "artifacts": {
+        "get_sysdiag_account_devices": [
+          "lastOctagonPush",
+          "Model",
+          "Product",
+          "OS Build",
+          "OS Version",
+          "Serial Number"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/systemVersionPlist.py": {
+      "artifacts": {
+        "system_version_plist": [
+          "Property",
+          "Property Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

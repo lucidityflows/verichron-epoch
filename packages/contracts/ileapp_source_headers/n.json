@@ -1,0 +1,240 @@
+{
+  "modules": {
+    "scripts/artifacts/netusage.py": {
+      "artifacts": {
+        "netusage_appdata": [
+          [
+            "Live Usage Timestamp",
+            "datetime"
+          ],
+          [
+            "Process First Usage Timestamp",
+            "datetime"
+          ],
+          [
+            "Process Timestamp",
+            "datetime"
+          ],
+          "Bundle Name",
+          "Process Name",
+          "ZKIND (as stored)",
+          "Wifi In (Bytes)",
+          "Wifi Out (Bytes)",
+          "Mobile/WWAN In (Bytes)",
+          "Mobile/WWAN Out (Bytes)",
+          "Wired In (Bytes)",
+          "Wired Out (Bytes)"
+        ],
+        "netusage_connections": [
+          [
+            "First Connection Timestamp",
+            "datetime"
+          ],
+          [
+            "Last Connection Timestamp",
+            "datetime"
+          ],
+          "Network Name",
+          "Network Identifier",
+          "Network Type",
+          "Bytes In",
+          "Bytes Out",
+          "Connection Attempts",
+          "Connection Successes",
+          "Packets In",
+          "Packets Out"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/notes.py": {
+      "artifacts": {
+        "notes": [
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          "Note Title",
+          "Snippet",
+          "Note Contents",
+          "Folder",
+          "Storage Place",
+          [
+            "Last Modified",
+            "datetime"
+          ],
+          "Password Protected",
+          "Password Hint",
+          "Marked for Deletion",
+          "Pinned",
+          [
+            "Attachment",
+            "media"
+          ],
+          "Attachment Original Filename",
+          "Attachment Storage Folder",
+          "Attachment Size (as stored)",
+          "Attachment Type",
+          [
+            "Attachment Creation Date",
+            "datetime"
+          ],
+          [
+            "Attachment Last Modified",
+            "datetime"
+          ]
+        ],
+        "notesParticipants": [
+          [
+            "Invitation Created",
+            "datetime"
+          ],
+          [
+            "Invitation Received",
+            "datetime"
+          ],
+          [
+            "Last Modified",
+            "datetime"
+          ],
+          "Note Title",
+          "Note Snippet",
+          "Participant Name",
+          "Email Address",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Role",
+          "Permission",
+          "Acceptance Status",
+          "Participant ID",
+          "Share URL",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/notesPasswordProtected.py": {
+      "artifacts": {
+        "notesPasswordProtected": [
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          [
+            "Last Modified",
+            "datetime"
+          ],
+          "Note Title",
+          "Password Hint",
+          "Encryption Scheme",
+          "KDF Iterations",
+          "Wrapped Key Bytes",
+          "Recoverability",
+          "Note Row ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/notificationsDuet.py": {
+      "artifacts": {
+        "get_notificationsDuet": [
+          [
+            "SEGB Timestamp",
+            "datetime"
+          ],
+          [
+            "Notification Time",
+            "datetime"
+          ],
+          [
+            "Notification Time 2",
+            "datetime"
+          ],
+          "SEGB State",
+          "GUID",
+          "Title",
+          "Subtitle",
+          "Body",
+          "Bundle ID",
+          "Bundle ID 2",
+          "Optional Data",
+          "Person Identifier",
+          "Person Info",
+          "GUID 2",
+          "Filename",
+          "Offset"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/notificationsXI.py": {
+      "artifacts": {
+        "notificationsXI": [
+          [
+            "Creation Time",
+            "datetime"
+          ],
+          "Bundle",
+          "Title[Subtitle]",
+          "Message",
+          "Other Details"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/notificationsXII.py": {
+      "artifacts": {
+        "notificationsXII": [
+          [
+            "Creation Time",
+            "datetime"
+          ],
+          "Bundle",
+          "Sender",
+          "Title[Subtitle]",
+          "Message",
+          [
+            "Attachments",
+            "media"
+          ],
+          "Attachment Count",
+          "Thread",
+          "Category",
+          "Trigger",
+          "Deep Link",
+          "Other Details"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/nsVault.py": {
+      "artifacts": {
+        "calculatorVault": [
+          [
+            "Modified Date",
+            "datetime"
+          ],
+          "Album Title",
+          "Album ID",
+          "Storage Path",
+          "Storage Thumbnail",
+          "Video ID",
+          "Video Name",
+          "Attachment",
+          "Duration",
+          "Video Size"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

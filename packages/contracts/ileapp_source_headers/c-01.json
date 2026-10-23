@@ -1,0 +1,368 @@
+{
+  "modules": {
+    "scripts/artifacts/ConnectedDeviceInformation.py": {
+      "artifacts": {
+        "connected_device_info_device_history": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          "Origin Product Type",
+          "Device Model",
+          "Source ID",
+          "Origin Build",
+          "OS Version"
+        ],
+        "connected_device_info_consolidated_connected_device_history": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          "Origin Product Type",
+          "Device Model"
+        ],
+        "connected_device_information_current_device_info": [
+          [
+            "Modified Time",
+            "datetime"
+          ],
+          "Origin Product Type",
+          "Device Model",
+          "OS Version"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/c2paProvenance.py": {
+      "artifacts": {
+        "c2paProvenance": [
+          [
+            "Signing Time (TSA)",
+            "datetime"
+          ],
+          [
+            "Media",
+            "media"
+          ],
+          "Media State",
+          "AI Generated?",
+          "Digital Source Type",
+          "Metadata Source",
+          "Claim Generator / Creator Tool",
+          "Actions",
+          "Software Agent(s)",
+          "Author(s) / Creator",
+          "Credit / Copyright",
+          "Title",
+          "Ingredients (Prior Assets)",
+          "Signed By (stated)",
+          "Certificate Issuer",
+          "Certificate Validity",
+          "Signature Algorithm",
+          "Manifest ID",
+          "Format",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/cacheDeletePurgeHistory.py": {
+      "artifacts": {
+        "cacheDeletePurgeHistory": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Target Directory",
+          "Urgency Level",
+          "Available Space (bytes)",
+          "Purged Amount (bytes)",
+          "Duration (seconds)",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/cacheRoutesGmap.py": {
+      "artifacts": {
+        "get_cacheRoutesGmap": [
+          [
+            "Timestamp (from filename)",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/cachev0.py": {
+      "artifacts": {
+        "cachev0": [
+          "ID",
+          [
+            "Media",
+            "media"
+          ],
+          "Source DB"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/calendarAll.py": {
+      "artifacts": {
+        "calendarEvents": [
+          [
+            "Start Time",
+            "datetime"
+          ],
+          [
+            "End Time",
+            "datetime"
+          ],
+          "Timezone",
+          "Calendar Name",
+          "Account Name",
+          "Event Title",
+          "Location Name",
+          "Location Address",
+          "Location Coordinates",
+          "Invitation From",
+          "Invitees",
+          "Conference URL",
+          "Attachments",
+          "Notes",
+          [
+            "Creation Time",
+            "datetime"
+          ],
+          [
+            "Last Modification Time",
+            "datetime"
+          ],
+          "Source File"
+        ],
+        "calendarBirthdays": [
+          "Start Date",
+          "Event Title",
+          "Calendar Name",
+          "Account Name",
+          "Source File"
+        ],
+        "calendarList": [
+          "Calendar Name",
+          "Account Name",
+          "Account Email",
+          "Owner Name",
+          "Owner Email",
+          "Sharing Status",
+          "Sharing Participants",
+          "Notes",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/callHistory.py": {
+      "artifacts": {
+        "callHistory": [
+          [
+            "Starting Timestamp",
+            "datetime"
+          ],
+          [
+            "Ending Timestamp",
+            "datetime"
+          ],
+          "Service Provider",
+          "Call Type",
+          "Call Direction",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Answered",
+          "Call Duration",
+          "FaceTime Data",
+          "Disconnected Cause",
+          "ISO Country Code",
+          "Location",
+          "Source File path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/callHistoryGroupCall.py": {
+      "artifacts": {
+        "callHistoryGroupCall": [
+          [
+            "Call Date/Time",
+            "datetime"
+          ],
+          [
+            "Call End Date/Time",
+            "datetime"
+          ],
+          "Service Provider",
+          "Call Type",
+          "Call Direction",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Call Description",
+          "Answered",
+          "Call Duration",
+          "FaceTime Data",
+          "Disconnected Cause",
+          "ISO Country Code",
+          "Location"
+        ],
+        "callHistoryInteractionC": [
+          [
+            "Call Date/Time",
+            "datetime"
+          ],
+          [
+            "Call End Date/Time",
+            "datetime"
+          ],
+          "Application Bundle ID",
+          "Call Direction",
+          "Display Name",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Call Description",
+          "Interaction Duration"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/callHistoryTransactions.py": {
+      "artifacts": {
+        "callHistoryTransactions": [
+          [
+            "Date",
+            "datetime"
+          ],
+          "handleType",
+          "callStatus",
+          "duration",
+          "remoteParticipantHandle",
+          "callerId",
+          "timeToEstablish",
+          "disconnectedCause",
+          "uniqueId",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/carCD.py": {
+      "artifacts": {
+        "carCD": []
+      },
+      "no_output_artifacts": [
+        "carCD"
+      ],
+      "unresolved": []
+    },
+    "scripts/artifacts/cashApp.py": {
+      "artifacts": {
+        "get_cashApp": [
+          [
+            "Transaction Date",
+            "datetime"
+          ],
+          "Display Name",
+          "Cashtag",
+          "Account Owner Role",
+          "Currency Amount",
+          "Transaction State",
+          "Note",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/cashAppB.py": {
+      "artifacts": {
+        "get_cashAppB": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Customer Token",
+          "Name",
+          "Username",
+          "ID",
+          "Full Name",
+          "Role",
+          "Amount",
+          "Currency",
+          "Note",
+          "Region",
+          "Units",
+          "URL",
+          "Card Brand",
+          "Suffix",
+          "Display Name",
+          "Display Instrument",
+          "Instrument Type",
+          "Transaction ID",
+          "Token",
+          "Receipt",
+          "State",
+          [
+            "Created At",
+            "datetime"
+          ],
+          [
+            "Captured At",
+            "datetime"
+          ],
+          [
+            "Reached Customer At",
+            "datetime"
+          ],
+          [
+            "Paid Out At",
+            "datetime"
+          ],
+          [
+            "Deposited At",
+            "datetime"
+          ],
+          [
+            "Display Date",
+            "datetime"
+          ],
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "modules": {
+    "scripts/artifacts/queryPredictions.py": {
+      "artifacts": {
+        "queryPredictions": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Is Sent?",
+          "Content",
+          "Conversation ID",
+          "ID",
+          "UUID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/quickLook.py": {
+      "artifacts": {
+        "quickLook": [
+          [
+            "Last Hit Date",
+            "datetime"
+          ],
+          "Last Seen Path",
+          "Size"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

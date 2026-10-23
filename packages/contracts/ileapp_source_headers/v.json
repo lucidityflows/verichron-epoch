@@ -1,0 +1,233 @@
+{
+  "modules": {
+    "scripts/artifacts/venmo.py": {
+      "artifacts": {
+        "venmo_transactions": [
+          [
+            "Date Created",
+            "datetime"
+          ],
+          [
+            "Date Completed",
+            "datetime"
+          ],
+          "Action",
+          "Payer",
+          "Payer Username",
+          "Receiver",
+          "Receiver Username",
+          "Note",
+          "Amount",
+          "Status",
+          "Audience",
+          "Transaction Type",
+          "Context",
+          "Source File"
+        ],
+        "venmo_users": [
+          "User ID",
+          [
+            "Date Joined",
+            "datetime"
+          ],
+          "Display Name",
+          "First Name",
+          "Last Name",
+          "Friend Status",
+          "Is Blocked",
+          "Is Active",
+          "Is Payable",
+          "Identity Type",
+          "Profile Pic URL",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/viber.py": {
+      "artifacts": {
+        "viber_settings": [
+          "Setting",
+          "Value"
+        ],
+        "viber_contacts": [
+          "Main Name",
+          "Prefix Name",
+          "Suffix Name",
+          "Phone Number",
+          "Canonized Phone Number",
+          "Contact ID"
+        ],
+        "viber_call_remnants": [
+          [
+            "Timestamp - UTC",
+            "datetime"
+          ],
+          "Caller",
+          "Call Type",
+          "Duration"
+        ],
+        "viber_chats": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "State",
+          "Sender (Display Full Name)",
+          "Chat Name",
+          "Message Content",
+          [
+            "Attachment",
+            "media"
+          ],
+          "Sender (Display Short Name)",
+          "Sender (Phone)",
+          "Chat Participant(s)",
+          "Chat Phone(s)",
+          "Message Date - UTC",
+          "Message State Date - UTC",
+          "Attachment Name",
+          "Call Date - UTC",
+          "Call Type",
+          "Duration (as stored)",
+          "System Type Description",
+          "Attachment Type",
+          "Attachment Size",
+          "Latitude",
+          "Longitude",
+          "Conversation Being Deleted",
+          "Message Being Deleted",
+          "Conversation Time Bomb Duration",
+          "Message Time Bomb Duration",
+          "Message Time Bomb Timestamp - UTC",
+          "Conversation Marked Favorite",
+          "Likes Count",
+          "Message Metadata Fragments"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/vipps.py": {
+      "artifacts": {
+        "vipps": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Telephone",
+            "phonenumber"
+          ],
+          "Name",
+          "Message",
+          "Amount",
+          "Status Text",
+          "Status Category",
+          "Direction",
+          "Transaction ID",
+          "Message Type",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/vippsContacts.py": {
+      "artifacts": {
+        "vippsContacts": [
+          [
+            "Profile Image",
+            "media"
+          ],
+          "Name",
+          "Telephone",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/voiceRecordings.py": {
+      "artifacts": {
+        "voice_memos": [
+          [
+            "Date and time",
+            "datetime"
+          ],
+          "Duration",
+          "Title",
+          "Local Path Status",
+          [
+            "Audio File",
+            "media"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/voiceTriggers.py": {
+      "artifacts": {
+        "voiceTriggers": [
+          [
+            "Date (grainedDate)",
+            "datetime"
+          ],
+          "Device",
+          "Internal Path Info",
+          [
+            "Audio File",
+            "media"
+          ],
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/voicemail.py": {
+      "artifacts": {
+        "voicemail": [
+          [
+            "Date and time",
+            "datetime"
+          ],
+          [
+            "Sender",
+            "phonenumber"
+          ],
+          [
+            "Receiver",
+            "phonenumber"
+          ],
+          "ICCID receiver",
+          "Duration",
+          "Deleted",
+          [
+            "Audio File",
+            "media"
+          ],
+          "Transcript",
+          "Transcript confidence",
+          [
+            "Callback Number",
+            "phonenumber"
+          ],
+          [
+            "File Created",
+            "datetime"
+          ],
+          [
+            "File Modified",
+            "datetime"
+          ],
+          "Audio Filename"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

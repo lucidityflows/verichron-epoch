@@ -1,0 +1,80 @@
+{
+  "modules": {
+    "scripts/artifacts/wifiIdentifiers.py": {
+      "artifacts": {
+        "wifiIdentifiers": [
+          "MAC Address",
+          "User Defined Name",
+          "BSD Name"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/wifiNetworkStoreModel.py": {
+      "artifacts": {
+        "get_wifiNetworkStoreModel": [
+          [
+            "Last Connection Timestamp",
+            "datetime"
+          ],
+          "Record ID",
+          "SSID",
+          "Latitude",
+          "Longitude",
+          "BSSID",
+          "5 GHz Network",
+          "2.4 GHz Network"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/wipe_indicators.py": {
+      "artifacts": {
+        "wipe_indicators": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Source File",
+          "Source Path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/wire.py": {
+      "artifacts": {
+        "wireAccount": [
+          "User ID",
+          "Display Name",
+          [
+            "Activation Date",
+            "datetime"
+          ],
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Email Address",
+          "Latitude",
+          "Longitude"
+        ],
+        "wireMessages": [
+          [
+            "Date / Time",
+            "datetime"
+          ],
+          "User ID",
+          "Display Name",
+          "Message",
+          "Message Type",
+          "Call Duration (seconds)"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

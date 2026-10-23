@@ -1,0 +1,129 @@
+{
+  "modules": {
+    "scripts/artifacts/ZaloChats.py": {
+      "artifacts": {
+        "zalo_users": [
+          "User-ID",
+          "Username",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Global-ID"
+        ],
+        "zalo_messages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Outgoing",
+          "Sender",
+          "Chat Name",
+          "Message",
+          [
+            "Attachment File",
+            "media"
+          ],
+          "Sender-ID",
+          "Type ID",
+          "Message Type",
+          "Latitude",
+          "Longitude",
+          "Group Chat",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/ZangiChats.py": {
+      "artifacts": {
+        "get_zangichats": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "First Name",
+          "Message Text",
+          "Last Name",
+          "Number",
+          "Filename"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/ZangiMessenger.py": {
+      "artifacts": {
+        "zangi_messages": [
+          [
+            "Message Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Sender Name",
+          "Chat Name",
+          "Message Text",
+          [
+            "Attachment File",
+            "media"
+          ],
+          "Conversation Type",
+          "Message Type",
+          "Message ID",
+          "Conversation ID",
+          "Sender Number",
+          "Media Path",
+          "Media Extension",
+          [
+            "Attachment Link",
+            "media"
+          ],
+          "Source Database"
+        ],
+        "zangi_contacts": [
+          [
+            "Last Modification Timestamp",
+            "datetime"
+          ],
+          [
+            "Last Activity Timestamp",
+            "datetime"
+          ],
+          "Last Name",
+          "First Name",
+          "Display Name",
+          "Contact Number",
+          "Contact Email",
+          "Registration Type",
+          "Contact ID",
+          "Is Blocked?",
+          "Is Favorite?",
+          "Source Database"
+        ],
+        "zangi_accounts": [
+          [
+            "Last Sync Timestamp",
+            "datetime"
+          ],
+          "Account ID",
+          "Nickname",
+          "Last Name",
+          "First Name",
+          "Passcode",
+          "Password",
+          "PIN Code",
+          "Conversation Hiding Password",
+          "E-Mail",
+          "Status",
+          "Registration Status",
+          "Country",
+          "Source Database"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

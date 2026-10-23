@@ -1,0 +1,46 @@
+{
+  "modules": {
+    "scripts/artifacts/mobileInstall.py": {
+      "artifacts": {
+        "mobileInstall_installed": [
+          "Last Installed",
+          "Bundle ID"
+        ],
+        "mobileInstall_uninstalled": [
+          "Last Uninstalled",
+          "Bundle ID"
+        ],
+        "mobileInstall_historical": [
+          "Timestamp",
+          "Event",
+          "Bundle ID",
+          "Event Path"
+        ],
+        "mobileInstall_reboots": [
+          "Timestamp (Local Time)",
+          "Description"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/mobileInstallb.py": {
+      "artifacts": {
+        "mobileInstallb": [
+          "Timestamp (Local)",
+          "Type",
+          "Notice",
+          "Source File"
+        ],
+        "mobileInstallb_reboots": [
+          "Timestamp (Local)",
+          "Type",
+          "Notice",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

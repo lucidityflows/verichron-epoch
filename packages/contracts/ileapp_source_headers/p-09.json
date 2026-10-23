@@ -1,0 +1,99 @@
+{
+  "modules": {
+    "scripts/artifacts/protonMail.py": {
+      "artifacts": {
+        "protonMail": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Sender",
+          "To Recipients",
+          "Reply To",
+          "Title",
+          "Body",
+          "Mime",
+          "Is encrypted?",
+          "File Size",
+          [
+            "Attachment",
+            "media"
+          ],
+          "Decrypted Attachment Filename",
+          "Type"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/protonMailInbox.py": {
+      "artifacts": {
+        "protonMailInboxMessages": [
+          [
+            "Time",
+            "datetime"
+          ],
+          "From Me",
+          "From",
+          "Conversation Subject",
+          "Body",
+          [
+            "Attachment",
+            "media"
+          ],
+          "Folder",
+          "Conversation ID",
+          "Subject",
+          "To",
+          "CC",
+          "BCC",
+          "Read",
+          "Replied",
+          "Forwarded",
+          "Attachments",
+          "Size",
+          "Deleted",
+          "Source File"
+        ],
+        "protonMailInboxAttachments": [
+          "Filename",
+          [
+            "Attachment",
+            "media"
+          ],
+          "Size",
+          "MIME Type",
+          "Cached Path",
+          "Remote Message ID",
+          "Source File"
+        ],
+        "protonMailInboxContacts": [
+          "Name",
+          "Email",
+          [
+            "Last Used",
+            "datetime"
+          ],
+          "Is Proton",
+          "Contact UID",
+          "Source File"
+        ],
+        "protonMailInboxAccount": [
+          "Username",
+          "Display Name",
+          "Email",
+          [
+            "Create Time",
+            "datetime"
+          ],
+          "Used Space",
+          "Max Space",
+          "Ready",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

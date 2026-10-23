@@ -1,0 +1,310 @@
+{
+  "modules": {
+    "scripts/artifacts/DataUsage.py": {
+      "artifacts": {
+        "get_DataUsage": [
+          [
+            "Process Timestamp",
+            "datetime"
+          ],
+          [
+            "Process First Timestamp",
+            "datetime"
+          ],
+          [
+            "Usage Entry Timestamp",
+            "datetime"
+          ],
+          "Bundle Name",
+          "Process Name",
+          "ZKIND (as stored)",
+          "Wifi In (Bytes)",
+          "Wifi Out (Bytes)",
+          "Mobile/WWAN In (Bytes)",
+          "Mobile/WWAN Out (Bytes)"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/deviceActivator.py": {
+      "artifacts": {
+        "deviceActivator": [
+          "Property",
+          "Property Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/deviceDatam.py": {
+      "artifacts": {
+        "deviceDatam": [
+          "Property",
+          "Property Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/deviceName.py": {
+      "artifacts": {
+        "deviceName": []
+      },
+      "no_output_artifacts": [
+        "deviceName"
+      ],
+      "unresolved": []
+    },
+    "scripts/artifacts/dhcphp.py": {
+      "artifacts": {
+        "dhcpHotspotClients": [
+          "Key Name",
+          "Value Data",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/dhcpl.py": {
+      "artifacts": {
+        "dhcpLeases": [
+          "Property Name",
+          "Property Value",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/diagnosticLogd.py": {
+      "artifacts": {
+        "diagnosticLogdEvents": [
+          [
+            "Timestamp (UTC)",
+            "datetime"
+          ],
+          "Recorded UTC Offset",
+          "Event",
+          "Process",
+          "PID",
+          "Log Message",
+          "Line Number",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/discordAcct.py": {
+      "artifacts": {
+        "get_discordAcct": [
+          "Key Name",
+          "Data Value",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/discordChats.py": {
+      "artifacts": {
+        "discordChats": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Edited Timestamp",
+            "datetime"
+          ],
+          [
+            "Call Ended",
+            "datetime"
+          ],
+          "Direction",
+          "Sender",
+          "Channel ID",
+          "Content",
+          [
+            "Attachment",
+            "media"
+          ],
+          "Username",
+          "Global Name",
+          "Bot?",
+          "Attachment Filename",
+          "Attachment Link",
+          "User ID",
+          "Account ID",
+          "Message Type",
+          "Message ID",
+          "Embedded Author",
+          "Author URL",
+          "Author Icon URL",
+          "Embedded URL",
+          "Embedded Description",
+          "Footer Text",
+          "Footer Icon URL",
+          "Source Type",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/discord_a.py": {
+      "artifacts": {
+        "DiscordChatsA": [
+          [
+            "Message Timestamp",
+            "datetime"
+          ],
+          [
+            "Edited Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Sender Username",
+          "Message",
+          "Sender Global Name",
+          "Sender ID",
+          "Attachment(s)",
+          "Message Type",
+          "Call Ended",
+          "Message ID",
+          "Channel ID",
+          "Account ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/discord_cache.py": {
+      "artifacts": {
+        "discord_cache": [
+          "Cache Entry ID",
+          [
+            "Cache Timestamp",
+            "datetime"
+          ],
+          [
+            "Media Preview",
+            "media"
+          ],
+          "Request URL",
+          "Storage Policy",
+          "Partition",
+          "Is Data On Filesystem",
+          "Cache Filename",
+          "Payload Exists",
+          "Orphaned Payload",
+          "Payload Path",
+          "Payload Size",
+          "Payload Type",
+          "Payload Preview",
+          "Response Object",
+          "Request Object",
+          "Proto Props",
+          "User Info",
+          "Source DB"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/dmss.py": {
+      "artifacts": {
+        "get_dmss_pin": [
+          "PIN",
+          "Source File"
+        ],
+        "get_dmss_channels": [
+          "Device Name",
+          "Channel ID",
+          "Channel Name",
+          "Source file"
+        ],
+        "get_dmss_info": [
+          "Name",
+          "IP/SN/Domain",
+          "Port",
+          "User",
+          "Password (Enc.)",
+          "DDNS Enabled",
+          "DDNS Address",
+          "DDNS Domain",
+          "DDNS Server Port",
+          "DDNS Username",
+          "DDNS Password (Enc.)",
+          "DDNS Type",
+          "DDNS Alias",
+          "Source File"
+        ],
+        "get_dmss_registered_sensors": [
+          "Device Name",
+          "Device Model",
+          "Device SN",
+          "Device Type",
+          "Alarm State",
+          "Battery Percent",
+          "Associated Hub SN",
+          "Online State",
+          "Door State Sensor",
+          "Full Day Alarm",
+          "Tamper Status",
+          "Owner",
+          "Source File"
+        ],
+        "get_dmss_registered_devices": [
+          "Device Name",
+          "Device Model",
+          "Device SN",
+          "Device Type",
+          "Channels",
+          "Online",
+          "Receive Share From",
+          "Send Share To",
+          "Username",
+          "Device Capabilities",
+          "Sup. Capabilities",
+          "Channels Capabilities",
+          "Port",
+          "RTSP Port",
+          "Hardware ID",
+          "Owner",
+          "Source File"
+        ],
+        "get_dmss_notifications": [
+          [
+            "Timestamp (Local)",
+            "datetime"
+          ],
+          "Sensor/Area/Nick Name",
+          "Sensor SN",
+          "Area Name",
+          "Nickname",
+          "Associated Device Name",
+          "Associated Device SN",
+          "Associated Device Type",
+          "Alarm Message ID",
+          "Alarm Notification",
+          "Checked",
+          "Owner",
+          "Source File"
+        ],
+        "get_dmss_created_media": [
+          "File Name",
+          [
+            "File Content",
+            "media"
+          ],
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

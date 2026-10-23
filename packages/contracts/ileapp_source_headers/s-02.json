@@ -1,0 +1,739 @@
+{
+  "modules": {
+    "scripts/artifacts/serialNumber.py": {
+      "artifacts": {
+        "serialNumber": []
+      },
+      "no_output_artifacts": [
+        "serialNumber"
+      ],
+      "unresolved": []
+    },
+    "scripts/artifacts/sessionIOS.py": {
+      "artifacts": {
+        "session_messages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Received Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Author",
+          "Conversation With",
+          "Message",
+          [
+            "Attachments",
+            "media"
+          ],
+          "Message Type",
+          "Was Read",
+          "Thread ID",
+          "Server Hash"
+        ],
+        "session_contacts": [
+          "Session ID",
+          "Name",
+          "Nickname",
+          "Approved",
+          "Approved Me",
+          "Blocked",
+          "Last Known Client Version"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/signalIOS.py": {
+      "artifacts": {
+        "get_signalIOSMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Received Timestamp",
+            "datetime"
+          ],
+          [
+            "Server Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Author",
+          "Conversation With",
+          "Message",
+          [
+            "Attachments",
+            "media"
+          ],
+          "Attachment Count",
+          "Read",
+          "Voice Message",
+          "View Once",
+          "Remotely Deleted",
+          "Disappearing Timer (Seconds)",
+          "Thread ID",
+          "Row ID"
+        ],
+        "get_signalIOSContacts": [
+          "Phone Number",
+          "ACI",
+          "PNI",
+          "Unregistered",
+          [
+            "Unregistered Timestamp",
+            "datetime"
+          ],
+          "Phone Number Discoverable",
+          "Unique ID"
+        ],
+        "get_signalIOSThreads": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          "Conversation With",
+          "Type",
+          "Message Count",
+          "Archived",
+          "Marked Unread",
+          "Draft Message",
+          [
+            "Muted Until",
+            "datetime"
+          ],
+          "Thread ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/simInfo.py": {
+      "artifacts": {
+        "simInfoUUID": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "MDN",
+          "ESIM",
+          "Type",
+          "CB_ID",
+          "No_SRC",
+          "Label-ID",
+          "Label-ID Confirmed",
+          "EAP_AKA",
+          "CB_Ver"
+        ],
+        "simInfoLabelStore": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Tag",
+          "SIM Label Store ID",
+          "Text"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/skg_archive.py": {
+      "artifacts": {
+        "skg_archive": [
+          [
+            "_kMDItemInterestingDate",
+            "datetime"
+          ],
+          [
+            "kMDItemContentCreationDate",
+            "datetime"
+          ],
+          "_kMDItemBundleID",
+          "_kMDItemOID",
+          "_kMDItemExternalID",
+          "_kMDItemDomainIdentifier",
+          "_kMDItemSnippet",
+          "kMDItemAuthorAddresses",
+          "kMDItemAuthorEmailAddresses",
+          "kMDItemAuthors",
+          "kMDItemContentType",
+          "kMDItemRecipientAddresses",
+          "kMDItemRecipientEmailAddresses",
+          "kMDItemRecipients",
+          "Raw Data"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/slack.py": {
+      "artifacts": {
+        "slackModelMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Sender Name",
+          "Channel Name",
+          "Message",
+          "Sender ID",
+          "Conversation ID",
+          "Group ID"
+        ],
+        "slackModelUsers": [
+          "Server Version (as stored)",
+          "Real Name",
+          "First Name",
+          "Last Name",
+          "User Name",
+          "Email",
+          "Phone",
+          "Team ID",
+          "Workspace ID",
+          "User ID",
+          "Local User",
+          "Owner",
+          "Admin",
+          "Bot",
+          "Timezone",
+          "Timezone Title",
+          "Timezone Offset (Hours)",
+          "Avatar Hash",
+          "Color String"
+        ],
+        "slackModelChannels": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "First Message Timestamp",
+            "datetime"
+          ],
+          "Creator ID",
+          "Creator Name",
+          "Channel Name",
+          "Channel ID",
+          "DM User ID",
+          "Channel Description",
+          "Channel Type"
+        ],
+        "slackMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Sender ID",
+          "Sender Name",
+          "Channel Name",
+          "Message",
+          "Shared File",
+          "Channel ID",
+          "Channel SID",
+          "Channel SID1",
+          "User SID"
+        ],
+        "slackUsers": [
+          "Admin",
+          "Owner",
+          "Real Name",
+          "First Name",
+          "Last Name",
+          "Display Name",
+          "Name",
+          "Phone",
+          "Timezone",
+          "Timezone Offset",
+          "Timezone Title",
+          "Title",
+          "SID",
+          "Team ID"
+        ],
+        "slackAttachments": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Sender ID",
+          "Sender Name",
+          "Channel Name",
+          "Message",
+          "Shared File",
+          "Mode",
+          "Title",
+          "Type",
+          [
+            "File Timestamp",
+            "datetime"
+          ],
+          "Preview",
+          "Size",
+          "Private Download URL",
+          "Permalink URL",
+          "Channel ID",
+          "Channel SID",
+          "Channel SID1",
+          "User SID"
+        ],
+        "slackChannels": [
+          [
+            "Timestamp Created",
+            "datetime"
+          ],
+          [
+            "Purpose Last Set",
+            "datetime"
+          ],
+          [
+            "Topic Last Set",
+            "datetime"
+          ],
+          [
+            "Latest",
+            "datetime"
+          ],
+          "Channel Names",
+          "DM Channels",
+          "Other Channels",
+          "User ID",
+          "Creator ID",
+          "Purpose Creator ID",
+          "Purpose Text",
+          "Topic Creator ID",
+          "Topic Text"
+        ],
+        "slackTeams": [
+          "Name",
+          "Domain Name",
+          "Auth User ID",
+          "SID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/sms.py": {
+      "artifacts": {
+        "sms": [
+          [
+            "Message Timestamp",
+            "datetime"
+          ],
+          [
+            "Read Timestamp",
+            "datetime"
+          ],
+          [
+            "Delivered Timestamp",
+            "datetime"
+          ],
+          [
+            "Attachment Timestamp",
+            "datetime"
+          ],
+          "From Me",
+          "Chat Contact ID",
+          "Message",
+          [
+            "Attachment File",
+            "media"
+          ],
+          "Service",
+          "Message Direction",
+          "Message Sent",
+          "Message Delivered",
+          "Message Read",
+          "Account",
+          "Account Login",
+          "Attachment Name",
+          "Attachment Mimetype",
+          "Attachment Size (Bytes)",
+          "Message Row ID",
+          "Message GUID",
+          "Chat ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/snapchat.py": {
+      "artifacts": {
+        "snapchatMessages": [
+          [
+            "Creation Timestamp",
+            "datetime"
+          ],
+          [
+            "Read Timestamp",
+            "datetime"
+          ],
+          "Message Direction",
+          "Sender Username",
+          "Message Text",
+          "Record Origin",
+          "Sender Display Name",
+          "Sender ID",
+          "Conversation Participants",
+          "Content Type (as stored)",
+          "Message State Type",
+          "Is Saved",
+          "Is Viewed By User",
+          "Remote Media Count",
+          "Quoted Server Message ID",
+          "Conversation ID",
+          "Client Message ID",
+          "Server Message ID",
+          "Recovery Method",
+          "Recovery Location"
+        ],
+        "snapchatConversations": [
+          [
+            "Creation Timestamp",
+            "datetime"
+          ],
+          [
+            "Last Updated Timestamp",
+            "datetime"
+          ],
+          [
+            "Display Timestamp",
+            "datetime"
+          ],
+          [
+            "Tombstoned At Timestamp",
+            "datetime"
+          ],
+          [
+            "Streak Expiration Timestamp",
+            "datetime"
+          ],
+          "Record Origin",
+          "Conversation Title",
+          "Participants",
+          "Participant IDs",
+          "Message Count",
+          "Streak Count",
+          "Conversation Type (as stored)",
+          "Send State Type",
+          "Feed Item Creator",
+          "Feed Item Creator ID",
+          "Last Chat Sender",
+          "Last Chat Sender ID",
+          "Tombstoned",
+          "Conversation ID",
+          "Recovery Method",
+          "Recovery Location"
+        ],
+        "snapchatFriends": [
+          "Username",
+          "Display Name",
+          "User ID",
+          "Mutable Username",
+          "Legacy Username",
+          "Source File"
+        ],
+        "snapchatGallerySearch": [
+          [
+            "Time Tag",
+            "date"
+          ],
+          "Snap ID",
+          "Location Tags",
+          "Location Cluster",
+          "Visual Tags",
+          "Visual Concepts (confidence)",
+          "Visual Cluster",
+          "Meta Tags",
+          "Time Tags",
+          "Caption",
+          "Language",
+          "Source File"
+        ],
+        "snapchatAccount": [
+          "Key",
+          "Value",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/splitwise.py": {
+      "artifacts": {
+        "splitwiseUsers": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "Updated Timestamp",
+            "datetime"
+          ],
+          "First Name",
+          "Last Name",
+          "Email",
+          [
+            "Phone",
+            "phonenumber"
+          ],
+          "Person ID",
+          "Avatar Path",
+          "Currency",
+          "Country",
+          "Registration Status"
+        ],
+        "splitwiseExpenses": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "Updated Timestamp",
+            "datetime"
+          ],
+          "Created By",
+          "Expense Description",
+          "Cost",
+          "Currency",
+          "Category",
+          "Group Name",
+          "Expense ID",
+          "Expense GUID"
+        ],
+        "splitwiseExpenseBalances": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          "Member Name",
+          "Email",
+          "Expense",
+          "Owed Share",
+          "Paid Share"
+        ],
+        "splitwiseTotalBalances": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "Updated Timestamp",
+            "datetime"
+          ],
+          "Friend Name",
+          "Email",
+          "Balance",
+          "Currency"
+        ],
+        "splitwiseGroups": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "Updated Timestamp",
+            "datetime"
+          ],
+          "Group Name",
+          "Members",
+          "Group ID",
+          "Group Type",
+          "Invite Link",
+          "Whiteboard",
+          "Avatar URL",
+          "Cover Photo URL"
+        ],
+        "splitwiseNotifications": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          "Notification",
+          "Source Type",
+          "Notification ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/spotlightIndex.py": {
+      "artifacts": {
+        "get_spotlightIndexCache": [
+          [
+            "File Modified Time",
+            "datetime"
+          ],
+          "Text Content",
+          "Cache Folder",
+          "Filename"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/springboard.py": {
+      "artifacts": {
+        "icons_screen": [
+          "Screen",
+          "Type",
+          "Name",
+          "Folder",
+          "Grid Size"
+        ],
+        "icons_screen_visual": [
+          "Screen",
+          [
+            "Layout",
+            "media"
+          ]
+        ],
+        "springboard_wallpaper": [
+          [
+            "File Created",
+            "datetime"
+          ],
+          [
+            "File Modified",
+            "datetime"
+          ],
+          [
+            "Wallpaper",
+            "media"
+          ],
+          "Variant",
+          "Filename",
+          "Status",
+          "Source Path"
+        ],
+        "posterboard_wallpaper": [
+          [
+            "File Created",
+            "datetime"
+          ],
+          [
+            "File Modified",
+            "datetime"
+          ],
+          [
+            "Wallpaper",
+            "media"
+          ],
+          "Layer Name",
+          "Filename",
+          "Status",
+          "Source Path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/storeSystem.py": {
+      "artifacts": {
+        "storeSystemAppInstalls": [
+          [
+            "Record Timestamp",
+            "datetime"
+          ],
+          [
+            "Install Finished",
+            "datetime"
+          ],
+          [
+            "Last Start Date",
+            "datetime"
+          ],
+          [
+            "Purchase Date",
+            "datetime"
+          ],
+          [
+            "App Release Date",
+            "datetime"
+          ],
+          "App Name",
+          "Bundle ID",
+          "Short Version",
+          "Bundle Version",
+          "Developer",
+          "Genre",
+          "Rating",
+          "Apple ID",
+          "Account DSID",
+          "altDSID",
+          "Item ID",
+          "External Version ID",
+          "Storefront Country",
+          "Storefront",
+          "Source App",
+          "Client ID",
+          "Install Path",
+          "Bundle Directory Name",
+          "Transaction ID",
+          "Phase",
+          "Update Type",
+          "Source Type",
+          "Redownload",
+          "One Shot Bootstrap",
+          "Switch Distributor",
+          "Optimal Download Duration"
+        ],
+        "storeSystemAppUpdates": [
+          [
+            "Record Timestamp",
+            "datetime"
+          ],
+          [
+            "Install Date",
+            "datetime"
+          ],
+          [
+            "Latest Version Released",
+            "datetime"
+          ],
+          [
+            "App First Released",
+            "datetime"
+          ],
+          "App Name",
+          "Bundle ID",
+          "Developer",
+          "Genre",
+          "Latest Version",
+          "Release Notes",
+          "Item ID",
+          "Store Software Version ID",
+          "External Version ID",
+          "Update State",
+          "Package Type",
+          "Installer Packaging Type",
+          "App Store URL"
+        ],
+        "storeSystemAppPackages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Bundle ID",
+          "App Name",
+          "Package Type",
+          "Bytes Total",
+          "Disk Usage",
+          "Extracted Content Size",
+          "Variant ID",
+          "Compression",
+          "Delta Algorithm",
+          "Archive Type",
+          "Request Count",
+          "Package URL"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

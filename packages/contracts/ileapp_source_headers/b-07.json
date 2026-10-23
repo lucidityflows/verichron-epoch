@@ -1,0 +1,200 @@
+{
+  "modules": {
+    "scripts/artifacts/burner.py": {
+      "artifacts": {
+        "get_burner_accounts": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Phone number",
+            "phonenumber"
+          ],
+          "Country code",
+          "Number of burners",
+          "Burner numbers",
+          "Burner IDs",
+          "Do not distub",
+          "Voicemail URL",
+          "User ID"
+        ],
+        "get_burner_contacts": [
+          [
+            "Phone number",
+            "phonenumber"
+          ],
+          "Full name",
+          "Other phones",
+          "Notes",
+          "Verified",
+          "Blocked",
+          "Muted",
+          [
+            "Image",
+            "media"
+          ],
+          [
+            "Thumbnail",
+            "media"
+          ],
+          "Image URL",
+          "Thumbnail URL",
+          "Contact ID"
+        ],
+        "get_burner_numbers": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Profile picture",
+            "media"
+          ],
+          [
+            "Burner number",
+            "phonenumber"
+          ],
+          "Display name",
+          [
+            "Subscription Expires",
+            "datetime"
+          ],
+          "Notifications",
+          "Inbound caller ID",
+          "In-App calling (VoIP)",
+          "Auto-replay enabled",
+          "Auto-reply message",
+          "Remaining/Total minutes",
+          "Remaining/Total messages",
+          [
+            "Phone number",
+            "phonenumber"
+          ],
+          "User ID",
+          "Burner ID"
+        ],
+        "get_burner_messages": [
+          [
+            "Sent",
+            "datetime"
+          ],
+          "Direction",
+          "Sender",
+          "Message",
+          [
+            "Image",
+            "media"
+          ],
+          "Thread",
+          "Read",
+          "Recipient",
+          "Message type",
+          [
+            "Thumbnail",
+            "media"
+          ],
+          "Media URL",
+          "Voicemail URL",
+          "Message ID",
+          "Burner ID",
+          "Thread ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/burnerCache.py": {
+      "artifacts": {
+        "burnerCache_accounts": [
+          [
+            "Last updated",
+            "datetime"
+          ],
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Phone number",
+            "phonenumber"
+          ],
+          "Country code",
+          "Carrier name",
+          "Number of burners",
+          "User ID",
+          "Source file name",
+          "Location"
+        ],
+        "burnerCache_contacts": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Phone number",
+            "phonenumber"
+          ],
+          "Full name",
+          "Notes",
+          "Verified",
+          "Blocked",
+          "Muted",
+          "Burner IDs",
+          "Contact ID",
+          "Source file name",
+          "Location"
+        ],
+        "burnerCache_numbers": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Burner number",
+          "Display name",
+          "Subscription Expires",
+          "Version",
+          "Notifications",
+          "Inbound caller ID",
+          "In-App calling (VoIP)",
+          "Auto-replay enabled",
+          "Auto-reply message",
+          "Remaining/Total minutes",
+          "Remaining/Total messages",
+          [
+            "Phone number",
+            "phonenumber"
+          ],
+          "User ID",
+          "Burner ID",
+          "Source file name",
+          "Location"
+        ],
+        "burnerCache_messages": [
+          [
+            "Sent",
+            "datetime"
+          ],
+          "Direction",
+          "Sender",
+          "Message",
+          [
+            "Media",
+            "media",
+            "height: 96px; border-radius: 5%;"
+          ],
+          "Thread",
+          "Read",
+          "Recipient",
+          "Message type",
+          "Media URL",
+          "Message ID",
+          "Source file name",
+          "Location"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

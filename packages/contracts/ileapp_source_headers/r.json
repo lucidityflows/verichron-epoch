@@ -1,0 +1,196 @@
+{
+  "modules": {
+    "scripts/artifacts/rctAsyncStorageManifest.py": {
+      "artifacts": {
+        "get_rctAsyncStorageManifest": [
+          "Key Name",
+          "Data Value",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/recentApphistory.py": {
+      "artifacts": {
+        "recentApphistory": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Bundle ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/recents.py": {
+      "artifacts": {
+        "appleRecents": [
+          [
+            "Last Date",
+            "datetime"
+          ],
+          "Parsed Dates (UTC)",
+          "Dates (Raw)",
+          "Recent ID",
+          "Contact Kind",
+          "Sending Address",
+          "Contact Address",
+          "Display Name",
+          "Metadata Key",
+          "Metadata Value",
+          "Original Source",
+          "Weight",
+          "Record Hash",
+          "Count",
+          "Group Kind"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/reddit.py": {
+      "artifacts": {
+        "reddit_chats": [
+          [
+            "Server Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Sender Display Name",
+          "Message",
+          [
+            "Attachment",
+            "media"
+          ],
+          "Event ID",
+          "Sender ID",
+          "Recipient(s)",
+          "Event Type",
+          "Message Type",
+          "Attachment Cached Name",
+          "Room ID"
+        ],
+        "reddit_chat_users": [
+          [
+            "Updated Date",
+            "datetime"
+          ],
+          [
+            "Access Date",
+            "datetime"
+          ],
+          [
+            "Store Update Date",
+            "datetime"
+          ],
+          "Display Name",
+          "Matrix User ID",
+          "Is Current App User",
+          "Store Key",
+          "Source File"
+        ],
+        "reddit_users": [
+          [
+            "Profile Created",
+            "datetime"
+          ],
+          [
+            "Access Date",
+            "datetime"
+          ],
+          [
+            "Store Update Date",
+            "datetime"
+          ],
+          "Display Name",
+          "Reddit ID",
+          "Total Karma",
+          "Karma From Posts",
+          "Karma From Comments",
+          "Is Verified",
+          "Profile Is NSFW",
+          "Is Blocked",
+          "Is Accepting Chats",
+          "Is Accepting PMs",
+          "Source File"
+        ],
+        "reddit_subreddit_subscriptions": [
+          [
+            "Community Created",
+            "datetime"
+          ],
+          "Community",
+          "Title",
+          "Community ID",
+          "Account",
+          "Subscribed",
+          "Favourite",
+          "Muted",
+          "NSFW",
+          "Subscriber Count",
+          "Active Count",
+          "Subreddit Type (as stored)",
+          "Public Description",
+          "URL",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/reminders.py": {
+      "artifacts": {
+        "reminders": [
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          [
+            "Last Modified",
+            "datetime"
+          ],
+          [
+            "Due Date",
+            "datetime"
+          ],
+          [
+            "Completion Date",
+            "datetime"
+          ],
+          "Title",
+          "Notes",
+          "Completed",
+          "Flagged",
+          "Marked for Deletion",
+          "File Location"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/restoreLog.py": {
+      "artifacts": {
+        "restore_log": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Original OS Build",
+          "Original OS Version",
+          "Updated OS Build",
+          "Updated OS Version",
+          "Event",
+          "Device Family",
+          "Board ID",
+          "Device Model",
+          "Battery Level",
+          "Battery Is Charging"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

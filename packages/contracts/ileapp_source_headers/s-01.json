@@ -1,0 +1,342 @@
+{
+  "modules": {
+    "scripts/artifacts/SMSmissingROWIDs.py": {
+      "artifacts": {
+        "SMS_Missing_ROWIDs": [
+          [
+            "Beginning Timestamp",
+            "datetime"
+          ],
+          [
+            "Ending Timestamp",
+            "datetime"
+          ],
+          "Previous guid",
+          "guid",
+          "Previous ROWID",
+          "ROWID",
+          "Number of Missing Rows"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/SiriRemembers.py": {
+      "artifacts": {
+        "siriRemembersMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Recipient",
+          "Recipient Handle",
+          "Sender",
+          "Sender Handle",
+          "Direction",
+          "Donated by Siri",
+          "Application Bundle ID",
+          "Application UUID",
+          "Domain ID",
+          "Verb ID",
+          "Intents ID",
+          "Intents UUID",
+          "Active Row"
+        ],
+        "siriRemembersCalls": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Recipient",
+          "Recipient Handle",
+          "Sender",
+          "Sender Handle",
+          "Direction",
+          "Duration",
+          "Donated by Siri",
+          "Application Bundle ID",
+          "Application UUID",
+          "Domain ID",
+          "Verb ID",
+          "Intents ID",
+          "Intents UUID"
+        ],
+        "siriRemembersMedia": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Media",
+          "Application Bundle ID",
+          "Donated by Siri",
+          "Application UUID",
+          "Domain ID",
+          "Verb ID",
+          "Intents ID",
+          "Intents UUID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/safariBookmarks.py": {
+      "artifacts": {
+        "safariBookmarks": [
+          "Title",
+          "URL",
+          "Hidden"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/safariCache.py": {
+      "artifacts": {
+        "safariCache": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Request URL",
+          "HTTP Status",
+          "Request Method",
+          "MIME Type",
+          [
+            "Cached Payload",
+            "media"
+          ],
+          "Payload Location",
+          "Cache File Name",
+          "Payload Size",
+          "Payload Type",
+          "Content Type",
+          "Content Length",
+          "Date",
+          "Expires",
+          "Last Modified",
+          "Cache Control",
+          "Server",
+          "Partition",
+          "Storage Policy",
+          "Entry ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/safariDownloads.py": {
+      "artifacts": {
+        "safariDownloads": [
+          [
+            "Date Added",
+            "datetime"
+          ],
+          "URL",
+          "Path",
+          "Bytes So Far",
+          "Total Bytes",
+          "Identifier",
+          "Sandbox Identifier",
+          "Remove When Done",
+          "Other Fields"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/safariFavicons.py": {
+      "artifacts": {
+        "safariFavicons": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Page URL",
+          "Icon URL",
+          "Width",
+          "Height",
+          "Generated Representations?"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/safariHistory.py": {
+      "artifacts": {
+        "safariHistory": [
+          [
+            "Visit Timestamp",
+            "datetime"
+          ],
+          "Title",
+          "URL",
+          "Visit Count",
+          "Redirect Source",
+          "Redirect Destination",
+          "Visit ID",
+          "Origin",
+          "Profile"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/safariRecentWebSearches.py": {
+      "artifacts": {
+        "safariRecentWebSearches": [
+          [
+            "Date",
+            "datetime"
+          ],
+          "Search Term"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/safariTabs.py": {
+      "artifacts": {
+        "safariTabsBrowserState": [
+          [
+            "Associated Timestamp",
+            "datetime"
+          ],
+          "Title",
+          "URL",
+          "User Visible URL",
+          "Opened from Link",
+          "Private Browsing"
+        ],
+        "safariTabsiCloud": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "Modified Timestamp",
+            "datetime"
+          ],
+          "Title",
+          "URL",
+          "Device Name",
+          "Device UUID",
+          "Tab UUID",
+          "Modified By"
+        ],
+        "safariTabsDatabase": [
+          [
+            "Last Modified",
+            "datetime"
+          ],
+          [
+            "Date Closed",
+            "datetime"
+          ],
+          "Tab ID",
+          "Title",
+          "URL",
+          "Parent ID",
+          "Parent / Tab Group",
+          "Browsing Mode",
+          [
+            "Last Visit Time",
+            "datetime"
+          ],
+          [
+            "Date Last Viewed",
+            "datetime"
+          ],
+          "Opened from Link",
+          "Tab Index",
+          "Muted",
+          "Showing Reader",
+          "Tab UUID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/safariWebsearch.py": {
+      "artifacts": {
+        "safariWebsearch": [
+          [
+            "Visit Time",
+            "datetime"
+          ],
+          "Search Term",
+          "URL",
+          "Visit Count",
+          "Title",
+          "Origin (as stored)",
+          "Load Successful",
+          "Visit ID",
+          "Redirect Source",
+          "Redirect Destination"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/sbbmobile.py": {
+      "artifacts": {
+        "sbb_searchhistory": [
+          [
+            "Search timestamp (UTC)",
+            "datetime"
+          ],
+          "Departure",
+          "Departure type",
+          "Target",
+          "Target type",
+          "Result Coordinates (lat/lon)"
+        ],
+        "sbb_easyride_trips": [
+          [
+            "Check-in Time (UTC)",
+            "datetime"
+          ],
+          "Check-out Time (UTC)",
+          "Duration (min)"
+        ],
+        "sbb_purchased_tickets": [
+          "Traveler",
+          "Valid from",
+          "Valid until",
+          "is Refunded",
+          "Payment method",
+          "Ticket description",
+          "Purchase Time",
+          "Departure",
+          "Target",
+          "Zones"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/secretCalculator.py": {
+      "artifacts": {
+        "secretCalculatorPhotoAlbum": [
+          [
+            "Date",
+            "datetime"
+          ],
+          [
+            "File",
+            "media",
+            "height: 96px;"
+          ],
+          "Album",
+          [
+            "Album Date",
+            "datetime"
+          ],
+          "Filename",
+          "Is Video"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

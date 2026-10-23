@@ -1,0 +1,414 @@
+{
+  "modules": {
+    "scripts/artifacts/tileAppDb.py": {
+      "artifacts": {
+        "tileAppDb": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Tile Name",
+          [
+            "Activation Timestamp",
+            "datetime"
+          ],
+          [
+            "Registration Timestamp",
+            "datetime"
+          ],
+          "Altitude",
+          "Latitude",
+          "Longitude",
+          "Tile ID",
+          "Tile Type",
+          "Status",
+          "Is Lost?",
+          [
+            "Last Lost-Tile Community Connection",
+            "datetime"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/tileAppDisc.py": {
+      "artifacts": {
+        "tileAppDisc": [
+          [
+            "Last Modified Timestamp",
+            "datetime"
+          ],
+          "Tile UUID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/tileAppNetDb.py": {
+      "artifacts": {
+        "tileAppNetDb": [
+          [
+            "Registration Timestamp",
+            "datetime"
+          ],
+          "Email",
+          "Full Name",
+          [
+            "Mobile Phone Number",
+            "phonenumber"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/timezoneInfo.py": {
+      "artifacts": {
+        "timezone_info": [
+          "Property",
+          "Property Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/timezoneSet.py": {
+      "artifacts": {
+        "timezone_set": [
+          "Key",
+          "Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/tinder.py": {
+      "artifacts": {
+        "tinderMessages": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Client Created",
+            "datetime"
+          ],
+          "Direction",
+          "Sender Name",
+          "Message",
+          "Match Name",
+          "Type (as stored)",
+          "Subtype (as stored)",
+          "Liked (as stored)",
+          "Viewed (as stored)",
+          "Is Hidden (as stored)",
+          "Media URL",
+          "Photo URL",
+          "Local Image URL",
+          "Link URL",
+          "Sender ID",
+          "Message ID",
+          "Match ID"
+        ],
+        "tinderMatches": [
+          [
+            "Match Created",
+            "datetime"
+          ],
+          [
+            "Last Activity",
+            "datetime"
+          ],
+          [
+            "Touched",
+            "datetime"
+          ],
+          [
+            "Expiration Date",
+            "datetime"
+          ],
+          "Matched Person",
+          [
+            "Birth Date",
+            "datetime"
+          ],
+          "Bio",
+          "City",
+          "Gender (as stored)",
+          "Distance (miles, as stored)",
+          "Server Message Count",
+          "Is Super Like Match (as stored)",
+          "Is Fast Match (as stored)",
+          "Is Boost Match (as stored)",
+          "Is Top Picks Match (as stored)",
+          "Is Expired (as stored)",
+          "Match Seen (as stored)",
+          "Viewed (as stored)",
+          "Following (as stored)",
+          "Subscription Tier (as stored)",
+          "Message Draft",
+          "Matched Person ID",
+          "Match ID"
+        ],
+        "tinderRecommendations": [
+          [
+            "Birth Date",
+            "datetime"
+          ],
+          [
+            "Expiration Date",
+            "datetime"
+          ],
+          "Name",
+          "Bio",
+          "City",
+          "User Location Name",
+          "Distance (miles, as stored)",
+          "Gender (as stored)",
+          "Custom Gender",
+          "School",
+          "Instagram Name",
+          "Public Username",
+          "Verified (as stored)",
+          "Liked (as stored)",
+          "Super Liked (as stored)",
+          "Rec Type (as stored)",
+          "Rec Source (as stored)",
+          "Sub Source (as stored)",
+          "Is New (as stored)",
+          "Did Rewind (as stored)",
+          "Swipe Note",
+          "User ID",
+          "Recommendation ID"
+        ],
+        "tinderAccount": [
+          [
+            "Account Created",
+            "datetime"
+          ],
+          [
+            "First Consecutive Login",
+            "datetime"
+          ],
+          [
+            "Last Consecutive Login",
+            "datetime"
+          ],
+          "Name",
+          "User ID",
+          "Email",
+          "Phone Number",
+          [
+            "Birth Date",
+            "datetime"
+          ],
+          "Gender (as stored)",
+          "Bio",
+          "City",
+          "Instagram Name",
+          "Apple ID Linked (as stored)",
+          "Facebook ID Linked (as stored)",
+          "Google ID Linked (as stored)",
+          "Line ID Linked (as stored)",
+          "Has Any User Previously Logged In (as stored)"
+        ],
+        "tinderCachedPhotos": [
+          [
+            "Photo",
+            "media"
+          ],
+          "Owner Name",
+          "Source",
+          "Source URL",
+          "File Size (bytes)",
+          "Owner User ID",
+          "Cache File Name"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/torrentData.py": {
+      "artifacts": {
+        "torrent_data": [
+          "Torrent Name",
+          "Info Hash",
+          "Data",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/torrentResumeinfo.py": {
+      "artifacts": {
+        "torrent_resume_info": [
+          "File",
+          "InfoHash",
+          "Data"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/torrentinfo.py": {
+      "artifacts": {
+        "torrent_info": [
+          "File",
+          "InfoHash",
+          "Data"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/trustedPeers.py": {
+      "artifacts": {
+        "trusted_peers": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Model",
+          "Model Version",
+          "Device Name",
+          "Serial Number",
+          "Secure Backup Numeric Passphrase Length",
+          "Device Color",
+          "Device Enclosure Color",
+          "Peer OS Version",
+          "Peer Model Name",
+          "Peer Computer Name",
+          "Peer Serial Number",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/truthSocial.py": {
+      "artifacts": {
+        "truthSocialMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "From Me",
+          "Sender",
+          "Conversation",
+          "Message",
+          "Chat ID",
+          "Chat Type",
+          "Event Type",
+          "Sender Account ID",
+          "Attachment Type",
+          "Attachment URL",
+          "Reactions",
+          "Unread",
+          "Hidden",
+          "Failed To Send",
+          "Message Expiration (Seconds)",
+          "URL",
+          "Membership Account ID",
+          "Changed By Account ID",
+          "Invited Account ID",
+          "Invited By Account ID",
+          "Raw HTML Content",
+          "Message ID"
+        ],
+        "truthSocialChats": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Last Activity",
+            "datetime"
+          ],
+          [
+            "Last Read",
+            "datetime"
+          ],
+          "Chat ID",
+          "Chat Type",
+          "Other Party Display Name",
+          "Other Party Handle",
+          "Other Party Account ID",
+          "Owned By Account ID",
+          "Created By Account ID",
+          "Message Count",
+          "Unread Count",
+          "Message TTL (Seconds)",
+          "Accepted",
+          "Blocked",
+          "Blocking",
+          "Hidden",
+          "Silenced",
+          "Other Party Verified",
+          "Avatar URL"
+        ],
+        "truthSocialAccounts": [
+          "Account ID",
+          "Handle",
+          "Display Name",
+          "Verified",
+          "Account Holder",
+          "Event Count",
+          "Avatar URL"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/twint.py": {
+      "artifacts": {
+        "twint_transactions": [
+          [
+            "Creation date",
+            "datetime"
+          ],
+          [
+            "Modified Timestamp",
+            "datetime"
+          ],
+          [
+            "Second Phase Timestamp",
+            "datetime"
+          ],
+          [
+            "Status Pending Until",
+            "datetime"
+          ],
+          "Merchant branch name",
+          "Merchant name",
+          [
+            "Sender mobile number",
+            "phonenumber"
+          ],
+          "Sender message",
+          [
+            "Receiver mobile number",
+            "phonenumber"
+          ],
+          "Receiver contact name",
+          "Response message",
+          "Amount authorized for the transaction",
+          "Paid amount",
+          "Requested amount",
+          "Discount",
+          "Currency",
+          "Content reference",
+          "Order link",
+          "Presence of multimedia content",
+          "Transaction status",
+          "Type of transaction",
+          "Direction of the transaction",
+          "Merchant confirmation"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

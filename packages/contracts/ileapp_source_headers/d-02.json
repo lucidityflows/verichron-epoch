@@ -1,0 +1,215 @@
+{
+  "modules": {
+    "scripts/artifacts/draftmessage.py": {
+      "artifacts": {
+        "get_draftmessage": [
+          [
+            "Modified Time",
+            "datetime"
+          ],
+          "Chat Directory Name",
+          "Draft Message",
+          "Source file"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/dubox.py": {
+      "artifacts": {
+        "dubox_messages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          "Sender",
+          "Content",
+          "Partner",
+          "Content Type Value",
+          "File Path",
+          "File Size",
+          "File MD5",
+          "Link"
+        ],
+        "dubox_conversations": [
+          [
+            "Last Message Time",
+            "datetime"
+          ],
+          [
+            "Created",
+            "datetime"
+          ],
+          "Session Name",
+          "Last Message",
+          "Unread Count",
+          "Conversation Type Value",
+          "Official Account",
+          "Draft Content",
+          "Conversation Key"
+        ],
+        "dubox_contacts": [
+          "User Name",
+          "Nickname",
+          "Display Name",
+          "Remark",
+          "Secure Mobile",
+          "Secure Email",
+          "Intro",
+          "VIP Type Value",
+          "Is Friend Value",
+          "User Key"
+        ],
+        "dubox_cloud_files": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          "File Name",
+          "Server Path",
+          "File Size",
+          "File MD5",
+          "Is Directory",
+          "File Category Value",
+          "Favourite",
+          "Shared",
+          "Collected",
+          "File ID"
+        ],
+        "dubox_photos": [
+          [
+            "Date Taken",
+            "datetime"
+          ],
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          "File Name",
+          "Server Path",
+          "File Size",
+          "File MD5",
+          "Latitude",
+          "Longitude",
+          "Full Address",
+          "City",
+          "Street",
+          "Resolution",
+          "Duration",
+          "File ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/duckduckgo.py": {
+      "artifacts": {
+        "duckduckgo_history": [
+          [
+            "Last Visit",
+            "datetime"
+          ],
+          "URL",
+          "Title",
+          "Total Visits",
+          "Trackers Blocked",
+          "Trackers Found",
+          "Blocked Tracking Entities",
+          "Failed To Load",
+          "Cookie Popup Blocked"
+        ],
+        "duckduckgo_page_visits": [
+          [
+            "Visit Time",
+            "datetime"
+          ],
+          "URL",
+          "Title",
+          "Tab ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/duetLocations.py": {
+      "artifacts": {
+        "duetlocations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Horizontal Accuracy",
+          "Altitude",
+          "Speed"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/duetNotificationSuggestions.py": {
+      "artifacts": {
+        "duetNotifications": [
+          [
+            "Received Timestamp",
+            "datetime"
+          ],
+          "Bundle ID",
+          "Is Message",
+          "Is Group Message",
+          "Urgency",
+          "Delivery Method",
+          "Delivery Reason",
+          "Latest Outcome",
+          [
+            "Latest Outcome Timestamp",
+            "datetime"
+          ],
+          "Is Prominent",
+          "Is Active",
+          "Expansions",
+          "Notification Body Length",
+          "Thread ID",
+          "Contact ID",
+          "Received Mode",
+          "Raw Identifier",
+          "UUID"
+        ],
+        "duetNotificationSuggestions": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "Shown Timestamp",
+            "datetime"
+          ],
+          "Suggestion Type",
+          "Scope",
+          "Entity Identifier",
+          "Latest Outcome",
+          [
+            "Latest Outcome Timestamp",
+            "datetime"
+          ],
+          "Is Active",
+          "Feedback Key",
+          "Trigger Notification UUID",
+          "UUID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

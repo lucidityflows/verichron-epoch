@@ -1,0 +1,386 @@
+{
+  "modules": {
+    "scripts/artifacts/iCloudWifi.py": {
+      "artifacts": {
+        "iCloudWifi": [
+          "BSSID",
+          "SSID",
+          "Added By",
+          "Enabled",
+          [
+            "Added At",
+            "datetime"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/iOSCacheLocations.py": {
+      "artifacts": {
+        "CacheSQLite_Locations": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Latitude",
+          "Longitude",
+          "Horizontal Accuracy (Meters)",
+          "Speed (Meters/Sec)",
+          "Speed (Miles/Hour)"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/iOSclaude.py": {
+      "artifacts": {
+        "iOSclaudeAccountInfo": [
+          [
+            "Account Created Time",
+            "datetime"
+          ],
+          [
+            "Account Updated Time",
+            "datetime"
+          ],
+          "Full Name",
+          "Display Name",
+          "Email Address",
+          "Tagged ID"
+        ],
+        "iOSclaudeConversations": [
+          [
+            "Conversation Start Time",
+            "datetime"
+          ],
+          [
+            "Conversation Updated Time",
+            "datetime"
+          ],
+          "Conversation ID",
+          "Conversation Name",
+          "Model",
+          "Incognito Conversation",
+          "Conversation Starred"
+        ],
+        "iOSclaudeMessages": [
+          [
+            "Message Created Time",
+            "datetime"
+          ],
+          "Message Sender",
+          "Conversation Name",
+          "Message",
+          "Image File Name",
+          "Conversation ID"
+        ],
+        "iOSclaudeProjects": [
+          [
+            "Project Created Time",
+            "datetime"
+          ],
+          [
+            "Project Updated Time",
+            "datetime"
+          ],
+          "Project Name",
+          "Project Description",
+          "Project Creator",
+          "Project Starred",
+          "Number of Documents",
+          "Document File Name(s)"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/iTunesBackupInfo.py": {
+      "artifacts": {
+        "itunes_backup_info": [
+          "Property",
+          "Property Value"
+        ],
+        "itunes_backup_installed_applications": [
+          "Bundle ID",
+          [
+            "App Icon",
+            "media",
+            "width: 60px;"
+          ],
+          "Item Name",
+          "Artist Name",
+          "Version",
+          "Genre",
+          [
+            "storeCohort Date (as stored)",
+            "date"
+          ],
+          "Downloaded by",
+          [
+            "Purchase Date",
+            "datetime"
+          ],
+          [
+            "Release Date",
+            "datetime"
+          ],
+          "Source App",
+          "Auto Download",
+          "Purchased Redownload",
+          "Factory Install",
+          "Side Loaded",
+          "Game Center Enabled",
+          "Game Center Ever Enabled",
+          "Messages Extension"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/icloudMeta.py": {
+      "artifacts": {
+        "icloudmeta": [
+          [
+            "Btime",
+            "datetime"
+          ],
+          [
+            "Ctime",
+            "datetime"
+          ],
+          [
+            "Mtime",
+            "datetime"
+          ],
+          "Name",
+          "Last Editor Name",
+          "Doc ID",
+          "Parent ID",
+          "Type",
+          "Deleted?",
+          "Size",
+          "Zone",
+          "Executable?",
+          "Hidden?"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/icloudPhotoMeta.py": {
+      "artifacts": {
+        "icloudPhotoMeta": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Row ID",
+          "Record Type",
+          "Decoded",
+          "Title",
+          "Original Filesize",
+          "Latitude",
+          "Longitude",
+          "Altitude",
+          "GPS Datestamp",
+          "GPS Time",
+          [
+            "Added Date",
+            "datetime"
+          ],
+          "Timezone Offset",
+          "Decoded TZ",
+          "Is Deleted?",
+          "Is Expunged?",
+          [
+            "Import Date",
+            "datetime"
+          ],
+          [
+            "Modification Date",
+            "datetime"
+          ],
+          "Res Original Filesize",
+          "ID",
+          "TIFF",
+          "EXIF"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/icloudSharedalbums.py": {
+      "artifacts": {
+        "icloudSharedOwnerInfo": [
+          "Album Title",
+          "Album ID",
+          "Cloud Owner Email",
+          "Cloud Owner First Name",
+          "Cloud Owner Last Name",
+          "Cloud Public URL Enabled?",
+          [
+            "Cloud Subscription Date",
+            "datetime"
+          ],
+          "Cloud Relationship State",
+          "Cloud Owner Hashed Person ID",
+          "File Location"
+        ],
+        "icloudSharedAlbumData": [
+          "Album ID",
+          "DCIM Last Directory Number",
+          "DCIM Last File Number",
+          "File Location"
+        ],
+        "icloudSharedPersonInfo": [
+          "Email",
+          "First Name",
+          "Last Name",
+          "Full Name",
+          "Identification"
+        ],
+        "icloudSharedEmails": [
+          "Key",
+          "Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/idstatuscache.py": {
+      "artifacts": {
+        "idstatuscache": [
+          [
+            "Lookup Date",
+            "datetime"
+          ],
+          "Service Type",
+          "Partner",
+          "ID Status (as stored)",
+          "Application",
+          "Identifier",
+          "Location"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/imeiImsi.py": {
+      "artifacts": {
+        "imeiImsi": [
+          "Property",
+          "Property Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/imoHD_Chat.py": {
+      "artifacts": {
+        "imoHDChatMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Message Status",
+          "Sender Name",
+          "Chat Name",
+          "Message",
+          [
+            "Attachment",
+            "media"
+          ],
+          "Chat BUID",
+          "Sender ID",
+          "Sender Alias",
+          [
+            "Sender Phone",
+            "phonenumber"
+          ],
+          "Item Action",
+          "Constructed CDN URL (unverified)"
+        ],
+        "imoHDChatContacts": [
+          "Contact Name",
+          "Contact Alias",
+          [
+            "Contact Phone",
+            "phonenumber"
+          ],
+          "Constructed Profile CDN URL (unverified)",
+          "User ID",
+          "Is Group"
+        ],
+        "imoHDChatKeyValues": [
+          "Key",
+          "String Value",
+          "Long Value",
+          "Date Value",
+          "Data Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/instagramThreads.py": {
+      "artifacts": {
+        "instagram_threads": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "DM Reaction Server Timestamp",
+            "datetime"
+          ],
+          [
+            "Shared Media URL Expiration Date",
+            "datetime"
+          ],
+          "Viewer ID equals Sender PK",
+          "Username",
+          "Message",
+          "Sender ID",
+          "Thread ID",
+          "Video Chat Title",
+          "Video Chat ID",
+          "DM Reaction",
+          "Reaction User ID",
+          "Shared Media ID",
+          "Shared Media URL"
+        ],
+        "instagram_calls": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Sender ID",
+          "Username",
+          "Video Chat Title",
+          "Video Chat ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/installHistory.py": {
+      "artifacts": {
+        "iosInstallHistory": [
+          [
+            "Timestamp (Device Local, No Offset)",
+            "datetime"
+          ],
+          "Record ID",
+          "Operation",
+          "Operation Type",
+          "Update Name",
+          "Build",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

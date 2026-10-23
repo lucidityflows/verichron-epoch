@@ -1,0 +1,269 @@
+{
+  "modules": {
+    "scripts/artifacts/AMDSQLiteDB.py": {
+      "artifacts": {
+        "AMDSQLiteDB_UsageEvents": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "App Action",
+          "App Name",
+          "Bundle ID",
+          "AdamID",
+          "App Version",
+          "Vendor Name",
+          "Foreground Duration (as stored)",
+          "Apple ID",
+          "User ID"
+        ],
+        "AMDSQLiteDB_StorageCapacity": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Available Capacity (GB)",
+          "Total Capacity (GB)"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/AWESearch.py": {
+      "artifacts": {
+        "get_AWESearch": [
+          [
+            "Time",
+            "datetime"
+          ],
+          "Keyword",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/Airbnb.py": {
+      "artifacts": {
+        "airbnb_messages": [
+          [
+            "Created Timestamp",
+            "datetime"
+          ],
+          [
+            "Updated Timestamp",
+            "datetime"
+          ],
+          [
+            "Fetched Timestamp",
+            "datetime"
+          ],
+          "Sent",
+          "Sender Display Name",
+          "Thread ID",
+          "Original Message",
+          "Sender User ID",
+          "Sender User Type",
+          "Translated Message"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/accountConfig.py": {
+      "artifacts": {
+        "accountConfig": [
+          "Account ID",
+          "Data Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/accountData.py": {
+      "artifacts": {
+        "accountData": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Account Desc.",
+          "Username",
+          "Description",
+          "Identifier",
+          "Bundle ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/addressBook.py": {
+      "artifacts": {
+        "addressBook": [
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          [
+            "Modification Date",
+            "datetime"
+          ],
+          [
+            "Thumbnail",
+            "media",
+            "height: 80px; border-radius: 50%;"
+          ],
+          [
+            "Full Size Image",
+            "media",
+            "height: 80px;"
+          ],
+          "Prefix",
+          "First Name",
+          "Middle Name",
+          "Last Name",
+          "Suffix",
+          "Display Name",
+          "First Name Phonetic",
+          "Middle Name Phonetic",
+          "Last Name Phonetic",
+          "Company",
+          "Department",
+          "Job Title",
+          [
+            "Phone Numbers",
+            "phonenumber"
+          ],
+          "Email addresses",
+          "Addresses",
+          "Instant Messages",
+          "URL",
+          "Related Names",
+          "Profiles",
+          "Nickname",
+          "Notes",
+          "Birthday",
+          "Group Name",
+          "Storage Place"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/advertisingID.py": {
+      "artifacts": {
+        "advertisingID": []
+      },
+      "no_output_artifacts": [
+        "advertisingID"
+      ],
+      "unresolved": []
+    },
+    "scripts/artifacts/airdropId.py": {
+      "artifacts": {
+        "airdropId": []
+      },
+      "no_output_artifacts": [
+        "airdropId"
+      ],
+      "unresolved": []
+    },
+    "scripts/artifacts/allTrails.py": {
+      "artifacts": {
+        "allTrailsTrailDetails": [
+          "Trail Name",
+          "Route Type",
+          "Trail Difficulty",
+          "Rating",
+          "Review Count",
+          "Length (Meters)",
+          "Elevation Gain (Meters)",
+          "Latitude",
+          "Longitude",
+          "City",
+          "State/Region",
+          "State/Region Name",
+          "Zip Code",
+          "Country",
+          "Country Name",
+          "Park Area Name"
+        ],
+        "allTrailsUserInfo": [
+          [
+            "Creation Timestamp",
+            "datetime"
+          ],
+          "First Name",
+          "Last Name",
+          "User Name",
+          "Email",
+          "Referral Link",
+          "Latitude",
+          "Longitude",
+          "City",
+          "Region",
+          "Region Name",
+          "Country",
+          "Country Name",
+          "Zip Code"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appConduit.py": {
+      "artifacts": {
+        "app_conduit": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Device interaction",
+          "Device ID",
+          "Pairing ID",
+          "Device Type",
+          "Device Model",
+          "OS Build",
+          "OS Version",
+          "Log File Name"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appCookies.py": {
+      "artifacts": {
+        "appCookies": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Expires",
+            "datetime"
+          ],
+          "Host",
+          "Cookie Name",
+          "Path",
+          "Value",
+          "Flags",
+          "Source File"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/appGrouplisting.py": {
+      "artifacts": {
+        "appGrouplisting": [
+          "Bundle ID",
+          "Type",
+          "Directory GUID",
+          "Path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}

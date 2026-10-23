@@ -1,0 +1,485 @@
+{
+  "modules": {
+    "scripts/artifacts/geodApplications.py": {
+      "artifacts": {
+        "geodapplications": [
+          [
+            "Creation Time",
+            "datetime"
+          ],
+          "Count ID",
+          "Application"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/geodMapTiles.py": {
+      "artifacts": {
+        "geodMapTiles": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Places_from_VLOC",
+          "Labels_in_tile",
+          [
+            "Image",
+            "media",
+            "max-height:240px; max-width:320px;"
+          ],
+          "Tileset",
+          "Key A",
+          "Key B",
+          "Key C",
+          "Key D"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/geodPDPlaceCache.py": {
+      "artifacts": {
+        "geodpdplacecache": [
+          [
+            "Last Access Time",
+            "datetime"
+          ],
+          "Request Key",
+          "PD Place Hash",
+          [
+            "Expire Time",
+            "datetime"
+          ],
+          "PD Place"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/gmail.py": {
+      "artifacts": {
+        "gmailOfflineSearch": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Sender Name",
+          "Sender Email",
+          "Receiver",
+          "CC",
+          "BCC",
+          "Subject",
+          "Body",
+          "Thread ID",
+          "Message ID"
+        ],
+        "gmailLabelDetails": [
+          "Label",
+          "Unread Count",
+          "Total Count",
+          "Unseen Count"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/googleChat.py": {
+      "artifacts": {
+        "google_chat": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Is Sent",
+          "Message Author",
+          "Message",
+          [
+            "Media",
+            "media"
+          ],
+          "Group Type",
+          "Conversation Name",
+          "Filename",
+          "Reaction",
+          "Reaction User",
+          "Account ID"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/googleDrive.py": {
+      "artifacts": {
+        "google_drive_accounts": [
+          "Account ID",
+          "Email",
+          "Display Name",
+          "Profile Image URL",
+          "Root Folder Title",
+          "Source Path"
+        ],
+        "google_drive_items": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Modified",
+            "datetime"
+          ],
+          [
+            "Modified By Me",
+            "datetime"
+          ],
+          [
+            "Viewed By Me",
+            "datetime"
+          ],
+          [
+            "Shared With Me",
+            "datetime"
+          ],
+          [
+            "Trashed Date",
+            "datetime"
+          ],
+          "Title",
+          "Folder",
+          "Mime Type",
+          "Quota Bytes",
+          "Starred",
+          "User is Owner",
+          "Trashed",
+          "Explicitly Trashed",
+          "Hidden",
+          "Folder Path",
+          "Item ID",
+          "Offline Status (as stored)",
+          [
+            "Local File",
+            "media"
+          ],
+          "Account ID",
+          "Source Path"
+        ],
+        "google_drive_local_files": [
+          [
+            "Offline Last Modified",
+            "datetime"
+          ],
+          [
+            "Item Modified",
+            "datetime"
+          ],
+          "Local Name",
+          "Drive Title",
+          "Mime Type",
+          "Trashed",
+          "In cello.db",
+          "Item ID",
+          [
+            "File",
+            "media"
+          ],
+          "Account ID",
+          "Source Path"
+        ],
+        "google_drive_thumbnails": [
+          "Drive Title",
+          "Item ID",
+          "Filename Number (as stored)",
+          [
+            "Thumbnail",
+            "media"
+          ],
+          "Account ID",
+          "Source Path"
+        ],
+        "google_drive_comments": [
+          [
+            "Published",
+            "datetime"
+          ],
+          [
+            "Updated",
+            "datetime"
+          ],
+          "Comment",
+          "Author Name",
+          "Author Email",
+          "Quoted Text",
+          "Drive Title",
+          "Item Identifier (as stored)",
+          "Post ID",
+          "Origin (as stored)",
+          "Action State (as stored)",
+          "Deleted",
+          "Content Reaction",
+          "Anchor (as stored)",
+          "Account ID",
+          "Source Path"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/googleDuo.py": {
+      "artifacts": {
+        "googleDuoContacts": [
+          [
+            "Registration Date",
+            "datetime"
+          ],
+          "Name",
+          "ID",
+          "Number Label",
+          [
+            "Sync Date",
+            "datetime"
+          ]
+        ],
+        "googleDuoCallHistory": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Local User ID",
+          "Remote User ID",
+          "Contact Name",
+          "Call Duration",
+          "Call Direction",
+          "Video Call?"
+        ],
+        "googleDuoClips": [
+          [
+            "Creation Date",
+            "datetime"
+          ],
+          [
+            "Message Date",
+            "datetime"
+          ],
+          [
+            "Viewed Date",
+            "datetime"
+          ],
+          "Local User ID",
+          "Media Clip Source (as stored)",
+          "Text Representation",
+          "Message ID",
+          "MD5 Checksum",
+          "Content Size",
+          "Transferred Size",
+          [
+            "Clip",
+            "media"
+          ]
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/googleTranslate.py": {
+      "artifacts": {
+        "googleTranslateHistory": [
+          [
+            "Created",
+            "datetime"
+          ],
+          "Language",
+          "Source text",
+          "Target text",
+          "Starred",
+          "Romanization",
+          "Location"
+        ],
+        "googleTranslateStarred": [
+          "Language",
+          "Source text",
+          "Target text",
+          "Romanization",
+          "Location"
+        ],
+        "googleTranslateTts": [
+          "Language",
+          "Text",
+          "Audio",
+          "Location"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/googleVoice.py": {
+      "artifacts": {
+        "googleVoiceMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "From Me",
+          [
+            "Sender",
+            "phonenumber"
+          ],
+          "Conversation",
+          "Message",
+          "Thread Key",
+          "Direction",
+          "Attachment Count",
+          "Unread",
+          "Deleted",
+          "System Message"
+        ],
+        "googleVoiceCalls": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "Direction",
+          [
+            "Other Party",
+            "phonenumber"
+          ],
+          "Duration (Seconds)",
+          "Ring Group Name",
+          "Ring Group Number",
+          "Transferred From",
+          "Transferred To",
+          "Deleted",
+          "Thread Key"
+        ],
+        "googleVoiceVoicemails": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          [
+            "Caller",
+            "phonenumber"
+          ],
+          "Duration (Seconds)",
+          "Transcript",
+          "Transcript Confidence",
+          "Unread",
+          "Deleted",
+          "Thread Key"
+        ],
+        "googleVoiceContacts": [
+          [
+            "Last Activity",
+            "datetime"
+          ],
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "Blocked",
+          "Thread Count",
+          "Item Count"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    },
+    "scripts/artifacts/groupMe.py": {
+      "artifacts": {
+        "groupMeMessages": [
+          [
+            "Timestamp",
+            "datetime"
+          ],
+          "From Me",
+          "Sender",
+          "Conversation",
+          "Message",
+          "Chat ID",
+          "Chat Type",
+          "Sender ID",
+          "Attachment Type",
+          "Attachment",
+          "Venue Name",
+          "Latitude",
+          "Longitude",
+          "System Message",
+          "Hidden",
+          "Deletion Status Recorded",
+          "System Deleted",
+          "Deletion Actor (as stored)",
+          "Favorited By",
+          "Reply To Message ID",
+          "Message ID",
+          "Source GUID"
+        ],
+        "groupMeChats": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Last Message",
+            "datetime"
+          ],
+          [
+            "Last Viewed",
+            "datetime"
+          ],
+          "Chat Name",
+          "Chat ID",
+          "Chat Type",
+          "Group Type",
+          "Group Description",
+          "Other Party User ID",
+          "Creator ID",
+          "Message Count",
+          "Unread Count",
+          "Muted",
+          "Hidden",
+          "Share URL",
+          "Avatar URL"
+        ],
+        "groupMeGroupMembers": [
+          "Group Name",
+          "Group ID",
+          "Nickname",
+          "Real Name",
+          "User ID",
+          "Member ID",
+          "State",
+          "Auto Kicked",
+          "Avatar URL"
+        ],
+        "groupMeContacts": [
+          [
+            "Created",
+            "datetime"
+          ],
+          [
+            "Updated",
+            "datetime"
+          ],
+          "Name",
+          "Address Book Name",
+          [
+            "Phone Number",
+            "phonenumber"
+          ],
+          "User ID",
+          "Relationship ID",
+          "Blocked",
+          "Hidden",
+          "GroupMe User",
+          "Address Book ID",
+          "Avatar URL"
+        ],
+        "groupMeAccount": [
+          "Key",
+          "Value"
+        ]
+      },
+      "no_output_artifacts": [],
+      "unresolved": []
+    }
+  }
+}
