@@ -164,7 +164,7 @@ def test_resolves_nested_header_unpacking_from_locals_and_constants(tmp_path: Pa
     assert errors == []
 
 
-def test_dynamic_header_reassignment_does_not_reuse_previous_value(tmp_path: Path) -> None:
+def test_unresolved_reassignment_preserves_valid_header_alias(tmp_path: Path) -> None:
     artifacts = tmp_path / "scripts" / "artifacts"
     artifacts.mkdir(parents=True)
     (artifacts / "sample.py").write_text(
@@ -174,6 +174,25 @@ def test_dynamic_header_reassignment_does_not_reuse_previous_value(tmp_path: Pat
         "    alias = headers\n"
         "    headers = build_headers(context)\n"
         "    data_headers = alias\n"
+        "    return data_headers, [], ''\n",
+        encoding="utf-8",
+    )
+
+    _, inventory, _, errors = scan_source(artifacts)
+
+    assert inventory == {"scripts/artifacts/sample.py": {"sample": ["Old"]}}
+    assert errors == []
+
+
+def test_dynamic_header_reassignment_does_not_reuse_previous_value(tmp_path: Path) -> None:
+    artifacts = tmp_path / "scripts" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "sample.py").write_text(
+        "@artifact_processor\n"
+        "def sample(context):\n"
+        "    headers = ['Old']\n"
+        "    headers = build_headers(context)\n"
+        "    data_headers = headers\n"
         "    return data_headers, [], ''\n",
         encoding="utf-8",
     )

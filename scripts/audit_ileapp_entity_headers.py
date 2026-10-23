@@ -327,7 +327,8 @@ def _header_declaration(
             resolved_value = _resolve(value, names)
         except IndexError, KeyError, TypeError, ValueError:
             target_names = set().union(*(_target_names(target) for target in targets))
-            _invalidate_bindings(names, target_names)
+            for name in target_names:
+                names.pop(name, None)
             if any("data_headers" in _target_names(target) for target in targets):
                 return None, "data_headers is not a supported static expression"
             continue
