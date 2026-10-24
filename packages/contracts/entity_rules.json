@@ -1,6 +1,6 @@
 {
   "description": "Which values a record mentions, by kind, and where they are (EPOCH-581). Each rule names one field of one source and what it holds; a value's shape never decides its kind (measured 2026-10-20 on a real backup: 129 columns had a phone number's shape, most of them coordinates, byte counts and scores). The field's name is the entity's role. Shapes only check a rule: a value that doesn't fit its kind is counted as unreadable, never stored. The Python reader is entity_rules.py; scripts/check_entity_rules.py runs every rule against a real iLEAPP output.",
-  "version": 7,
+  "version": 8,
   "kinds": {
     "url": {
       "title": "URL",
@@ -5209,6 +5209,1321 @@
       "artifact": "Biome DB - Minimum Battery (Daily)",
       "field": "Minimum Battery Percentage",
       "reason": "The pinned parser for Biome DB - Minimum Battery (Daily) emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "Action GUID",
+      "reason": "The pinned parser for Biome - App Install emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "Activity",
+      "reason": "The pinned parser for Biome - App Install emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "App Info",
+      "reason": "The pinned parser for Biome - App Install emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "App Info2",
+      "reason": "The pinned parser for Biome - App Install emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "Bundle Info",
+      "reason": "The pinned parser for Biome - App Install emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - App Install emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - App Install emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - App Install emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "Time End",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "Time Write",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Install",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "App Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "App UUID",
+      "reason": "The pinned parser for Biome - App Installation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "Build Version",
+      "reason": "The pinned parser for Biome - App Installation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "Digest 1",
+      "reason": "The pinned parser for Biome - App Installation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "Digest 2",
+      "reason": "The pinned parser for Biome - App Installation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "Event Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "Event Type (raw)",
+      "reason": "The pinned parser for Biome - App Installation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - App Installation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - App Installation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - App Installation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Installation",
+      "field": "Version",
+      "reason": "The pinned parser for Biome - App Installation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Asset Category",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Asset ID",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Attribute",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Attribute Value",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Event Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Feature or Client",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "OS Build",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Requesting Client",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Result (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "Status (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Asset Availability",
+      "field": "User ID",
+      "reason": "The pinned parser for Biome - Apple Intelligence Asset Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Availability",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Apple Intelligence Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Availability",
+      "field": "Language",
+      "reason": "The pinned parser for Biome - Apple Intelligence Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Availability",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Apple Intelligence Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Availability",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Apple Intelligence Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Availability",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Availability",
+      "field": "State 1 (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Availability",
+      "field": "State 2 (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Availability",
+      "field": "State 3 (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Availability emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Asset Category",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Asset ID",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Attribute",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Attribute Value",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Event Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Feature or Client",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "OS Build",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Requesting Client",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Result (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "Status (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Model Catalog",
+      "field": "User ID",
+      "reason": "The pinned parser for Biome - Apple Intelligence Model Catalog emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Asset Category",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Asset ID",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Attribute",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Attribute Value",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Event Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Feature or Client",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "OS Build",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Requesting Client",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Result (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "Status (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Safety Overrides",
+      "field": "User ID",
+      "reason": "The pinned parser for Biome - Apple Intelligence Safety Overrides emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Asset Category",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Asset ID",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Attribute",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Attribute Value",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Event Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Feature or Client",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "OS Build",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Requesting Client",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Result (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "Status (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Software Update",
+      "field": "User ID",
+      "reason": "The pinned parser for Biome - Apple Intelligence Software Update emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Asset Category",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Asset ID",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Attribute",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Attribute Value",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Event Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Feature or Client",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "OS Build",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Requesting Client",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Result (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "Status (raw)",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Apple Intelligence Unified Asset",
+      "field": "User ID",
+      "reason": "The pinned parser for Biome - Apple Intelligence Unified Asset emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Syncs",
+      "field": "Device ID",
+      "reason": "The parser exposes a device identifier, which is not one of the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Device Syncs",
+      "field": "Device Type",
+      "reason": "The pinned parser for Biome - Device Syncs emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Syncs",
+      "field": "Last Sync Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Device Syncs",
+      "field": "Local Device",
+      "reason": "The pinned parser for Biome - Device Syncs emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Syncs",
+      "field": "Name",
+      "reason": "The pinned parser for Biome - Device Syncs emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Syncs",
+      "field": "OS Build",
+      "reason": "The pinned parser for Biome - Device Syncs emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Syncs",
+      "field": "OS Version",
+      "reason": "The pinned parser for Biome - Device Syncs emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "Action",
+      "reason": "The pinned parser for Biome - Intents emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "Classname",
+      "reason": "The pinned parser for Biome - Intents emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "Data",
+      "reason": "The pinned parser for Biome - Intents emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "Direction",
+      "reason": "The pinned parser for Biome - Intents emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "Donated by Siri",
+      "reason": "The pinned parser for Biome - Intents emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "Duration Interval",
+      "reason": "The pinned parser for Biome - Intents emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "End Date",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Intents emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "Group ID",
+      "reason": "The pinned parser for Biome - Intents emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "Protobuf data Offset",
+      "reason": "The pinned parser for Biome - Intents emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Intents",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Keyboard Learned Tokens",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Keyboard Learned Tokens emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Keyboard Learned Tokens",
+      "field": "Frequency",
+      "reason": "The pinned parser for Biome - Keyboard Learned Tokens emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Keyboard Learned Tokens",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Keyboard Learned Tokens emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Keyboard Learned Tokens",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Keyboard Learned Tokens emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Keyboard Learned Tokens",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Keyboard Learned Tokens",
+      "field": "Token",
+      "reason": "A learned keyboard token is not a defined entity kind; text shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notes",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Notes emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notes",
+      "field": "Identifier 1",
+      "reason": "The pinned parser for Biome - Notes emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notes",
+      "field": "Identifier 2",
+      "reason": "The pinned parser for Biome - Notes emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notes",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Notes emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notes",
+      "field": "Record Num",
+      "reason": "The pinned parser for Biome - Notes emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notes",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Notes emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notes",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Notes",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Notification Usage",
+      "field": "Application name",
+      "reason": "The pinned parser for Biome - Notification Usage emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notification Usage",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Notification Usage emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notification Usage",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Notification Usage emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notification Usage",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Notification Usage emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notification Usage",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Notification Usage",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "Field 1",
+      "reason": "The pinned parser for Biome - Notifications emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "Field 2",
+      "reason": "The pinned parser for Biome - Notifications emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "Field 3",
+      "reason": "The pinned parser for Biome - Notifications emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "Field 4",
+      "reason": "The pinned parser for Biome - Notifications emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "Field 5",
+      "reason": "The pinned parser for Biome - Notifications emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "Field 6",
+      "reason": "The pinned parser for Biome - Notifications emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Notifications emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Notifications emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Notifications emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Notifications",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Now Playing",
+      "field": "Artist",
+      "reason": "The pinned parser for Biome - Now Playing emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Now Playing",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Now Playing emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Now Playing",
+      "field": "Media Type",
+      "reason": "The pinned parser for Biome - Now Playing emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Now Playing",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Now Playing emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Now Playing",
+      "field": "Output",
+      "reason": "The pinned parser for Biome - Now Playing emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Now Playing",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Now Playing emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Now Playing",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Now Playing",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Now Playing",
+      "field": "Title",
+      "reason": "The pinned parser for Biome - Now Playing emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Field 1 (raw)",
+      "reason": "The pinned parser for Biome - Photos Search Insights emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Field 25 (raw)",
+      "reason": "The pinned parser for Biome - Photos Search Insights emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Field 26 (raw)",
+      "reason": "The pinned parser for Biome - Photos Search Insights emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Field 5 (raw)",
+      "reason": "The pinned parser for Biome - Photos Search Insights emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Photos Search Insights emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Language",
+      "reason": "The pinned parser for Biome - Photos Search Insights emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Photos Search Insights emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Region",
+      "reason": "The pinned parser for Biome - Photos Search Insights emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Photos Search Insights emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Schema Version",
+      "reason": "The pinned parser for Biome - Photos Search Insights emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Conversation",
+      "field": "Contact Handle",
+      "reason": "The parser extracts this from a service-scoped conversation identifier but does not establish whether the handle is an email address, phone number, or another identifier."
+    },
+    {
+      "artifact": "Biome - Share Sheet Conversation",
+      "field": "Conversation ID",
+      "reason": "The pinned parser for Biome - Share Sheet Conversation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Conversation",
+      "field": "Field 10 (raw)",
+      "reason": "The pinned parser for Biome - Share Sheet Conversation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Conversation",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Share Sheet Conversation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Conversation",
+      "field": "Interaction Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Share Sheet Conversation",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Share Sheet Conversation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Conversation",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Share Sheet Conversation emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Conversation",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "Activity Type",
+      "reason": "The pinned parser for Biome - Share Sheet Feedback emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "Chosen Activity",
+      "reason": "The pinned parser for Biome - Share Sheet Feedback emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "Event UUID",
+      "reason": "The pinned parser for Biome - Share Sheet Feedback emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "Field 17 (raw)",
+      "reason": "The pinned parser for Biome - Share Sheet Feedback emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "Field 20 (raw)",
+      "reason": "The pinned parser for Biome - Share Sheet Feedback emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Share Sheet Feedback emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "Offered Candidates",
+      "reason": "The parser notes that candidates were bundle IDs in tested data but does not establish that as a stable field meaning; the value is not classified as apps."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Share Sheet Feedback emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Share Sheet Feedback emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "Session ID",
+      "reason": "The pinned parser for Biome - Share Sheet Feedback emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Share Sheet Feedback",
+      "field": "Source App",
+      "reason": "The parser identifies the app that shared the content but does not establish that this raw value is a bundle ID."
+    },
+    {
+      "artifact": "Biome - System Settings Search Terms",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - System Settings Search Terms emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - System Settings Search Terms",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - System Settings Search Terms emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - System Settings Search Terms",
+      "field": "Result Label(s)",
+      "reason": "The pinned parser for Biome - System Settings Search Terms emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - System Settings Search Terms",
+      "field": "Result URI(s)",
+      "reason": "The parser emits result URIs, which may not be URLs with a scheme and host as required by the URL entity kind."
+    },
+    {
+      "artifact": "Biome - System Settings Search Terms",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - System Settings Search Terms emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - System Settings Search Terms",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Text Input Session",
+      "field": "Duration",
+      "reason": "The pinned parser for Biome - Text Input Session emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Text Input Session",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Text Input Session emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Text Input Session",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Text Input Session emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Text Input Session",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Text Input Session emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Text Input Session",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Text Input Session",
+      "field": "Time Start",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "Activity type",
+      "reason": "The pinned parser for Biome - User Activity Metadata emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "Bplist Data",
+      "reason": "The pinned parser for Biome - User Activity Metadata emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "Container Data",
+      "reason": "The pinned parser for Biome - User Activity Metadata emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "Description",
+      "reason": "The pinned parser for Biome - User Activity Metadata emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - User Activity Metadata emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - User Activity Metadata emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "Payload Data",
+      "reason": "The pinned parser for Biome - User Activity Metadata emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - User Activity Metadata emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - User Activity Metadata",
+      "field": "Title",
+      "reason": "The pinned parser for Biome - User Activity Metadata emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Wallet Transactions",
+      "field": "Card Name",
+      "reason": "The pinned parser for Biome - Wallet Transactions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Wallet Transactions",
+      "field": "Field 3 (raw)",
+      "reason": "The pinned parser for Biome - Wallet Transactions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Wallet Transactions",
+      "field": "Field 5 (raw)",
+      "reason": "The pinned parser for Biome - Wallet Transactions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Wallet Transactions",
+      "field": "Filename",
+      "reason": "The pinned parser for Biome - Wallet Transactions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Wallet Transactions",
+      "field": "Offset",
+      "reason": "The pinned parser for Biome - Wallet Transactions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Wallet Transactions",
+      "field": "Pass ID",
+      "reason": "The parser identifies this as an opaque Wallet pass identifier, which is not one of the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Wallet Transactions",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Wallet Transactions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Wallet Transactions",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Wallet Transactions",
+      "field": "Transaction UUID",
+      "reason": "The parser identifies this as a transaction UUID, which is not one of the defined entity kinds."
+    },
+    {
+      "artifact": "Biome DB - App Openings",
+      "field": "Event Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome DB - App Openings",
+      "field": "Launch Type",
+      "reason": "The pinned parser for Biome DB - App Openings emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome DB - App Openings",
+      "field": "Starting",
+      "reason": "The pinned parser for Biome DB - App Openings emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome DB - App Openings (Hourly)",
+      "field": "App Open Count",
+      "reason": "The pinned parser for Biome DB - App Openings (Hourly) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome DB - App Openings (Hourly)",
+      "field": "Hour (UTC)",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome DB - App Openings (Hourly)",
+      "field": "Launch Type",
+      "reason": "The pinned parser for Biome DB - App Openings (Hourly) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome DB - Intelligence Platform Entities",
+      "field": "Object",
+      "reason": "The parser exposes a predicate-dependent heterogeneous object; no single defined entity kind applies."
+    },
+    {
+      "artifact": "Biome DB - Intelligence Platform Entities",
+      "field": "Predicate",
+      "reason": "This field describes the relationship predicate rather than a value of a defined entity kind."
+    },
+    {
+      "artifact": "Biome DB - Intelligence Platform Entities",
+      "field": "Relationship ID",
+      "reason": "The parser exposes an opaque relationship identifier without a namespace matching a defined entity kind."
+    },
+    {
+      "artifact": "Biome DB - Intelligence Platform Entities",
+      "field": "Relationship Predicate",
+      "reason": "This field describes the relationship predicate rather than a value of a defined entity kind."
+    },
+    {
+      "artifact": "Biome DB - Intelligence Platform Entities",
+      "field": "Subject ID",
+      "reason": "The parser exposes an opaque graph subject identifier without a namespace matching a defined entity kind."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Entities",
+      "field": "Entity Identifier",
+      "reason": "The parser reports this identifier beside entity type and query provider but does not map its namespace to a defined entity kind."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Entities",
+      "field": "Entity Name",
+      "reason": "The pinned parser for Biome Sets - App Shortcut Entities emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Entities",
+      "field": "Entity Type",
+      "reason": "The pinned parser for Biome Sets - App Shortcut Entities emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Entities",
+      "field": "Modified",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Entities",
+      "field": "Query Provider",
+      "reason": "The pinned parser for Biome Sets - App Shortcut Entities emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Entities",
+      "field": "Source App",
+      "reason": "The parser obtains this source identifier from the store path but does not establish that it is a bundle ID."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Entities",
+      "field": "Source File",
+      "reason": "The pinned parser for Biome Sets - App Shortcut Entities emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Phrases",
+      "field": "Modified",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Phrases",
+      "field": "Phrase",
+      "reason": "The pinned parser for Biome Sets - App Shortcut Phrases emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Phrases",
+      "field": "Phrase Template",
+      "reason": "The pinned parser for Biome Sets - App Shortcut Phrases emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Phrases",
+      "field": "Source App",
+      "reason": "The parser obtains this source identifier from the store path but does not establish that it is a bundle ID."
+    },
+    {
+      "artifact": "Biome Sets - App Shortcut Phrases",
+      "field": "Source File",
+      "reason": "The pinned parser for Biome Sets - App Shortcut Phrases emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - Contacts",
+      "field": "Family Name",
+      "reason": "The pinned parser for Biome Sets - Contacts emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - Contacts",
+      "field": "Given Name",
+      "reason": "The pinned parser for Biome Sets - Contacts emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - Contacts",
+      "field": "Modified",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome Sets - Contacts",
+      "field": "Other Fields",
+      "reason": "The pinned parser for Biome Sets - Contacts emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - FindMy Devices",
+      "field": "Device Name",
+      "reason": "The pinned parser for Biome Sets - FindMy Devices emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - FindMy Devices",
+      "field": "Modified",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome Sets - FindMy Devices",
+      "field": "Other Fields",
+      "reason": "The pinned parser for Biome Sets - FindMy Devices emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - FindMy Devices",
+      "field": "Owner Family Name",
+      "reason": "The pinned parser for Biome Sets - FindMy Devices emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - FindMy Devices",
+      "field": "Owner Given Name",
+      "reason": "The pinned parser for Biome Sets - FindMy Devices emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - Installed Apps",
+      "field": "App Name",
+      "reason": "The pinned parser for Biome Sets - Installed Apps emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome Sets - Installed Apps",
+      "field": "Modified",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome Sets - Installed Apps",
+      "field": "Other Fields",
+      "reason": "The pinned parser for Biome Sets - Installed Apps emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
     }
   ],
   "reviewed_artifacts": [
@@ -5229,10 +6544,18 @@
     "Biome - Airplane Mode",
     "Biome - Airplane Mode DKEvent",
     "Biome - App Activity",
+    "Biome - App Install",
+    "Biome - App Installation",
     "Biome - App Intents Transcript",
     "Biome - App Location Activity",
     "Biome - App Relevant Shortcuts",
     "Biome - App Web Usage",
+    "Biome - Apple Intelligence Asset Availability",
+    "Biome - Apple Intelligence Availability",
+    "Biome - Apple Intelligence Model Catalog",
+    "Biome - Apple Intelligence Safety Overrides",
+    "Biome - Apple Intelligence Software Update",
+    "Biome - Apple Intelligence Unified Asset",
     "Biome - Audio Input Route DKEvent",
     "Biome - Audio Output Route DKEvent",
     "Biome - Audio Route",
@@ -5252,6 +6575,7 @@
     "Biome - Contact Autocomplete Feedback (CNA)",
     "Biome - Device Metadata",
     "Biome - Device Plugged In",
+    "Biome - Device Syncs",
     "Biome - Device TimeZone",
     "Biome - Discoverability Signals",
     "Biome - Display Orientation DKEvent",
@@ -5263,9 +6587,11 @@
     "Biome - Hardware Reliability",
     "Biome - In Focus",
     "Biome - In Focus DKEvent",
+    "Biome - Intents",
     "Biome - Interface Orientation",
     "Biome - Keybag",
     "Biome - Keybag Locked",
+    "Biome - Keyboard Learned Tokens",
     "Biome - Location Activity",
     "Biome - Location Visit",
     "Biome - Low Power Mode",
@@ -5273,6 +6599,11 @@
     "Biome - Media Route",
     "Biome - Messages Read",
     "Biome - Networking Edge Selection",
+    "Biome - Notes",
+    "Biome - Notification Usage",
+    "Biome - Notifications",
+    "Biome - Now Playing",
+    "Biome - Photos Search Insights",
     "Biome - Power Plugged In",
     "Biome - Proactive Harvesting Mail",
     "Biome - Proactive Harvesting Messages",
@@ -5282,6 +6613,8 @@
     "Biome - Screen Lock Imputed DKEvent",
     "Biome - Screen Locked",
     "Biome - ScreenTime App Usage",
+    "Biome - Share Sheet Conversation",
+    "Biome - Share Sheet Feedback",
     "Biome - Silent Mode",
     "Biome - Siri Remembers Assistant Suggestions",
     "Biome - Siri Remembers Audio History",
@@ -5290,14 +6623,26 @@
     "Biome - Siri Remembers Message History",
     "Biome - Siri UI",
     "Biome - Siri UI DKEvent",
+    "Biome - System Settings Search Terms",
+    "Biome - Text Input Session",
+    "Biome - User Activity Metadata",
+    "Biome - Wallet Transactions",
     "Biome - WiFi DKEvent",
     "Biome - WiFi Devices",
+    "Biome DB - App Openings",
+    "Biome DB - App Openings (Hourly)",
     "Biome DB - Audio Route (Daily)",
     "Biome DB - Backlight Events",
     "Biome DB - Button Clicks (Daily)",
     "Biome DB - Cable Plug Events",
     "Biome DB - CarPlay Activity (Daily)",
+    "Biome DB - Intelligence Platform Entities",
     "Biome DB - Minimum Battery (Daily)",
+    "Biome Sets - App Shortcut Entities",
+    "Biome Sets - App Shortcut Phrases",
+    "Biome Sets - Contacts",
+    "Biome Sets - FindMy Devices",
+    "Biome Sets - Installed Apps",
     "Biome Sets - Significant Locations",
     "Calendar Birthdays",
     "Calendar Events",
@@ -6671,6 +8016,183 @@
       "source_type": "ileapp_record",
       "artifact": "Biome - Emergency Voice Call",
       "field": "Emergency Number"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - App Installation",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - App Install",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome DB - App Openings",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome DB - App Openings (Hourly)",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Intents",
+      "field": "App ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Notifications",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Now Playing",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome Sets - Installed Apps",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Share Sheet Conversation",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Text Input Session",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - User Activity Metadata",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Biome Sets - App Shortcut Phrases",
+      "field": "Intent URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Notes",
+      "field": "Note",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Notes",
+      "field": "Note",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Notes",
+      "field": "Note",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Notification Usage",
+      "field": "Notification content",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Notification Usage",
+      "field": "Notification content",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Notification Usage",
+      "field": "Notification content",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Notification Usage",
+      "field": "Notification content 2",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Notification Usage",
+      "field": "Notification content 2",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Notification Usage",
+      "field": "Notification content 2",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Search Term",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Search Term",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Photos Search Insights",
+      "field": "Search Term",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - System Settings Search Terms",
+      "field": "Search Term",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - System Settings Search Terms",
+      "field": "Search Term",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - System Settings Search Terms",
+      "field": "Search Term",
+      "extract": "ips_in_text"
     }
   ]
 }
