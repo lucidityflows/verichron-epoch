@@ -1,6 +1,6 @@
 {
   "description": "Which values a record mentions, by kind, and where they are (EPOCH-581). Each rule names one field of one source and what it holds; a value's shape never decides its kind (measured 2026-10-20 on a real backup: 129 columns had a phone number's shape, most of them coordinates, byte counts and scores). The field's name is the entity's role. Shapes only check a rule: a value that doesn't fit its kind is counted as unreadable, never stored. The Python reader is entity_rules.py; scripts/check_entity_rules.py runs every rule against a real iLEAPP output.",
-  "version": 8,
+  "version": 12,
   "kinds": {
     "url": {
       "title": "URL",
@@ -6524,6 +6524,2223 @@
       "artifact": "Biome Sets - Installed Apps",
       "field": "Other Fields",
       "reason": "The pinned parser for Biome Sets - Installed Apps emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Web History",
+      "field": "Hidden",
+      "reason": "The pinned Chromium parser emits this as a visibility flag, not an entity value."
+    },
+    {
+      "artifact": "Web History",
+      "field": "ID",
+      "reason": "The pinned Chromium parser emits this as a local history-row identifier, not an entity value."
+    },
+    {
+      "artifact": "Web History",
+      "field": "Last Visit Time",
+      "reason": "The pinned Chromium parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Web History",
+      "field": "Typed Count",
+      "reason": "The pinned Chromium parser emits this as a visit count, not an entity value."
+    },
+    {
+      "artifact": "Web History",
+      "field": "Visit Count",
+      "reason": "The pinned Chromium parser emits this as a visit count, not an entity value."
+    },
+    {
+      "artifact": "Web Visits",
+      "field": "Duration",
+      "reason": "The pinned Chromium parser emits this as an elapsed duration, not an entity value."
+    },
+    {
+      "artifact": "Web Visits",
+      "field": "Qualifier(s)",
+      "reason": "The pinned Chromium parser emits this as transition metadata, not an entity value."
+    },
+    {
+      "artifact": "Web Visits",
+      "field": "Transition Type",
+      "reason": "The pinned Chromium parser emits this as transition metadata, not an entity value."
+    },
+    {
+      "artifact": "Web Visits",
+      "field": "Visit Timestamp",
+      "reason": "The pinned Chromium parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Web Searches",
+      "field": "Last Visit Time",
+      "reason": "The pinned Chromium parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Web Searches",
+      "field": "Visit Count",
+      "reason": "The pinned Chromium parser emits this as a visit count, not an entity value."
+    },
+    {
+      "artifact": "Keyword Search Terms",
+      "field": "Last Visit Time",
+      "reason": "The pinned Chromium parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - History",
+      "field": "Origin",
+      "reason": "The pinned Safari parser emits this as origin metadata; it does not establish an entity kind."
+    },
+    {
+      "artifact": "Safari Browser - History",
+      "field": "Profile",
+      "reason": "The pinned Safari parser emits this as profile metadata, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - History",
+      "field": "Visit Count",
+      "reason": "The pinned Safari parser emits this as a visit count, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - History",
+      "field": "Visit ID",
+      "reason": "The pinned Safari parser emits this as a local visit-row identifier, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - History",
+      "field": "Visit Timestamp",
+      "reason": "The pinned Safari parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Recent Web Searches",
+      "field": "Date",
+      "reason": "The pinned Safari parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Load Successful",
+      "reason": "The pinned Safari parser emits this as a load-status flag, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Origin (as stored)",
+      "reason": "The pinned Safari parser emits this as origin metadata; it does not establish an entity kind."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Redirect Destination",
+      "reason": "The pinned Safari search parser emits this as an unresolved local redirect-row identifier, unlike the history parser's URL resolution."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Redirect Source",
+      "reason": "The pinned Safari search parser emits this as an unresolved local redirect-row identifier, unlike the history parser's URL resolution."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Visit Count",
+      "reason": "The pinned Safari parser emits this as a visit count, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Visit ID",
+      "reason": "The pinned Safari parser emits this as a local visit-row identifier, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Visit Time",
+      "reason": "The pinned Safari parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Date (device local)",
+      "reason": "The pinned OrNET parser emits this as a device-local date, not an entity value."
+    },
+    {
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Icon",
+      "reason": "The pinned OrNET parser emits this as an icon/media reference, not an entity value."
+    },
+    {
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Time (device local)",
+      "reason": "The pinned OrNET parser emits this as a device-local time, not an entity value."
+    },
+    {
+      "artifact": "Autofill Entries",
+      "field": "Count",
+      "reason": "The pinned parser for Autofill Entries emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Entries",
+      "field": "Date Created",
+      "reason": "The pinned parser for Autofill Entries emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Entries",
+      "field": "Date Last Used",
+      "reason": "The pinned parser for Autofill Entries emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Entries",
+      "field": "Field",
+      "reason": "The pinned parser for Autofill Entries emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Entries",
+      "field": "Value",
+      "reason": "The pinned parser for Autofill Entries emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "Address",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "City",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "Company Name",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "Date Last Used",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "Date Modified",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "First Name",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "GUID",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "Last Name",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "Middle Name",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "State",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "Use Count",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Autofill Profiles",
+      "field": "Zip Code",
+      "reason": "The pinned parser for Autofill Profiles emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Bookmarks",
+      "field": "Added Date",
+      "reason": "The pinned parser for Bookmarks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Bookmarks",
+      "field": "Name",
+      "reason": "The pinned parser for Bookmarks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Bookmarks",
+      "field": "Parent",
+      "reason": "The pinned parser for Bookmarks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Bookmarks",
+      "field": "Type",
+      "reason": "The pinned parser for Bookmarks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Cookies",
+      "field": "Created Date",
+      "reason": "The pinned parser for Cookies emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Cookies",
+      "field": "Expiration Date",
+      "reason": "The pinned parser for Cookies emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Cookies",
+      "field": "Last Access Date",
+      "reason": "The pinned parser for Cookies emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Cookies",
+      "field": "Name",
+      "reason": "The pinned parser for Cookies emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Cookies",
+      "field": "Path",
+      "reason": "The pinned parser for Cookies emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Cookies",
+      "field": "Value",
+      "reason": "The pinned parser for Cookies emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Downloads",
+      "field": "Danger Type",
+      "reason": "The pinned parser for Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Downloads",
+      "field": "End Time",
+      "reason": "The pinned parser for Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Downloads",
+      "field": "Interrupt Reason",
+      "reason": "The pinned parser for Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Downloads",
+      "field": "Last Access Time",
+      "reason": "The pinned parser for Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Downloads",
+      "field": "Opened?",
+      "reason": "The pinned parser for Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Downloads",
+      "field": "Received Bytes",
+      "reason": "The pinned parser for Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Downloads",
+      "field": "Start Time",
+      "reason": "The pinned parser for Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Downloads",
+      "field": "State",
+      "reason": "The pinned parser for Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Downloads",
+      "field": "Target Path",
+      "reason": "The pinned parser for Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Downloads",
+      "field": "Total Bytes",
+      "reason": "The pinned parser for Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Login Data",
+      "field": "Blacklisted by User",
+      "reason": "The pinned parser for Login Data emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Login Data",
+      "field": "Created Time",
+      "reason": "The pinned parser for Login Data emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Login Data",
+      "field": "Password",
+      "reason": "The pinned parser for Login Data emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Login Data",
+      "field": "Username",
+      "reason": "The pinned parser for Login Data emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Origins",
+      "field": "Aggregate Watchtime",
+      "reason": "The pinned parser for Media History Origins emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Origins",
+      "field": "ID",
+      "reason": "The pinned parser for Media History Origins emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Origins",
+      "field": "Last Updated",
+      "reason": "The pinned parser for Media History Origins emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Playbacks",
+      "field": "Has Audio",
+      "reason": "The pinned parser for Media History Playbacks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Playbacks",
+      "field": "Has Video",
+      "reason": "The pinned parser for Media History Playbacks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Playbacks",
+      "field": "ID",
+      "reason": "The pinned parser for Media History Playbacks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Playbacks",
+      "field": "Last Updated",
+      "reason": "The pinned parser for Media History Playbacks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Playbacks",
+      "field": "Origin ID",
+      "reason": "The pinned parser for Media History Playbacks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Playbacks",
+      "field": "Watch Time",
+      "reason": "The pinned parser for Media History Playbacks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Sessions",
+      "field": "Album",
+      "reason": "The pinned parser for Media History Sessions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Sessions",
+      "field": "Artist",
+      "reason": "The pinned parser for Media History Sessions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Sessions",
+      "field": "Duration",
+      "reason": "The pinned parser for Media History Sessions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Sessions",
+      "field": "Last Updated",
+      "reason": "The pinned parser for Media History Sessions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Sessions",
+      "field": "Origin ID",
+      "reason": "The pinned parser for Media History Sessions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Sessions",
+      "field": "Position",
+      "reason": "The pinned parser for Media History Sessions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Sessions",
+      "field": "Source Title",
+      "reason": "The pinned parser for Media History Sessions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Media History Sessions",
+      "field": "Title",
+      "reason": "The pinned parser for Media History Sessions emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Network Action Predictor",
+      "field": "Number of Hits",
+      "reason": "The pinned parser for Network Action Predictor emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Network Action Predictor",
+      "field": "Number of Misses",
+      "reason": "The pinned parser for Network Action Predictor emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Network Action Predictor",
+      "field": "User Text",
+      "reason": "The pinned parser for Network Action Predictor emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Offline Pages",
+      "field": "Access Count",
+      "reason": "The pinned parser for Offline Pages emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Offline Pages",
+      "field": "Creation Time",
+      "reason": "The pinned parser for Offline Pages emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Offline Pages",
+      "field": "File Path",
+      "reason": "The pinned parser for Offline Pages emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Offline Pages",
+      "field": "File Size",
+      "reason": "The pinned parser for Offline Pages emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Offline Pages",
+      "field": "Last Access Time",
+      "reason": "The pinned parser for Offline Pages emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Onion Browser - Bookmarks",
+      "field": "Icon",
+      "reason": "The pinned parser emits this field as a media reference, not an entity value."
+    },
+    {
+      "artifact": "Onion Browser - Bookmarks",
+      "field": "Name",
+      "reason": "The pinned parser for Onion Browser - Bookmarks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Onion Browser - Bookmarks",
+      "field": "Source Path",
+      "reason": "The pinned parser for Onion Browser - Bookmarks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Onion Browser - HSTS Cache",
+      "field": "Allow Subdomains",
+      "reason": "The pinned parser for Onion Browser - HSTS Cache emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Onion Browser - HSTS Cache",
+      "field": "Expiration",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Onion Browser - HSTS Cache",
+      "field": "Preloaded",
+      "reason": "The pinned parser for Onion Browser - HSTS Cache emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Onion Browser - HSTS Cache",
+      "field": "Source Path",
+      "reason": "The pinned parser for Onion Browser - HSTS Cache emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "OrNET Browser - Bookmarks",
+      "field": "Icon",
+      "reason": "The pinned parser emits this field as a media reference, not an entity value."
+    },
+    {
+      "artifact": "OrNET Browser - Favourites",
+      "field": "Icon",
+      "reason": "The pinned parser emits this field as a media reference, not an entity value."
+    },
+    {
+      "artifact": "OrNET Browser - Open Tabs",
+      "field": "Tab Type",
+      "reason": "The pinned parser for OrNET Browser - Open Tabs emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "OrNET Browser - Settings",
+      "field": "Setting",
+      "reason": "The pinned parser for OrNET Browser - Settings emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "OrNET Browser - Settings",
+      "field": "Value",
+      "reason": "The pinned parser for OrNET Browser - Settings emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Payments Customer Data",
+      "field": "Browser Name",
+      "reason": "The pinned parser for Payments Customer Data emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Payments Customer Data",
+      "field": "Customer ID",
+      "reason": "The pinned parser for Payments Customer Data emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Payments Customer Data",
+      "field": "Source File",
+      "reason": "The pinned parser for Payments Customer Data emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari - Downloads",
+      "field": "Bytes So Far",
+      "reason": "The pinned parser for Safari - Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari - Downloads",
+      "field": "Date Added",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari - Downloads",
+      "field": "Identifier",
+      "reason": "The pinned parser for Safari - Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari - Downloads",
+      "field": "Path",
+      "reason": "The pinned parser for Safari - Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari - Downloads",
+      "field": "Remove When Done",
+      "reason": "The pinned parser for Safari - Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari - Downloads",
+      "field": "Sandbox Identifier",
+      "reason": "The pinned parser for Safari - Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari - Downloads",
+      "field": "Total Bytes",
+      "reason": "The pinned parser for Safari - Downloads emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Bookmarks",
+      "field": "Hidden",
+      "reason": "The pinned parser for Safari Browser - Bookmarks emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Cache Control",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Cache File Name",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Cached Payload",
+      "reason": "The pinned parser emits this field as a media reference, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Content Length",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Content Type",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Date",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Entry ID",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Expires",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "HTTP Status",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Last Modified",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "MIME Type",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Partition",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Payload Location",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Payload Size",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Payload Type",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Request Method",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Server",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Storage Policy",
+      "reason": "The pinned parser for Safari Browser - Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Favicons",
+      "field": "Generated Representations?",
+      "reason": "The pinned parser for Safari Browser - Favicons emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Favicons",
+      "field": "Height",
+      "reason": "The pinned parser for Safari Browser - Favicons emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Favicons",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Favicons",
+      "field": "Width",
+      "reason": "The pinned parser for Safari Browser - Favicons emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (BrowserState)",
+      "field": "Associated Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (BrowserState)",
+      "field": "Opened from Link",
+      "reason": "The pinned parser for Safari Browser - Tabs (BrowserState) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (BrowserState)",
+      "field": "Private Browsing",
+      "reason": "The pinned parser for Safari Browser - Tabs (BrowserState) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Browsing Mode",
+      "reason": "The pinned parser for Safari Browser - Tabs (SafariTabs) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Date Closed",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Date Last Viewed",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Last Modified",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Last Visit Time",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Muted",
+      "reason": "The pinned parser for Safari Browser - Tabs (SafariTabs) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Opened from Link",
+      "reason": "The pinned parser for Safari Browser - Tabs (SafariTabs) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Parent / Tab Group",
+      "reason": "The pinned parser for Safari Browser - Tabs (SafariTabs) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Parent ID",
+      "reason": "The pinned parser for Safari Browser - Tabs (SafariTabs) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Showing Reader",
+      "reason": "The pinned parser for Safari Browser - Tabs (SafariTabs) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Tab ID",
+      "reason": "The pinned parser for Safari Browser - Tabs (SafariTabs) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Tab Index",
+      "reason": "The pinned parser for Safari Browser - Tabs (SafariTabs) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Tab UUID",
+      "reason": "The pinned parser for Safari Browser - Tabs (SafariTabs) emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - iCloud Tabs",
+      "field": "Created Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - iCloud Tabs",
+      "field": "Device Name",
+      "reason": "The pinned parser for Safari Browser - iCloud Tabs emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - iCloud Tabs",
+      "field": "Device UUID",
+      "reason": "The pinned parser for Safari Browser - iCloud Tabs emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - iCloud Tabs",
+      "field": "Modified By",
+      "reason": "The pinned parser for Safari Browser - iCloud Tabs emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Safari Browser - iCloud Tabs",
+      "field": "Modified Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - iCloud Tabs",
+      "field": "Tab UUID",
+      "reason": "The pinned parser for Safari Browser - iCloud Tabs emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Bank Name",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Billing Address ID",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Browser Name",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Card Creation Source",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Card Issuer",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Card Issuer ID",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Card Network (as stored)",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Date Last Used",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Expiration Month",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Expiration Year",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Instrument ID",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Last Four Digits",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Name on Card",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Nickname",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Product Description",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Server ID",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Source File",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Use Count",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Saved Credit Cards",
+      "field": "Virtual Card Enrollment State",
+      "reason": "The pinned parser for Saved Credit Cards emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Top Sites",
+      "field": "Rank",
+      "reason": "The pinned parser for Top Sites emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Top Sites",
+      "field": "Redirects",
+      "reason": "The pinned parser for Top Sites emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Application GUID",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Body SHA1",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Body Size",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Body Size 2",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Content Type",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Content Type Flag",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Encoding Pad",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Encoding Pad Flag",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Encoding Type",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Encoding Type Flag",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "File",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Filename",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Foldername",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Full File Path",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "HTTP Header Count",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "HTTP Headers",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "HTTP Type",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "HTTP Type Flag",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Has Cookie",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Header",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Is Body Inline",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Marker",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Marker Content Type",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Marker2",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Meta SHA1",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Meta Size",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Meta URI Flag",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Other Trailing Data",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Partition",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Partition Flag",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Records GUID",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Response Code",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Salt",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Start of Meta",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Thumbnail",
+      "reason": "The pinned parser emits this field as a media reference, not an entity value."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Trailing Hash",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Trailing Size",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Type",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Type Flag",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "U1",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "U2",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "U3",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "U4",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "U5",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "U6",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "U7",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "U8",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "URI Flag",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "WebKit Cache Records",
+      "field": "Unknown Hash",
+      "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Live Usage Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Mobile/WWAN In (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Mobile/WWAN Out (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Process First Usage Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Process Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Wifi In (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Wifi Out (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Wired In (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Wired Out (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "ZKIND (as stored)",
+      "reason": "The pinned parser documents ZKIND values as unknown and reports them as stored; no entity kind is established."
+    },
+    {
+      "artifact": "Bluetooth Other LE",
+      "field": "Name",
+      "reason": "The parser emits a display name, not a MAC address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Bluetooth Other LE",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "Bluetooth Other LE",
+      "field": "UUID",
+      "reason": "The pinned parser emits this UUID without identifying it as a device address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Default Name",
+      "reason": "The parser emits a display name, not a MAC address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Device Product ID",
+      "reason": "The pinned parser emits this field as a product identifier, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Last Seen Time",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Name",
+      "reason": "The parser emits a display name, not a MAC address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Name Key",
+      "reason": "The pinned parser emits this field as a name key, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "Bluetooth Paired LE",
+      "field": "Last Connection Time",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Bluetooth Paired LE",
+      "field": "Name",
+      "reason": "The parser emits a display name, not a MAC address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Bluetooth Paired LE",
+      "field": "Name Origin",
+      "reason": "The pinned parser emits this field as name-origin metadata, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "Bluetooth Paired LE",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "Bluetooth Paired LE",
+      "field": "UUID",
+      "reason": "The pinned parser emits this UUID without identifying it as a device address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Connected Devices",
+      "field": "Computer Name",
+      "reason": "The pinned parser emits this field as a paired computer name; no currently defined entity kind represents computer names."
+    },
+    {
+      "artifact": "Connected Devices",
+      "field": "File Offset",
+      "reason": "The pinned parser emits this field as a byte offset, not an entity value."
+    },
+    {
+      "artifact": "Connected Devices",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "Connected Devices",
+      "field": "User Name",
+      "reason": "The pinned parser emits this field as a paired computer-user name; no currently defined entity kind represents person names."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Bytes In",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Bytes Out",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Connection Attempts",
+      "reason": "The pinned parser emits this field as a connection counter, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Connection Successes",
+      "reason": "The pinned parser emits this field as a connection counter, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "First Connection Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Last Connection Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Network Identifier",
+      "reason": "The parser maps this identifier from a network attachment of varying type; it does not establish that the value identifies a Wi-Fi network."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Network Name",
+      "reason": "The parser maps this name from a network attachment of varying type; it does not establish that the value is a Wi-Fi SSID."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Network Type",
+      "reason": "The pinned parser emits this field as a network-type category, not a network entity."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Packets In",
+      "reason": "The pinned parser emits this field as a packet counter, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Packets Out",
+      "reason": "The pinned parser emits this field as a packet counter, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Mobile/WWAN In (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Mobile/WWAN Out (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Process First Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Process Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Usage Entry Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Wifi In (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Wifi Out (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "ZKIND (as stored)",
+      "reason": "The pinned parser documents ZKIND values as unknown and reports them as stored; no entity kind is established."
+    },
+    {
+      "artifact": "iCloud Wifi Networks",
+      "field": "Added At",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "iCloud Wifi Networks",
+      "field": "Added By",
+      "reason": "The pinned parser emits this field as origin metadata, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "iCloud Wifi Networks",
+      "field": "Enabled",
+      "reason": "The pinned parser emits this field as a state flag, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Altitude",
+      "reason": "The pinned parser emits this field as a location measurement; coordinates and measurements are not defined entity kinds."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Channel",
+      "reason": "The pinned parser emits this field as a radio-channel value, not an entity identifier."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Horizontal Accuracy",
+      "reason": "The pinned parser emits this field as a location-accuracy measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "LOI Type",
+      "reason": "The pinned parser emits this field as a location-record category, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "RSSI",
+      "reason": "The pinned parser emits this field as a signal-strength measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Scan Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Vertical Accuracy",
+      "reason": "The pinned parser emits this field as a location-accuracy measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "ALS Query Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Altitude",
+      "reason": "The pinned parser emits this field as a location measurement; coordinates and measurements are not defined entity kinds."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Channel",
+      "reason": "The pinned parser emits this field as a radio-channel value, not an entity identifier."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Confidence",
+      "reason": "The pinned parser emits this field as a confidence score, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Course",
+      "reason": "The pinned parser emits this field as a movement measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Horizontal Accuracy",
+      "reason": "The pinned parser emits this field as a location-accuracy measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Info Mask",
+      "reason": "The pinned parser emits this field as a bit mask, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Reach",
+      "reason": "The pinned parser emits this field as a reachability status, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Score",
+      "reason": "The pinned parser emits this field as a score, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Speed",
+      "reason": "The pinned parser emits this field as a movement measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Vertical Accuracy",
+      "reason": "The pinned parser emits this field as a location-accuracy measurement, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Date",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Entity ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Geotag ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Last Seen",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Created",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Edge",
+      "reason": "The pinned parser emits this field as an edge relationship value, not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Network Identifier",
+      "reason": "The pinned parser emits this field as an opaque local network identifier; it does not establish a Wi-Fi network name."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Network Name",
+      "reason": "The pinned parser does not identify this field as an SSID; the header alone does not establish Wi-Fi network semantics."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Popularity Score",
+      "reason": "The pinned parser emits this field as a score, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Quality Score",
+      "reason": "The pinned parser emits this field as a score, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Record ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "TCP Good",
+      "reason": "The pinned parser emits this field as a connection-quality flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Created",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "ETag",
+      "reason": "The pinned parser emits this field as an HTTP cache validator, not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Network Count",
+      "reason": "The pinned parser emits this field as a count, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Record ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Tile Key",
+      "reason": "The pinned parser emits this field as a tile-cache key, not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Access Point Count",
+      "reason": "The pinned parser emits this field as a count, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Auth Mask",
+      "reason": "The pinned parser emits this field as a bit mask, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Captive",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Created",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Identifier",
+      "reason": "The pinned parser emits this field as an opaque local network identifier; it does not establish a Wi-Fi network name."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Low Quality",
+      "reason": "The pinned parser emits this field as a network-quality flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Moving",
+      "reason": "The pinned parser emits this field as a movement flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Network Name",
+      "reason": "The pinned parser does not identify this field as an SSID; the header alone does not establish Wi-Fi network semantics."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Popularity Score",
+      "reason": "The pinned parser emits this field as a score, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Public",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Quality Score",
+      "reason": "The pinned parser emits this field as a score, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Record ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Suspicious",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Tile Key",
+      "reason": "The pinned parser emits this field as a tile-cache key, not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Type",
+      "reason": "The pinned parser emits this field as a network-type category, not a network entity."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Venue Group",
+      "reason": "The pinned parser emits this field as a venue category, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Venue Type",
+      "reason": "The pinned parser emits this field as a venue category, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "2.4 GHz Network",
+      "reason": "The pinned parser emits this field as a band-presence flag, not an entity value."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "5 GHz Network",
+      "reason": "The pinned parser emits this field as a band-presence flag, not an entity value."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Last Connection Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Record ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Channel",
+      "reason": "The pinned parser emits this field as a radio-channel value, not an entity identifier."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Channel Flags",
+      "reason": "The pinned parser emits this field as radio-channel flags, not an entity value."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Last Associated/Roamed At",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Location Accuracy",
+      "reason": "The pinned parser emits this field as a location-accuracy measurement, not an entity value."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Location Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Add Reason",
+      "reason": "The pinned parser emits this field as network-addition metadata, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Captive Network",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Carplay Network",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Country Code",
+      "reason": "The pinned parser emits this field as a country code, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Device Name",
+      "reason": "The pinned parser emits this field as a device display name; no currently defined entity kind represents device names."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Enabled",
+      "reason": "The pinned parser emits this field as a state flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Hidden",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Manufacturer",
+      "reason": "The pinned parser emits this field as manufacturer metadata, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Model Name",
+      "reason": "The pinned parser emits this field as model metadata, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Network Usage",
+      "reason": "The pinned parser emits this field as usage metadata, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Serial Number",
+      "reason": "The pinned parser emits this field as device metadata; serial numbers are not a defined entity kind."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Added At",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Captive Web Sheet Login Date",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Last Auto Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Last Discovered",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Last Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Last Updated",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Previous Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "System Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "User Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Whitelisted Captive Network Probe Date",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "WiFi Network Password Modification Date",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Added At",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "First Join With New MAC Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "In Known Networks",
+      "reason": "The pinned parser emits this field as a membership flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Last Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Last Updated",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Link Down Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "MAC Generation Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "MAC Used For Network",
+      "reason": "This is the phone's own Wi-Fi MAC address used for the network, not another device or network entity."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "MAC Valid",
+      "reason": "The pinned parser emits this field as a validity flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Private MAC Computed For Network",
+      "reason": "This is the phone's own computed private Wi-Fi MAC address, not another device or network entity."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    }
+  ],
+  "deferred_location_headers": [
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Altitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Horizontal Accuracy",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "LOI Type",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Scan Timestamp",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Timestamp",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Vertical Accuracy",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "ALS Query Timestamp",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Altitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Confidence",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Course",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Horizontal Accuracy",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Info Mask",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Reach",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Score",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Speed",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Timestamp",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Vertical Accuracy",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Date",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Last Seen",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Location Accuracy",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Location Timestamp",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Created",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Created",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Tile Key",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Created",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Tile Key",
+      "deferred_to": "VER-306"
+    }
+  ],
+  "deferred_location_sources": [
+    {
+      "module": "scripts/artifacts/locationdCacheEncryptedB.py",
+      "artifacts": [
+        "Locationd Cache - Associated Wi-Fi Harvest",
+        "Locationd Cache - Wi-Fi Locations"
+      ]
+    },
+    {
+      "module": "scripts/artifacts/wifiAnalytics.py",
+      "artifacts": [
+        "Wi-Fi Analytics - Geotags"
+      ]
+    },
+    {
+      "module": "scripts/artifacts/appleWifiPlist.py",
+      "artifacts": [
+        "WiFi BSS List"
+      ]
+    },
+    {
+      "module": "scripts/artifacts/wifiNetworkStoreModel.py",
+      "artifacts": [
+        "Wifi Known Networkss"
+      ]
+    },
+    {
+      "module": "scripts/artifacts/threeBars.py",
+      "artifacts": [
+        "Wi-Fi ThreeBars - Access Points",
+        "Wi-Fi ThreeBars - Networks",
+        "Wi-Fi ThreeBars - Downloaded Tiles"
+      ]
     }
   ],
   "reviewed_artifacts": [
@@ -6541,6 +8758,10 @@
     "Apple Wallet - PK Passes",
     "Apple Wallet Cards",
     "Apple Wallet Transactions",
+    "App Data",
+    "Autofill Entries",
+    "Autofill Profiles",
+    "Bookmarks",
     "Biome - Airplane Mode",
     "Biome - Airplane Mode DKEvent",
     "Biome - App Activity",
@@ -6647,6 +8868,10 @@
     "Calendar Birthdays",
     "Calendar Events",
     "Calendar List",
+    "Connected Devices",
+    "Connections",
+    "Cookies",
+    "Downloads",
     "Health - Achievements",
     "Health - Device - Watch Worn Data",
     "Health - Headphone Audio Levels",
@@ -6661,15 +8886,62 @@
     "Health - Weight Samples",
     "Health - Workouts",
     "Health - Wrist Temperature",
+    "iCloud Wifi Networks",
+    "Keyword Search Terms",
+    "Login Data",
+    "Locationd Cache - Associated Wi-Fi Harvest",
+    "Locationd Cache - Wi-Fi Locations",
     "Media Library",
     "Media Library - Database Properties",
+    "Media History Origins",
+    "Media History Playbacks",
+    "Media History Sessions",
     "Medical ID",
+    "Network Action Predictor",
     "Notes",
     "Notes - Password Protected",
     "Notes - Shared Note Participants",
+    "Offline Pages",
+    "Onion Browser - Bookmarks",
+    "Onion Browser - HSTS Cache",
+    "OrNET Browser - Bookmarks",
+    "OrNET Browser - Browsing History",
+    "OrNET Browser - Favourites",
+    "OrNET Browser - Open Tabs",
+    "OrNET Browser - Settings",
+    "Payments Customer Data",
     "Reminders",
+    "Safari - Downloads",
+    "Safari Browser - Bookmarks",
+    "Safari Browser - Cache Records",
+    "Safari Browser - Favicons",
+    "Safari Browser - History",
+    "Safari Browser - Recent Web Searches",
+    "Safari Browser - Search Terms",
+    "Safari Browser - Tabs (BrowserState)",
+    "Safari Browser - Tabs (SafariTabs)",
+    "Safari Browser - iCloud Tabs",
+    "Saved Credit Cards",
     "Stopwatch",
     "Timers",
+    "Top Sites",
+    "Web History",
+    "Web Searches",
+    "Web Visits",
+    "WebKit Cache Records",
+    "Data Usage",
+    "Bluetooth Other LE",
+    "Bluetooth Paired",
+    "Bluetooth Paired LE",
+    "Wi-Fi Analytics - Geotags",
+    "Wi-Fi ThreeBars - Access Points",
+    "Wi-Fi ThreeBars - Downloaded Tiles",
+    "Wi-Fi ThreeBars - Networks",
+    "Wifi Known Networkss",
+    "WiFi BSS List",
+    "WiFi Known Networks Info",
+    "WiFi Known Networks Times",
+    "WiFi Scanned Networks (Private)",
     "WorldClock"
   ],
   "shape_hints": {
@@ -8193,6 +10465,574 @@
       "artifact": "Biome - System Settings Search Terms",
       "field": "Search Term",
       "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web History",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web History",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Web History",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Web History",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Visits",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Visits",
+      "field": "From Visit URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Visits",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Web Visits",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Web Visits",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Search Term",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Search Term",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Search Term",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Keyword Search Terms",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Keyword Search Terms",
+      "field": "Term",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Keyword Search Terms",
+      "field": "Term",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Keyword Search Terms",
+      "field": "Term",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Recent Web Searches",
+      "field": "Search Term",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Recent Web Searches",
+      "field": "Search Term",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Recent Web Searches",
+      "field": "Search Term",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Search Term",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Search Term",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Search Term",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Autofill Profiles",
+      "field": "Email"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Autofill Profiles",
+      "field": "Phone Number"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Bookmarks",
+      "field": "URL"
+    },
+    {
+      "kind": "domain",
+      "source_type": "ileapp_record",
+      "artifact": "Cookies",
+      "field": "Host",
+      "extract": "cookie_host"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Downloads",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Login Data",
+      "field": "Origin URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Media History Origins",
+      "field": "Origin"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Media History Playbacks",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Media History Sessions",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Network Action Predictor",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Offline Pages",
+      "field": "Online URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Offline Pages",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Offline Pages",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Offline Pages",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Top Sites",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Top Sites",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Top Sites",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Top Sites",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Saved Credit Cards",
+      "field": "Card Art URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari - Downloads",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Bookmarks",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Bookmarks",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Bookmarks",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Cache Records",
+      "field": "Request URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Favicons",
+      "field": "Page URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Favicons",
+      "field": "Icon URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Tabs (SafariTabs)",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - iCloud Tabs",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - iCloud Tabs",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - iCloud Tabs",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - iCloud Tabs",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Onion Browser - Bookmarks",
+      "field": "URL"
+    },
+    {
+      "kind": "domain",
+      "source_type": "ileapp_record",
+      "artifact": "Onion Browser - HSTS Cache",
+      "field": "Host"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Bookmarks",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Bookmarks",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Bookmarks",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Bookmarks",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Favourites",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Favourites",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Favourites",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Favourites",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Open Tabs",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "WebKit Cache Records",
+      "field": "URI"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "WebKit Cache Records",
+      "field": "Meta URI"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "App Data",
+      "field": "Bundle Name"
+    },
+    {
+      "kind": "process",
+      "source_type": "ileapp_record",
+      "artifact": "App Data",
+      "field": "Process Name"
+    },
+    {
+      "kind": "wifi_network",
+      "source_type": "ileapp_record",
+      "artifact": "iCloud Wifi Networks",
+      "field": "SSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "iCloud Wifi Networks",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_network",
+      "source_type": "ileapp_record",
+      "artifact": "Wifi Known Networkss",
+      "field": "SSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "Wifi Known Networkss",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_network",
+      "source_type": "ileapp_record",
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "SSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "BSSID"
     }
   ]
 }
