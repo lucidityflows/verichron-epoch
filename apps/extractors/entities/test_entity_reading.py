@@ -109,13 +109,7 @@ def test_browser_titles_and_search_terms_read_only_supported_text_entities(artif
         "ileapp_record",
         artifact,
         {},
-        [
-            ileapp(
-                32,
-                artifact,
-                **{field: "Visit https://browser.example and mail help@example.org at 192.0.2.8"}
-            )
-        ],
+        [ileapp(32, artifact, **{field: "Visit https://browser.example and mail help@example.org at 192.0.2.8"})],
     )
 
     assert set(reading.mentions) == {
