@@ -1,6 +1,6 @@
 {
   "description": "Which values a record mentions, by kind, and where they are (EPOCH-581). Each rule names one field of one source and what it holds; a value's shape never decides its kind (measured 2026-10-20 on a real backup: 129 columns had a phone number's shape, most of them coordinates, byte counts and scores). The field's name is the entity's role. Shapes only check a rule: a value that doesn't fit its kind is counted as unreadable, never stored. The Python reader is entity_rules.py; scripts/check_entity_rules.py runs every rule against a real iLEAPP output.",
-  "version": 4,
+  "version": 5,
   "kinds": {
     "url": {
       "title": "URL",
@@ -2054,6 +2054,726 @@
       "artifact": "WorldClock",
       "field": "Yahoo Code",
       "reason": "The parser decodes Clock city, timezone, locale, and coordinate fields; these values are not defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "Expiration Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - App Activity emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "Activity Type",
+      "reason": "The pinned parser for Biome - App Activity emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "Payload",
+      "reason": "The pinned parser for Biome - App Activity emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "Item URI",
+      "reason": "The pinned parser for Biome - App Activity emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "Activity UUID",
+      "reason": "The pinned parser for Biome - App Activity emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "Session UUID",
+      "reason": "The pinned parser for Biome - App Activity emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "Source",
+      "reason": "The pinned parser for Biome - App Activity emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "Status (raw)",
+      "reason": "The pinned parser for Biome - App Activity emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - App Activity",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - App Intents Transcript",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Intents Transcript",
+      "field": "Intent Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Intents Transcript",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - App Intents Transcript emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Intents Transcript",
+      "field": "Intent Class",
+      "reason": "The pinned parser for Biome - App Intents Transcript emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Intents Transcript",
+      "field": "Parameters",
+      "reason": "The pinned parser for Biome - App Intents Transcript emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Intents Transcript",
+      "field": "Entity Types",
+      "reason": "The pinned parser for Biome - App Intents Transcript emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Intents Transcript",
+      "field": "Entity Titles",
+      "reason": "The pinned parser for Biome - App Intents Transcript emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Intents Transcript",
+      "field": "Phrase Template",
+      "reason": "The pinned parser for Biome - App Intents Transcript emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Intents Transcript",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - App Intents Transcript",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "Relevance Start",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "Relevance End",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - App Relevant Shortcuts emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "Widget Kind",
+      "reason": "The pinned parser for Biome - App Relevant Shortcuts emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "Shortcut Role (raw)",
+      "reason": "The pinned parser for Biome - App Relevant Shortcuts emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "Shortcut Title",
+      "reason": "The pinned parser for Biome - App Relevant Shortcuts emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "Intent",
+      "reason": "The pinned parser for Biome - App Relevant Shortcuts emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "Watch Template",
+      "reason": "The pinned parser for Biome - App Relevant Shortcuts emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Autonaming Message IDs",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Autonaming Message IDs",
+      "field": "Message Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Autonaming Message IDs",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Autonaming Message IDs emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Autonaming Message IDs",
+      "field": "Chat ID",
+      "reason": "The pinned parser for Biome - Autonaming Message IDs emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Autonaming Message IDs",
+      "field": "Message GUID",
+      "reason": "The pinned parser for Biome - Autonaming Message IDs emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Autonaming Message IDs",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Autonaming Message IDs",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Report Time",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Feedback Type",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Is Implicit",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Suggested Name",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Suggested Handle",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Handle Type",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Recipient Identifier",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Conversation ID",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Suggestion Reason",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Group Name",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Family Suggestion",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Interaction Detail",
+      "reason": "The pinned parser for Biome - Contact Autocomplete Feedback (CNA) emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Messages Read",
+      "field": "Read Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Messages Read",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Messages Read emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Messages Read",
+      "field": "Message ID",
+      "reason": "The pinned parser for Biome - Messages Read emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Messages Read",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Messages Read",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "Harvest Time",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Proactive Harvesting Mail emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "Message Date",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "Message ID",
+      "reason": "The pinned parser for Biome - Proactive Harvesting Mail emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Messages",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Messages",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Proactive Harvesting Messages emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Messages",
+      "field": "Service and Handle",
+      "reason": "The pinned parser for Biome - Proactive Harvesting Messages emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Messages",
+      "field": "Sender",
+      "reason": "The pinned parser for Biome - Proactive Harvesting Messages emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Messages",
+      "field": "GUID",
+      "reason": "The pinned parser for Biome - Proactive Harvesting Messages emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Messages",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Proactive Harvesting Messages",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - ScreenTime App Usage",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - ScreenTime App Usage",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - ScreenTime App Usage emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - ScreenTime App Usage",
+      "field": "Event (as stored)",
+      "reason": "The pinned parser for Biome - ScreenTime App Usage emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - ScreenTime App Usage",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - ScreenTime App Usage",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "Suggestion Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Siri Remembers Assistant Suggestions emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "Suggestions",
+      "reason": "The pinned parser for Biome - Siri Remembers Assistant Suggestions emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "Suggestion Types",
+      "reason": "The pinned parser for Biome - Siri Remembers Assistant Suggestions emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "Intent Class",
+      "reason": "The pinned parser for Biome - Siri Remembers Assistant Suggestions emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "Metadata",
+      "reason": "The pinned parser for Biome - Siri Remembers Assistant Suggestions emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "Event ID",
+      "reason": "The pinned parser for Biome - Siri Remembers Assistant Suggestions emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "Sync Origin",
+      "reason": "The pinned parser for Biome - Siri Remembers Assistant Suggestions emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Playback Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Siri Remembers Audio History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Title",
+      "reason": "The pinned parser for Biome - Siri Remembers Audio History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Artist",
+      "reason": "The pinned parser for Biome - Siri Remembers Audio History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Media Type",
+      "reason": "The pinned parser for Biome - Siri Remembers Audio History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Media ID",
+      "reason": "The pinned parser for Biome - Siri Remembers Audio History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Item ID",
+      "reason": "The pinned parser for Biome - Siri Remembers Audio History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Intent Class",
+      "reason": "The pinned parser for Biome - Siri Remembers Audio History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Intent UUID",
+      "reason": "The pinned parser for Biome - Siri Remembers Audio History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Sync Origin",
+      "reason": "The pinned parser for Biome - Siri Remembers Audio History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Call Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Siri Remembers Call History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Direction",
+      "reason": "The pinned parser for Biome - Siri Remembers Call History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Contacts",
+      "reason": "The pinned parser for Biome - Siri Remembers Call History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Contact Handles",
+      "reason": "The pinned parser for Biome - Siri Remembers Call History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Group Name",
+      "reason": "The pinned parser for Biome - Siri Remembers Call History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Is Group",
+      "reason": "The pinned parser for Biome - Siri Remembers Call History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Conversation ID",
+      "reason": "The pinned parser for Biome - Siri Remembers Call History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Call GUID",
+      "reason": "The pinned parser for Biome - Siri Remembers Call History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Intent Class",
+      "reason": "The pinned parser for Biome - Siri Remembers Call History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Sync Origin",
+      "reason": "The pinned parser for Biome - Siri Remembers Call History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "Intent Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Siri Remembers Interaction History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "Intent Class",
+      "reason": "The pinned parser for Biome - Siri Remembers Interaction History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "Domain",
+      "reason": "The pinned parser for Biome - Siri Remembers Interaction History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "Parameters",
+      "reason": "The pinned parser for Biome - Siri Remembers Interaction History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "Intent UUID",
+      "reason": "The pinned parser for Biome - Siri Remembers Interaction History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "Item GUID",
+      "reason": "The pinned parser for Biome - Siri Remembers Interaction History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "Sync Origin",
+      "reason": "The pinned parser for Biome - Siri Remembers Interaction History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Message Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Direction",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Sender",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Sender Handle",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Recipients",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Recipient Handles",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Group Name",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Is Group",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Chat ID",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Message GUID",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Intent Class",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Sync Origin",
+      "reason": "The pinned parser for Biome - Siri Remembers Message History emits this decoded record field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
     }
   ],
   "reviewed_artifacts": [
@@ -2071,6 +2791,20 @@
     "Apple Wallet - PK Passes",
     "Apple Wallet Cards",
     "Apple Wallet Transactions",
+    "Biome - App Activity",
+    "Biome - App Intents Transcript",
+    "Biome - App Relevant Shortcuts",
+    "Biome - Autonaming Message IDs",
+    "Biome - Contact Autocomplete Feedback (CNA)",
+    "Biome - Messages Read",
+    "Biome - Proactive Harvesting Mail",
+    "Biome - Proactive Harvesting Messages",
+    "Biome - ScreenTime App Usage",
+    "Biome - Siri Remembers Assistant Suggestions",
+    "Biome - Siri Remembers Audio History",
+    "Biome - Siri Remembers Call History",
+    "Biome - Siri Remembers Interaction History",
+    "Biome - Siri Remembers Message History",
     "Calendar Birthdays",
     "Calendar Events",
     "Calendar List",
@@ -3198,6 +3932,134 @@
       "artifact": "Reminders",
       "field": "Notes",
       "extract": "ips_in_text"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - App Activity",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - App Intents Transcript",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - App Intents Transcript",
+      "field": "App URL"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - App Relevant Shortcuts",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Autonaming Message IDs",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Contact Autocomplete Feedback (CNA)",
+      "field": "App"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "Sender",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "Recipient",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "Subject",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "Subject",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Proactive Harvesting Mail",
+      "field": "Subject",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Proactive Harvesting Messages",
+      "field": "Content",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Proactive Harvesting Messages",
+      "field": "Content",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Proactive Harvesting Messages",
+      "field": "Content",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - ScreenTime App Usage",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Siri Remembers Assistant Suggestions",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Siri Remembers Audio History",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Siri Remembers Call History",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Siri Remembers Interaction History",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Siri Remembers Message History",
+      "field": "Bundle ID"
     }
   ]
 }

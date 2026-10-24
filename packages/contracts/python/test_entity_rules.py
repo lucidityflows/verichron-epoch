@@ -55,6 +55,22 @@ VER_291_ARTIFACTS = {
     "Timers",
     "WorldClock",
 }
+VER_288_ARTIFACTS = {
+    "Biome - App Activity",
+    "Biome - App Intents Transcript",
+    "Biome - App Relevant Shortcuts",
+    "Biome - Autonaming Message IDs",
+    "Biome - Contact Autocomplete Feedback (CNA)",
+    "Biome - Messages Read",
+    "Biome - Proactive Harvesting Mail",
+    "Biome - Proactive Harvesting Messages",
+    "Biome - ScreenTime App Usage",
+    "Biome - Siri Remembers Assistant Suggestions",
+    "Biome - Siri Remembers Audio History",
+    "Biome - Siri Remembers Call History",
+    "Biome - Siri Remembers Interaction History",
+    "Biome - Siri Remembers Message History",
+}
 
 
 def pinned_ileapp_commit() -> str:
@@ -165,10 +181,10 @@ def test_every_excluded_header_is_declared_by_the_pinned_source():
         )
 
 
-def test_every_ver_291_header_has_exactly_one_coverage_decision():
+def test_every_reviewed_header_has_exactly_one_coverage_decision():
     rules = load()
     declared, declared_types = declared_pinned_ileapp_columns()
-    assert set(rules.reviewed_artifacts) == VER_291_ARTIFACTS
+    assert set(rules.reviewed_artifacts) == VER_291_ARTIFACTS | VER_288_ARTIFACTS
     ileapp_rules = {(rule.artifact, rule.field) for rule in rules.rules if rule.source_type == "ileapp_record"}
     exclusions = {exclusion.key for exclusion in rules.excluded_headers}
     implicit_rules = {key for key, types in declared_types.items() if types & set(rules.declared_types)}

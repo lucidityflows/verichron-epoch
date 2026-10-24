@@ -73,6 +73,78 @@ def test_apple_podcasts_reads_feed_and_episode_urls():
     }
 
 
+def test_biome_app_intents_reads_only_explicit_bundle_and_url_fields():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - App Intents Transcript",
+        {},
+        [
+            ileapp(
+                21,
+                "Biome - App Intents Transcript",
+                **{"Bundle ID": "com.apple.shortcuts", "App URL": "https://maps.example/place"},
+            )
+        ],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(21, "app", "Bundle ID", "com.apple.shortcuts"),
+        Mention(21, "url", "App URL", "https://maps.example/place"),
+        Mention(21, "domain", "App URL", "maps.example"),
+    }
+
+
+def test_biome_proactive_harvesting_reads_mail_addresses_and_message_text():
+    mail = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Proactive Harvesting Mail",
+        {},
+        [
+            ileapp(
+                22,
+                "Biome - Proactive Harvesting Mail",
+                Sender="Sender <sender@example.org>",
+                Recipient="recipient@example.net",
+                Subject="See https://mail.example and contact help@example.com",
+            )
+        ],
+    )
+    message = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Proactive Harvesting Messages",
+        {},
+        [ileapp(23, "Biome - Proactive Harvesting Messages", Content="Open https://chat.example")],
+    )
+
+    assert set(mail.mentions) == {
+        Mention(22, "email", "Sender", "sender@example.org"),
+        Mention(22, "email", "Recipient", "recipient@example.net"),
+        Mention(22, "url", "Subject", "https://mail.example"),
+        Mention(22, "domain", "Subject", "mail.example"),
+        Mention(22, "email", "Subject", "help@example.com"),
+    }
+    assert set(message.mentions) == {
+        Mention(23, "url", "Content", "https://chat.example"),
+        Mention(23, "domain", "Content", "chat.example"),
+    }
+
+
+def test_biome_siri_contact_handle_is_not_classified_by_shape():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Siri Remembers Call History",
+        {},
+        [ileapp(24, "Biome - Siri Remembers Call History", **{"Contact Handles": "contact@example.org"})],
+    )
+
+    assert reading.mentions == []
+    assert reading.unread == {"Contact Handles": {"records": 1, "shaped": {"email": 1}}}
+
+
 def test_notes_shared_participant_phone_is_a_named_phone_entity():
     reading = read_unit(
         RULES,
