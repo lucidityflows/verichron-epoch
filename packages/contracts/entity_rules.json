@@ -1,6 +1,6 @@
 {
   "description": "Which values a record mentions, by kind, and where they are (EPOCH-581). Each rule names one field of one source and what it holds; a value's shape never decides its kind (measured 2026-10-20 on a real backup: 129 columns had a phone number's shape, most of them coordinates, byte counts and scores). The field's name is the entity's role. Shapes only check a rule: a value that doesn't fit its kind is counted as unreadable, never stored. The Python reader is entity_rules.py; scripts/check_entity_rules.py runs every rule against a real iLEAPP output.",
-  "version": 6,
+  "version": 7,
   "kinds": {
     "url": {
       "title": "URL",
@@ -3644,6 +3644,1571 @@
       "artifact": "Biome Sets - Significant Locations",
       "field": "Other Fields",
       "reason": "The pinned parser maps a significant-place label or address component; these are location descriptions, not values in a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Airplane Mode",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Airplane Mode",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Airplane Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Airplane Mode",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Airplane Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Airplane Mode",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Airplane Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Airplane Mode",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Airplane Mode",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Airplane Mode DKEvent",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Airplane Mode DKEvent",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Airplane Mode DKEvent",
+      "field": "Timestamp2",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Airplane Mode DKEvent",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Airplane Mode DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Airplane Mode DKEvent",
+      "field": "Event",
+      "reason": "The pinned parser for Biome - Airplane Mode DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Airplane Mode DKEvent",
+      "field": "GUID",
+      "reason": "The pinned parser for Biome - Airplane Mode DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Airplane Mode DKEvent",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Airplane Mode DKEvent",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Backlight",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Backlight",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Backlight",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Backlight emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Backlight",
+      "field": "State",
+      "reason": "The pinned parser for Biome - Backlight emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Backlight",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Backlight",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Battery Level",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Battery Level",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Battery Level emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Level",
+      "field": "Battery Level (%)",
+      "reason": "The pinned parser for Biome - Battery Level emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Level",
+      "field": "Field 2 (raw)",
+      "reason": "The pinned parser for Biome - Battery Level emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Level",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Battery Level",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Battery Percentage",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Battery Percentage",
+      "field": "Time Start",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Battery Percentage",
+      "field": "Time End",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Battery Percentage",
+      "field": "Time Write",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Battery Percentage",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Battery Percentage emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Percentage",
+      "field": "Activity",
+      "reason": "The pinned parser for Biome - Battery Percentage emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Percentage",
+      "field": "Battery Percentage",
+      "reason": "The pinned parser for Biome - Battery Percentage emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Percentage",
+      "field": "Action GUID",
+      "reason": "The pinned parser for Biome - Battery Percentage emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Percentage",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Battery Percentage",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Battery Temperature",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Battery Temperature",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Battery Temperature emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Temperature",
+      "field": "Temperature (C)",
+      "reason": "The pinned parser for Biome - Battery Temperature emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Temperature",
+      "field": "Temperature (raw)",
+      "reason": "The pinned parser for Biome - Battery Temperature emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Temperature",
+      "field": "Field 2 (raw)",
+      "reason": "The pinned parser for Biome - Battery Temperature emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Battery Temperature",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Battery Temperature",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Boot Session",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Boot Session",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Boot Session emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Boot Session",
+      "field": "Session State",
+      "reason": "The pinned parser for Biome - Boot Session emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Boot Session",
+      "field": "Session State (raw)",
+      "reason": "The pinned parser for Biome - Boot Session emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Boot Session",
+      "field": "Session ID",
+      "reason": "The pinned parser for Biome - Boot Session emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Boot Session",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Boot Session",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Camera Auto Focus ROI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Camera Port",
+      "reason": "The pinned parser for Biome - Camera Auto Focus ROI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Field 8 (float)",
+      "reason": "The pinned parser for Biome - Camera Auto Focus ROI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Field 2 (raw)",
+      "reason": "The pinned parser for Biome - Camera Auto Focus ROI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Field 3 (raw)",
+      "reason": "The pinned parser for Biome - Camera Auto Focus ROI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Field 4 (raw)",
+      "reason": "The pinned parser for Biome - Camera Auto Focus ROI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Field 5 (raw)",
+      "reason": "The pinned parser for Biome - Camera Auto Focus ROI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Field 6 (raw)",
+      "reason": "The pinned parser for Biome - Camera Auto Focus ROI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Field 7 (raw)",
+      "reason": "The pinned parser for Biome - Camera Auto Focus ROI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Field 9 (raw)",
+      "reason": "The pinned parser for Biome - Camera Auto Focus ROI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Camera Auto Focus ROI",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - CarPlay Connected",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - CarPlay Connected",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - CarPlay Connected emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - CarPlay Connected",
+      "field": "CarPlay State",
+      "reason": "The pinned parser for Biome - CarPlay Connected emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - CarPlay Connected",
+      "field": "State (raw)",
+      "reason": "The pinned parser for Biome - CarPlay Connected emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - CarPlay Connected",
+      "field": "Field 2 (raw)",
+      "reason": "The pinned parser for Biome - CarPlay Connected emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - CarPlay Connected",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - CarPlay Connected",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Carplay",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Carplay",
+      "field": "Time Start",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Carplay",
+      "field": "Time End",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Carplay",
+      "field": "Time Write",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Carplay",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Carplay emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Carplay",
+      "field": "Activity",
+      "reason": "The pinned parser for Biome - Carplay emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Carplay",
+      "field": "Status",
+      "reason": "The pinned parser for Biome - Carplay emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Carplay",
+      "field": "Action GUID",
+      "reason": "The pinned parser for Biome - Carplay emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Carplay",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Carplay",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Cellular Data Enabled",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Cellular Data Enabled",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Cellular Data Enabled emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Cellular Data Enabled",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Cellular Data Enabled emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Cellular Data Enabled",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Cellular Data Enabled emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Cellular Data Enabled",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Cellular Data Enabled",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Clock Alarm",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Clock Alarm",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Clock Alarm emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm",
+      "field": "Alarm ID",
+      "reason": "The pinned parser for Biome - Clock Alarm emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm",
+      "field": "State (raw)",
+      "reason": "The pinned parser for Biome - Clock Alarm emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm",
+      "field": "Field 1 (raw)",
+      "reason": "The pinned parser for Biome - Clock Alarm emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm",
+      "field": "Field 4 (raw)",
+      "reason": "The pinned parser for Biome - Clock Alarm emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Clock Alarm",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "Start Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "End Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Clock Alarm DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Clock Alarm DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Clock Alarm DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "Metadata",
+      "reason": "The pinned parser for Biome - Clock Alarm DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "Event",
+      "reason": "The pinned parser for Biome - Clock Alarm DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "GUID",
+      "reason": "The pinned parser for Biome - Clock Alarm DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "Device UTC Offset",
+      "reason": "The pinned parser for Biome - Clock Alarm DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Clock Alarm DKEvent",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Device Metadata",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Device Metadata",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Device Metadata emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Metadata",
+      "field": "OS Build",
+      "reason": "The pinned parser for Biome - Device Metadata emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Metadata",
+      "field": "OS Build (Field 4)",
+      "reason": "The pinned parser for Biome - Device Metadata emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Metadata",
+      "field": "Type (raw)",
+      "reason": "The pinned parser for Biome - Device Metadata emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Metadata",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Device Metadata",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Device Plugged In",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Device Plugged In",
+      "field": "Time Start",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Device Plugged In",
+      "field": "Time End",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Device Plugged In",
+      "field": "Time Write",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Device Plugged In",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Device Plugged In emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Plugged In",
+      "field": "Activity",
+      "reason": "The pinned parser for Biome - Device Plugged In emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Plugged In",
+      "field": "Status",
+      "reason": "The pinned parser for Biome - Device Plugged In emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Plugged In",
+      "field": "Action GUID",
+      "reason": "The pinned parser for Biome - Device Plugged In emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device Plugged In",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Device Plugged In",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Device TimeZone",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Device TimeZone",
+      "field": "Timezone",
+      "reason": "The pinned parser for Biome - Device TimeZone emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Device TimeZone",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "Start Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "End Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Display Orientation DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Display Orientation DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Display Orientation DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "Metadata",
+      "reason": "The pinned parser for Biome - Display Orientation DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "Event",
+      "reason": "The pinned parser for Biome - Display Orientation DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "GUID",
+      "reason": "The pinned parser for Biome - Display Orientation DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "Device UTC Offset",
+      "reason": "The pinned parser for Biome - Display Orientation DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Display Orientation DKEvent",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "Start Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "End Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Do Not Disturb DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Do Not Disturb DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Do Not Disturb DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "Metadata",
+      "reason": "The pinned parser for Biome - Do Not Disturb DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "Event",
+      "reason": "The pinned parser for Biome - Do Not Disturb DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "GUID",
+      "reason": "The pinned parser for Biome - Do Not Disturb DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "Device UTC Offset",
+      "reason": "The pinned parser for Biome - Do Not Disturb DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Do Not Disturb DKEvent",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Emergency Voice Call emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "Mobile Country Code",
+      "reason": "The parser describes these code fields as inferred from value ranges, not independently verified entity identifiers; no matching entity kind is defined."
+    },
+    {
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "Mobile Network Code",
+      "reason": "The parser describes these code fields as inferred from value ranges, not independently verified entity identifiers; no matching entity kind is defined."
+    },
+    {
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "Duration Seconds (unconfirmed)",
+      "reason": "The pinned parser for Biome - Emergency Voice Call emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "Field 4 (raw)",
+      "reason": "The pinned parser exposes this field as raw and does not establish an entity meaning."
+    },
+    {
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "Field 5 (raw)",
+      "reason": "The pinned parser exposes this field as raw and does not establish an entity meaning."
+    },
+    {
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "Field 6 (raw)",
+      "reason": "The pinned parser exposes this field as raw and does not establish an entity meaning."
+    },
+    {
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Emoji Engagement",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Emoji Engagement",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Emoji Engagement emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Emoji Engagement",
+      "field": "Emoji",
+      "reason": "The pinned parser for Biome - Emoji Engagement emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Emoji Engagement",
+      "field": "Code Points",
+      "reason": "The pinned parser for Biome - Emoji Engagement emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Emoji Engagement",
+      "field": "Context (decoded)",
+      "reason": "The pinned parser for Biome - Emoji Engagement emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Emoji Engagement",
+      "field": "Context (raw)",
+      "reason": "The pinned parser for Biome - Emoji Engagement emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Emoji Engagement",
+      "field": "Field 2 (raw)",
+      "reason": "The pinned parser for Biome - Emoji Engagement emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Emoji Engagement",
+      "field": "Field 4 (raw)",
+      "reason": "The pinned parser for Biome - Emoji Engagement emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Emoji Engagement",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Emoji Engagement",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Energy Mode",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Energy Mode",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Energy Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Energy Mode",
+      "field": "Field 1 (raw)",
+      "reason": "The pinned parser for Biome - Energy Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Energy Mode",
+      "field": "Field 2 (raw)",
+      "reason": "The pinned parser for Biome - Energy Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Energy Mode",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Energy Mode",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Event Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - FrontBoard Display Element emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Scene ID",
+      "reason": "The pinned parser for Biome - FrontBoard Display Element emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Display Type",
+      "reason": "The pinned parser for Biome - FrontBoard Display Element emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Display Role",
+      "reason": "The pinned parser for Biome - FrontBoard Display Element emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Field 4 (raw)",
+      "reason": "The pinned parser reports this numeric field raw because its semantics are unconfirmed; it is not classified by shape."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Field 5 (raw)",
+      "reason": "The pinned parser reports this numeric field raw because its semantics are unconfirmed; it is not classified by shape."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Field 6 (raw)",
+      "reason": "The pinned parser reports this numeric field raw because its semantics are unconfirmed; it is not classified by shape."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Field 7 (raw)",
+      "reason": "The pinned parser reports this numeric field raw because its semantics are unconfirmed; it is not classified by shape."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Field 8 (raw)",
+      "reason": "The pinned parser reports this numeric field raw because its semantics are unconfirmed; it is not classified by shape."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Field 10 (raw)",
+      "reason": "The pinned parser reports this numeric field raw because its semantics are unconfirmed; it is not classified by shape."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Hardware Reliability",
+      "field": "SEGB Record Time",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Hardware Reliability",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Hardware Reliability emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Hardware Reliability",
+      "field": "Hardware",
+      "reason": "The pinned parser for Biome - Hardware Reliability emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Hardware Reliability",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Hardware Reliability",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - In Focus",
+      "field": "Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - In Focus",
+      "field": "Start Time",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - In Focus",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - In Focus emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - In Focus",
+      "field": "Action",
+      "reason": "The pinned parser for Biome - In Focus emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - In Focus",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - In Focus",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "Time Start",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "Time End",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "Time Write",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - In Focus DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "Activity",
+      "reason": "The pinned parser for Biome - In Focus DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "Transition",
+      "reason": "The pinned parser for Biome - In Focus DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "Action GUID",
+      "reason": "The pinned parser for Biome - In Focus DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Interface Orientation",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Interface Orientation",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Interface Orientation emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Interface Orientation",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Interface Orientation emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Interface Orientation",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Interface Orientation emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Interface Orientation",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Interface Orientation",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Keybag",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Keybag",
+      "field": "Start Time",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Keybag",
+      "field": "End Time",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Keybag",
+      "field": "isLocked",
+      "reason": "The pinned parser for Biome - Keybag emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Keybag",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Keybag Locked",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Keybag Locked",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Keybag Locked emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Keybag Locked",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Keybag Locked emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Keybag Locked",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Keybag Locked emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Keybag Locked",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Keybag Locked",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Low Power Mode",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Low Power Mode",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Low Power Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Low Power Mode",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Low Power Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Low Power Mode",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Low Power Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Low Power Mode",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Low Power Mode",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "Start Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "End Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Low Power Mode DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Low Power Mode DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Low Power Mode DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "Metadata",
+      "reason": "The pinned parser for Biome - Low Power Mode DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "Event",
+      "reason": "The pinned parser for Biome - Low Power Mode DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "GUID",
+      "reason": "The pinned parser for Biome - Low Power Mode DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "Device UTC Offset",
+      "reason": "The pinned parser for Biome - Low Power Mode DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Low Power Mode DKEvent",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Power Plugged In",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Power Plugged In",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Power Plugged In emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Power Plugged In",
+      "field": "Power State",
+      "reason": "The pinned parser for Biome - Power Plugged In emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Power Plugged In",
+      "field": "State (raw)",
+      "reason": "The pinned parser for Biome - Power Plugged In emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Power Plugged In",
+      "field": "Field 2 (raw)",
+      "reason": "The pinned parser for Biome - Power Plugged In emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Power Plugged In",
+      "field": "Field 3 (raw)",
+      "reason": "The pinned parser for Biome - Power Plugged In emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Power Plugged In",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Power Plugged In",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "Start Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "End Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Screen Lock Imputed DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Screen Lock Imputed DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Screen Lock Imputed DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "Metadata",
+      "reason": "The pinned parser for Biome - Screen Lock Imputed DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "Event",
+      "reason": "The pinned parser for Biome - Screen Lock Imputed DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "GUID",
+      "reason": "The pinned parser for Biome - Screen Lock Imputed DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "Device UTC Offset",
+      "reason": "The pinned parser for Biome - Screen Lock Imputed DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Screen Lock Imputed DKEvent",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Screen Locked",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Screen Locked",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Screen Locked emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Screen Locked",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Screen Locked emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Screen Locked",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Screen Locked emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Screen Locked",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Screen Locked",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Silent Mode",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Silent Mode",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Silent Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Silent Mode",
+      "field": "Ringer State",
+      "reason": "The pinned parser for Biome - Silent Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Silent Mode",
+      "field": "State (raw)",
+      "reason": "The pinned parser for Biome - Silent Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Silent Mode",
+      "field": "Reason",
+      "reason": "The pinned parser for Biome - Silent Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Silent Mode",
+      "field": "Field 2 (raw)",
+      "reason": "The pinned parser for Biome - Silent Mode emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Silent Mode",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Silent Mode",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri UI",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri UI",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Siri UI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI",
+      "field": "Interface State",
+      "reason": "The pinned parser for Biome - Siri UI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI",
+      "field": "State (raw)",
+      "reason": "The pinned parser for Biome - Siri UI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI",
+      "field": "Dismissal Reason",
+      "reason": "The pinned parser for Biome - Siri UI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI",
+      "field": "Session ID",
+      "reason": "The pinned parser for Biome - Siri UI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI",
+      "field": "Related ID",
+      "reason": "The pinned parser for Biome - Siri UI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI",
+      "field": "Presentation (raw)",
+      "reason": "The pinned parser for Biome - Siri UI emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri UI",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "SEGB Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "Start Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "End Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "SEGB State",
+      "reason": "The pinned parser for Biome - Siri UI DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "Value",
+      "reason": "The pinned parser for Biome - Siri UI DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "Value (raw)",
+      "reason": "The pinned parser for Biome - Siri UI DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "Metadata",
+      "reason": "The pinned parser for Biome - Siri UI DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "Event",
+      "reason": "The pinned parser for Biome - Siri UI DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "GUID",
+      "reason": "The pinned parser for Biome - Siri UI DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "Device UTC Offset",
+      "reason": "The pinned parser for Biome - Siri UI DKEvent emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "Filename",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome - Siri UI DKEvent",
+      "field": "Offset",
+      "reason": "The pinned parser adds this value as source-location bookkeeping, not as a value from the evidence record or a defined entity kind."
+    },
+    {
+      "artifact": "Biome DB - Backlight Events",
+      "field": "Event Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome DB - Backlight Events",
+      "field": "Backlight Level",
+      "reason": "The pinned parser for Biome DB - Backlight Events emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome DB - Button Clicks (Daily)",
+      "field": "Date (UTC)",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome DB - Button Clicks (Daily)",
+      "field": "Button Click Count",
+      "reason": "The pinned parser for Biome DB - Button Clicks (Daily) emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome DB - Button Clicks (Daily)",
+      "field": "Reason",
+      "reason": "The pinned parser for Biome DB - Button Clicks (Daily) emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome DB - Cable Plug Events",
+      "field": "Event Timestamp",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome DB - Cable Plug Events",
+      "field": "Starting",
+      "reason": "The pinned parser for Biome DB - Cable Plug Events emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome DB - CarPlay Activity (Daily)",
+      "field": "Date (UTC)",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome DB - CarPlay Activity (Daily)",
+      "field": "CarPlay Activity Count",
+      "reason": "The pinned parser for Biome DB - CarPlay Activity (Daily) emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Biome DB - Minimum Battery (Daily)",
+      "field": "Date (UTC)",
+      "reason": "The pinned iLEAPP source declares this column as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Biome DB - Minimum Battery (Daily)",
+      "field": "Minimum Battery Percentage",
+      "reason": "The pinned parser for Biome DB - Minimum Battery (Daily) emits device-state or system-event data in this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
     }
   ],
   "reviewed_artifacts": [
@@ -3661,6 +5226,8 @@
     "Apple Wallet - PK Passes",
     "Apple Wallet Cards",
     "Apple Wallet Transactions",
+    "Biome - Airplane Mode",
+    "Biome - Airplane Mode DKEvent",
     "Biome - App Activity",
     "Biome - App Intents Transcript",
     "Biome - App Location Activity",
@@ -3670,28 +5237,67 @@
     "Biome - Audio Output Route DKEvent",
     "Biome - Audio Route",
     "Biome - Autonaming Message IDs",
+    "Biome - Backlight",
+    "Biome - Battery Level",
+    "Biome - Battery Percentage",
+    "Biome - Battery Temperature",
     "Biome - Bluetooth",
+    "Biome - Boot Session",
+    "Biome - Camera Auto Focus ROI",
+    "Biome - CarPlay Connected",
+    "Biome - Carplay",
+    "Biome - Cellular Data Enabled",
+    "Biome - Clock Alarm",
+    "Biome - Clock Alarm DKEvent",
     "Biome - Contact Autocomplete Feedback (CNA)",
+    "Biome - Device Metadata",
+    "Biome - Device Plugged In",
+    "Biome - Device TimeZone",
     "Biome - Discoverability Signals",
+    "Biome - Display Orientation DKEvent",
+    "Biome - Do Not Disturb DKEvent",
+    "Biome - Emergency Voice Call",
+    "Biome - Emoji Engagement",
+    "Biome - Energy Mode",
+    "Biome - FrontBoard Display Element",
+    "Biome - Hardware Reliability",
+    "Biome - In Focus",
+    "Biome - In Focus DKEvent",
+    "Biome - Interface Orientation",
+    "Biome - Keybag",
+    "Biome - Keybag Locked",
     "Biome - Location Activity",
     "Biome - Location Visit",
+    "Biome - Low Power Mode",
+    "Biome - Low Power Mode DKEvent",
     "Biome - Media Route",
     "Biome - Messages Read",
     "Biome - Networking Edge Selection",
+    "Biome - Power Plugged In",
     "Biome - Proactive Harvesting Mail",
     "Biome - Proactive Harvesting Messages",
     "Biome - Safari",
     "Biome - Safari Navigations",
     "Biome - Safari Web Page Performance",
+    "Biome - Screen Lock Imputed DKEvent",
+    "Biome - Screen Locked",
     "Biome - ScreenTime App Usage",
+    "Biome - Silent Mode",
     "Biome - Siri Remembers Assistant Suggestions",
     "Biome - Siri Remembers Audio History",
     "Biome - Siri Remembers Call History",
     "Biome - Siri Remembers Interaction History",
     "Biome - Siri Remembers Message History",
+    "Biome - Siri UI",
+    "Biome - Siri UI DKEvent",
     "Biome - WiFi DKEvent",
     "Biome - WiFi Devices",
     "Biome DB - Audio Route (Daily)",
+    "Biome DB - Backlight Events",
+    "Biome DB - Button Clicks (Daily)",
+    "Biome DB - Cable Plug Events",
+    "Biome DB - CarPlay Activity (Daily)",
+    "Biome DB - Minimum Battery (Daily)",
     "Biome Sets - Significant Locations",
     "Calendar Birthdays",
     "Calendar Events",
@@ -5041,6 +6647,30 @@
       "source_type": "ileapp_record",
       "artifact": "Biome - WiFi Devices",
       "field": "SSID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - In Focus DKEvent",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - In Focus",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - FrontBoard Display Element",
+      "field": "Bundle ID"
+    },
+    {
+      "kind": "phone",
+      "source_type": "ileapp_record",
+      "artifact": "Biome - Emergency Voice Call",
+      "field": "Emergency Number"
     }
   ]
 }

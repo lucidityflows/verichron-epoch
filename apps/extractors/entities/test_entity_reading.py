@@ -252,6 +252,34 @@ def test_biome_network_prefix_is_not_an_ip_endpoint_entity():
     assert reading.unread["IP Address (Truncated)"]["records"] == 1
 
 
+def test_biome_system_events_read_explicit_app_and_dialed_number_fields():
+    focus = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - In Focus DKEvent",
+        {},
+        [ileapp(32, "Biome - In Focus DKEvent", **{"Bundle ID": "com.apple.mobilesafari"})],
+    )
+    display = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - FrontBoard Display Element",
+        {},
+        [ileapp(33, "Biome - FrontBoard Display Element", **{"Bundle ID": "com.apple.Maps"})],
+    )
+    emergency = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Emergency Voice Call",
+        {},
+        [ileapp(34, "Biome - Emergency Voice Call", **{"Emergency Number": "+1 (800) 555-0123"})],
+    )
+
+    assert focus.mentions == [Mention(32, "app", "Bundle ID", "com.apple.mobilesafari")]
+    assert display.mentions == [Mention(33, "app", "Bundle ID", "com.apple.maps")]
+    assert emergency.mentions == [Mention(34, "phone", "Emergency Number", "+18005550123")]
+
+
 def test_notes_shared_participant_phone_is_a_named_phone_entity():
     reading = read_unit(
         RULES,
