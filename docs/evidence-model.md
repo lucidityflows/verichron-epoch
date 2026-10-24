@@ -320,6 +320,11 @@ devices. One value of one kind is an **entity**; it always names its record.
   VER-284 `reviewed_artifacts` are checked against the pinned source
   inventory, so every header in their reviewed Apple-native app, Biome,
   browser, and network scopes has exactly one rule or a reasoned exclusion.
+  Exact location headers deferred from mixed Wi-Fi artifacts to [VER-306](https://linear.app/verichron-epoch/issue/VER-306/review-remaining-location-data-coverage-across-artifact-families)
+  are listed in `deferred_location_headers` in the same contract, with their
+  pinned iLEAPP modules in `deferred_location_sources`. Their existing
+  exclusions remain in effect; retained SSID/BSSID connectivity rules are
+  unchanged, and no whole artifact or family is deferred.
 - **The field is the role.** An entity keeps the field it was read from
   ("Imported by Bundle ID"), so "the app that imported this photo" and "the app
   whose state this is" stay apart without a second taxonomy.

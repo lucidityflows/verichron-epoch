@@ -1,6 +1,6 @@
 {
   "description": "Which values a record mentions, by kind, and where they are (EPOCH-581). Each rule names one field of one source and what it holds; a value's shape never decides its kind (measured 2026-10-20 on a real backup: 129 columns had a phone number's shape, most of them coordinates, byte counts and scores). The field's name is the entity's role. Shapes only check a rule: a value that doesn't fit its kind is counted as unreadable, never stored. The Python reader is entity_rules.py; scripts/check_entity_rules.py runs every rule against a real iLEAPP output.",
-  "version": 11,
+  "version": 12,
   "kinds": {
     "url": {
       "title": "URL",
@@ -8504,6 +8504,243 @@
       "artifact": "WiFi Scanned Networks (Private)",
       "field": "Source File",
       "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    }
+  ],
+  "deferred_location_headers": [
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Altitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Horizontal Accuracy",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "LOI Type",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Scan Timestamp",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Timestamp",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Vertical Accuracy",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "ALS Query Timestamp",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Altitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Confidence",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Course",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Horizontal Accuracy",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Info Mask",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Reach",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Score",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Speed",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Timestamp",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Vertical Accuracy",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Date",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Last Seen",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Location Accuracy",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Location Timestamp",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Created",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Created",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Latitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Longitude",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Tile Key",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Created",
+      "deferred_to": "VER-306"
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Tile Key",
+      "deferred_to": "VER-306"
+    }
+  ],
+  "deferred_location_sources": [
+    {
+      "module": "scripts/artifacts/locationdCacheEncryptedB.py",
+      "artifacts": [
+        "Locationd Cache - Associated Wi-Fi Harvest",
+        "Locationd Cache - Wi-Fi Locations"
+      ]
+    },
+    {
+      "module": "scripts/artifacts/wifiAnalytics.py",
+      "artifacts": [
+        "Wi-Fi Analytics - Geotags"
+      ]
+    },
+    {
+      "module": "scripts/artifacts/appleWifiPlist.py",
+      "artifacts": [
+        "WiFi BSS List"
+      ]
+    },
+    {
+      "module": "scripts/artifacts/wifiNetworkStoreModel.py",
+      "artifacts": [
+        "Wifi Known Networkss"
+      ]
+    },
+    {
+      "module": "scripts/artifacts/threeBars.py",
+      "artifacts": [
+        "Wi-Fi ThreeBars - Access Points",
+        "Wi-Fi ThreeBars - Networks",
+        "Wi-Fi ThreeBars - Downloaded Tiles"
+      ]
     }
   ],
   "reviewed_artifacts": [

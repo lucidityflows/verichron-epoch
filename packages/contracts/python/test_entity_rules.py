@@ -219,6 +219,58 @@ VER_284_NETWORK_ARTIFACTS = {
     "WiFi Known Networks Times",
     "WiFi Scanned Networks (Private)",
 }
+VER_306_DEFERRED_LOCATION_HEADERS = {
+    ("Locationd Cache - Associated Wi-Fi Harvest", "Altitude"),
+    ("Locationd Cache - Associated Wi-Fi Harvest", "Horizontal Accuracy"),
+    ("Locationd Cache - Associated Wi-Fi Harvest", "Latitude"),
+    ("Locationd Cache - Associated Wi-Fi Harvest", "Longitude"),
+    ("Locationd Cache - Associated Wi-Fi Harvest", "LOI Type"),
+    ("Locationd Cache - Associated Wi-Fi Harvest", "Scan Timestamp"),
+    ("Locationd Cache - Associated Wi-Fi Harvest", "Timestamp"),
+    ("Locationd Cache - Associated Wi-Fi Harvest", "Vertical Accuracy"),
+    ("Locationd Cache - Wi-Fi Locations", "ALS Query Timestamp"),
+    ("Locationd Cache - Wi-Fi Locations", "Altitude"),
+    ("Locationd Cache - Wi-Fi Locations", "Confidence"),
+    ("Locationd Cache - Wi-Fi Locations", "Course"),
+    ("Locationd Cache - Wi-Fi Locations", "Horizontal Accuracy"),
+    ("Locationd Cache - Wi-Fi Locations", "Info Mask"),
+    ("Locationd Cache - Wi-Fi Locations", "Latitude"),
+    ("Locationd Cache - Wi-Fi Locations", "Longitude"),
+    ("Locationd Cache - Wi-Fi Locations", "Reach"),
+    ("Locationd Cache - Wi-Fi Locations", "Score"),
+    ("Locationd Cache - Wi-Fi Locations", "Speed"),
+    ("Locationd Cache - Wi-Fi Locations", "Timestamp"),
+    ("Locationd Cache - Wi-Fi Locations", "Vertical Accuracy"),
+    ("Wi-Fi Analytics - Geotags", "Date"),
+    ("Wi-Fi Analytics - Geotags", "Last Seen"),
+    ("Wi-Fi Analytics - Geotags", "Latitude"),
+    ("Wi-Fi Analytics - Geotags", "Longitude"),
+    ("WiFi BSS List", "Location Accuracy"),
+    ("WiFi BSS List", "Location Timestamp"),
+    ("WiFi BSS List", "Latitude"),
+    ("WiFi BSS List", "Longitude"),
+    ("Wifi Known Networkss", "Latitude"),
+    ("Wifi Known Networkss", "Longitude"),
+    ("Wi-Fi ThreeBars - Access Points", "Created"),
+    ("Wi-Fi ThreeBars - Access Points", "Latitude"),
+    ("Wi-Fi ThreeBars - Access Points", "Longitude"),
+    ("Wi-Fi ThreeBars - Networks", "Created"),
+    ("Wi-Fi ThreeBars - Networks", "Latitude"),
+    ("Wi-Fi ThreeBars - Networks", "Longitude"),
+    ("Wi-Fi ThreeBars - Networks", "Tile Key"),
+    ("Wi-Fi ThreeBars - Downloaded Tiles", "Created"),
+    ("Wi-Fi ThreeBars - Downloaded Tiles", "Tile Key"),
+}
+VER_306_DEFERRED_LOCATION_SOURCES = {
+    "Locationd Cache - Associated Wi-Fi Harvest": "scripts/artifacts/locationdCacheEncryptedB.py",
+    "Locationd Cache - Wi-Fi Locations": "scripts/artifacts/locationdCacheEncryptedB.py",
+    "Wi-Fi Analytics - Geotags": "scripts/artifacts/wifiAnalytics.py",
+    "WiFi BSS List": "scripts/artifacts/appleWifiPlist.py",
+    "Wifi Known Networkss": "scripts/artifacts/wifiNetworkStoreModel.py",
+    "Wi-Fi ThreeBars - Access Points": "scripts/artifacts/threeBars.py",
+    "Wi-Fi ThreeBars - Networks": "scripts/artifacts/threeBars.py",
+    "Wi-Fi ThreeBars - Downloaded Tiles": "scripts/artifacts/threeBars.py",
+}
 
 
 def pinned_ileapp_commit() -> str:
@@ -228,7 +280,9 @@ def pinned_ileapp_commit() -> str:
     ).stdout.strip()
 
 
-def declared_pinned_ileapp_columns() -> tuple[dict[str, set[str]], dict[tuple[str, str], set[str]]]:
+def declared_pinned_ileapp_columns() -> tuple[
+    dict[str, set[str]], dict[tuple[str, str], set[str]], dict[str, set[str]]
+]:
     index = json.loads((REPO / "packages" / "contracts" / "ileapp_source_headers" / "index.json").read_text())
     assert index["ileapp_commit"] == pinned_ileapp_commit()
     source_headers: dict[str, object] = {}
@@ -239,6 +293,7 @@ def declared_pinned_ileapp_columns() -> tuple[dict[str, set[str]], dict[tuple[st
 
     declared: dict[str, set[str]] = {}
     declared_types: dict[tuple[str, str], set[str]] = {}
+    artifact_modules: dict[str, set[str]] = {}
     for module, module_data in source_headers.items():
         if not isinstance(module_data, dict):
             continue
@@ -271,6 +326,7 @@ def declared_pinned_ileapp_columns() -> tuple[dict[str, set[str]], dict[tuple[st
             artifact = metadata_entry.get("name")
             if not isinstance(artifact, str):
                 continue
+            artifact_modules.setdefault(artifact, set()).add(module)
             names = {header[0] if isinstance(header, list) else header for header in headers}
             declared.setdefault(artifact, set()).update(name for name in names if isinstance(name, str))
             for header in headers:
@@ -281,7 +337,7 @@ def declared_pinned_ileapp_columns() -> tuple[dict[str, set[str]], dict[tuple[st
                     and isinstance(header[1], str)
                 ):
                     declared_types.setdefault((artifact, header[0]), set()).add(header[1])
-    return declared, declared_types
+    return declared, declared_types, artifact_modules
 
 
 def test_the_rules_load_with_their_kinds():
@@ -308,7 +364,7 @@ def test_entities_stage_parser_version_matches_the_rule_contract():
 
 
 def test_every_ileapp_rule_names_a_header_declared_by_the_pinned_source():
-    declared, _ = declared_pinned_ileapp_columns()
+    declared, _, _ = declared_pinned_ileapp_columns()
     for rule in load().rules:
         if rule.source_type != "ileapp_record":
             continue
@@ -320,7 +376,7 @@ def test_every_ileapp_rule_names_a_header_declared_by_the_pinned_source():
 
 
 def test_every_excluded_header_is_declared_by_the_pinned_source():
-    declared, _ = declared_pinned_ileapp_columns()
+    declared, _, _ = declared_pinned_ileapp_columns()
     for exclusion in load().excluded_headers:
         assert exclusion.artifact in declared, f"{exclusion.key}: pinned iLEAPP declares no artifact"
         assert exclusion.field in declared[exclusion.artifact], (
@@ -331,7 +387,7 @@ def test_every_excluded_header_is_declared_by_the_pinned_source():
 
 def test_every_reviewed_header_has_exactly_one_coverage_decision():
     rules = load()
-    declared, declared_types = declared_pinned_ileapp_columns()
+    declared, declared_types, _ = declared_pinned_ileapp_columns()
     assert set(rules.reviewed_artifacts) == (
         VER_291_ARTIFACTS | VER_288_ARTIFACTS | VER_284_BROWSER_ARTIFACTS | VER_284_NETWORK_ARTIFACTS
     )
@@ -347,6 +403,34 @@ def test_every_reviewed_header_has_exactly_one_coverage_decision():
             assert int(explicit_rule) + int(key in exclusions) + int(implicit_rule) == 1, (
                 f"{artifact!r} / {field!r} must have exactly one explicit rule, declared-type rule, or exclusion"
             )
+
+
+def test_deferred_location_headers_are_exact_and_remain_excluded_from_ver_284():
+    rules = load()
+    declared, _, artifact_modules = declared_pinned_ileapp_columns()
+    deferred = {header.key: header.deferred_to for header in rules.deferred_location_headers}
+    exclusions = {exclusion.key for exclusion in rules.excluded_headers}
+    ileapp_rules = {(rule.artifact, rule.field) for rule in rules.rules if rule.source_type == "ileapp_record"}
+    source_modules = {
+        artifact: source.module for source in rules.deferred_location_sources for artifact in source.artifacts
+    }
+
+    assert deferred == {header: "VER-306" for header in VER_306_DEFERRED_LOCATION_HEADERS}
+    assert source_modules == VER_306_DEFERRED_LOCATION_SOURCES
+    for artifact, module in source_modules.items():
+        assert module in artifact_modules[artifact], f"{artifact!r} is not emitted by pinned module {module!r}"
+    for artifact, field in VER_306_DEFERRED_LOCATION_HEADERS:
+        assert field in declared[artifact], f"{artifact!r} does not declare deferred header {field!r}"
+        assert artifact in rules.reviewed_artifacts
+        assert (artifact, field) in exclusions
+        assert (artifact, field) not in ileapp_rules
+    for key in (
+        ("WiFi BSS List", "Last Associated/Roamed At"),
+        ("Wifi Known Networkss", "Last Connection Timestamp"),
+    ):
+        assert key not in deferred
+        assert key in exclusions
+        assert key not in ileapp_rules
 
 
 def test_address_book_url_and_note_rules_allow_columns_dropped_when_empty():

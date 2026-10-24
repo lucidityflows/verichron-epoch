@@ -119,6 +119,25 @@ class HeaderExclusion(_Strict):
         return (self.artifact, self.field)
 
 
+class DeferredLocationHeader(_Strict):
+    """A location header assigned to the final location review."""
+
+    artifact: str = Field(min_length=1)
+    field: str = Field(min_length=1)
+    deferred_to: Literal["VER-306"]
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return (self.artifact, self.field)
+
+
+class DeferredLocationSource(_Strict):
+    """A pinned iLEAPP module that emits headers assigned to the final location review."""
+
+    module: str = Field(min_length=1)
+    artifacts: tuple[str, ...]
+
+
 class EntityRules(_Strict):
     description: str
     #: Bumped whenever the rule, normalization or reviewed header classification changes (R8).
@@ -131,6 +150,10 @@ class EntityRules(_Strict):
     not_covered: dict[str, str]
     #: Pinned iLEAPP artifact headers reviewed and deliberately left unruled.
     excluded_headers: tuple[HeaderExclusion, ...]
+    #: Location headers in mixed connectivity artifacts assigned to VER-306.
+    deferred_location_headers: tuple[DeferredLocationHeader, ...]
+    #: Pinned iLEAPP modules that emit artifacts with location headers assigned to VER-306.
+    deferred_location_sources: tuple[DeferredLocationSource, ...]
     #: Pinned iLEAPP artifacts whose headers were exhaustively reviewed for assigned coverage tickets.
     reviewed_artifacts: tuple[str, ...]
     #: What each shape hint is called (entity_normalize.SHAPE_HINTS): shapes
@@ -158,14 +181,38 @@ class EntityRules(_Strict):
         ]
         if repeated_exclusions:
             raise ValueError(f"header exclusions repeated: {repeated_exclusions}")
+        repeated_deferrals = [
+            key for key, n in Counter(deferral.key for deferral in self.deferred_location_headers).items() if n > 1
+        ]
+        if repeated_deferrals:
+            raise ValueError(f"location header deferrals repeated: {repeated_deferrals}")
+        source_artifacts = [artifact for source in self.deferred_location_sources for artifact in source.artifacts]
+        if len(source_artifacts) != len(set(source_artifacts)):
+            raise ValueError("location deferral artifacts must map to exactly one source module")
+        deferred_artifacts = {deferral.artifact for deferral in self.deferred_location_headers}
+        if set(source_artifacts) != deferred_artifacts:
+            raise ValueError("location deferral source artifacts must match deferred header artifacts")
         ruled_headers = {
             (rule.artifact, rule.field)
             for rule in self.rules
             if rule.source_type == "ileapp_record" and rule.artifact is not None
         }
-        excluded_and_ruled = ruled_headers & {exclusion.key for exclusion in self.excluded_headers}
+        exclusion_keys = {exclusion.key for exclusion in self.excluded_headers}
+        excluded_and_ruled = ruled_headers & exclusion_keys
         if excluded_and_ruled:
             raise ValueError(f"headers are both ruled and excluded: {sorted(excluded_and_ruled)}")
+        deferral_keys = {deferral.key for deferral in self.deferred_location_headers}
+        if deferral_keys & ruled_headers:
+            raise ValueError(f"deferred location headers are ruled: {sorted(deferral_keys & ruled_headers)}")
+        if deferral_keys - exclusion_keys:
+            missing_exclusions = sorted(deferral_keys - exclusion_keys)
+            raise ValueError(f"deferred location headers must retain an exclusion: {missing_exclusions}")
+        reviewed_headers = {
+            exclusion.key for exclusion in self.excluded_headers if exclusion.artifact in self.reviewed_artifacts
+        }
+        if deferral_keys - reviewed_headers:
+            unreviewed_headers = sorted(deferral_keys - reviewed_headers)
+            raise ValueError(f"deferred location headers must be reviewed artifacts: {unreviewed_headers}")
         for rule in self.rules:
             required = _EXTRACT_KIND.get(rule.extract)
             if required and rule.kind != required:

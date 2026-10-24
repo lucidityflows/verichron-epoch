@@ -15,11 +15,19 @@ For VER-291, VER-288, and the browser and network/connectivity families of
 VER-284, the contract names the reviewed Apple-native app, Biome, browser, and
 network artifacts against the pinned iLEAPP source. Tests require every
 declared header in those artifacts to have exactly one rule or a reasoned
-exclusion. The remaining location family in VER-284, Photos/iCloud, and
-communications/social families assigned to other review batches remain
-outside that set. The four VER-282 research fields are explicitly reserved
-and do not gain rules from these reviews. VER-288 includes the pinned
-Biome-category Photos Search Insights stream; this does not bring the
+exclusion. The contract's `deferred_location_headers` identifies exact location fields
+in mixed Wi-Fi artifacts assigned to
+[VER-306](https://linear.app/verichron-epoch/issue/VER-306/review-remaining-location-data-coverage-across-artifact-families).
+`deferred_location_sources` records the pinned iLEAPP modules that emit those
+artifacts.
+Existing connectivity rules, including SSID and BSSID rules in those
+artifacts, remain in VER-284; connection/association timestamps also remain
+connectivity decisions. Only the specific location headers listed in the
+contract are assigned to VER-306; deferrals do not exclude a whole artifact
+or family. Photos/iCloud and communications/social families remain assigned
+to other review batches. The four VER-282 research fields are explicitly
+reserved and do not gain rules from these reviews. VER-288 includes the
+pinned Biome-category Photos Search Insights stream; this does not bring the
 Photos/iCloud artifact family into scope.
 
 It reads the evidence's facts, not a derivative (`"reads": "facts"`): one
