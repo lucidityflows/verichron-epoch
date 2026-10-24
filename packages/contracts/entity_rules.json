@@ -1,6 +1,6 @@
 {
   "description": "Which values a record mentions, by kind, and where they are (EPOCH-581). Each rule names one field of one source and what it holds; a value's shape never decides its kind (measured 2026-10-20 on a real backup: 129 columns had a phone number's shape, most of them coordinates, byte counts and scores). The field's name is the entity's role. Shapes only check a rule: a value that doesn't fit its kind is counted as unreadable, never stored. The Python reader is entity_rules.py; scripts/check_entity_rules.py runs every rule against a real iLEAPP output.",
-  "version": 8,
+  "version": 9,
   "kinds": {
     "url": {
       "title": "URL",
@@ -6524,6 +6524,146 @@
       "artifact": "Biome Sets - Installed Apps",
       "field": "Other Fields",
       "reason": "The pinned parser for Biome Sets - Installed Apps emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "Web History",
+      "field": "Hidden",
+      "reason": "The pinned Chromium parser emits this as a visibility flag, not an entity value."
+    },
+    {
+      "artifact": "Web History",
+      "field": "ID",
+      "reason": "The pinned Chromium parser emits this as a local history-row identifier, not an entity value."
+    },
+    {
+      "artifact": "Web History",
+      "field": "Last Visit Time",
+      "reason": "The pinned Chromium parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Web History",
+      "field": "Typed Count",
+      "reason": "The pinned Chromium parser emits this as a visit count, not an entity value."
+    },
+    {
+      "artifact": "Web History",
+      "field": "Visit Count",
+      "reason": "The pinned Chromium parser emits this as a visit count, not an entity value."
+    },
+    {
+      "artifact": "Web Visits",
+      "field": "Duration",
+      "reason": "The pinned Chromium parser emits this as an elapsed duration, not an entity value."
+    },
+    {
+      "artifact": "Web Visits",
+      "field": "Qualifier(s)",
+      "reason": "The pinned Chromium parser emits this as transition metadata, not an entity value."
+    },
+    {
+      "artifact": "Web Visits",
+      "field": "Transition Type",
+      "reason": "The pinned Chromium parser emits this as transition metadata, not an entity value."
+    },
+    {
+      "artifact": "Web Visits",
+      "field": "Visit Timestamp",
+      "reason": "The pinned Chromium parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Web Searches",
+      "field": "Last Visit Time",
+      "reason": "The pinned Chromium parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Web Searches",
+      "field": "Visit Count",
+      "reason": "The pinned Chromium parser emits this as a visit count, not an entity value."
+    },
+    {
+      "artifact": "Keyword Search Terms",
+      "field": "Last Visit Time",
+      "reason": "The pinned Chromium parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - History",
+      "field": "Origin",
+      "reason": "The pinned Safari parser emits this as origin metadata; it does not establish an entity kind."
+    },
+    {
+      "artifact": "Safari Browser - History",
+      "field": "Profile",
+      "reason": "The pinned Safari parser emits this as profile metadata, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - History",
+      "field": "Visit Count",
+      "reason": "The pinned Safari parser emits this as a visit count, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - History",
+      "field": "Visit ID",
+      "reason": "The pinned Safari parser emits this as a local visit-row identifier, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - History",
+      "field": "Visit Timestamp",
+      "reason": "The pinned Safari parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Recent Web Searches",
+      "field": "Date",
+      "reason": "The pinned Safari parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Load Successful",
+      "reason": "The pinned Safari parser emits this as a load-status flag, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Origin (as stored)",
+      "reason": "The pinned Safari parser emits this as origin metadata; it does not establish an entity kind."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Redirect Destination",
+      "reason": "The pinned Safari search parser emits this as an unresolved local redirect-row identifier, unlike the history parser's URL resolution."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Redirect Source",
+      "reason": "The pinned Safari search parser emits this as an unresolved local redirect-row identifier, unlike the history parser's URL resolution."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Visit Count",
+      "reason": "The pinned Safari parser emits this as a visit count, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Visit ID",
+      "reason": "The pinned Safari parser emits this as a local visit-row identifier, not an entity value."
+    },
+    {
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Visit Time",
+      "reason": "The pinned Safari parser emits this as a timestamp; timestamps are not among the defined entity kinds."
+    },
+    {
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Date (device local)",
+      "reason": "The pinned OrNET parser emits this as a device-local date, not an entity value."
+    },
+    {
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Icon",
+      "reason": "The pinned OrNET parser emits this as an icon/media reference, not an entity value."
+    },
+    {
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Time (device local)",
+      "reason": "The pinned OrNET parser emits this as a device-local time, not an entity value."
     }
   ],
   "reviewed_artifacts": [
@@ -6661,15 +6801,23 @@
     "Health - Weight Samples",
     "Health - Workouts",
     "Health - Wrist Temperature",
+    "Keyword Search Terms",
     "Media Library",
     "Media Library - Database Properties",
     "Medical ID",
     "Notes",
     "Notes - Password Protected",
     "Notes - Shared Note Participants",
+    "OrNET Browser - Browsing History",
     "Reminders",
+    "Safari Browser - History",
+    "Safari Browser - Recent Web Searches",
+    "Safari Browser - Search Terms",
     "Stopwatch",
     "Timers",
+    "Web History",
+    "Web Searches",
+    "Web Visits",
     "WorldClock"
   ],
   "shape_hints": {
@@ -8192,6 +8340,210 @@
       "source_type": "ileapp_record",
       "artifact": "Biome - System Settings Search Terms",
       "field": "Search Term",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web History",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web History",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Web History",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Web History",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Visits",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Visits",
+      "field": "From Visit URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Visits",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Web Visits",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Web Visits",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Search Term",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Search Term",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Search Term",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Web Searches",
+      "field": "Title",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Keyword Search Terms",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Keyword Search Terms",
+      "field": "Term",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Keyword Search Terms",
+      "field": "Term",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Keyword Search Terms",
+      "field": "Term",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Recent Web Searches",
+      "field": "Search Term",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Recent Web Searches",
+      "field": "Search Term",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Recent Web Searches",
+      "field": "Search Term",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Search Term",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Search Term",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "Safari Browser - Search Terms",
+      "field": "Search Term",
+      "extract": "ips_in_text"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "URL"
+    },
+    {
+      "kind": "url",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Title",
+      "extract": "urls_in_text"
+    },
+    {
+      "kind": "email",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Title",
+      "extract": "emails_in_text"
+    },
+    {
+      "kind": "ip",
+      "source_type": "ileapp_record",
+      "artifact": "OrNET Browser - Browsing History",
+      "field": "Title",
       "extract": "ips_in_text"
     }
   ]

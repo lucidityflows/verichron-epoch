@@ -160,6 +160,16 @@ VER_288_ARTIFACTS = {
     "Biome Sets - FindMy Devices",
     "Biome Sets - Installed Apps",
 }
+VER_284_BROWSER_ARTIFACTS = {
+    "Keyword Search Terms",
+    "OrNET Browser - Browsing History",
+    "Safari Browser - History",
+    "Safari Browser - Recent Web Searches",
+    "Safari Browser - Search Terms",
+    "Web History",
+    "Web Searches",
+    "Web Visits",
+}
 
 
 def pinned_ileapp_commit() -> str:
@@ -273,7 +283,7 @@ def test_every_excluded_header_is_declared_by_the_pinned_source():
 def test_every_reviewed_header_has_exactly_one_coverage_decision():
     rules = load()
     declared, declared_types = declared_pinned_ileapp_columns()
-    assert set(rules.reviewed_artifacts) == VER_291_ARTIFACTS | VER_288_ARTIFACTS
+    assert set(rules.reviewed_artifacts) == VER_291_ARTIFACTS | VER_288_ARTIFACTS | VER_284_BROWSER_ARTIFACTS
     ileapp_rules = {(rule.artifact, rule.field) for rule in rules.rules if rule.source_type == "ileapp_record"}
     exclusions = {exclusion.key for exclusion in rules.excluded_headers}
     implicit_rules = {key for key, types in declared_types.items() if types & set(rules.declared_types)}

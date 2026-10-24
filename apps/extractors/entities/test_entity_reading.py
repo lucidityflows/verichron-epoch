@@ -32,6 +32,94 @@ def test_a_url_is_read_with_its_host_under_the_field_it_came_from():
     assert Mention(1, "domain", "URL", "example.com") in reading.mentions
 
 
+@pytest.mark.parametrize(
+    ("artifact", "field"),
+    [
+        ("Web History", "URL"),
+        ("Web Visits", "URL"),
+        ("Web Visits", "From Visit URL"),
+        ("Web Searches", "URL"),
+        ("Keyword Search Terms", "URL"),
+        ("Safari Browser - Search Terms", "URL"),
+        ("OrNET Browser - Browsing History", "URL"),
+    ],
+)
+def test_browser_url_fields_read_urls_and_hosts(artifact, field):
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        artifact,
+        {},
+        [ileapp(31, artifact, **{field: "https://browser.example/path"})],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(31, "url", field, "https://browser.example/path"),
+        Mention(31, "domain", field, "browser.example"),
+    }
+
+
+@pytest.mark.parametrize(
+    ("artifact", "field"),
+    [
+        ("Web History", "Title"),
+        ("Web Visits", "Title"),
+        ("Web Searches", "Search Term"),
+        ("Web Searches", "Title"),
+        ("Keyword Search Terms", "Term"),
+        ("Safari Browser - Recent Web Searches", "Search Term"),
+        ("Safari Browser - Search Terms", "Search Term"),
+        ("OrNET Browser - Browsing History", "Title"),
+    ],
+)
+def test_browser_titles_and_search_terms_read_only_supported_text_entities(artifact, field):
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        artifact,
+        {},
+        [
+            ileapp(
+                32,
+                artifact,
+                **{field: "Visit https://browser.example and mail help@example.org at 192.0.2.8"}
+            )
+        ],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(32, "url", field, "https://browser.example"),
+        Mention(32, "domain", field, "browser.example"),
+        Mention(32, "email", field, "help@example.org"),
+        Mention(32, "ip", field, "192.0.2.8"),
+    }
+
+
+def test_safari_search_redirect_identifiers_are_not_read_as_urls_by_shape():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Safari Browser - Search Terms",
+        {},
+        [
+            ileapp(
+                33,
+                "Safari Browser - Search Terms",
+                **{
+                    "Redirect Source": "https://url-shaped.example/source",
+                    "Redirect Destination": "https://url-shaped.example/destination",
+                },
+            )
+        ],
+    )
+
+    assert reading.mentions == []
+    assert reading.unread == {
+        "Redirect Source": {"records": 1, "shaped": {"url": 1}},
+        "Redirect Destination": {"records": 1, "shaped": {"url": 1}},
+    }
+
+
 def test_apple_podcasts_reads_feed_and_episode_urls():
     shows = read_unit(
         RULES,

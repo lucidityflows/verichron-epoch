@@ -11,10 +11,11 @@ from its shape alone. How entities are stored and read is in
 The rules contract also records reviewed iLEAPP headers that deliberately have
 no entity rule. Those exclusions do not suppress field-coverage reporting: a
 populated excluded field remains visible as unread in the unit summary.
-For VER-291 and VER-288, the contract names the reviewed Apple-native app and
-Biome artifacts against the pinned iLEAPP source, and tests require every
-declared header in those artifacts to have exactly one rule or a reasoned
-exclusion. Photos/iCloud, communications/social, and browser/network/location
+For VER-291 and VER-288, and the browser/history checkpoint of VER-284, the
+contract names the reviewed Apple-native app, Biome, and browser artifacts
+against the pinned iLEAPP source. Tests require every declared header in those
+artifacts to have exactly one rule or a reasoned exclusion. The remaining
+network/location families in VER-284, Photos/iCloud, and communications/social
 families assigned to other review batches remain outside that set. The four
 VER-282 research fields are explicitly reserved and do not gain rules from
 these reviews. VER-288 includes the pinned Biome-category Photos Search
