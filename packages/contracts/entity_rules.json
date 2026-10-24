@@ -1,6 +1,6 @@
 {
   "description": "Which values a record mentions, by kind, and where they are (EPOCH-581). Each rule names one field of one source and what it holds; a value's shape never decides its kind (measured 2026-10-20 on a real backup: 129 columns had a phone number's shape, most of them coordinates, byte counts and scores). The field's name is the entity's role. Shapes only check a rule: a value that doesn't fit its kind is counted as unreadable, never stored. The Python reader is entity_rules.py; scripts/check_entity_rules.py runs every rule against a real iLEAPP output.",
-  "version": 10,
+  "version": 11,
   "kinds": {
     "url": {
       "title": "URL",
@@ -7689,6 +7689,821 @@
       "artifact": "WebKit Cache Records",
       "field": "Unknown Hash",
       "reason": "The pinned parser for WebKit Cache Records emits this field without assigning it to a defined entity kind; the header or value shape alone does not establish entity semantics."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Live Usage Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Mobile/WWAN In (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Mobile/WWAN Out (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Process First Usage Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Process Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Wifi In (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Wifi Out (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Wired In (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "Wired Out (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "App Data",
+      "field": "ZKIND (as stored)",
+      "reason": "The pinned parser documents ZKIND values as unknown and reports them as stored; no entity kind is established."
+    },
+    {
+      "artifact": "Bluetooth Other LE",
+      "field": "Name",
+      "reason": "The parser emits a display name, not a MAC address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Bluetooth Other LE",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "Bluetooth Other LE",
+      "field": "UUID",
+      "reason": "The pinned parser emits this UUID without identifying it as a device address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Default Name",
+      "reason": "The parser emits a display name, not a MAC address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Device Product ID",
+      "reason": "The pinned parser emits this field as a product identifier, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Last Seen Time",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Name",
+      "reason": "The parser emits a display name, not a MAC address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Name Key",
+      "reason": "The pinned parser emits this field as a name key, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "Bluetooth Paired",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "Bluetooth Paired LE",
+      "field": "Last Connection Time",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Bluetooth Paired LE",
+      "field": "Name",
+      "reason": "The parser emits a display name, not a MAC address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Bluetooth Paired LE",
+      "field": "Name Origin",
+      "reason": "The pinned parser emits this field as name-origin metadata, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "Bluetooth Paired LE",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "Bluetooth Paired LE",
+      "field": "UUID",
+      "reason": "The pinned parser emits this UUID without identifying it as a device address; the bluetooth_device kind currently normalizes MAC addresses only."
+    },
+    {
+      "artifact": "Connected Devices",
+      "field": "Computer Name",
+      "reason": "The pinned parser emits this field as a paired computer name; no currently defined entity kind represents computer names."
+    },
+    {
+      "artifact": "Connected Devices",
+      "field": "File Offset",
+      "reason": "The pinned parser emits this field as a byte offset, not an entity value."
+    },
+    {
+      "artifact": "Connected Devices",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "Connected Devices",
+      "field": "User Name",
+      "reason": "The pinned parser emits this field as a paired computer-user name; no currently defined entity kind represents person names."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Bytes In",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Bytes Out",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Connection Attempts",
+      "reason": "The pinned parser emits this field as a connection counter, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Connection Successes",
+      "reason": "The pinned parser emits this field as a connection counter, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "First Connection Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Last Connection Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Network Identifier",
+      "reason": "The parser maps this identifier from a network attachment of varying type; it does not establish that the value identifies a Wi-Fi network."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Network Name",
+      "reason": "The parser maps this name from a network attachment of varying type; it does not establish that the value is a Wi-Fi SSID."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Network Type",
+      "reason": "The pinned parser emits this field as a network-type category, not a network entity."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Packets In",
+      "reason": "The pinned parser emits this field as a packet counter, not an entity value."
+    },
+    {
+      "artifact": "Connections",
+      "field": "Packets Out",
+      "reason": "The pinned parser emits this field as a packet counter, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Mobile/WWAN In (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Mobile/WWAN Out (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Process First Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Process Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Usage Entry Timestamp",
+      "reason": "The pinned parser emits this field as a usage timestamp, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Wifi In (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "Wifi Out (Bytes)",
+      "reason": "The pinned parser emits this field as a byte counter, not an entity value."
+    },
+    {
+      "artifact": "Data Usage",
+      "field": "ZKIND (as stored)",
+      "reason": "The pinned parser documents ZKIND values as unknown and reports them as stored; no entity kind is established."
+    },
+    {
+      "artifact": "iCloud Wifi Networks",
+      "field": "Added At",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "iCloud Wifi Networks",
+      "field": "Added By",
+      "reason": "The pinned parser emits this field as origin metadata, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "iCloud Wifi Networks",
+      "field": "Enabled",
+      "reason": "The pinned parser emits this field as a state flag, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Altitude",
+      "reason": "The pinned parser emits this field as a location measurement; coordinates and measurements are not defined entity kinds."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Channel",
+      "reason": "The pinned parser emits this field as a radio-channel value, not an entity identifier."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Horizontal Accuracy",
+      "reason": "The pinned parser emits this field as a location-accuracy measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "LOI Type",
+      "reason": "The pinned parser emits this field as a location-record category, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "RSSI",
+      "reason": "The pinned parser emits this field as a signal-strength measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Scan Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "Vertical Accuracy",
+      "reason": "The pinned parser emits this field as a location-accuracy measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "ALS Query Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Altitude",
+      "reason": "The pinned parser emits this field as a location measurement; coordinates and measurements are not defined entity kinds."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Channel",
+      "reason": "The pinned parser emits this field as a radio-channel value, not an entity identifier."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Confidence",
+      "reason": "The pinned parser emits this field as a confidence score, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Course",
+      "reason": "The pinned parser emits this field as a movement measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Horizontal Accuracy",
+      "reason": "The pinned parser emits this field as a location-accuracy measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Info Mask",
+      "reason": "The pinned parser emits this field as a bit mask, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Reach",
+      "reason": "The pinned parser emits this field as a reachability status, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Score",
+      "reason": "The pinned parser emits this field as a score, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Speed",
+      "reason": "The pinned parser emits this field as a movement measurement, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "Vertical Accuracy",
+      "reason": "The pinned parser emits this field as a location-accuracy measurement, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Date",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Entity ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Geotag ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Last Seen",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Created",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Edge",
+      "reason": "The pinned parser emits this field as an edge relationship value, not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Network Identifier",
+      "reason": "The pinned parser emits this field as an opaque local network identifier; it does not establish a Wi-Fi network name."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Network Name",
+      "reason": "The pinned parser does not identify this field as an SSID; the header alone does not establish Wi-Fi network semantics."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Popularity Score",
+      "reason": "The pinned parser emits this field as a score, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Quality Score",
+      "reason": "The pinned parser emits this field as a score, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "Record ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "TCP Good",
+      "reason": "The pinned parser emits this field as a connection-quality flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Created",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "ETag",
+      "reason": "The pinned parser emits this field as an HTTP cache validator, not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Network Count",
+      "reason": "The pinned parser emits this field as a count, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Record ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Downloaded Tiles",
+      "field": "Tile Key",
+      "reason": "The pinned parser emits this field as a tile-cache key, not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Access Point Count",
+      "reason": "The pinned parser emits this field as a count, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Auth Mask",
+      "reason": "The pinned parser emits this field as a bit mask, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Captive",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Created",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Identifier",
+      "reason": "The pinned parser emits this field as an opaque local network identifier; it does not establish a Wi-Fi network name."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Low Quality",
+      "reason": "The pinned parser emits this field as a network-quality flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Moving",
+      "reason": "The pinned parser emits this field as a movement flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Network Name",
+      "reason": "The pinned parser does not identify this field as an SSID; the header alone does not establish Wi-Fi network semantics."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Popularity Score",
+      "reason": "The pinned parser emits this field as a score, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Public",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Quality Score",
+      "reason": "The pinned parser emits this field as a score, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Record ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Suspicious",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Tile Key",
+      "reason": "The pinned parser emits this field as a tile-cache key, not a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Type",
+      "reason": "The pinned parser emits this field as a network-type category, not a network entity."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Venue Group",
+      "reason": "The pinned parser emits this field as a venue category, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "Wi-Fi ThreeBars - Networks",
+      "field": "Venue Type",
+      "reason": "The pinned parser emits this field as a venue category, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "2.4 GHz Network",
+      "reason": "The pinned parser emits this field as a band-presence flag, not an entity value."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "5 GHz Network",
+      "reason": "The pinned parser emits this field as a band-presence flag, not an entity value."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Last Connection Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "Wifi Known Networkss",
+      "field": "Record ID",
+      "reason": "The pinned parser emits this field as a local database identifier, not an entity value."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Channel",
+      "reason": "The pinned parser emits this field as a radio-channel value, not an entity identifier."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Channel Flags",
+      "reason": "The pinned parser emits this field as radio-channel flags, not an entity value."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Last Associated/Roamed At",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Latitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Location Accuracy",
+      "reason": "The pinned parser emits this field as a location-accuracy measurement, not an entity value."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Location Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Longitude",
+      "reason": "The pinned parser emits this field as a coordinate; coordinates are not a defined entity kind."
+    },
+    {
+      "artifact": "WiFi BSS List",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Add Reason",
+      "reason": "The pinned parser emits this field as network-addition metadata, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Captive Network",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Carplay Network",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Country Code",
+      "reason": "The pinned parser emits this field as a country code, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Device Name",
+      "reason": "The pinned parser emits this field as a device display name; no currently defined entity kind represents device names."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Enabled",
+      "reason": "The pinned parser emits this field as a state flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Hidden",
+      "reason": "The pinned parser emits this field as a network-state flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Manufacturer",
+      "reason": "The pinned parser emits this field as manufacturer metadata, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Model Name",
+      "reason": "The pinned parser emits this field as model metadata, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Network Usage",
+      "reason": "The pinned parser emits this field as usage metadata, not a value of a defined entity kind."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Serial Number",
+      "reason": "The pinned parser emits this field as device metadata; serial numbers are not a defined entity kind."
+    },
+    {
+      "artifact": "WiFi Known Networks Info",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Added At",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Captive Web Sheet Login Date",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Last Auto Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Last Discovered",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Last Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Last Updated",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Previous Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "System Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "User Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "Whitelisted Captive Network Probe Date",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Known Networks Times",
+      "field": "WiFi Network Password Modification Date",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Added At",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "First Join With New MAC Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "In Known Networks",
+      "reason": "The pinned parser emits this field as a membership flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Last Joined",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Last Updated",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Link Down Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "MAC Generation Timestamp",
+      "reason": "The pinned parser emits this field as a timestamp, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "MAC Used For Network",
+      "reason": "This is the phone's own Wi-Fi MAC address used for the network, not another device or network entity."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "MAC Valid",
+      "reason": "The pinned parser emits this field as a validity flag, not an entity value."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Private MAC Computed For Network",
+      "reason": "This is the phone's own computed private Wi-Fi MAC address, not another device or network entity."
+    },
+    {
+      "artifact": "WiFi Scanned Networks (Private)",
+      "field": "Source File",
+      "reason": "The pinned parser emits this field as source-file provenance, not an entity value."
     }
   ],
   "reviewed_artifacts": [
@@ -7706,6 +8521,7 @@
     "Apple Wallet - PK Passes",
     "Apple Wallet Cards",
     "Apple Wallet Transactions",
+    "App Data",
     "Autofill Entries",
     "Autofill Profiles",
     "Bookmarks",
@@ -7815,6 +8631,8 @@
     "Calendar Birthdays",
     "Calendar Events",
     "Calendar List",
+    "Connected Devices",
+    "Connections",
     "Cookies",
     "Downloads",
     "Health - Achievements",
@@ -7831,8 +8649,11 @@
     "Health - Weight Samples",
     "Health - Workouts",
     "Health - Wrist Temperature",
+    "iCloud Wifi Networks",
     "Keyword Search Terms",
     "Login Data",
+    "Locationd Cache - Associated Wi-Fi Harvest",
+    "Locationd Cache - Wi-Fi Locations",
     "Media Library",
     "Media Library - Database Properties",
     "Media History Origins",
@@ -7871,6 +8692,19 @@
     "Web Searches",
     "Web Visits",
     "WebKit Cache Records",
+    "Data Usage",
+    "Bluetooth Other LE",
+    "Bluetooth Paired",
+    "Bluetooth Paired LE",
+    "Wi-Fi Analytics - Geotags",
+    "Wi-Fi ThreeBars - Access Points",
+    "Wi-Fi ThreeBars - Downloaded Tiles",
+    "Wi-Fi ThreeBars - Networks",
+    "Wifi Known Networkss",
+    "WiFi BSS List",
+    "WiFi Known Networks Info",
+    "WiFi Known Networks Times",
+    "WiFi Scanned Networks (Private)",
     "WorldClock"
   ],
   "shape_hints": {
@@ -9896,6 +10730,72 @@
       "source_type": "ileapp_record",
       "artifact": "WebKit Cache Records",
       "field": "Meta URI"
+    },
+    {
+      "kind": "app",
+      "source_type": "ileapp_record",
+      "artifact": "App Data",
+      "field": "Bundle Name"
+    },
+    {
+      "kind": "process",
+      "source_type": "ileapp_record",
+      "artifact": "App Data",
+      "field": "Process Name"
+    },
+    {
+      "kind": "wifi_network",
+      "source_type": "ileapp_record",
+      "artifact": "iCloud Wifi Networks",
+      "field": "SSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "iCloud Wifi Networks",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_network",
+      "source_type": "ileapp_record",
+      "artifact": "Wifi Known Networkss",
+      "field": "SSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "Wifi Known Networkss",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_network",
+      "source_type": "ileapp_record",
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "SSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "Wi-Fi Analytics - Geotags",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "Locationd Cache - Associated Wi-Fi Harvest",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "Locationd Cache - Wi-Fi Locations",
+      "field": "BSSID"
+    },
+    {
+      "kind": "wifi_access_point",
+      "source_type": "ileapp_record",
+      "artifact": "Wi-Fi ThreeBars - Access Points",
+      "field": "BSSID"
     }
   ]
 }

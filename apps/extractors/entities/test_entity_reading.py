@@ -603,6 +603,96 @@ def test_wifi_known_networks_reads_portal_urls_and_bundle_ids():
     }
 
 
+def test_app_data_reads_explicit_bundle_and_process_fields():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "App Data",
+        {},
+        [
+            ileapp(
+                40,
+                "App Data",
+                **{"Bundle Name": "com.example.app", "Process Name": "MediaIndexer"},
+            )
+        ],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(40, "app", "Bundle Name", "com.example.app"),
+        Mention(40, "process", "Process Name", "MediaIndexer"),
+    }
+
+
+@pytest.mark.parametrize(
+    ("artifact", "field", "kind", "value", "normalized"),
+    [
+        ("iCloud Wifi Networks", "SSID", "wifi_network", "Home Network", "Home Network"),
+        ("iCloud Wifi Networks", "BSSID", "wifi_access_point", "AA:BB:CC:DD:EE:FF", "aa:bb:cc:dd:ee:ff"),
+        ("Wifi Known Networkss", "SSID", "wifi_network", "Cafe", "Cafe"),
+        ("Wifi Known Networkss", "BSSID", "wifi_access_point", "10:20:30:40:50:60", "10:20:30:40:50:60"),
+        ("Wi-Fi Analytics - Geotags", "SSID", "wifi_network", "Office", "Office"),
+        ("Wi-Fi Analytics - Geotags", "BSSID", "wifi_access_point", "01:23:45:67:89:ab", "01:23:45:67:89:ab"),
+        (
+            "Locationd Cache - Associated Wi-Fi Harvest",
+            "BSSID",
+            "wifi_access_point",
+            "11:22:33:44:55:66",
+            "11:22:33:44:55:66",
+        ),
+        (
+            "Locationd Cache - Wi-Fi Locations",
+            "BSSID",
+            "wifi_access_point",
+            "22:33:44:55:66:77",
+            "22:33:44:55:66:77",
+        ),
+        (
+            "Wi-Fi ThreeBars - Access Points",
+            "BSSID",
+            "wifi_access_point",
+            "33:44:55:66:77:88",
+            "33:44:55:66:77:88",
+        ),
+    ],
+)
+def test_network_rules_read_explicit_ssid_and_bssid_fields(artifact, field, kind, value, normalized):
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        artifact,
+        {},
+        [ileapp(41, artifact, **{field: value})],
+    )
+
+    assert reading.mentions == [Mention(41, kind, field, normalized)]
+
+
+def test_network_names_and_identifiers_are_not_entities_from_shape_alone():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Connections",
+        {},
+        [
+            ileapp(
+                42,
+                "Connections",
+                **{
+                    "Network Name": "https://shape.example/",
+                    "Network Identifier": "192.0.2.8",
+                },
+            )
+        ],
+    )
+
+    assert reading.mentions == []
+    assert reading.unread == {
+        "Network Identifier": {"records": 1, "shaped": {"ipv4": 1}},
+        "Network Name": {"records": 1, "shaped": {"url": 1}},
+    }
+
+
 def test_photos_icloud_records_read_explicit_app_url_email_and_phone_fields():
     artifact = "Ph126.1-iOS26_Ref_for_Asset_Analysis-PhDaPsql"
     fields = {

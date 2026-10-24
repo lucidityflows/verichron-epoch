@@ -316,10 +316,10 @@ devices. One value of one kind is an **entity**; it always names its record.
   `not_covered`; reviewed iLEAPP artifact/header pairs deliberately left
   unruled are in `excluded_headers`, each with its reason. An exclusion does
   not hide a populated field: it remains in the unit's unread-field summary.
-  The VER-291, VER-288 and browser-family checkpoint of VER-284
-  `reviewed_artifacts` are checked against the pinned source inventory, so
-  every header in their reviewed Apple-native app, Biome, and browser scopes
-  has exactly one rule or a reasoned exclusion.
+  The VER-291, VER-288, and browser and network/connectivity checkpoints of
+  VER-284 `reviewed_artifacts` are checked against the pinned source
+  inventory, so every header in their reviewed Apple-native app, Biome,
+  browser, and network scopes has exactly one rule or a reasoned exclusion.
 - **The field is the role.** An entity keeps the field it was read from
   ("Imported by Bundle ID"), so "the app that imported this photo" and "the app
   whose state this is" stay apart without a second taxonomy.

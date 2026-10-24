@@ -198,6 +198,27 @@ VER_284_BROWSER_ARTIFACTS = {
     "Web Visits",
     "WebKit Cache Records",
 }
+VER_284_NETWORK_ARTIFACTS = {
+    "App Data",
+    "Bluetooth Other LE",
+    "Bluetooth Paired",
+    "Bluetooth Paired LE",
+    "Connected Devices",
+    "Connections",
+    "Data Usage",
+    "iCloud Wifi Networks",
+    "Locationd Cache - Associated Wi-Fi Harvest",
+    "Locationd Cache - Wi-Fi Locations",
+    "Wi-Fi Analytics - Geotags",
+    "Wi-Fi ThreeBars - Access Points",
+    "Wi-Fi ThreeBars - Downloaded Tiles",
+    "Wi-Fi ThreeBars - Networks",
+    "Wifi Known Networkss",
+    "WiFi BSS List",
+    "WiFi Known Networks Info",
+    "WiFi Known Networks Times",
+    "WiFi Scanned Networks (Private)",
+}
 
 
 def pinned_ileapp_commit() -> str:
@@ -311,7 +332,9 @@ def test_every_excluded_header_is_declared_by_the_pinned_source():
 def test_every_reviewed_header_has_exactly_one_coverage_decision():
     rules = load()
     declared, declared_types = declared_pinned_ileapp_columns()
-    assert set(rules.reviewed_artifacts) == VER_291_ARTIFACTS | VER_288_ARTIFACTS | VER_284_BROWSER_ARTIFACTS
+    assert set(rules.reviewed_artifacts) == (
+        VER_291_ARTIFACTS | VER_288_ARTIFACTS | VER_284_BROWSER_ARTIFACTS | VER_284_NETWORK_ARTIFACTS
+    )
     ileapp_rules = {(rule.artifact, rule.field) for rule in rules.rules if rule.source_type == "ileapp_record"}
     exclusions = {exclusion.key for exclusion in rules.excluded_headers}
     implicit_rules = {key for key, types in declared_types.items() if types & set(rules.declared_types)}
