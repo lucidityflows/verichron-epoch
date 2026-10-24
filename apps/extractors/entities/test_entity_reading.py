@@ -145,6 +145,113 @@ def test_biome_siri_contact_handle_is_not_classified_by_shape():
     assert reading.unread == {"Contact Handles": {"records": 1, "shaped": {"email": 1}}}
 
 
+def test_biome_web_and_location_activity_read_explicit_urls_and_bundle_ids():
+    web = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - App Web Usage",
+        {},
+        [
+            ileapp(
+                25,
+                "Biome - App Web Usage",
+                URL="https://web.example/page",
+                Domain="web.example",
+                **{"Bundle ID": "com.apple.mobilesafari"},
+            )
+        ],
+    )
+    location = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - App Location Activity",
+        {},
+        [
+            ileapp(
+                26,
+                "Biome - App Location Activity",
+                **{
+                    "Bundle ID": "com.apple.Maps",
+                    "URL": "https://maps.example/item",
+                    "Place URL": "https://maps.example/place",
+                },
+            )
+        ],
+    )
+    safari = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Safari",
+        {},
+        [ileapp(30, "Biome - Safari", URL="https://history.example/page", Title="See https://title.example")],
+    )
+    location_activity = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Location Activity",
+        {},
+        [ileapp(31, "Biome - Location Activity", **{"Bundle ID": "com.apple.Maps", "Bundle ID 2": "com.apple.Safari"})],
+    )
+
+    assert set(web.mentions) == {
+        Mention(25, "url", "URL", "https://web.example/page"),
+        Mention(25, "domain", "URL", "web.example"),
+        Mention(25, "domain", "Domain", "web.example"),
+        Mention(25, "app", "Bundle ID", "com.apple.mobilesafari"),
+    }
+    assert set(location.mentions) == {
+        Mention(26, "app", "Bundle ID", "com.apple.maps"),
+        Mention(26, "url", "URL", "https://maps.example/item"),
+        Mention(26, "domain", "URL", "maps.example"),
+        Mention(26, "url", "Place URL", "https://maps.example/place"),
+        Mention(26, "domain", "Place URL", "maps.example"),
+    }
+    assert set(safari.mentions) == {
+        Mention(30, "url", "URL", "https://history.example/page"),
+        Mention(30, "domain", "URL", "history.example"),
+        Mention(30, "url", "Title", "https://title.example"),
+        Mention(30, "domain", "Title", "title.example"),
+    }
+    assert set(location_activity.mentions) == {
+        Mention(31, "app", "Bundle ID", "com.apple.maps"),
+        Mention(31, "app", "Bundle ID 2", "com.apple.safari"),
+    }
+
+
+def test_biome_wifi_reads_ssid_but_not_ambiguous_bluetooth_mac():
+    wifi = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - WiFi Devices",
+        {},
+        [ileapp(27, "Biome - WiFi Devices", SSID="Lab Network")],
+    )
+    bluetooth = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Bluetooth",
+        {},
+        [ileapp(28, "Biome - Bluetooth", MAC="AA:BB:CC:DD:EE:FF")],
+    )
+
+    assert wifi.mentions == [Mention(27, "wifi_network", "SSID", "Lab Network")]
+    assert bluetooth.mentions == []
+    assert bluetooth.unread["MAC"]["records"] == 1
+
+
+def test_biome_network_prefix_is_not_an_ip_endpoint_entity():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Networking Edge Selection",
+        {},
+        [ileapp(29, "Biome - Networking Edge Selection", **{"IP Address (Truncated)": "203.0.113.0"})],
+    )
+
+    assert reading.mentions == []
+    assert reading.unread["IP Address (Truncated)"]["records"] == 1
+
+
 def test_notes_shared_participant_phone_is_a_named_phone_entity():
     reading = read_unit(
         RULES,
