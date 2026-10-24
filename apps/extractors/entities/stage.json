@@ -4,6 +4,6 @@
   "runtime": "python",
   "order": 30,
   "reads": "facts",
-  "parserVersion": 4,
+  "parserVersion": 8,
   "enabled": true
 }

@@ -4,6 +4,7 @@ evidence."""
 
 from __future__ import annotations
 
+import pytest
 from db_writer import Mention
 from entity_reading import Record, read_unit, rules_for
 from entity_rules import load
@@ -71,6 +72,213 @@ def test_apple_podcasts_reads_feed_and_episode_urls():
         Mention(6, "url", "Web Page URL", "https://episodes.example/page"),
         Mention(6, "domain", "Web Page URL", "episodes.example"),
     }
+
+
+def test_biome_app_intents_reads_only_explicit_bundle_and_url_fields():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - App Intents Transcript",
+        {},
+        [
+            ileapp(
+                21,
+                "Biome - App Intents Transcript",
+                **{"Bundle ID": "com.apple.shortcuts", "App URL": "https://maps.example/place"},
+            )
+        ],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(21, "app", "Bundle ID", "com.apple.shortcuts"),
+        Mention(21, "url", "App URL", "https://maps.example/place"),
+        Mention(21, "domain", "App URL", "maps.example"),
+    }
+
+
+def test_biome_proactive_harvesting_reads_mail_addresses_and_message_text():
+    mail = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Proactive Harvesting Mail",
+        {},
+        [
+            ileapp(
+                22,
+                "Biome - Proactive Harvesting Mail",
+                Sender="Sender <sender@example.org>",
+                Recipient="recipient@example.net",
+                Subject="See https://mail.example and contact help@example.com",
+            )
+        ],
+    )
+    message = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Proactive Harvesting Messages",
+        {},
+        [ileapp(23, "Biome - Proactive Harvesting Messages", Content="Open https://chat.example")],
+    )
+
+    assert set(mail.mentions) == {
+        Mention(22, "email", "Sender", "sender@example.org"),
+        Mention(22, "email", "Recipient", "recipient@example.net"),
+        Mention(22, "url", "Subject", "https://mail.example"),
+        Mention(22, "domain", "Subject", "mail.example"),
+        Mention(22, "email", "Subject", "help@example.com"),
+    }
+    assert set(message.mentions) == {
+        Mention(23, "url", "Content", "https://chat.example"),
+        Mention(23, "domain", "Content", "chat.example"),
+    }
+
+
+def test_biome_siri_contact_handle_is_not_classified_by_shape():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Siri Remembers Call History",
+        {},
+        [ileapp(24, "Biome - Siri Remembers Call History", **{"Contact Handles": "contact@example.org"})],
+    )
+
+    assert reading.mentions == []
+    assert reading.unread == {"Contact Handles": {"records": 1, "shaped": {"email": 1}}}
+
+
+def test_biome_web_and_location_activity_read_explicit_urls_and_bundle_ids():
+    web = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - App Web Usage",
+        {},
+        [
+            ileapp(
+                25,
+                "Biome - App Web Usage",
+                URL="https://web.example/page",
+                Domain="web.example",
+                **{"Bundle ID": "com.apple.mobilesafari"},
+            )
+        ],
+    )
+    location = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - App Location Activity",
+        {},
+        [
+            ileapp(
+                26,
+                "Biome - App Location Activity",
+                **{
+                    "Bundle ID": "com.apple.Maps",
+                    "URL": "https://maps.example/item",
+                    "Place URL": "https://maps.example/place",
+                },
+            )
+        ],
+    )
+    safari = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Safari",
+        {},
+        [ileapp(30, "Biome - Safari", URL="https://history.example/page", Title="See https://title.example")],
+    )
+    location_activity = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Location Activity",
+        {},
+        [ileapp(31, "Biome - Location Activity", **{"Bundle ID": "com.apple.Maps", "Bundle ID 2": "com.apple.Safari"})],
+    )
+
+    assert set(web.mentions) == {
+        Mention(25, "url", "URL", "https://web.example/page"),
+        Mention(25, "domain", "URL", "web.example"),
+        Mention(25, "domain", "Domain", "web.example"),
+        Mention(25, "app", "Bundle ID", "com.apple.mobilesafari"),
+    }
+    assert set(location.mentions) == {
+        Mention(26, "app", "Bundle ID", "com.apple.maps"),
+        Mention(26, "url", "URL", "https://maps.example/item"),
+        Mention(26, "domain", "URL", "maps.example"),
+        Mention(26, "url", "Place URL", "https://maps.example/place"),
+        Mention(26, "domain", "Place URL", "maps.example"),
+    }
+    assert set(safari.mentions) == {
+        Mention(30, "url", "URL", "https://history.example/page"),
+        Mention(30, "domain", "URL", "history.example"),
+        Mention(30, "url", "Title", "https://title.example"),
+        Mention(30, "domain", "Title", "title.example"),
+    }
+    assert set(location_activity.mentions) == {
+        Mention(31, "app", "Bundle ID", "com.apple.maps"),
+        Mention(31, "app", "Bundle ID 2", "com.apple.safari"),
+    }
+
+
+def test_biome_wifi_reads_ssid_but_not_ambiguous_bluetooth_mac():
+    wifi = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - WiFi Devices",
+        {},
+        [ileapp(27, "Biome - WiFi Devices", SSID="Lab Network")],
+    )
+    bluetooth = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Bluetooth",
+        {},
+        [ileapp(28, "Biome - Bluetooth", MAC="AA:BB:CC:DD:EE:FF")],
+    )
+
+    assert wifi.mentions == [Mention(27, "wifi_network", "SSID", "Lab Network")]
+    assert bluetooth.mentions == []
+    assert bluetooth.unread["MAC"]["records"] == 1
+
+
+def test_biome_network_prefix_is_not_an_ip_endpoint_entity():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Networking Edge Selection",
+        {},
+        [ileapp(29, "Biome - Networking Edge Selection", **{"IP Address (Truncated)": "203.0.113.0"})],
+    )
+
+    assert reading.mentions == []
+    assert reading.unread["IP Address (Truncated)"]["records"] == 1
+
+
+def test_biome_system_events_read_explicit_app_and_dialed_number_fields():
+    focus = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - In Focus DKEvent",
+        {},
+        [ileapp(32, "Biome - In Focus DKEvent", **{"Bundle ID": "com.apple.mobilesafari"})],
+    )
+    display = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - FrontBoard Display Element",
+        {},
+        [ileapp(33, "Biome - FrontBoard Display Element", **{"Bundle ID": "com.apple.Maps"})],
+    )
+    emergency = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Emergency Voice Call",
+        {},
+        [ileapp(34, "Biome - Emergency Voice Call", **{"Emergency Number": "+1 (800) 555-0123"})],
+    )
+
+    assert focus.mentions == [Mention(32, "app", "Bundle ID", "com.apple.mobilesafari")]
+    assert display.mentions == [Mention(33, "app", "Bundle ID", "com.apple.maps")]
+    assert emergency.mentions == [Mention(34, "phone", "Emergency Number", "+18005550123")]
 
 
 def test_notes_shared_participant_phone_is_a_named_phone_entity():
@@ -385,3 +593,104 @@ def test_a_field_no_rule_reads_is_ranked_by_the_shapes_its_values_have():
     )
     assert reading.unread["Handle"] == {"records": 3, "shaped": {"phone": 2}}
     assert reading.unread["Blob"] == {"records": 3, "shaped": {"bundle_id": 1, "url": 1}}
+
+
+@pytest.mark.parametrize(
+    ("artifact", "field"),
+    [
+        ("Biome - App Installation", "Bundle ID"),
+        ("Biome - App Install", "Bundle ID"),
+        ("Biome DB - App Openings", "Bundle ID"),
+        ("Biome DB - App Openings (Hourly)", "Bundle ID"),
+        ("Biome - Intents", "App ID"),
+        ("Biome - Notifications", "Bundle ID"),
+        ("Biome - Now Playing", "Bundle ID"),
+        ("Biome Sets - Installed Apps", "Bundle ID"),
+        ("Biome - Share Sheet Conversation", "Bundle ID"),
+        ("Biome - Text Input Session", "Bundle ID"),
+        ("Biome - User Activity Metadata", "Bundle ID"),
+    ],
+)
+def test_biome_app_identifiers_are_read_from_explicit_bundle_fields(artifact, field):
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        artifact,
+        {},
+        [ileapp(40, artifact, **{field: "com.apple.Maps"})],
+    )
+
+    assert reading.mentions == [Mention(40, "app", field, "com.apple.maps")]
+
+
+def test_biome_shortcut_intent_url_is_read_as_a_url():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome Sets - App Shortcut Phrases",
+        {},
+        [ileapp(41, "Biome Sets - App Shortcut Phrases", **{"Intent URL": "https://shortcuts.example/run"})],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(41, "url", "Intent URL", "https://shortcuts.example/run"),
+        Mention(41, "domain", "Intent URL", "shortcuts.example"),
+    }
+
+
+@pytest.mark.parametrize(
+    ("artifact", "field"),
+    [
+        ("Biome - Notes", "Note"),
+        ("Biome - Notification Usage", "Notification content"),
+        ("Biome - Notification Usage", "Notification content 2"),
+        ("Biome - Photos Search Insights", "Search Term"),
+        ("Biome - System Settings Search Terms", "Search Term"),
+    ],
+)
+def test_biome_free_text_reads_only_urls_emails_and_ips(artifact, field):
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        artifact,
+        {},
+        [ileapp(42, artifact, **{field: "See https://entity.example/page, write me@example.org or 192.0.2.42"})],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(42, "url", field, "https://entity.example/page"),
+        Mention(42, "domain", field, "entity.example"),
+        Mention(42, "email", field, "me@example.org"),
+        Mention(42, "ip", field, "192.0.2.42"),
+    }
+
+
+def test_biome_opaque_identifiers_and_result_uris_are_not_classified_by_shape():
+    wallet = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Wallet Transactions",
+        {},
+        [ileapp(43, "Biome - Wallet Transactions", **{"Pass ID": "com.example.wallet"})],
+    )
+    conversation = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - Share Sheet Conversation",
+        {},
+        [ileapp(44, "Biome - Share Sheet Conversation", **{"Contact Handle": "person@example.org"})],
+    )
+    settings = read_unit(
+        RULES,
+        "ileapp_record",
+        "Biome - System Settings Search Terms",
+        {},
+        [ileapp(45, "Biome - System Settings Search Terms", **{"Result URI(s)": "https://settings.example/result"})],
+    )
+
+    assert wallet.mentions == []
+    assert wallet.unread["Pass ID"] == {"records": 1, "shaped": {"bundle_id": 1}}
+    assert conversation.mentions == []
+    assert conversation.unread["Contact Handle"] == {"records": 1, "shaped": {"email": 1}}
+    assert settings.mentions == []
+    assert settings.unread["Result URI(s)"] == {"records": 1, "shaped": {"url": 1}}
