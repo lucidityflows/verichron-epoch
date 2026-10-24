@@ -40,6 +40,30 @@ def test_a_url_is_read_with_its_host_under_the_field_it_came_from():
         ("Web Visits", "From Visit URL"),
         ("Web Searches", "URL"),
         ("Keyword Search Terms", "URL"),
+        ("Bookmarks", "URL"),
+        ("Downloads", "URL"),
+        ("Login Data", "Origin URL"),
+        ("Media History Origins", "Origin"),
+        ("Media History Playbacks", "URL"),
+        ("Media History Sessions", "URL"),
+        ("Network Action Predictor", "URL"),
+        ("Offline Pages", "Online URL"),
+        ("Top Sites", "URL"),
+        ("Saved Credit Cards", "Card Art URL"),
+        ("Safari - Downloads", "URL"),
+        ("Safari Browser - Bookmarks", "URL"),
+        ("Safari Browser - Cache Records", "Request URL"),
+        ("Safari Browser - Favicons", "Page URL"),
+        ("Safari Browser - Favicons", "Icon URL"),
+        ("Safari Browser - Tabs (BrowserState)", "User Visible URL"),
+        ("Safari Browser - Tabs (SafariTabs)", "URL"),
+        ("Safari Browser - iCloud Tabs", "URL"),
+        ("Onion Browser - Bookmarks", "URL"),
+        ("OrNET Browser - Bookmarks", "URL"),
+        ("OrNET Browser - Favourites", "URL"),
+        ("OrNET Browser - Open Tabs", "URL"),
+        ("WebKit Cache Records", "URI"),
+        ("WebKit Cache Records", "Meta URI"),
         ("Safari Browser - Search Terms", "URL"),
         ("OrNET Browser - Browsing History", "URL"),
     ],
@@ -67,6 +91,13 @@ def test_browser_url_fields_read_urls_and_hosts(artifact, field):
         ("Web Searches", "Search Term"),
         ("Web Searches", "Title"),
         ("Keyword Search Terms", "Term"),
+        ("Offline Pages", "Title"),
+        ("Top Sites", "Title"),
+        ("Safari Browser - Bookmarks", "Title"),
+        ("Safari Browser - Tabs (SafariTabs)", "Title"),
+        ("Safari Browser - iCloud Tabs", "Title"),
+        ("OrNET Browser - Bookmarks", "Title"),
+        ("OrNET Browser - Favourites", "Title"),
         ("Safari Browser - Recent Web Searches", "Search Term"),
         ("Safari Browser - Search Terms", "Search Term"),
         ("OrNET Browser - Browsing History", "Title"),
@@ -118,6 +149,61 @@ def test_safari_search_redirect_identifiers_are_not_read_as_urls_by_shape():
         "Redirect Source": {"records": 1, "shaped": {"url": 1}},
         "Redirect Destination": {"records": 1, "shaped": {"url": 1}},
     }
+
+
+def test_browser_cookie_and_hsts_hosts_are_read_as_domains():
+    cookies = read_unit(
+        RULES,
+        "ileapp_record",
+        "Cookies",
+        {},
+        [ileapp(34, "Cookies", Host=".browser.example")],
+    )
+    hsts = read_unit(
+        RULES,
+        "ileapp_record",
+        "Onion Browser - HSTS Cache",
+        {},
+        [ileapp(35, "Onion Browser - HSTS Cache", Host="browser.example")],
+    )
+
+    assert cookies.mentions == [Mention(34, "domain", "Host", "browser.example")]
+    assert hsts.mentions == [Mention(35, "domain", "Host", "browser.example")]
+
+
+def test_chromium_autofill_profile_reads_explicit_email_and_phone_fields():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Autofill Profiles",
+        {},
+        [
+            ileapp(
+                36,
+                "Autofill Profiles",
+                Email="person@example.org",
+                **{"Phone Number": "+1 (555) 555-0199"},
+            )
+        ],
+    )
+
+    assert set(reading.mentions) == {
+        Mention(36, "email", "Email", "person@example.org"),
+        Mention(36, "phone", "Phone Number", "+15555550199"),
+    }
+
+
+def test_browser_text_outside_reviewed_title_and_search_fields_is_not_read_by_shape():
+    reading = read_unit(
+        RULES,
+        "ileapp_record",
+        "Network Action Predictor",
+        {},
+        [ileapp(37, "Network Action Predictor", **{"User Text": "https://shape-only.example"})],
+    )
+
+    assert reading.mentions == []
+    assert reading.unread == {"User Text": {"records": 1, "shaped": {"url": 1}}}
 
 
 def test_apple_podcasts_reads_feed_and_episode_urls():
